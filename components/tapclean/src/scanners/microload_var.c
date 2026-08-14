@@ -81,7 +81,7 @@ static void microloadvar_search_core(int lt)
 	lp = ft[lt].lp;
 
 	if (!quiet) {
-		sprintf(lin, "  Microload (Blue Ribbon Variant) T%d", lt - MICROLOADVAR_T1 + 1);
+		sprintf(lin, "\r\n  Microload (Blue Ribbon Variant) T%d", lt - MICROLOADVAR_T1 + 1);
 		msgout(lin);
 	}
 

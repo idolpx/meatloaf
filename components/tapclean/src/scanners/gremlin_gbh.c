@@ -97,7 +97,7 @@ void gremlin_gbh_search(void)
 	sv = ft[THISLOADER].sv;
 
 	if (!quiet)
-		msgout("  Gremlin GBH");
+		msgout("\r\n  Gremlin GBH");
 
 	state = STATE_SEARCH_HEADER;	/* Initially search for a Header */
 

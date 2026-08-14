@@ -97,12 +97,20 @@ bool M2IMStream::readHeader()
         entries.push_back(e);
     }
 
-    Debug_printv("title[%s] entries[%u]", title.c_str(), (unsigned)entries.size());
+    //Debug_printv("title[%s] entries[%u]", title.c_str(), (unsigned)entries.size());
+    header_read = true;
     return true;
 }
 
 bool M2IMStream::seekEntry( uint16_t index )
 {
+    // The index is the whole filesystem, and the constructor no longer parses
+    // it. Both the directory listing and a by-name lookup funnel through here,
+    // so this is where a stream that has not been through a directory listing
+    // gets its entries - without it every load reports "not found".
+    if (!header_read && !readHeader())
+        return false;
+
     if (index == 0 || index > entries.size())
         return false;
 
@@ -205,7 +213,7 @@ bool M2IMStream::resolveEntry(uint16_t index)
             if (entry_index == index)
                 entry = e;
 
-            Debug_printv("entry[%s] target[%s] size[%lu]", e.cbmname.c_str(), target.c_str(), e.size);
+            //Debug_printv("entry[%s] target[%s] size[%lu]", e.cbmname.c_str(), target.c_str(), e.size);
             return true;
         }
     }
@@ -307,7 +315,7 @@ MFile* M2IMFile::getNextFileInDir()
         if (image->resolveEntry(image->entry_index))
             file->size = image->entry.size;
 
-        Debug_printv("entry[%s] ext[%s] size[%lu]", filename.c_str(), file->extension.c_str(), file->size);
+        //Debug_printv("entry[%s] ext[%s] size[%lu]", filename.c_str(), file->extension.c_str(), file->size);
         return file;
     }
 

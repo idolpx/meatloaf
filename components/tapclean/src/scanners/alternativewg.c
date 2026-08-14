@@ -49,7 +49,7 @@ void alternativewg_search(void)
 	lp = ft[ALTERWG].lp;
 
 	if (!quiet)
-		msgout("  Alternative World Games");
+		msgout("\r\n  Alternative World Games");
 
 	for (i = 20; i < tap.len - 8; i++) {
 

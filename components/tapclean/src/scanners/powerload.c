@@ -92,7 +92,7 @@ void powerload_search (void)
 	lp = ft[THISLOADER].lp;
 
 	if (!quiet)
-		msgout("  Power Load");
+		msgout("\r\n  Power Load");
 
 	cbm_index = 1;
 	cbm_skip_inspection_count = 0;

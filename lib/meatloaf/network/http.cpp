@@ -742,6 +742,17 @@ void HTTPMStream::close() {
     }
 }
 
+bool HTTPMStream::seek(uint32_t pos, int mode) {
+    // NOT MStream::seek(pos, mode): that commits _position before delegating,
+    // which destroys the one piece of information seek() below needs — where
+    // this stream actually is. seek() commits _position itself on success.
+    uint32_t target;
+    if ( mode == SEEK_SET )      target = pos;
+    else if ( mode == SEEK_CUR ) target = _position + pos;
+    else                         target = _size - pos;
+    return seek( target );
+}
+
 bool HTTPMStream::seek(uint32_t pos) {
     if ( !_session->client->_is_open )
     {
@@ -750,6 +761,25 @@ bool HTTPMStream::seek(uint32_t pos) {
             return false;
         }
     }
+
+    // ONE MeatHttpClient is shared by every stream on this host:port, so its
+    // _position is whichever stream — or reopen — last touched it, not
+    // necessarily this one. Its seek() decides whether a real re-request is
+    // needed by comparing the target against that counter and returns
+    // "already there" when they match, doing nothing at all. A stale counter
+    // therefore turns a rewind into a silent no-op, and the caller reads on
+    // from wherever the previous response stopped.
+    //
+    // That is how an archive re-opened from a cached ArchiveMStream got
+    // handed bytes 524 into the file: the stream had consumed 524 bytes, the
+    // shared client's counter said 0, seek(0) "succeeded" without moving, and
+    // libarchive bid the format on mid-file bytes. Hand the client OUR offset
+    // first — for the bytes this stream consumed it is the authoritative one.
+    //
+    // Only in the plain streaming path: in full mode _position indexes
+    // _responseBuffer / the JSON result, which are not HTTP body offsets.
+    if ( _responseBuffer.empty() && !_jsonQueryRequested )
+        _session->client->_position = _position;
 
     // Keep this stream's own _position in sync with the client's. Without
     // this, position() still reports the pre-seek offset after a successful
@@ -1350,11 +1380,52 @@ void MeatHttpClient::setOnHeader(const std::function<int(char*, char*)> &lambda)
 
 bool MeatHttpClient::seek(uint32_t pos) {
 
+    // Already sitting exactly where the caller wants to be, on a response that
+    // still has data coming: there is nothing to do. Without this the
+    // isFriendlySkipper path below drains the live response and re-requests
+    // the same bytes — and re-using the handle for a fresh request right after
+    // flushing the previous one desynchronises it, so the reads that follow
+    // return the buffer UNWRITTEN (ESP-IDF heap canaries, 0xBAAD5678) while
+    // still reporting a positive byte count.
+    //
+    // That is the "fails on the first attempt, works on the second" case: on a
+    // freshly opened stream Archive::open()'s seek(0) is a seek to where the
+    // stream already is, and the pointless re-request corrupted it. The second
+    // attempt only worked because its re-request FAILED (httpCode=-1), and the
+    // failure path tears the handle down and rebuilds it clean.
+    //
+    // _position is the offset of the next byte this response will yield
+    // (processRedirectsAndOpen() sets it to the requested position, read()
+    // advances it), so pos == _position means the caller's target is exactly
+    // what a read would return next.
+    if ( _is_open && pos == _position && !complete() )
+        return true;
+
     if(isFriendlySkipper) {
 
         if (_is_open) {
-            // Drain remaining bytes from the current range response.
-            flush(0);
+            // Drain the current range response so the handle can be re-opened.
+            //
+            // If that does not complete, REBUILD the handle instead of reusing
+            // it. esp_http_client_open() on a handle whose previous GET is
+            // still outstanding does not regenerate the request line — ESP-IDF
+            // leaves first_line_prepared set for GET/HEAD, which init() below
+            // documents — so the client sends a stale request and then parses
+            // whatever comes back as if it were the response it asked for.
+            // That is the fault behind every archive failure seen over HTTPS:
+            // read buffers returned unwritten (0xBAAD5678 heap canaries), a
+            // gzip filter lost on re-open so a 174848-byte D64 was measured as
+            // its 52223-byte compressed length, and finally a NULL-pointer
+            // memcpy inside esp_http_client_read() during filter bidding.
+            //
+            // init() recreates the handle for a GET, which costs a fresh
+            // connection but is the state the client actually works in — the
+            // one time this path recovered on hardware was when the re-request
+            // failed and the error path called init().
+            if (!flush(0)) {
+                Debug_printv("response not fully drained — rebuilding the client handle");
+                init();
+            }
         }
 
         // Make a single range request directly to the target position.
@@ -1430,11 +1501,13 @@ bool MeatHttpClient::flush(uint32_t numBytes) {
     // For POST/PUT, the buffered body must be sent before draining the response.
     // Let close() handle sending the POST body - flush() only drains the response here.
     if (numBytes == 0) {
-        // Drain the remaining response body so the connection is clean
+        // Drain the remaining response body so the connection is clean.
+        // The RESULT matters: re-opening a handle whose previous response was
+        // not fully consumed is what corrupts this client (see seek()).
         int bytes = 0;
-        esp_http_client_flush_response(_http, &bytes);
+        esp_err_t e = esp_http_client_flush_response(_http, &bytes);
         //Debug_printv("Flushed %d bytes to complete response", bytes);
-        return true;
+        return e == ESP_OK;
     }
 
     uint32_t flushed = 0;
@@ -1581,6 +1654,10 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     // Set URL and Method
     mstr::replaceAll(url, " ", "%20");
     //Debug_printv("method[%d] url[%s]", method, url.c_str());
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 1, 3)
+    // Clear the response buffer before each new request to ensure raw_data == orig_raw_data.
+    esp_http_client_clear_response_buffer(_http);
+#endif
     esp_http_client_set_url(_http, url.c_str());
     esp_http_client_set_method(_http, method);
 

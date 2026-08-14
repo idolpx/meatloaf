@@ -57,12 +57,18 @@ public:
             18,    // directory_track
             1,     // directory_sector
             0x00,  // directory_offset
+            0,     // parent_header_track
+            0,     // parent_header_sector
+            0,     // parent_entry_track
+            0,     // parent_entry_sector
+            0,     // parent_entry_offset
             b      // block_allocation_map
         };
         partitions.clear();
         partitions.push_back(p);
         sectorsPerTrack = { 17, 18, 20, 21 };
         dos_rom = "dos2040";
+        dos_version = 0x01; 
 
         // this.size = data.media_data.length;
         // switch (this.size + this.media_header_size) {

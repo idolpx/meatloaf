@@ -83,7 +83,7 @@ void rainbowf2_search (void)
 	lp = ft[THISLOADER].lp;
 
 	if (!quiet)
-		msgout("  Rainbow Arts F2");
+		msgout("\r\n  Rainbow Arts F2");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		eop = find_pilot(i, THISLOADER);

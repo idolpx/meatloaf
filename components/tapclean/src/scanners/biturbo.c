@@ -90,7 +90,7 @@ void biturbo_search (void)
 	lp = ft[THISLOADER].lp;
 
 	if (!quiet)
-		msgout("  Biturbo");
+		msgout("\r\n  Biturbo");
 
 	cbm_index = 1;
 

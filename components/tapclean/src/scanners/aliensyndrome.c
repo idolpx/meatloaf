@@ -50,7 +50,7 @@ void aliensyndrome_search(void)
 	sv = ft[ALIENSY].sv;
 
 	if (!quiet)
-		msgout("  Alien Syndrome");
+		msgout("\r\n  Alien Syndrome");
 
 	for (i = 20; i < tap.len - 8; i++) {
 

@@ -16,9 +16,11 @@
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
 #include "meat_media.h"
+#ifndef TEST_NATIVE
 #include <esp_task_wdt.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#endif
 
 std::unordered_map<std::string, std::shared_ptr<MMediaStream>>ImageBroker::image_repo;
 std::vector<ImageBroker::LRUEntry> ImageBroker::lru_order;
@@ -364,7 +366,9 @@ uint32_t MMediaStream::seekFileSize( uint8_t start_track, uint8_t start_sector )
         // Yield to other tasks every 10 blocks to prevent watchdog timeout
         // and feed watchdog every 100 blocks
         if (blocks % 10 == 0) {
+#ifndef TEST_NATIVE
             vTaskDelay(0);  // Yield to scheduler
+#endif
         }
         
         if ( start_track > 0 )

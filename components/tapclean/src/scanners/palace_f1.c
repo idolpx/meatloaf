@@ -43,7 +43,7 @@ void palacef1_search(void)
    int bsync_b2[5]= {0x42,0x4C,0x4B,0x10}; /* block sync sequence. followed by block # for Barbarian II side B. */
 
    if(!quiet)
-      msgout("  Palace Tape F1");
+      msgout("\r\n  Palace Tape F1");
          
    
    for(i=20; i<tap.len-8; i++)

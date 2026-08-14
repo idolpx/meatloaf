@@ -889,8 +889,6 @@ static void process_options(int argc, char **argv)
 
 /*
  * Choose CPU cycles based on computer type and PAL/NTSC
- *
- * (Embedded build: tapclean_load_buffer() sets 'cps' directly.)
  */
 
 static void handle_cps(void)

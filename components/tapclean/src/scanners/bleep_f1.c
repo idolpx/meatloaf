@@ -80,7 +80,7 @@ void bleep_search(void)
 	pv = 0x0F;			/* initial pilot value */
 
 	if (!quiet)
-		msgout("  Bleepload");
+		msgout("\r\n  Bleepload");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		ft[THISLOADER].pv = pv;

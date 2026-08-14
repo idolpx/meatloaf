@@ -18,7 +18,10 @@
 #include "hdd.h"
 
 #include "endianness.h"
+#include <cstdlib>
 #include <cstring>
+#include <map>
+#include <memory>
 
 /********************************************************
  * Utility Functions
@@ -144,6 +147,7 @@ bool HDDMStream::readHeader()
     Debug_printv("CFS label[%s] partitions[%d] default[%d]",
         header.disk_label.c_str(), header.partition_count, boot_sector.default_partition);
 
+    header_read = true;
     return true;
 }
 
@@ -198,6 +202,39 @@ bool HDDMStream::selectPartitionByName(std::string name)
 
     //Debug_printv("selected partition [%s] root[%lu]", dir_label.c_str(), dir_start_lba);
     return true;
+}
+
+// 'number' is 1-based and counts only VALID entries - identical to the walk
+// in seekPartitionEntry(), and it must stay identical, or the registry and
+// the stream would disagree about which partition a number names. 0 is not a
+// partition: it means "the currently selected one", which the caller has
+// already resolved before reaching here.
+bool HDDMStream::selectPartitionByNumber(uint8_t number)
+{
+    if (number == 0)
+        return false;
+
+    uint8_t count = 0;
+    for (int i = 0; i < 16; i++)
+    {
+        const PartitionEntry &pe = partition_entries[i];
+        if (!pe.isValid())
+            continue;
+
+        if (++count != number)
+            continue;
+
+        if (!pe.isCFS())
+            return false;   // listed, but not browsable
+
+        partition_list = false;
+        dir_start_lba = pe.root_dir.getLBA();
+        dir_label = trimEntryName(pe.name, 16, '\0');
+        restartDirWalk();
+        entry_index = 0;
+        return true;
+    }
+    return false;
 }
 
 bool HDDMStream::seekPartitionEntry(uint16_t index)
@@ -382,8 +419,27 @@ bool HDDMStream::enterDirectory(std::string name)
     return true;
 }
 
+// The partition this stream treats as its root: whatever HDDMFile put in
+// selected_partition, else the boot sector's default partition, else the
+// first valid CFS partition (which is what selectPartitionByName("") does).
+bool HDDMStream::selectCurrentPartition()
+{
+    if (selected_partition != 0 && selectPartitionByNumber(selected_partition))
+        return true;
+
+    return selectPartitionByName("");
+}
+
 bool HDDMStream::seekDirectory(std::string path)
 {
+    // The whole CFS geometry lives in the boot sector and partition directory,
+    // and the constructor no longer reads them. Every path walk enters here,
+    // so this is where a stream that has not been through a directory listing
+    // gets its header - without it the partition table is empty and every
+    // path resolves to "not found".
+    if (!header_read && !readHeader())
+        return false;
+
     // Reset to the image root: the partition list
     partition_list = true;
     dir_start_lba = 0;
@@ -394,12 +450,24 @@ bool HDDMStream::seekDirectory(std::string path)
     auto parts = splitPathComponents(path);
     size_t i = 0;
 
-    if (parts.size())
+    // The image root is the SELECTED partition's directory, matching the CMD
+    // HD/FD behaviour and a real drive. The partition list is served only in
+    // response to "$=P", which HDDMFile handles.
+    //
+    // Only re-resolve a leading component as a partition name when NO partition
+    // has been pushed in. HDDMFile::normalizePath() already stripped any
+    // partition from the path, so once selected_partition is set, parts[0] is a
+    // directory INSIDE that partition - and matching it against the partition
+    // table here would silently switch partitions on a name collision.
+    // A directly constructed stream (the native tests) has no selection and
+    // keeps the legacy name-first behaviour.
+    if (selected_partition == 0 && parts.size() && selectPartitionByName(parts[0]))
     {
-        if (selectPartitionByName(parts[0]))
-            i = 1;
-        else if (!selectPartitionByName("")) // fall back to default partition
-            return false;
+        i = 1;
+    }
+    else if (!selectCurrentPartition())
+    {
+        return false;
     }
 
     for (; i < parts.size(); i++)
@@ -427,14 +495,6 @@ HDDMStream::PathResult HDDMStream::resolvePath(std::string path)
         return PATH_NOT_FOUND;
 
     std::string last = parts.back();
-
-    if (partition_list)
-    {
-        if (selectPartitionByName(last))
-            return PATH_DIR;
-        if (!selectPartitionByName(""))
-            return PATH_NOT_FOUND;
-    }
 
     if (!seekEntry(last))
         return PATH_NOT_FOUND;
@@ -619,27 +679,376 @@ bool HDDMStream::seekPath(std::string path)
 }
 
 /********************************************************
+ * Partition registry
+ ********************************************************/
+
+std::map<std::string, HDDImageRegistry::Image> HDDImageRegistry::s_images;
+bool HDDImageRegistry::s_probing = false;
+
+const HDDPartition* HDDImageRegistry::Image::byNumber(uint8_t number) const
+{
+    for (auto &p : parts)
+    {
+        if (p.number == number)
+            return &p;
+    }
+    return nullptr;
+}
+
+const HDDPartition* HDDImageRegistry::Image::byName(std::string name) const
+{
+    bool wildcard = (mstr::contains(name, "*") || mstr::contains(name, "?"));
+    for (auto &p : parts)
+    {
+        std::string p_name = p.name;
+        if (mstr::compareFilename(p_name, name, wildcard))
+            return &p;
+    }
+    return nullptr;
+}
+
+bool HDDImageRegistry::Image::trySelect(uint8_t number)
+{
+    // 0 is not a partition - it means "the currently selected one". byNumber()
+    // never returns an entry for it, so this is belt-and-braces, but it states
+    // the rule where a reader will look for it.
+    if (number == 0)
+        return false;
+
+    const HDDPartition* p = byNumber(number);
+    if (p == nullptr || p->type != 1)   // only a CFS partition is browsable
+        return false;
+    selected = number;
+    return true;
+}
+
+bool HDDImageRegistry::parseInto(MStream* s, Image& img)
+{
+    if (s == nullptr || !s->isOpen())
+        return false;
+
+    HDDMStream::BootSector boot;
+    if (!s->seek(0))
+        return false;
+    if (s->read((uint8_t*)&boot, sizeof(boot)) != sizeof(boot))
+        return false;
+
+    if (strncmp(boot.id, "C64 CFS", 7) != 0)
+    {
+        Debug_printv("Invalid CFS signature");
+        return false;
+    }
+
+    img.disk_label = std::string(boot.disk_label, 16);
+    while (!img.disk_label.empty() &&
+           (img.disk_label.back() == ' ' || img.disk_label.back() == '\0'))
+        img.disk_label.pop_back();
+
+    // DP is a SLOT index here; it is converted to a partition number below,
+    // once the table has been walked and the numbering is known.
+    const uint8_t dp_slot = boot.default_partition & 0x0F;
+    img.default_part = 0;
+
+    // The partition directory is exactly one 512-byte sector: 16 entries of
+    // 32 bytes. There is no second sector and no chaining.
+    uint8_t sector[512];
+    if (!s->seek(boot.part_dir.getLBA() * 512))
+        return false;
+    if (s->read(sector, sizeof(sector)) != sizeof(sector))
+        return false;
+
+    img.parts.clear();
+    uint8_t next_number = 1;                // partitions are numbered from 1
+    for (uint8_t i = 0; i < 16; i++)
+    {
+        HDDMStream::PartitionEntry pe;
+        memcpy(&pe, sector + (i * 32), sizeof(pe));
+
+        if (!pe.isValid())
+            continue;                       // an invalid slot consumes no number
+
+        HDDPartition p;
+        p.number = next_number++;           // must match seekPartitionEntry()
+        p.slot = i;
+        p.type = pe.getType();
+        p.name = trimEntryName(pe.name, 16, '\0');
+        p.root_lba = pe.root_dir.getLBA();
+        p.size = 0;
+        if (pe.end.getLBA() >= pe.start.getLBA())
+            p.size = (pe.end.getLBA() - pe.start.getLBA() + 1) * 512;
+        p.hidden = pe.isHidden();
+        p.writeable = (pe.start.b[0] & 0x10) != 0;
+        img.parts.push_back(p);
+
+        Debug_printv("partition[%d] slot[%d] type[%d] name[%s] root[%lu] size[%lu]",
+                     p.number, p.slot, p.type, p.name.c_str(), p.root_lba, p.size);
+    }
+
+    // Convert DP out of slot space into partition-number space. This is the
+    // ONLY place the two meet; everything downstream speaks numbers.
+    for (const HDDPartition &p : img.parts)
+    {
+        if (p.slot == dp_slot) { img.default_part = p.number; break; }
+    }
+
+    // The default partition when it names a CFS one, else the first CFS
+    // partition. An image with NO CFS partition fails to parse: there is
+    // nothing to select and nothing to mount, and the alternative is a
+    // `selected` naming a partition trySelect() would refuse.
+    if (!img.trySelect(img.default_part))
+    {
+        bool any = false;
+        for (const HDDPartition &p : img.parts)
+        {
+            if (p.type == 1) { img.selected = p.number; any = true; break; }
+        }
+        if (!any)
+        {
+            Debug_printv("No usable CFS partitions");
+            return false;
+        }
+    }
+
+    img.valid = true;
+    Debug_printv("CFS label[%s] partitions[%d] default[%d] selected[%d]",
+                 img.disk_label.c_str(), img.parts.size(),
+                 img.default_part, img.selected);
+    return true;
+}
+
+std::string HDDImageRegistry::containerOf(const std::string &path)
+{
+    static const char *ext = ".hdd";
+    const size_t elen = 4;
+
+    std::string lower = path;
+    for (auto &c : lower)
+        c = tolower(c);
+
+    size_t p = lower.find(ext);
+    while (p != std::string::npos)
+    {
+        size_t end = p + elen;
+        if (end == lower.size() || lower[end] == '/')
+            return path.substr(0, end);
+        p = lower.find(ext, p + 1);
+    }
+    return "";
+}
+
+HDDImageRegistry::Image* HDDImageRegistry::obtain(const std::string &containerUrl)
+{
+    if (containerUrl.empty())
+        return nullptr;
+
+    auto it = s_images.find(containerUrl);
+    if (it != s_images.end() && it->second.valid)
+        return &it->second;
+
+    // (Re-)parse: not yet seen, or the image wasn't readable last time
+    Image img;
+    if (!parse(containerUrl, img))
+        return nullptr;
+
+    s_images[containerUrl] = std::move(img);
+    return &s_images[containerUrl];
+}
+
+bool HDDImageRegistry::parse(const std::string &containerUrl, Image &img)
+{
+    // Open the raw image bytes: the probing flag makes HDDMFileSystem decline
+    // the path so the underlying filesystem serves it, rather than handing
+    // back another HDDMFile whose stream is already decoded.
+    s_probing = true;
+    std::unique_ptr<MFile> f(MFSOwner::File(containerUrl));
+    std::shared_ptr<MStream> s = (f != nullptr) ? f->getSourceStream() : nullptr;
+    s_probing = false;
+
+    if (s == nullptr || !s->isOpen())
+    {
+        Debug_printv("Cannot open CFS image [%s]", containerUrl.c_str());
+        return false;
+    }
+
+    return parseInto(s.get(), img);
+}
+
+bool HDDImageRegistry::select(const std::string &containerUrl, uint8_t number)
+{
+    Image* img = obtain(containerUrl);
+    if (img == nullptr)
+        return false;
+
+    // No cached-stream disposal here, unlike DHDImageRegistry::select(): see
+    // the class comment. HDDMStream re-derives its position on every call.
+    return img->trySelect(number);
+}
+
+const HDDPartition* hddResolvePartitionIn(const HDDImageRegistry::Image &img,
+                                          const std::string &in_path,
+                                          std::string *out_rest,
+                                          bool *out_explicit)
+{
+    if (out_rest) *out_rest = in_path;
+    if (out_explicit) *out_explicit = false;
+
+    if (!img.valid)
+        return nullptr;
+
+    const HDDPartition *p = nullptr;
+
+    if (!in_path.empty())
+    {
+        std::string comp = in_path;
+        size_t slash = comp.find('/');
+        if (slash != std::string::npos)
+            comp = comp.substr(0, slash);
+
+        if (!comp.empty())
+        {
+            bool numeric = comp.find_first_not_of("0123456789") == std::string::npos;
+            if (numeric)
+            {
+                // Range-check BEFORE narrowing to uint8_t. An int silently
+                // truncated into byNumber() is what once made "1571" resolve
+                // to partition 35 in DHD.
+                //
+                // v == 0 means "the currently selected partition", exactly as
+                // in DHD (vdrive.c:1324) - it must NOT go through byNumber().
+                // 16 is the bound because a CFS table holds 16 entries, so
+                // that is the highest number the 1-based numbering reaches.
+                char *end = nullptr;
+                long v = strtol(comp.c_str(), &end, 10);
+                if (end != comp.c_str() && *end == '\0' && v >= 0 && v <= 16)
+                    p = (v == 0) ? img.current() : img.byNumber((uint8_t)v);
+            }
+            else
+            {
+                p = img.byName(comp);
+            }
+
+            if (p != nullptr)
+            {
+                if (out_explicit) *out_explicit = true;
+                if (out_rest)
+                    *out_rest = (slash == std::string::npos) ? std::string()
+                                                            : in_path.substr(slash + 1);
+            }
+        }
+    }
+
+    if (p == nullptr)
+        p = img.current();
+
+    return p;
+}
+
+const HDDPartition* HDDResolvePartition(const std::string &containerUrl,
+                                        const std::string &in_path,
+                                        std::string *out_rest,
+                                        bool *out_explicit)
+{
+    if (out_rest) *out_rest = in_path;
+    if (out_explicit) *out_explicit = false;
+
+    HDDImageRegistry::Image *img = HDDImageRegistry::obtain(containerUrl);
+    if (img == nullptr)
+        return nullptr;
+
+    return hddResolvePartitionIn(*img, in_path, out_rest, out_explicit);
+}
+
+/********************************************************
  * File implementations
  ********************************************************/
 
+void HDDMFile::normalizePath()
+{
+    if (normalized)
+        return;
+    normalized = true;
+
+    if (pathInStream.empty())
+        return;
+
+    // "$=P" switches to partition-list mode.
+    if (mstr::startsWith(pathInStream, "$=P") || mstr::startsWith(pathInStream, "$=p"))
+    {
+        listing_partitions = true;
+        pathInStream.clear();
+        return;
+    }
+
+    std::string rest;
+    bool explicit_part = false;
+    const HDDPartition *p = HDDResolvePartition(
+        HDDImageRegistry::containerOf(url), pathInStream, &rest, &explicit_part);
+
+    if (p != nullptr && explicit_part)
+    {
+        m_part = p->number;
+        pathInStream = rest;
+    }
+}
+
+const HDDPartition* HDDMFile::effectivePartition()
+{
+    auto img = HDDImageRegistry::obtain(HDDImageRegistry::containerOf(url));
+    if (img == nullptr)
+        return nullptr;
+    return (m_part == 0) ? img->current() : img->byNumber(m_part);
+}
+
+void HDDMFile::applyPartition(const std::shared_ptr<HDDMStream>& image)
+{
+    if (image == nullptr)
+        return;
+
+    // 0 when the image has no usable table, which is the stream's "use the
+    // boot sector's DP" fallback - the same value m_part uses for "no
+    // partition named", since partitions are numbered from 1.
+    const HDDPartition *p = effectivePartition();
+    image->selected_partition = (p != nullptr) ? p->number : 0;
+}
+
 bool HDDMFile::rewindDirectory()
 {
+    normalizePath();
     dirIsOpen = true;
     Debug_printv("url[%s] pathInStream[%s]", url.c_str(), pathInStream.c_str());
 
+    if (listing_partitions)
+    {
+        auto img = HDDImageRegistry::obtain(HDDImageRegistry::containerOf(url));
+        if (img == nullptr)
+        {
+            dirIsOpen = false;
+            return false;
+        }
+        part_index = 0;
+        media_header = img->disk_label;
+        media_id = "cfs";
+        media_blocks_free = 0;
+        media_block_size = 512;
+        media_image = name;
+        return true;
+    }
+
     auto image = ImageBroker::obtain<HDDMStream>("hdd", url);
     if (image == nullptr)
+    {
+        dirIsOpen = false;
         return false;
+    }
 
     if (!image->readHeader())
     {
         Debug_printv("Failed to read HDD/CFS header");
+        dirIsOpen = false;
         return false;
     }
 
-    // Start at the image root (partition list)
-    image->seekDirectory("");
-
+    applyPartition(image);
     image->resetEntryCounter();
 
     if (!image->seekDirectory(pathInStream))
@@ -663,31 +1072,68 @@ bool HDDMFile::rewindDirectory()
 
 MFile* HDDMFile::getNextFileInDir()
 {
-    if (!dirIsOpen)
-        rewindDirectory();
+    // Same as D64MFile::getNextFileInDir(): a failed rewind has already reset
+    // the shared stream's entry counter, so reading on would restart the
+    // listing from entry 0 forever.
+    if (!dirIsOpen && !rewindDirectory())
+        return nullptr;
+
+    if (listing_partitions)
+    {
+        auto img = HDDImageRegistry::obtain(HDDImageRegistry::containerOf(url));
+        if (img == nullptr || part_index >= img->parts.size())
+        {
+            dirIsOpen = false;
+            return nullptr;
+        }
+
+        const HDDPartition &p = img->parts[part_index++];
+        std::string fname = p.name;
+        mstr::replaceAll(fname, "/", "\\");
+
+        // By NUMBER, not name: CFS names are 16 bytes that may contain '/'
+        // and spaces, which do not survive a URL path component.
+        auto file = MFSOwner::File(url + "/" + std::to_string((unsigned)p.number));
+        file->name = fname;
+        file->extension = (p.type == 1) ? "CFS"
+                        : (p.type == 2) ? "GEOS"
+                        : (p.type == 0) ? "----" : "?";
+        file->size = p.size;
+        file->is_dir = (p.type == 1) ? 1 : 0;   // only CFS is browsable
+        file->is_hidden = p.hidden;
+        return file;
+    }
 
     auto image = ImageBroker::obtain<HDDMStream>("hdd", url);
     if (image == nullptr)
         goto exit;
+
+    applyPartition(image);
 
     if (image->getNextImageEntry())
     {
         std::string filename = image->entry.filename;
         mstr::replaceAll(filename, "/", "\\");
 
-        // Entry URL must include the in-image path (partition/subdirectory)
+        // Entry URLs name the partition BY NUMBER, so an entry listed from a
+        // partition other than the selected one still resolves back into its
+        // own partition rather than into the selection.
         std::string entryUrl = url;
+        const HDDPartition *p = effectivePartition();
+        if (p != nullptr)
+        {
+            entryUrl += '/';
+            entryUrl += std::to_string((unsigned)p->number);
+        }
         if (pathInStream.size()) { entryUrl += '/'; entryUrl += pathInStream; }
         entryUrl += '/'; entryUrl += filename;
+
         auto file = MFSOwner::File(entryUrl);
         file->name = filename;  // Use actual entry name, not container image name
         file->extension = image->entry.type;
         file->size = image->entry.size;
         file->is_dir = image->entry.is_directory;
         file->is_hidden = image->entry.is_hidden;
-
-        //Debug_printv("Entry: %s Type:%s Size:%lu Dir:%d",
-        //    filename.c_str(), file->extension.c_str(), file->size, (int)file->is_dir);
 
         return file;
     }
@@ -699,6 +1145,11 @@ exit:
 
 bool HDDMFile::isDirectory()
 {
+    normalizePath();
+
+    if (listing_partitions)
+        return true;
+
     // Use cached value if set (e.g. by getNextFileInDir)
     if (is_dir != -1)
         return is_dir == 1;
@@ -709,16 +1160,26 @@ bool HDDMFile::isDirectory()
 
     auto stream = ImageBroker::obtain<HDDMStream>("hdd", url);
     if (stream != nullptr)
+    {
+        applyPartition(stream);
         return stream->resolvePath(pathInStream) == HDDMStream::PATH_DIR;
+    }
 
     return false;
 }
 
 bool HDDMFile::exists()
 {
+    normalizePath();
+
+    if (listing_partitions)
+        return true;
+
     auto stream = ImageBroker::obtain<HDDMStream>("hdd", url);
     if (stream == nullptr)
         return false;
+
+    applyPartition(stream);
 
     if (pathInStream.size() && pathInStream != "/")
         return stream->resolvePath(pathInStream) != HDDMStream::PATH_NOT_FOUND;

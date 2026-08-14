@@ -45,7 +45,7 @@ void seuck1_search(void)
    int i,sof,sod,eod,eof,z,byt;
    
    if(!quiet)
-      msgout("  SEUCK tape");
+      msgout("\r\n  SEUCK tape");
          
    
    for(i=20; i<tap.len-8; i++)

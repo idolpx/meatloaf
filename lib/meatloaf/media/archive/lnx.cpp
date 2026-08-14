@@ -76,6 +76,17 @@ bool LNXMStream::readHeader()
     return true;
 }
 
+bool LNXMStream::ensureEntries()
+{
+    if (entry_count != (size_t)-1)
+        return true;
+
+    if (!readHeader())
+        return false;
+
+    return loadEntries() >= 0;
+}
+
 int8_t LNXMStream::loadEntries()
 {
     // Skip to start of directory entries (after header padding to 254-byte boundary)
@@ -89,7 +100,9 @@ int8_t LNXMStream::loadEntries()
     {
         Entry e;
 
-        // Read filename (16 chars, PETASCII, padded with $A0)
+        // Read filename (16 chars, PETASCII, padded with $A0). Only the $A0
+        // comes off - a trailing SPACE is part of the name, so rtrimPad()
+        // would merge "CLOUD KING" and "CLOUD KING      " into one entry.
         uint8_t filename_buf[17];
         readContainer(filename_buf, 16);
         filename_buf[16] = '\0';
@@ -193,6 +206,13 @@ bool LNXMStream::seekEntry( std::string filename )
 
 bool LNXMStream::seekEntry( uint16_t index )
 {
+    // The constructor no longer parses the index. Both the directory listing
+    // and a by-name lookup funnel through here, so this is where a stream that
+    // has not been through a directory listing gets its entries - without it
+    // `entries` is empty and every load reports "not found".
+    if ( !ensureEntries() )
+        return false;
+
     if ( index && index <= entries.size() )
     {
         index--;
@@ -269,9 +289,9 @@ bool LNXMFile::rewindDirectory()
     if (image == nullptr)
         return false;
 
-    // Read Header
-    image->readHeader();
-    image->loadEntries();
+    // Parse the index (once per stream; re-running loadEntries() appended a
+    // second copy of every entry to the listing)
+    image->ensureEntries();
     image->resetEntryCounter();
 
     // Set Media Info Fields
@@ -310,13 +330,16 @@ MFile *LNXMFile::getNextFileInDir()
         filename = filename.substr(0, i);
         mstr::replaceAll(filename, "/", "\\");
 
-        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+        // sourceFile->url is the archive's PARENT DIRECTORY - see the note in
+        // ARKMFile::getNextFileInDir(); LNX was the only other format naming
+        // its entries outside its own container.
+        auto file = MFSOwner::File(fullUrl() + "/" + filename);
         file->name = filename;  // Use actual entry name, not container image name
         file->extension = image->entry.type;
         file->size = image->entry.size;
         file->is_dir = 0;
 
-        Debug_printv("entry[%s] ext[%s] size[%d]", filename.c_str(), file->extension.c_str(), file->size);
+        //Debug_printv("entry[%s] ext[%s] size[%d]", filename.c_str(), file->extension.c_str(), file->size);
 
         return file;
     }

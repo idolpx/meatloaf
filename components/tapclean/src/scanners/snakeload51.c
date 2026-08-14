@@ -40,7 +40,7 @@ void snakeload51_search(void)
    unsigned int s,e,x;
 
    if(!quiet)
-      msgout("  Snakeload 5.1");
+      msgout("\r\n  Snakeload 5.1");
          
    
    for(i=20; i<tap.len-8; i++)

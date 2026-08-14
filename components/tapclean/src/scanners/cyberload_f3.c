@@ -150,7 +150,7 @@ void cyberload_f3_search(void)
       return;
 
    if(!quiet)
-      msgout("  Cyberload F3");
+      msgout("\r\n  Cyberload F3");
 
 
    for(i=20; i<tap.len-50; i++)

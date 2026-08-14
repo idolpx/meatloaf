@@ -65,9 +65,9 @@ bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
     //Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
 
     // Is this a valid track?
-    uint16_t c = partitions[partition].block_allocation_map.size() - 1;
-    uint8_t start_track = partitions[partition].block_allocation_map[0].start_track;
-    uint8_t end_track = partitions[partition].block_allocation_map[c].end_track;
+    uint16_t c = curPartition().block_allocation_map.size() - 1;
+    uint8_t start_track = curPartition().block_allocation_map[0].start_track;
+    uint8_t end_track = curPartition().block_allocation_map[c].end_track;
     if (track < start_track || track > end_track)
     {
         Debug_printv("Invalid Track: track[%d] start_track[%d] end_track[%d]", track, start_track, end_track);
@@ -88,13 +88,13 @@ bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
         // Look up error for this track/sector
     }
 
-    track--;
+    if (dos_version != 0xFF) track--; // D9060/D9090: Track 1 is at index 0, not 1
     for (uint8_t index = 0; index < track; ++index)
     {
         sectorOffset += getSectorCount(index + 1);
         //Debug_printv("track[%d] speedZone[%d] secotorsPerTrack[%d] sectorOffset[%d]", (index + 1), speedZone(index), getSectorCount(index + 1), sectorOffset);
     }
-    track++;
+    if (dos_version != 0xFF) track++;
     sectorOffset += sector;
 
     this->block = sectorOffset;
@@ -152,7 +152,7 @@ bool D64MStream::writeBlock(uint8_t track, uint8_t sector, std::string data)
 // map(s), so multi-BAM formats (D71 second side, D81 side 2) work too.
 bool D64MStream::getBAMRecord(uint8_t track, BAMRecord *rec)
 {
-    for (auto &bam : partitions[partition].block_allocation_map)
+    for (auto &bam : curPartition().block_allocation_map)
     {
         if (track >= bam.start_track && track <= bam.end_track)
         {
@@ -233,7 +233,11 @@ bool D64MStream::deallocateBlock(uint8_t track, uint8_t sector)
     return setBlockAllocation(track, sector, false);
 }
 
-uint8_t D64MStream::getTrackFreeCount(uint8_t track)
+// Returns uint16_t, not uint8_t: a CMD native track (DNP, DHD) has 256 sectors,
+// so a fully free one counts 256 - which truncates to 0 in a byte. That made
+// blocksFree() report 0 and, worse, made getNextFreeBlock() treat every track as
+// full so no write could allocate anything.
+uint16_t D64MStream::getTrackFreeCount(uint8_t track)
 {
     BAMRecord rec;
     uint8_t buf[32];
@@ -244,7 +248,7 @@ uint8_t D64MStream::getTrackFreeCount(uint8_t track)
         return buf[0];
 
     // Bitmap-only record: count the free (1) bits
-    uint8_t count = 0;
+    uint16_t count = 0;
     for (uint8_t i = 0; i < rec.byte_count; i++)
         count += std::bitset<8>(buf[i]).count();
     return count;
@@ -294,7 +298,7 @@ bool D64MStream::initializeBlocks()
         for (uint8_t s = 0; s < sectors; s++)
         {
             // Skip the directory track (track 18) - it will be initialized separately
-            if (t == partitions[partition].header_track)
+            if (t == curPartition().header_track)
                 continue;
 
             if (!seekSector(t, s, 0))
@@ -353,11 +357,13 @@ D64MStream::BlockChain D64MStream::getFreeBlocks(uint16_t file_size)
 //   when the track fills up, move one track further away from the directory,
 //   and when that side of the disk is exhausted, switch to the other side.
 // startTrack == 0 (files only) means "first block of a new file".
-bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory)
+// Searches the tracks that exist right now. getNextFreeBlock() wraps this with
+// a grow-and-retry for media that can be extended.
+bool D64MStream::findFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory)
 {
-    uint8_t dir_track = partitions[partition].directory_track;
-    uint8_t first_track = partitions[partition].block_allocation_map.front().start_track;
-    uint8_t last_track = partitions[partition].block_allocation_map.back().end_track;
+    uint8_t dir_track = curPartition().directory_track;
+    uint8_t first_track = curPartition().block_allocation_map.front().start_track;
+    uint8_t last_track = curPartition().block_allocation_map.back().end_track;
 
     if (forDirectory)
     {
@@ -370,12 +376,27 @@ bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8
             *foundTrack = t;
             return true;
         }
-        return false; // directory track is full
+        // A dedicated directory track is a hard limit. Without one the
+        // directory is just a chain, so a new block may go anywhere and the
+        // search below applies - the caller links it to the previous block.
+        if (dedicated_directory_track)
+            return false;
     }
 
     if (startTrack == 0)
     {
-        // First block: closest track to the directory track with a free sector
+        // First block: closest track to the directory track with a free sector.
+        // Distance 0 - the directory track itself - is only a candidate when the
+        // format does not dedicate that track to the directory. Skipping it
+        // unconditionally left a 1-track CMD native partition with nowhere to
+        // put a first block, so every save "filled the disk" immediately.
+        if (!dedicated_directory_track &&
+            getTrackFreeCount(dir_track) && findFreeSectorOnTrack(dir_track, 0, foundSector))
+        {
+            *foundTrack = dir_track;
+            return true;
+        }
+
         for (uint16_t d = 1; ; d++)
         {
             int below = (int)dir_track - d;
@@ -416,7 +437,7 @@ bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8
     int step = (startTrack < dir_track) ? -1 : 1;
     for (int t = (int)startTrack + step; t >= first_track && t <= last_track; t += step)
     {
-        if (t == dir_track)
+        if (dedicated_directory_track && t == dir_track)
             continue;
         if (getTrackFreeCount(t) && findFreeSectorOnTrack(t, 0, foundSector))
         {
@@ -427,7 +448,7 @@ bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8
     // ...then try the other side of the directory
     for (int t = (int)dir_track - step; t >= first_track && t <= last_track; t -= step)
     {
-        if (t == dir_track)
+        if (dedicated_directory_track && t == dir_track)
             continue;
         if (getTrackFreeCount(t) && findFreeSectorOnTrack(t, 0, foundSector))
         {
@@ -442,7 +463,7 @@ bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8
     // otherwise be missed.
     for (int t = first_track; t <= last_track; t++)
     {
-        if (t == dir_track)
+        if (dedicated_directory_track && t == dir_track)
             continue;
         if (getTrackFreeCount(t) && findFreeSectorOnTrack(t, 0, foundSector))
         {
@@ -452,6 +473,20 @@ bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8
     }
 
     return false;
+}
+
+bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory)
+{
+    if (findFreeBlock(startTrack, startSector, foundTrack, foundSector, forDirectory))
+        return true;
+
+    // Nothing free in the tracks that exist. Media that can be extended get one
+    // more track and a second look; for everything else growImage() refuses and
+    // this is a genuine DISK FULL.
+    if (!growImage())
+        return false;
+
+    return findFreeBlock(startTrack, startSector, foundTrack, foundSector, forDirectory);
 }
 
 bool D64MStream::isBlockFree(uint8_t track, uint8_t sector)
@@ -525,8 +560,8 @@ bool D64MStream::seekEntry( uint16_t index )
     // Current directory defaults to the partition's root directory
     if (dir_track == 0)
     {
-        dir_track = partitions[partition].directory_track;
-        dir_sector = partitions[partition].directory_sector;
+        dir_track = curPartition().directory_track;
+        dir_sector = curPartition().directory_sector;
     }
 
     // Calculate Sector offset & Entry offset
@@ -545,7 +580,7 @@ bool D64MStream::seekEntry( uint16_t index )
         if (!seekSector(
                 dir_track,
                 dir_sector,
-                partitions[partition].directory_offset))
+                curPartition().directory_offset))
             return false;
 
         // Find sector with requested entry
@@ -714,8 +749,8 @@ bool D64MStream::finalizeFileWrite()
 
     // Find the first free directory entry, following the chain of the
     // directory the file was created in
-    uint8_t dt = dir_track ? dir_track : partitions[partition].directory_track;
-    uint8_t ds = dir_track ? dir_sector : partitions[partition].directory_sector;
+    uint8_t dt = dir_track ? dir_track : curPartition().directory_track;
+    uint8_t ds = dir_track ? dir_sector : curPartition().directory_sector;
     std::string dirsec;
     int slot = -1;
     uint16_t chain_safety = 0;
@@ -818,6 +853,148 @@ void D64MStream::rollbackFileWrite()
     creating = false;
 }
 
+// Defined further down; unremoveFile() needs it and sits above the definition.
+static std::vector<std::string> splitPathComponents(const std::string &path);
+
+bool D64MStream::queryBlockAllocation(uint8_t track, uint8_t sector, bool& out_allocated)
+{
+    BAMRecord rec;
+    uint8_t buf[32];
+    if (!readBAMRecord(track, &rec, buf))
+        return false;
+
+    uint8_t base = rec.has_count ? 1 : 0;
+    uint8_t byte_index = base + (sector >> 3);
+    if (byte_index >= rec.byte_count)
+        return false;   // sector beyond what this BAM record can represent
+
+    uint8_t bitmask = (uint8_t)(1 << (sector & 7));
+    out_allocated = (buf[byte_index] & bitmask) == 0;   // 1 = free, 0 = allocated
+    return true;
+}
+
+bool D64MStream::seekScratchedEntry(std::string filename)
+{
+    if (filename.empty())
+        return false;
+
+    mstr::replaceAll(filename, "\\", "/");
+    bool wildcard = (mstr::contains(filename, "*") || mstr::contains(filename, "?"));
+
+    uint16_t index = 1;
+    while (seekEntry(index))
+    {
+        // Only scratched entries are candidates. A never-used slot is also
+        // type 0, but carries no name, so an empty name is not a match.
+        if (entry.file_type != 0x00)
+        {
+            index++;
+            continue;
+        }
+
+        std::string entryFilename = entry.filename;
+        size_t i = entryFilename.find_first_of(0xA0);
+        if (i == std::string::npos || i > 16) i = 16;
+        entryFilename = mstr::toUTF8(entryFilename.substr(0, i));
+
+        if (!entryFilename.empty() &&
+            mstr::compareFilename(entryFilename, filename, wildcard))
+            return true;
+
+        index++;
+    }
+
+    return false;
+}
+
+bool D64MStream::unscratchEntry()
+{
+    uint8_t dir_track = track;
+    uint8_t dir_sector = sector;
+    uint8_t slot = (entry_index - 1) % 8;
+
+    // Pass 1: walk the chain and prove every block is still free. The links
+    // live in the blocks themselves, which are unallocated now, so they may
+    // have been overwritten - hence bounding the walk by the block count the
+    // entry recorded and bailing out on anything that does not add up.
+    //
+    // Nothing is modified during this pass. A recovery that cannot complete
+    // must leave the disk exactly as it found it, or a failed unscratch would
+    // be worse than the delete it was trying to undo.
+    std::vector<Block> chain;
+    uint8_t t = entry.start_track;
+    uint8_t s = entry.start_sector;
+    size_t limit = entry.blocks ? (size_t)entry.blocks + 2 : 10000;
+
+    while (t != 0)
+    {
+        if (chain.size() >= limit)
+            return false;   // chain runs longer than the entry claims
+
+        bool allocated = false;
+        if (!queryBlockAllocation(t, s, allocated))
+            return false;   // not a representable block: garbage link
+        if (allocated)
+            return false;   // already handed to a newer file - unrecoverable
+
+        chain.push_back({t, s});
+
+        if (!seekSector(t, s))
+            return false;
+        uint8_t link[2];
+        if (readContainer(link, 2) != 2)
+            return false;
+        t = link[0];
+        s = link[1];
+    }
+
+    if (chain.empty())
+        return false;
+
+    // Pass 2: commit. Reclaim the blocks, then put the type back.
+    for (const Block& b : chain)
+    {
+        if (!allocateBlock(b.track, b.sector))
+            return false;
+    }
+
+    std::string dirsec = readBlock(dir_track, dir_sector);
+    if (dirsec.size() != block_size)
+        return false;
+    dirsec[slot * 32 + 2] = 0x82;   // PRG, closed
+    return writeBlock(dir_track, dir_sector, dirsec);
+}
+
+bool D64MStream::unremoveFile(std::string path)
+{
+    auto parts = splitPathComponents(path);
+    if (parts.empty())
+        return false;
+
+    std::string parent;
+    for (size_t i = 0; i + 1 < parts.size(); i++)
+    {
+        if (i) parent += '/';
+        parent += parts[i];
+    }
+
+    if (!seekDirectory(parent))
+        return false;
+    if (!seekScratchedEntry(parts.back()))
+        return false;
+    return unscratchEntry();
+}
+
+bool D64MStream::removeFile(std::string path)
+{
+    // resolvePath() leaves track/sector on the entry's DIRECTORY sector, which
+    // is what scratchEntry() requires. seekPath() would not: in read mode it
+    // goes on to seek the file's first block.
+    if (resolvePath(path) != PATH_FILE)
+        return false;
+    return scratchEntry();
+}
+
 // Scratch an existing entry so a SAVE"@:file" can rewrite it: free the block
 // chain and mark the entry deleted. Assumes seekEntry() just succeeded, so
 // 'entry' holds the file and track/sector point at its directory sector.
@@ -893,11 +1070,11 @@ uint16_t D64MStream::blocksFree()
 
     // getTrackFreeCount handles both record styles: free-count byte
     // (D64/D81) and bitmap-only (D71 side 2, CMD native)
-    for (auto &bam : partitions[partition].block_allocation_map)
+    for (auto &bam : curPartition().block_allocation_map)
     {
         for (uint16_t t = bam.start_track; t <= bam.end_track; t++)
         {
-            if (t == partitions[partition].directory_track)
+            if (dedicated_directory_track && t == curPartition().directory_track)
                 continue;
             free_count += getTrackFreeCount(t);
         }
@@ -1131,6 +1308,7 @@ bool D64MStream::seekPath(std::string path)
     next_track = 0;
     next_sector = 0;
     sector_offset = 0;
+    _position = 0;
 
     entry_index = 0;
 
@@ -1183,8 +1361,8 @@ bool D64MStream::seekPath(std::string path)
         // chain so broker-cached streams for listings open successfully
         // (and the chain can be read raw, as before).
         _size = 0;
-        uint8_t dt = dir_track ? dir_track : partitions[partition].directory_track;
-        uint8_t ds = dir_track ? dir_sector : partitions[partition].directory_sector;
+        uint8_t dt = dir_track ? dir_track : curPartition().directory_track;
+        uint8_t ds = dir_track ? dir_sector : curPartition().directory_sector;
         return seekSector(dt, ds);
     }
     if (pr == PATH_FILE)
@@ -1225,41 +1403,128 @@ bool D64MStream::seekPath(std::string path)
  * File implementations
  ********************************************************/
 
+bool D64MStream::formatImage(std::string name, std::string id, size_t track_count, bool error_info)
+{
+    // Settle the geometry BEFORE anything is laid out: initializeBlocks() fills
+    // every track and initializeBlockAllocationMap() writes one BAM entry per
+    // track, and both read end_track. A non-zero track_count is how a 40- or
+    // 42-track D64, an 81-track D81, or a DNP created with more than one track
+    // is asked for; 0 means "whatever this media's default is".
+    if (track_count > 0)
+        curPartition().block_allocation_map.back().end_track = (uint8_t)track_count;
+
+    // The parameter shadows the member of the same name - keep the member in
+    // step so anything reading it later sees what was actually created.
+    this->error_info = error_info;
+
+    if (!initializeBlocks())
+        return false;
+
+    if (!initializeBlockAllocationMap())
+        return false;
+
+    if (!writeHeader(name, id))
+        return false;
+
+    if (!initializeDirectory())
+        return false;
+
+    // Total blocks across the geometry just laid down.
+    uint8_t last_track = curPartition().block_allocation_map.back().end_track;
+    uint32_t blocks = 0;
+    for (uint16_t t = 1; t <= last_track; t++)
+        blocks += getSectorCount(t);
+
+    // Canonical size only for a brand new image with no track count asked for.
+    // Otherwise size from the geometry, which both honours an explicit
+    // track_count and stops an existing 40-track D64 being truncated to 35.
+    uint32_t image_size = (track_count == 0 && containerStream->size() == 0)
+                        ? defaultImageSize()
+                        : blocks * block_size;
+
+    // An image carrying error info appends one status byte per sector after the
+    // data area: 174848 + 683 = 175531 for a 35-track D64, 196608 + 768 =
+    // 197376 for 40 tracks, 205312 + 802 = 206114 for 42.
+    if (error_info)
+        image_size += blocks;
+
+    if (!seek(image_size - 1))
+        return false;
+
+    uint8_t pad = 0x00;
+    return write(&pad, 1) == 1;
+}
+
+D64FormatSpec parseD64FormatSpec(const std::string& header_info)
+{
+    D64FormatSpec spec;
+
+    // Split into at most four fields; everything after the fourth comma is
+    // ignored rather than treated as an error.
+    std::string field[4];
+    size_t n = 0, start = 0;
+    while (n < 4)
+    {
+        size_t comma = header_info.find(',', start);
+        field[n++] = (comma == std::string::npos)
+                   ? header_info.substr(start)
+                   : header_info.substr(start, comma - start);
+        if (comma == std::string::npos)
+            break;
+        start = comma + 1;
+    }
+
+    spec.name = field[0];
+    spec.id   = field[1];
+
+    // strtol, NOT std::stoi: this string arrives from the C64 and can be
+    // anything, and ESP-IDF builds with -fno-exceptions - a stoi on garbage
+    // would call std::terminate rather than throw something catchable.
+    if (!field[2].empty())
+    {
+        char* end = nullptr;
+        long v = strtol(field[2].c_str(), &end, 10);
+        // Only a whole, in-range track count counts; anything else leaves the
+        // default in place rather than creating a nonsense image.
+        if (end != field[2].c_str() && *end == '\0' && v > 0 && v <= 255)
+            spec.track_count = (size_t)v;
+    }
+
+    if (!field[3].empty())
+    {
+        char* end = nullptr;
+        long v = strtol(field[3].c_str(), &end, 10);
+        spec.error_info = (end != field[3].c_str() && *end == '\0' && v != 0);
+    }
+
+    return spec;
+}
+
 bool D64MFile::format(std::string header_info)
 {
     Debug_printv("header_info[%s] url[%s]", header_info.c_str(), url.c_str());
 
-    // Set the stream file
     auto newFile = MFSOwner::File(url);
-    std::shared_ptr<D64MStream> image = std::static_pointer_cast<D64MStream>(newFile->getSourceStream(std::ios_base::in | std::ios_base::out | std::ios_base::trunc));
-    if (image == nullptr)
+    if (newFile == nullptr)
         return false;
 
-    // Initialize Blocks
-    image->initializeBlocks();
+    std::shared_ptr<D64MStream> image = std::static_pointer_cast<D64MStream>(
+        newFile->getSourceStream(std::ios_base::in | std::ios_base::out | std::ios_base::trunc));
+    if (image == nullptr)
+    {
+        delete newFile;
+        return false;
+    }
 
-    // Initialize Block Allocation Map
-    image->initializeBlockAllocationMap();
+    D64FormatSpec spec = parseD64FormatSpec(header_info);
+    Debug_printv("name[%s] id[%s] tracks[%d] error_info[%d]",
+                 spec.name.c_str(), spec.id.c_str(),
+                 (int)spec.track_count, (int)spec.error_info);
 
-    // Initialize directory
-    image->initializeDirectory();
-
-    // Write the header to the file
-    size_t comma = header_info.find(',');
-    std::string diskname = header_info.substr(0,comma);
-    std::string id = header_info.substr(comma+1);
-    Debug_printv("write media header");
-    Debug_printv("name[%s] id[%s]", diskname.c_str(), id.c_str());
-    image->writeHeader(diskname, id);
-
-    // Truncate the file to the desired size
-    image->seek(size - 1);
-    uint8_t data = 0x00;
-    image->write(&data, 1);
+    bool ok = image->formatImage(spec.name, spec.id, spec.track_count, spec.error_info);
 
     delete newFile;
-    //delete image;
-    return true;
+    return ok;
 }
 
 
@@ -1267,7 +1532,7 @@ bool D64MFile::rewindDirectory()
 {
     dirIsOpen = true;
     //Debug_printv("url[%s] sourceFile->url[%s]", url.c_str(), sourceFile->url.c_str());
-    auto image = ImageBroker::obtain<D64MStream>("d64", url);
+    auto image = ImageBroker::obtain<D64MStream>("d64", brokerUrl());
     if (image == nullptr)
         return false;
 
@@ -1300,15 +1565,30 @@ bool D64MFile::rewindDirectory()
     return true;
 }
 
+std::string D64MFile::entryUrlFor(const std::string& filename)
+{
+    // Entry URL must include the in-image path (partition/subdirectory)
+    std::string entryUrl;
+    entryUrl.reserve(url.size() + pathInStream.size() + 2 + filename.size());
+    entryUrl = url;
+    if (pathInStream.size()) { entryUrl += '/'; entryUrl += pathInStream; }
+    entryUrl += '/'; entryUrl += filename;
+    return entryUrl;
+}
+
 MFile* D64MFile::getNextFileInDir()
 {
     bool r = false;
 
-    if (!dirIsOpen)
-        rewindDirectory();
+    // A failed rewind leaves dirIsOpen false but has already reset the shared
+    // stream's entry counter, so continuing would hand back the first entry
+    // again on every call - an endless listing (e.g. "ls sett*", where
+    // pathInStream names a file, not a directory).
+    if (!dirIsOpen && !rewindDirectory())
+        return nullptr;
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<D64MStream>("d64", url);
+    auto image = ImageBroker::obtain<D64MStream>("d64", brokerUrl());
     if (image == nullptr)
         goto exit;
 
@@ -1324,12 +1604,7 @@ MFile* D64MFile::getNextFileInDir()
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (url + "/" + filename).c_str() );
 
-        // Entry URL must include the in-image path (partition/subdirectory)
-        std::string entryUrl;
-        entryUrl.reserve(url.size() + pathInStream.size() + 2 + filename.size());
-        entryUrl = url;
-        if (pathInStream.size()) { entryUrl += '/'; entryUrl += pathInStream; }
-        entryUrl += '/'; entryUrl += filename;
+        std::string entryUrl = entryUrlFor(filename);
         auto file = MFSOwner::File(entryUrl);
         file->name = filename;  // Use actual CBM entry name, not container image name
         file->extension = image->decodeType(image->entry.file_type);
@@ -1358,7 +1633,7 @@ time_t D64MFile::getCreationTime()
 {
     // Use a stack-allocated tm to avoid dereferencing a null pointer.
     std::tm entry_time = {};
-    auto stream = ImageBroker::obtain<D64MStream>("d64", url);
+    auto stream = ImageBroker::obtain<D64MStream>("d64", brokerUrl());
     if ( stream != nullptr )
     {
         auto entry = stream->entry;
@@ -1383,11 +1658,41 @@ bool D64MFile::isDirectory()
         return true;
 
     // Walk the path inside the image (partition / subdirectory / file)
-    auto stream = ImageBroker::obtain<D64MStream>("d64", url);
+    auto stream = ImageBroker::obtain<D64MStream>("d64", brokerUrl());
     if (stream != nullptr)
         return stream->resolvePath(pathInStream) == D64MStream::PATH_DIR;
 
     return false;
+}
+
+bool D64MFile::remove()
+{
+    // The container itself - a .d64/.dhd sitting on flash or SD - is an
+    // ordinary file, and deleting it is the base class's business.
+    if (pathInStream.empty() || pathInStream == "/")
+        return MFile::remove();
+
+    // A file INSIDE the image. The base MFile::remove() deliberately refuses
+    // this (there is no such path for ::remove() to unlink), so without this
+    // override "rm" simply could not delete anything in a disk image.
+    //
+    // Not the ImageBroker's stream: that one is opened read-only, so freeing
+    // blocks and rewriting the directory sector through it would fail. Ask for
+    // in|out, which makes MFile::getSourceStream() open the container "r+".
+    auto stream = std::static_pointer_cast<D64MStream>(
+        getSourceStream(std::ios_base::in | std::ios_base::out));
+    if (stream == nullptr || !stream->isOpen())
+        return false;
+
+    bool ok = stream->removeFile(pathInStream);
+    stream->close();
+
+    // The cached listing stream has its own handle on the container and would
+    // keep serving the entry we just scratched.
+    if (ok)
+        ImageBroker::disposeFor("d64", brokerUrl());
+
+    return ok;
 }
 
 bool D64MFile::exists()
@@ -1404,7 +1709,7 @@ bool D64MFile::exists()
     if ( pathInStream.empty() || pathInStream == "/" )
         return ( sourceFile != nullptr ) ? sourceFile->exists() : true;
 
-    auto stream = ImageBroker::obtain<D64MStream>("d64", url);
+    auto stream = ImageBroker::obtain<D64MStream>("d64", brokerUrl());
     if ( stream == nullptr )
         return false;
 

@@ -44,7 +44,7 @@
 #include "time_converter.h"
 
 #include "meat_media.h"
-#include "media/hd/dhd.h"
+#include "media/hd/partition_select.h"
 #include "media/tape/tap.h"
 #include "qrmanager.h"
 #include "../../www/ws/activity.h"
@@ -1801,10 +1801,23 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
         case 'C':
             if ( command[1] == 'P') // Change Partition text: CP<n>
             {
+                // Digits must start right after "CP" - find_first_of over the
+                // whole string would let "CPX5" parse as partition 5. strtol
+                // (not atoi) per the project rule against atoi/std::stoi on
+                // C64-sourced input; leave pnum = -1 on any parse failure so
+                // hdpart::select() (called via changePartition()) rejects it,
+                // range-checking per format.
                 int pnum = -1;
-                size_t d = command.find_first_of("0123456789");
-                if( d != std::string::npos )
-                    pnum = atoi(command.c_str() + d);
+                char *end = nullptr;
+                const char *start = command.c_str() + 2;
+                long v = strtol(start, &end, 10);
+                if ( end != start )
+                {
+                    while ( *end == ' ' || *end == '\r' )
+                        end++;
+                    if ( *end == '\0' )
+                        pnum = (int)v;
+                }
                 changePartition(pnum);
                 return;
             }
@@ -2228,6 +2241,10 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
 
         case ST_WRITE_VERIFY        : msg = "WRITE ERROR"; break;
         case ST_WRITE_PROTECT_ON    : msg = "WRITE PROTECT"; break;
+        // 30 became reachable when CP<n> started distinguishing "not a
+        // partition number" from "no such partition"; without a case here it
+        // fell through to "UNKNOWN ERROR".
+        case ST_SYNTAX_UNKNOWN      : msg = "SYNTAX ERROR"; break;
         case ST_SYNTAX_INVALID      : msg = "INVALID COMMAND"; break;
         case ST_SYNTAX_BAD_NAME     : msg = "INVALID FILENAME"; break;
         case ST_FILE_NOT_FOUND      : msg = "FILE NOT FOUND"; break;
@@ -2358,23 +2375,55 @@ void iecDrive::tapeCommand(std::string command)
     setStatusCode(tf->buildIndex() ? ST_OK : ST_WRITE_VERIFY);
 }
 
-// CMD "CP<n>" - change the selected partition of the mounted CMD media
-// image (DHD hard disk or D1M/D2M/D4M floppy)
+// CMD "CP<n>" - change the selected partition of the mounted image. Works on
+// a CMD HD/FD image (DHD, D1M/D2M/D4M) and on an IDE64 CFS image (.hdd); the
+// per-format bound on which partitions actually EXIST lives in hdpart::select().
+//
+// Three failures, three codes. The split is by WHAT FAILED, not by how far out
+// of range the number was:
+//
+//   31 INVALID COMMAND (ST_SYNTAX_INVALID)
+//                    - there is no partition table here at all, so CP is not a
+//                      command this image understands. Nothing to do with the
+//                      number, which is never even looked at.
+//   30 SYNTAX ERROR (ST_SYNTAX_UNKNOWN)
+//                    - the argument is not a partition number: it did not
+//                      parse, or it cannot fit the one-byte partition number a
+//                      CBM drive uses (CP256 and up).
+//   77 SELECTED PARTITION ILLEGAL
+//                    - it IS a well-formed partition number (0-255) but this
+//                      image has no such partition. That covers CP0, which is
+//                      reserved for "the currently selected partition" and is
+//                      therefore never a real one, and every unused number up
+//                      to 255 - including 17-255 on a CFS image, whose table
+//                      only ever holds 16.
+//
+// Note ST_SYNTAX_UNKNOWN is 30 and ST_SYNTAX_INVALID is 31 (include/
+// cbm_defines.h) - the names do not read in that order, so check the value
+// rather than the name when touching this.
 void iecDrive::changePartition(int pnum)
 {
-    std::string container = DHDImageRegistry::containerOf(m_cwd != nullptr ? m_cwd->url : "");
-    Debug_printv("change partition pnum[%d] container[%s]", pnum, container.c_str());
+    hdpart::Target t = hdpart::targetFor(m_cwd != nullptr ? m_cwd->url : "");
+    Debug_printv("change partition pnum[%d] container[%s]", pnum, t.container.c_str());
 
-    if (container.empty() || pnum < 1 || pnum > 254)
+    if (!t)
     {
-        setStatusCode(ST_SYNTAX_INVALID);
+        setStatusCode(ST_SYNTAX_INVALID);   // 31 - CP means nothing here
         return;
     }
 
-    if (DHDImageRegistry::select(container, (uint8_t)pnum))
+    // Not a partition number: unparseable (the caller's -1 sentinel) or beyond
+    // the one-byte range a partition number can occupy.
+    if (pnum < 0 || pnum > 255)
+    {
+        setStatusCode(ST_SYNTAX_UNKNOWN);   // 30 - not a partition number
+        return;
+    }
+
+    if (hdpart::select(t, pnum))
     {
         // The new partition's root becomes the working directory
-        set_cwd(container, true);
+        set_cwd(t.container, true);
         setStatusCode(ST_PARTITION_SELECTED, pnum);
     }
     else

@@ -75,7 +75,7 @@ static void oceannew1_search_core(int lt)
 	sv = ft[lt].sv;
 
 	if (!quiet) {
-		msgout("  New Ocean Tape 1 T");
+		msgout("\r\n  New Ocean Tape 1 T");
 		msgout((lt == OCNEW1_T1) ? "1" : "2");
 	}
 

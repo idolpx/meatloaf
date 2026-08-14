@@ -4,6 +4,9 @@
 # VS Code build directory
 **/.vscode
 
+# GitHub Actions workflow files
+.github
+
 # PlatformIO build directory
 **/.pio
 **/build
@@ -35,13 +38,10 @@ compile_commands.json
 dependencies.lock
 components.staged/*
 
-.claude/*
-**/CLAUDE.md
-
 deploy.*
 sdkconfig.*
 version.txt
 include/version.h
 .superpowers/
 
-__pycache__/build_version.cpython-314.pyc
+**/*.pyc

@@ -60,18 +60,18 @@ public:
         };
 
         Partition p = {
-            1,     // track
-            0,     // sector
-            0x04,  // header_offset
-            1,     // directory_track
-            4,     // directory_sector
+            18,    // header_track
+            0,     // header_sector
+            0x90,  // header_offset
+            18,    // directory_track
+            1,     // directory_sector
             0x00,  // directory_offset
             0,     // parent_header_track
             0,     // parent_header_sector
             0,     // parent_entry_track
             0,     // parent_entry_sector
             0,     // parent_entry_offset
-            b      // block_allocation_map
+            b     // block_allocation_map
         };
         partitions.clear();
         partitions.push_back(p);
@@ -91,13 +91,83 @@ public:
         }
     };
 
+    // On a 1571 the side-2 BAM is SPLIT: the per-track free-sector COUNTS for
+    // tracks 36-70 live in the header sector (18/0) at offset 0xDD - one byte
+    // per track, filling 0xDD..0xFF - while the matching BITMAPS live at 53/0.
+    // BlockAllocationMap can only describe one contiguous run of bytes, so the
+    // base class maintains the bitmap and D71 maintains the counts alongside it.
+    static constexpr uint8_t SIDE2_FIRST_TRACK = 36;
+    static constexpr uint8_t SIDE2_COUNT_OFFSET = 0xDD;
+
+    bool writeSide2FreeCount( uint8_t track, uint8_t count )
+    {
+        if (!seekSector( curPartition().header_track,
+                         curPartition().header_sector,
+                         SIDE2_COUNT_OFFSET + (track - SIDE2_FIRST_TRACK) ))
+            return false;
+        return writeContainer(&count, 1) == 1;
+    }
+
+    bool setBlockAllocation( uint8_t track, uint8_t sector, bool allocate ) override
+    {
+        // The base class owns the bitmap. For side 1 that is the whole job.
+        if (!D64MStream::setBlockAllocation(track, sector, allocate))
+            return false;
+
+        if (track < SIDE2_FIRST_TRACK)
+            return true;
+
+        // Side 2: mirror the change into the split-off count byte. getTrackFreeCount()
+        // counts bits in the bitmap the base class just updated, so it is already
+        // the post-change value - no need to re-derive it here.
+        return writeSide2FreeCount(track, (uint8_t)getTrackFreeCount(track));
+    }
+
+    bool initializeBlockAllocationMap() override
+    {
+        if (!D64MStream::initializeBlockAllocationMap())
+            return false;
+
+        // The base initializer only writes the records BlockAllocationMap
+        // describes, so side 2's counts would be left as whatever was in 18/0.
+        // Seed them from the bitmaps it just wrote.
+        uint8_t last_track = curPartition().block_allocation_map.back().end_track;
+        for (uint8_t t = SIDE2_FIRST_TRACK; t <= last_track; t++)
+        {
+            if (!writeSide2FreeCount(t, (uint8_t)getTrackFreeCount(t)))
+                return false;
+        }
+
+        // A 1571 reserves the side-2 BAM track (53) IN FULL, not just the one
+        // sector the BAM occupies - unlike track 18, where only the two sectors
+        // actually in use (18/0 header+BAM, 18/1 first directory block) are
+        // allocated. Verified against c1541's own format: it writes 00 00 00 for
+        // track 53 while track 18 reads 11 fc ff 07 (17 of 19 free), and reports
+        // "1328 blocks free" = 1366 - 19 - 19, excluding both tracks whole.
+        uint8_t bam2_track = curPartition().block_allocation_map.back().track;
+        uint16_t bam2_sectors = getSectorCount(bam2_track);
+        for (uint16_t s = 0; s < bam2_sectors; s++)
+        {
+            if (!isBlockFree(bam2_track, (uint8_t)s))
+                continue;
+            if (!setBlockAllocation(bam2_track, (uint8_t)s, true))
+                return false;
+        }
+        return true;
+    }
+
     virtual uint8_t speedZone( uint8_t track) override
     {
-        if ( track < 35 )
+        // Track 35 is the LAST track of side 1 (17 sectors). `track < 35` sent
+        // it into the side-2 branch below, which resolved to 21 sectors and
+        // inflated the computed image size by 4 blocks.
+        if ( track <= 35 )
 		    return (track < 18) + (track < 25) + (track < 31);
         else
             return (track < 53) + (track < 60) + (track < 66);
     };
+
+    uint32_t defaultImageSize() override { return 349696; }
 
 protected:
 

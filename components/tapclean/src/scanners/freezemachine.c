@@ -77,7 +77,7 @@ void freezemachine_search (void)
 	sv = ft[THISLOADER].sv;
 
 	if (!quiet)
-		msgout("  Freeze Machine tape");
+		msgout("\r\n  Freeze Machine tape");
 
 	/*
 	 * First we retrieve loader variables from the CBM header and data.

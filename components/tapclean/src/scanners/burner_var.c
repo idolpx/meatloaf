@@ -177,9 +177,9 @@ void burnervar_search (void)
 
 	if (!quiet)
 #ifdef ENABLE_LEGACY_BURNER_SUPPORT
-		msgout("  Burner (+Mastertronic Variants)");
+		msgout("\r\n  Burner (+Mastertronic Variants)");
 #else
-		msgout("  Burner (Mastertronic Variants)");
+		msgout("\r\n  Burner (Mastertronic Variants)");
 #endif
 
 	/*

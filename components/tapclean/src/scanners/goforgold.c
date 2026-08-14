@@ -85,7 +85,7 @@ void goforgold_search (void)
 	sv = ft[THISLOADER].sv;
 
 	if (!quiet)
-		msgout("  Go For The Gold (limited support)");
+		msgout("\r\n  Go For The Gold (limited support)");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		eop = find_pilot(i, THISLOADER);

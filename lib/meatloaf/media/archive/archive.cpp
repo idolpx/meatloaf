@@ -68,6 +68,17 @@ ssize_t cb_read(struct archive *, void *userData, const void **buff) {
     *buff = a->m_srcBuffer;
     if (a->m_archive == NULL) return 0;
     ssize_t n = (ssize_t)a->m_srcStream->read(a->m_srcBuffer, a->m_buffSize);
+
+    // Keep the first bytes libarchive is handed. When no format recognizes
+    // the stream, these say WHY in one line: a container that opens fine
+    // locally but not over the network is being served bytes that are not
+    // its first bytes, and the signature here proves it rather than
+    // suggesting it. Costs one memcpy per archive open.
+    if (a->m_firstBytesLen == 0 && n > 0) {
+        size_t keep = (n < (ssize_t)sizeof(a->m_firstBytes)) ? (size_t)n : sizeof(a->m_firstBytes);
+        memcpy(a->m_firstBytes, a->m_srcBuffer, keep);
+        a->m_firstBytesLen = keep;
+    }
     return n;
 }
 
@@ -194,6 +205,74 @@ int64_t cb_seek(struct archive *, void *userData, int64_t offset, int whence)
 
 
 
+// The name to give the single entry of a compressed-only file (.gz, .bz2, ...),
+// derived from the container's own path because the stream carries no directory.
+//
+// Percent-decoding is applied ONLY when the container came from a URL. A URL
+// path component is encoded, and letting the encoding through names the
+// extracted file literally `ordeal%2b2100p.d64`; a LOCAL path is not encoded,
+// so a file genuinely containing '%' must keep it. `alter_pluses` is false
+// because a '+' in a path is a literal plus, not the form-encoded space it
+// means in a query string — the same call fnFsHTTP.cpp makes for the filenames
+// in an HTTP directory listing.
+std::string Archive::gzipNameFromHeader(const uint8_t *p, size_t n)
+{
+    // RFC 1952: ID1 ID2 CM FLG MTIME(4) XFL OS  = 10 bytes, then the optional
+    // fields in FLG order. FNAME is a NUL-terminated string, and it is only
+    // present when bit 3 is set.
+    static const uint8_t FEXTRA = 0x04, FNAME = 0x08;
+
+    if (p == nullptr || n < 10) return "";
+    if (p[0] != 0x1f || p[1] != 0x8b || p[2] != 0x08) return "";   // not gzip/deflate
+
+    const uint8_t flg = p[3];
+    if ((flg & FNAME) == 0) return "";
+
+    size_t at = 10;
+    if (flg & FEXTRA) {
+        if (at + 2 > n) return "";
+        const size_t xlen = (size_t)p[at] | ((size_t)p[at + 1] << 8);
+        at += 2 + xlen;
+    }
+    if (at >= n) return "";
+
+    // The name must terminate within what we have; a partial one would be a
+    // silently truncated filename, which is worse than falling back to the URL.
+    const void *nul = memchr(p + at, '\0', n - at);
+    if (nul == nullptr) return "";
+
+    std::string name((const char *)(p + at), (const char *)nul - (const char *)(p + at));
+
+    // Stored names are meant to be bare, but strip any directory part rather
+    // than trust an archive to write outside where the caller intends.
+    size_t slash = name.find_last_of("/\\");
+    if (slash != std::string::npos)
+        name = name.substr(slash + 1);
+
+    return name;
+}
+
+static std::string compressedEntryNameFromUrl(const std::string &containerUrl)
+{
+    size_t lastSlash = containerUrl.find_last_of("/\\");
+    std::string filename = (lastSlash != std::string::npos)
+        ? containerUrl.substr(lastSlash + 1)
+        : containerUrl;
+
+    static const char *compressionExts[] = {".gz", ".bz2", ".xz", ".lz", ".z", ".zst", ".lz4"};
+    for (const char *ext : compressionExts) {
+        if (mstr::endsWith(filename, ext, false)) {
+            filename = filename.substr(0, filename.length() - strlen(ext));
+            break;
+        }
+    }
+
+    if (containerUrl.find("://") != std::string::npos)
+        filename = mstr::urlDecode(filename, false);
+
+    return filename;
+}
+
 bool Archive::open(std::ios_base::openmode mode, bool rawOnly, bool randomAccess) {
     // close the archive if it was already open
     close();
@@ -202,6 +281,7 @@ bool Archive::open(std::ios_base::openmode mode, bool rawOnly, bool randomAccess
 
     m_srcBuffer = (uint8_t*)psram_malloc(m_buffSize);
     m_archive = archive_read_new();
+    m_firstBytesLen = 0;
     Debug_printv("pre-seek pos[%lu]", (unsigned long)m_srcStream->position());
     bool seekOk = m_srcStream->seek(0, SEEK_SET);
     Debug_printv("post-seek pos[%lu] seekOk[%d]", (unsigned long)m_srcStream->position(), (int)seekOk);
@@ -255,11 +335,23 @@ bool Archive::open(std::ios_base::openmode mode, bool rawOnly, bool randomAccess
         } else if (mstr::endsWith(u, ".cpio") || mstr::endsWith(u, ".cpgz")) {
             archive_read_support_format_cpio(m_archive);
         } else {
-            // Unknown/ambiguous extension — let libarchive bid across all formats.
+            // Unknown/ambiguous extension — let libarchive bid across all
+            // formats, and fall back to raw for single compressed files like
+            // .gz/.bz2, whose decompressed content is just bytes that no
+            // archive format recognizes.
             archive_read_support_format_all(m_archive);
+            archive_read_support_format_raw(m_archive);
         }
 
-        archive_read_support_format_raw(m_archive);  // Support single compressed files like .gz
+        // NOTE: raw is deliberately NOT registered above when the extension
+        // names a real container. raw bids 1 on ANY byte stream and
+        // synthesizes a single entry called "data" spanning the whole input,
+        // so registering it alongside zip/tar/7z/... turns "this isn't the
+        // format it claims to be" into a silent success: the caller extracts
+        // one bogus file that is a byte-for-byte copy of the container. That
+        // is what `unzipx <a .zip whose source stream was misaligned>`
+        // produced — "extracted 1 entries, 303509 bytes" of nothing but the
+        // zip itself. With raw absent the open fails, which callers report.
     }
 
     //archive_read_set_open_callback(m_archive, cb_open);
@@ -273,6 +365,19 @@ bool Archive::open(std::ios_base::openmode mode, bool rawOnly, bool randomAccess
     int r = archive_read_open1(m_archive);
     if (r != ARCHIVE_OK) {
         Debug_printv("Error opening archive: %d! [%s]", r, archive_error_string(m_archive));
+        // No format bid on this stream. Report what it was actually handed —
+        // a container whose first bytes are not its own signature is being
+        // read from the wrong offset, which is a source-stream fault, not an
+        // archive one, and is otherwise invisible from the outside.
+        // Only the leading bytes are diagnostic — m_firstBytes is sized for a
+        // gzip FNAME, not for printing.
+        const size_t kShow = 16;
+        char hex[3 * kShow + 1] = {0};
+        for (size_t i = 0; i < m_firstBytesLen && i < kShow; i++)
+            snprintf(hex + (i * 3), 4, "%02X ", m_firstBytes[i]);
+        Debug_printv("first bytes[%s] srcSize[%lu] srcPos[%lu]", hex,
+                     (unsigned long)m_srcStream->size(),
+                     (unsigned long)m_srcStream->position());
         archive_read_free(m_archive);
         m_archive = NULL;
     } else {
@@ -465,7 +570,7 @@ bool ArchiveMStream::seekEntry(std::string filename)
 
 bool ArchiveMStream::seekEntry( uint16_t index )
 {
-    Debug_printv("entry_count[%d] entry_index[%d] index[%d] m_isCompressedOnly[%d]", entry_count, entry_index, index, m_isCompressedOnly);
+    //Debug_printv("entry_count[%d] entry_index[%d] index[%d] m_isCompressedOnly[%d]", entry_count, entry_index, index, m_isCompressedOnly);
 
     if ( !m_archive->isOpen() ) {
         Debug_printv("ERROR: archive not open");
@@ -487,7 +592,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
     archive *a = m_archive->getArchive();
 
     int r = archive_read_next_header(a, &a_entry);
-    Debug_printv("archive_read_next_header returned: %d", r);
+    //Debug_printv("archive_read_next_header returned: %d", r);
 
     // Special handling for compressed-only files (e.g., standalone .gz, .bz2 files)
     // These have compression filters but no archive format, so archive_read_next_header returns EOF
@@ -497,25 +602,19 @@ bool ArchiveMStream::seekEntry( uint16_t index )
         // Mark this as a compressed-only file so we don't try to read more entries
         m_isCompressedOnly = true;
 
-        // Derive filename from archive URL by removing compression extension
-        std::string archivePath = url;
-
-        // Extract filename from path
-        size_t lastSlash = archivePath.find_last_of("/\\");
-        std::string filename = (lastSlash != std::string::npos)
-            ? archivePath.substr(lastSlash + 1)
-            : archivePath;
-
-        // Remove compression extension
-        const char* compressionExts[] = {".gz", ".bz2", ".xz", ".lz", ".z", ".zst", ".lz4"};
-        for (const char* ext : compressionExts) {
-            if (mstr::endsWith(filename, ext, false)) {
-                filename = filename.substr(0, filename.length() - strlen(ext));
-                break;
-            }
-        }
-
-        entry.filename = filename;
+        // Prefer the name the gzip stream stores in its own header: it is the
+        // ORIGINAL filename, which the URL cannot reproduce
+        // (`ordeal%2b2100p.d64.gz` on the server is
+        // `ordeal +2 100% (ntsc pal) wanderer.d64` inside). libarchive exposes
+        // FNAME as the entry pathname, but only when a format reader yields an
+        // entry — and getting here means it returned ARCHIVE_EOF instead, so it
+        // is read from the header bytes cb_read already captured. Falls back to
+        // the archive's own path (percent-decoded only when that path is a URL
+        // — see compressedEntryNameFromUrl).
+        entry.filename = Archive::gzipNameFromHeader(m_archive->firstBytes(),
+                                                     m_archive->firstBytesLen());
+        if (entry.filename.empty())
+            entry.filename = compressedEntryNameFromUrl(url);
         Debug_printv("Synthesized filename: %s", entry.filename.c_str());
 
         // Determine decompressed size via gzip ISIZE trailer (last 4 bytes of .gz file).
@@ -578,7 +677,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
 
     // Check filetype
     const mode_t type = archive_entry_filetype(a_entry);
-    Debug_printv("entry filetype: 0x%x, S_ISREG=%d", type, S_ISREG(type));
+    //Debug_printv("entry filetype: 0x%x, S_ISREG=%d", type, S_ISREG(type));
     if ( S_ISREG(type) ) {
         const char* pathname = archive_entry_pathname(a_entry);
 
@@ -591,24 +690,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
         bool isRawCompressedEntry = (pathname == nullptr || pathname[0] == '\0' ||
                                      strcmp(pathname, "data") == 0);
         if (isRawCompressedEntry) {
-            std::string archivePath = url;
-
-            // Extract filename from path
-            size_t lastSlash = archivePath.find_last_of("/\\");
-            std::string filename = (lastSlash != std::string::npos)
-                ? archivePath.substr(lastSlash + 1)
-                : archivePath;
-
-            // Remove compression extension
-            const char* compressionExts[] = {".gz", ".bz2", ".xz", ".lz", ".z", ".zst", ".lz4"};
-            for (const char* ext : compressionExts) {
-                if (mstr::endsWith(filename, ext, false)) {
-                    filename = filename.substr(0, filename.length() - strlen(ext));
-                    break;
-                }
-            }
-
-            entry.filename = filename;
+            entry.filename = compressedEntryNameFromUrl(url);
         } else {
             entry.filename = basename(pathname);
         }
@@ -620,6 +702,15 @@ bool ArchiveMStream::seekEntry( uint16_t index )
         // the true decompressed size and reset the archive for data extraction.
         if (entry.size == 0 || isRawCompressedEntry) {
             bool sizeKnown = false;
+
+            // Whether the archive is decoding a COMPRESSED stream right now,
+            // captured before the probes below re-open it. That is the state
+            // any later byte count has to still be in to mean anything, and
+            // it is not the same question as isRawCompressedEntry: a gzip
+            // stream carrying an FNAME header (Elite.d64.gz does) yields a
+            // real pathname, so isRawCompressedEntry is false and only the
+            // `entry.size == 0` arm brought us here.
+            const bool hadCompressionFilter = m_archive->hasCompressionFilter();
 
             // For .gz files: read the ISIZE field from the gzip trailer (last 4 bytes).
             // ISIZE = decompressed size mod 2^32 — exact for files < 4 GB.
@@ -675,6 +766,36 @@ bool ArchiveMStream::seekEntry( uint16_t index )
             }
 
             if (!sizeKnown) {
+                // The count below measures whatever the archive currently decodes.
+                // If the re-open above came back WITHOUT the compression filter,
+                // it measures the COMPRESSED stream and reports that as the
+                // decompressed size — and the caller then extracts exactly that
+                // many bytes, i.e. a silently truncated file. Seen on hardware
+                // for a .gz over HTTPS: `srcSize=41448` (compressed) followed by
+                // `Counted decompressed size: 41448` for a 174848-byte D64,
+                // because the re-open reported `filter count: 1 / none`. The
+                // cause is upstream — the source served something other than the
+                // file's start after a seek, which a network source does when a
+                // re-request desynchronises — but counting the wrong stream must
+                // not be how it surfaces.
+                //
+                // A further re-open is worth one try: on the hardware trace the
+                // NEXT open of the same source did come back with the filter.
+                if (hadCompressionFilter && !m_archive->hasCompressionFilter()) {
+                    Debug_printv("compression filter LOST after reopen — retrying once");
+                    m_archive->close();
+                    m_archive->open(std::ios_base::in);
+                    a = m_archive->getArchive();
+                    if (archive_read_next_header(a, &a_entry) != ARCHIVE_OK ||
+                        !m_archive->hasCompressionFilter()) {
+                        Debug_printv("ERROR! source is not serving [%s] as a compressed stream; "
+                                     "refusing to report the compressed length as the entry size",
+                                     url.c_str());
+                        entry.size = 0;
+                        return false;
+                    }
+                }
+
                 // Fallback: count actual decompressed bytes by reading through the data.
                 // Used for non-gz compressed formats (.bz2, .xz, etc.) or when ISIZE read fails.
                 uint8_t buff[256] = {0};
@@ -705,7 +826,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
 
     entry_index = index + 1;
 
-    Debug_printv("entry_index[%d] filename[%s] size[%lu]", entry_index, entry.filename.c_str(), entry.size);
+    //Debug_printv("entry_index[%d] filename[%s] size[%lu]", entry_index, entry.filename.c_str(), entry.size);
     return true;
 }
 
@@ -755,6 +876,10 @@ bool ArchiveMStream::nextEntrySimple() {
         if (!S_ISREG(archive_entry_filetype(a_entry))) continue;  // skip dirs
 
         const char *pn = archive_entry_pathname(a_entry);
+        // Keep BOTH: the basename for flat listings, and the stored path so
+        // extraction can recreate the directory structure. basename() is
+        // destructive on some platforms, so read pathname first.
+        entry.pathname = (pn && pn[0]) ? pn : "";
         entry.filename = (pn && pn[0]) ? basename((char *)pn) : "";
         if (entry.filename.empty()) continue;  // unnamed/synthetic — skip
 
@@ -895,7 +1020,12 @@ bool ArchiveMFile::extractAll(const ExtractCallback &onEntry)
     while (image->nextEntrySimple()) {
         // Any bytes of this entry left unread are skipped by the next
         // archive_read_next_header(), so aborting a partial read is safe.
-        if (!onEntry(image->entry.filename, image->entry.size, readFn)) {
+        // Hand over the STORED path so the caller can recreate the directory
+        // structure; fall back to the basename when the archive stored none.
+        const std::string &entryName = image->entry.pathname.empty()
+                                     ? image->entry.filename
+                                     : image->entry.pathname;
+        if (!onEntry(entryName, image->entry.size, readFn)) {
             ok = false;
             break;
         }
@@ -929,17 +1059,17 @@ MFile *ArchiveMFile::getNextFileInDir()
         goto exit;
     }
 
-    Debug_printv("Calling getNextImageEntry()");
+    //Debug_printv("Calling getNextImageEntry()");
     do
     {
         r = image->getNextImageEntry();
-        Debug_printv("getNextImageEntry() returned %d, filename=[%s]", r, r ? image->entry.filename.c_str() : "");
+        //Debug_printv("getNextImageEntry() returned %d, filename=[%s]", r, r ? image->entry.filename.c_str() : "");
     } while (r && image->entry.filename.empty()); // Don't want empty entries
 
     if (r)
     {
         std::string filename = image->entry.filename;
-        Debug_printv("Found entry: filename=[%s] size=%lu", filename.c_str(), image->entry.size);
+        //Debug_printv("Found entry: filename=[%s] size=%lu", filename.c_str(), image->entry.size);
 
         std::string entryUrl;
         entryUrl.reserve(url.size() + 1 + filename.size());

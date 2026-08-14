@@ -18,7 +18,9 @@
 #include "meat_session.h"
 
 #include "meatloaf.h"
+#ifndef TEST_NATIVE
 #include "fnFsSD.h"
+#endif
 
 #include <sys/stat.h>
 #include <cstdio>

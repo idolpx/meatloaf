@@ -219,6 +219,7 @@ namespace ESP32Console
         registerCommand(getCDCommand());
         registerCommand(getPWDCommand());
         registerCommand(getLsCommand());
+        registerCommand(getPartitionCommand());
         registerCommand(getMvCommand());
         registerCommand(getCPCommand());
         registerCommand(getRMCommand());
@@ -642,7 +643,7 @@ namespace ESP32Console
             std::string prompt = console.prompt_;
 
             // Insert current PWD into prompt if needed
-            mstr::replaceAll(prompt, "%pwd%", getCurrentPath()->url);
+            mstr::replaceAll(prompt, "%pwd%", getCurrentPathUrl());
             char *line = linenoise(prompt.c_str());
             if (line == NULL)
             {
@@ -681,6 +682,22 @@ namespace ESP32Console
                 linenoiseFree(line);
                 do_reboot();
             }
+
+#ifdef SD_CARD
+            // "updatedb stop" must work while a scan is running. The scan
+            // occupies the executor, so submitting this as a command would
+            // queue it behind the very thing it is meant to cancel. It only
+            // sets a volatile flag the scan polls, so it is safe here.
+            if (raw_line == "updatedb stop")
+            {
+                linenoiseFree(line);
+                if (updatedb_request_stop())
+                    ::printf("updatedb: stopping...\r\n");
+                else
+                    ::printf("updatedb: no scan in progress\r\n");
+                continue;
+            }
+#endif
 
             // "exit" must work even when the executor can't be created
             // (memory pressure) — handle it without submitting a command.
@@ -793,6 +810,19 @@ namespace ESP32Console
             do_reboot();
         }
 
+#ifdef SD_CARD
+        // "updatedb stop" must work while a scan occupies the executor — see
+        // the matching interception in repl_task().
+        if (command_str == "updatedb stop")
+        {
+            if (updatedb_request_stop())
+                ::printf("updatedb: stopping...\r\n");
+            else
+                ::printf("updatedb: no scan in progress\r\n");
+            return;
+        }
+#endif
+
 #ifdef ENABLE_CONSOLE_TCP
         // "exit" must work even when the executor can't be created
         // (memory pressure) — drop the client without running a command.
@@ -833,7 +863,7 @@ namespace ESP32Console
         // Prompt goes to TCP only — the REPL loop owns the UART prompt via linenoise.
         {
             std::string p = prompt_;
-            mstr::replaceAll(p, "%pwd%", getCurrentPath()->url);
+            mstr::replaceAll(p, "%pwd%", getCurrentPathUrl());
             tcp_server.send(p);
         }
 #endif

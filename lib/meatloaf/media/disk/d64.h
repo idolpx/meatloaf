@@ -18,6 +18,7 @@
 // .D64, .D41 - 1541 disk image format
 //
 // https://vice-emu.sourceforge.io/vice_16.html#SEC408
+// http://fileformats.archiveteam.org/wiki/CBMFS
 // https://ist.uwaterloo.ca/~schepers/formats/D64.TXT
 // https://ist.uwaterloo.ca/~schepers/formats/REL.TXT
 // https://ist.uwaterloo.ca/~schepers/formats/GEOS.TXT
@@ -48,6 +49,28 @@
 /********************************************************
  * Streams
  ********************************************************/
+
+// The string a CBM NEW (N0:) hands to format(), parsed.
+//
+// CBM syntax is "name,id". Meatloaf extends it with two optional trailing
+// fields, so a 40-track D64 or a multi-track DNP can be created from BASIC:
+//
+//     N0:name,id                 media default geometry, no error info
+//     N0:name,id,40              40 tracks
+//     N0:name,id,40,1            40 tracks with an error-info area
+//     N0:name,id,,1              default geometry with an error-info area
+//
+// Missing or unparseable trailing fields fall back to the defaults, so a plain
+// "name,id" behaves exactly as it always did.
+struct D64FormatSpec
+{
+    std::string name;
+    std::string id;
+    size_t      track_count = 0;      // 0 = whatever the media's default is
+    bool        error_info  = false;
+};
+
+D64FormatSpec parseD64FormatSpec(const std::string& header_info);
 
 class D64MStream : public MMediaStream {
 
@@ -114,7 +137,27 @@ public:
     std::vector<uint16_t> sectorsPerTrack = { 17, 18, 19, 21 };
     std::vector<uint8_t> interleave = { 3, 10 }; // Directory, File
 
-    uint8_t dos_version = 0x41;
+    // True for the floppy formats: one whole track belongs to the directory,
+    // so directory blocks are only ever placed there and file data never is.
+    // CMD native partitions (DNP) do not work that way - their directory is a
+    // plain chain that can extend onto any track, and file data shares track 1
+    // with it. On a small native partition that distinction is not cosmetic:
+    // excluding the directory track would leave a 1-track partition with no
+    // data blocks at all.
+    bool dedicated_directory_track = true;
+
+    // Opt-in permission to extend the medium as it fills. OFF by default, and
+    // deliberately so: a growable partition is a MEATLOAF EXTENSION, not CMD
+    // behaviour - a real CMD native partition is fixed at the size it was
+    // created with. Leaving it off keeps us compatible by default.
+    //
+    // It must also stay off whenever the image is embedded in a container. A
+    // DNP inside a DHD occupies a fixed window at a fixed offset, so growing it
+    // would write straight over the NEXT partition. Nothing sets this flag for
+    // a DHD-hosted partition, and nothing should.
+    bool allow_grow = false;
+
+    uint8_t dos_version = 0x41; // 'A' - CBM DOS 2.6 (1541)
     std::string dos_rom = "dos1541";
     std::string dos_name = "";
 
@@ -165,20 +208,20 @@ public:
                 break;
 
             case 196608: // 40 tracks no errors
-                partitions[partition].block_allocation_map[0].end_track = 40;
+                curPartition().block_allocation_map[0].end_track = 40;
                 break;
 
             case 197376: // 40 w/ errors
-                partitions[partition].block_allocation_map[0].end_track = 40;
+                curPartition().block_allocation_map[0].end_track = 40;
                 error_info = true;
                 break;
 
             case 205312: // 42 tracks no errors
-                partitions[partition].block_allocation_map[0].end_track = 42;
+                curPartition().block_allocation_map[0].end_track = 42;
                 break;
 
             case 206114: // 42 w/ errors
-                partitions[partition].block_allocation_map[0].end_track = 42;
+                curPartition().block_allocation_map[0].end_track = 42;
                 error_info = true;
                 break;
         }
@@ -251,6 +294,12 @@ public:
 
     uint16_t blocksFree() override;
 
+    // Canonical image size in bytes for this media type. Used when format()
+    // creates an image from nothing. Declared explicitly per format rather
+    // than derived from the geometry tables, so the two can be cross-checked
+    // against each other instead of a wrong table validating itself.
+    virtual uint32_t defaultImageSize() { return 174848; } // D64, 35 tracks
+
     uint8_t speedZone( uint8_t track) override
     {
         return (track < 18) + (track < 25) + (track < 31);
@@ -267,7 +316,7 @@ public:
     }
     uint16_t getTrackCount()
     {
-        return partitions[partition].block_allocation_map[0].end_track;
+        return curPartition().block_allocation_map[curPartition().block_allocation_map.size() - 1].end_track;
     }
 
     virtual bool seekPath(std::string path) override;
@@ -289,6 +338,23 @@ public:
     // current directory is set to it.
     PathResult resolvePath(std::string path);
 
+    // Delete a file inside the image: free its block chain and mark the
+    // directory entry scratched. Public counterpart to scratchEntry(), which
+    // is protected because it assumes the caller has already positioned on
+    // the entry - a contract that is easy to get wrong from outside (seekPath
+    // leaves track/sector on the file's first block, not its directory sector).
+    bool removeFile(std::string path);
+
+    // Recover a scratched file, the way a CBM unscratch utility does. A scratch
+    // only zeroes the entry's type byte, so the name, start track/sector and
+    // block count all survive - the file is recoverable until either its
+    // directory slot is reused or its blocks are handed to a new file.
+    //
+    // Fails, changing nothing, if any block of the chain has since been
+    // allocated. Restores the type as PRG: the original type is genuinely gone,
+    // since that is the single byte a scratch overwrites.
+    bool unremoveFile(std::string path);
+
     // Enter a subdirectory entry (CMD native DIR or 1581 CBM sub-partition)
     bool enterDirectory(std::string name);
 
@@ -299,7 +365,22 @@ public:
     Header header;      // Directory header data
     Entry entry;        // Directory entry data
 
+    // The current partition WITHIN this disk image - an index into
+    // partitions[], selecting among a 1581's CBM sub-partitions or a CMD
+    // native image's sub-partitions. Every format currently pushes exactly one
+    // Partition, so it is 0 today, but this is a real index and must stay one:
+    // callers index partitions[] with it, and the bounds guards on it are
+    // load-bearing.
+    //
+    // This is NOT the CMD HD partition. Which partition of a .dhd/.d1m/.d2m/
+    // .d4m file a disk image lives in is tracked by DHDImageRegistry, one
+    // level up - this field is scoped to the decoded disk itself.
     uint8_t partition = 0;
+
+    // Geometry for the current partition of this image.
+    Partition& curPartition() { return partitions[partition]; }
+    const Partition& curPartition() const { return partitions[partition]; }
+
     uint8_t track = 0;
     uint8_t sector = 0;
     uint8_t offset = 0;
@@ -319,44 +400,10 @@ protected:
             Debug_printv("Invalid partition index: %d", partition);
             return false;
         }
-        return seekSector(partitions[partition].header_track, 
-                        partitions[partition].header_sector, 
-                        partitions[partition].header_offset) &&
+        return seekSector(curPartition().header_track, 
+                        curPartition().header_sector, 
+                        curPartition().header_offset) &&
             readContainer((uint8_t*)&header, sizeof(header));
-    }
-
-    // Block/entry helpers usable by derived formats (D71/D81/DNP/DHD/...)
-    bool writeHeader(std::string name, std::string id) override
-    {
-        if (partitions.empty() || partition >= partitions.size()) {
-            Debug_printv("Invalid partition index: %d", partition);
-            return false;
-        }
-        seekSector( 
-            partitions[partition].header_track, 
-            partitions[partition].header_sector, 
-            partitions[partition].header_offset 
-        );
-
-        name = mstr::toPETSCII2(name);
-        id = mstr::toPETSCII2(id);
-
-        // Set default values
-        memset(&header, 0xA0, sizeof(header));
-        memcpy(header.id_dos, "\x30\x30\xA0\x32\x41", 5); // "00 2A"
-
-        // Set values
-        memcpy(header.name, name.c_str(), name.size());
-        memcpy(header.id_dos, id.c_str(), id.size());
-        Debug_printv("name[%16s] id_dos[%5s]", header.name, header.id_dos);
-        if (writeContainer((uint8_t*)&header, sizeof(header)))
-            return true;
-
-        std::string bam_message = "meatloaf!!! https://meatloaf.cc";
-        if (writeContainer((uint8_t*)bam_message.c_str(), sizeof(bam_message)))
-            return true;
-
-        return false;
     }
 
     bool seekEntry( std::string filename ) override;
@@ -370,6 +417,25 @@ protected:
     bool deallocateBlock( uint8_t track, uint8_t sector );
     BlockChain getFreeBlocks(uint16_t file_size);
     bool getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory = false);
+    bool findFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory);
+
+    // True for blocks a format permanently reserves for its own structures,
+    // beyond the header/BAM/first-directory blocks the generic code already
+    // knows about. They are allocated but belong to no chain, so anything
+    // auditing reachability has to treat them as reservations rather than
+    // leaks. Only CMD native partitions have such an area today.
+    virtual bool isReservedBlock(uint8_t track, uint8_t sector)
+    {
+        (void)track; (void)sector;
+        return false;
+    }
+
+    // Grow the medium by one track and return true if that succeeded. Fixed
+    // geometry formats cannot, so the default refuses; a CMD native partition
+    // (DNP) can, which is the whole point of "native" - it is sized at creation
+    // but not capped there. getNextFreeBlock() calls this once when it can find
+    // no free block, then retries.
+    virtual bool growImage() { return false; }
     bool isBlockFree(uint8_t track, uint8_t sector);
 
     // BAM record location for one track (which BAM sector holds it and where)
@@ -382,8 +448,11 @@ protected:
     };
     bool getBAMRecord( uint8_t track, BAMRecord *rec );
     bool readBAMRecord( uint8_t track, BAMRecord *rec, uint8_t *buf );
-    bool setBlockAllocation( uint8_t track, uint8_t sector, bool allocate );
-    uint8_t getTrackFreeCount( uint8_t track );
+    // Virtual so formats whose BAM splits the free COUNT away from the BITMAP
+    // can maintain both halves - see D71MStream, where side 2's counts live in
+    // 18/0 at 0xDD while its bitmaps live at 53/0.
+    virtual bool setBlockAllocation( uint8_t track, uint8_t sector, bool allocate );
+    uint16_t getTrackFreeCount( uint8_t track );
     bool findFreeSectorOnTrack( uint8_t track, uint8_t startSector, uint8_t *foundSector );
 
     // Streamed new-file write (SAVE): blocks are allocated one at a time as
@@ -393,6 +462,20 @@ protected:
     bool finalizeFileWrite();
     void rollbackFileWrite();
     bool scratchEntry();
+
+    // Restore the entry scratchEntry() blanked. Assumes the caller has already
+    // positioned on it (see seekScratchedEntry), same contract as scratchEntry.
+    bool unscratchEntry();
+
+    // Locate a SCRATCHED entry by name. seekEntry() skips type-0 entries, which
+    // is correct for every normal lookup and exactly wrong for recovery. Slots
+    // that were never used are also type 0, so a blank name is not a match.
+    bool seekScratchedEntry(std::string filename);
+
+    // Read a block's BAM bit. Returns false if the block is not representable
+    // in the BAM at all, so a caller that cannot answer treats it as unsafe
+    // rather than assuming free. out_allocated is only set when it returns true.
+    bool queryBlockAllocation(uint8_t track, uint8_t sector, bool& out_allocated);
 
     bool creating = false;          // building a new file via streamed writes
     std::string create_filename;    // name for the directory entry (UTF8)
@@ -409,38 +492,119 @@ protected:
 
     bool initializeBlocks();
 
-    bool initializeBlockAllocationMap()
+public:
+    // Lay out a blank image: fill blocks, initialize the BAM and directory,
+    // and write the header. Contains no MFSOwner/MFile resolution so it can
+    // be driven directly over any container stream.
+    bool formatImage(std::string name, std::string id, size_t track_count = 0, bool error_info = false);
+
+protected:
+    // CBM 8050/8250 BAM blocks carry a 6-byte header ahead of their per-track
+    // entries: a T/S link, the DOS version, a reserved byte, and the range of
+    // tracks the block covers (lowest, highest + 1). The blocks chain to each
+    // other and the last one links to the first directory sector. Without this
+    // c1541 derives a bogus track range and reports "ERR = 65, NO BLOCK" for
+    // tracks outside the disk. BlockAllocationMap has no room for it, so
+    // formats that need it call this after the generic initializer.
+    // Uses the dos_version member rather than a parameter: passing it in let
+    // D80 and D82 drift apart (one read the member, the other hardcoded 0x43).
+    bool writeBamBlockHeaders()
+    {
+        auto &maps = curPartition().block_allocation_map;
+        for (size_t i = 0; i < maps.size(); i++)
+        {
+            // Link to the next BAM block, or to the directory from the last one.
+            uint8_t next_track  = (i + 1 < maps.size()) ? maps[i + 1].track
+                                                        : curPartition().directory_track;
+            uint8_t next_sector = (i + 1 < maps.size()) ? maps[i + 1].sector
+                                                        : curPartition().directory_sector;
+
+            uint8_t hdr[6] = {
+                next_track,
+                next_sector,
+                dos_version,
+                0x00,                               // reserved
+                maps[i].start_track,
+                (uint8_t)(maps[i].end_track + 1)    // highest track + 1
+            };
+
+            if (!seekSector(maps[i].track, maps[i].sector, 0))
+                return false;
+            if (writeContainer(hdr, sizeof(hdr)) != sizeof(hdr))
+                return false;
+
+            // Zero the unused tail of the sector. initializeBlocks() fills every
+            // non-header track with the CBM 0x4B/0x01 pattern, and the per-track
+            // entries only cover part of the sector, so the remainder would keep
+            // that fill - a real format leaves it zero.
+            uint16_t used = maps[i].offset
+                          + (uint16_t)(maps[i].end_track - maps[i].start_track + 1) * maps[i].byte_count;
+            if (used < block_size)
+            {
+                std::vector<uint8_t> pad(block_size - used, 0);
+                if (!seekSector(maps[i].track, maps[i].sector, (uint8_t)used))
+                    return false;
+                if (writeContainer(pad.data(), pad.size()) != pad.size())
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    // Virtual for the same reason as setBlockAllocation(): a format whose BAM
+    // splits counts from bitmaps has to seed both halves at format time.
+    virtual bool initializeBlockAllocationMap()
     {
         uint16_t bam_index = 0;
-        uint16_t bam_count = partitions[partition].block_allocation_map.size();
+        uint16_t bam_count = curPartition().block_allocation_map.size();
 
         Debug_printv("initialize block allocation map");
 
         while (bam_index < bam_count) {
             seekSector( 
-                partitions[partition].block_allocation_map[bam_index].track, 
-                partitions[partition].block_allocation_map[bam_index].sector, 
-                partitions[partition].block_allocation_map[bam_index].offset 
+                curPartition().block_allocation_map[bam_index].track, 
+                curPartition().block_allocation_map[bam_index].sector, 
+                curPartition().block_allocation_map[bam_index].offset 
             );
 
             // Set default values
-            uint8_t track = partitions[partition].block_allocation_map[bam_index].start_track;
-            uint8_t end_track = partitions[partition].block_allocation_map[bam_index].end_track;
-            uint8_t byte_count = partitions[partition].block_allocation_map[bam_index].byte_count;
-            byte_count--; // First byte is number of sectors allocated
+            uint8_t track = curPartition().block_allocation_map[bam_index].start_track;
+            uint8_t end_track = curPartition().block_allocation_map[bam_index].end_track;
+            uint8_t rec_bytes = curPartition().block_allocation_map[bam_index].byte_count;
 
             // Update BAM for each track
             for (uint16_t t = track; t <= end_track; t++) {
-                uint8_t sectors = getSectorCount(t);
+                // MUST be 16-bit: CMD native formats (DNP, DHD) have 256
+                // sectors per track, which truncates to 0 in a uint8_t. That
+                // made the bitmap loop write all-zero bytes - every block
+                // marked ALLOCATED - and made bitmap_bytes compute as 0, which
+                // flipped has_count on so the writer emitted a leading count
+                // byte the reader does not expect. getSectorCount() returns
+                // uint16_t for exactly this reason.
+                uint16_t sectors = getSectorCount(t);
                 uint8_t data = 0;
-                
-                // First byte is count of free sectors
-                data = sectors;
-                if (!writeContainer((uint8_t*)&data, 1))
-                    return false;
+
+                // A record carries a leading free-sector count ONLY when it has
+                // more bytes than the bitmap needs (D64/D81). Bitmap-only records
+                // - D71 side 2, CMD native 32-byte records - must not get one:
+                // writing it anyway shifts the whole bitmap over by a byte and
+                // truncates its last byte, so blocks read back as allocated that
+                // were never allocated. Same test getBAMRecord() uses, so the
+                // writer and the readers agree about the record's shape.
+                uint8_t bitmap_bytes = (uint8_t)((sectors + 7) / 8);
+                bool has_count = rec_bytes > bitmap_bytes;
+                if (has_count)
+                {
+                    data = (uint8_t)sectors;
+                    if (!writeContainer((uint8_t*)&data, 1))
+                        return false;
+                }
+                // Keep the record's fixed width either way, so the next track's
+                // entry lands at the right offset.
+                bitmap_bytes = has_count ? (uint8_t)(rec_bytes - 1) : rec_bytes;
 
                 // Next bytes are the bit map (1 = Free, 0 = Allocated)
-                for (uint8_t i = 0; i < byte_count; i++) {
+                for (uint8_t i = 0; i < bitmap_bytes; i++) {
                     if ( sectors >= 8 )
                     {
                         data = 0xFF;
@@ -464,18 +628,65 @@ protected:
 
         return true;
     }
+
+
+    // Block/entry helpers usable by derived formats (D71/D81/DNP/DHD/...)
+    bool writeHeader(std::string name, std::string id) override
+    {
+        if (partitions.empty() || partition >= partitions.size()) {
+            Debug_printv("Invalid partition index: %d", partition);
+            return false;
+        }
+        seekSector(
+            curPartition().header_track,
+            curPartition().header_sector, 
+            curPartition().header_offset 
+        );
+
+        name = mstr::toPETSCII2(name);
+        id = mstr::toPETSCII2(id);
+
+        // Set default values
+        memset(&header, 0xA0, sizeof(header));
+        memcpy(header.id_dos, "\x30\x30\xA0\x32\x41", 5); // "00 2A"
+
+        // Set values
+        memcpy(header.name, name.c_str(), name.size());
+        memcpy(header.id_dos, id.c_str(), id.size());
+        Debug_printv("name[%16s] id_dos[%5s]", header.name, header.id_dos);
+        // NOTE: writeContainer() returns a BYTE COUNT, so `if (writeContainer(...))
+        // return true;` used to exit here on SUCCESS - making everything below
+        // unreachable, and inverting the return value on the failure path.
+        if (writeContainer((uint8_t*)&header, sizeof(header)) != sizeof(header))
+            return false;
+
+        // NOTE: a "meatloaf!!! https://meatloaf.cc" bam_message write used to sit
+        // here, but it was unreachable behind the early return above and used
+        // sizeof() on a std::string (the OBJECT size, not the text length).
+        // Left out deliberately: enabling it writes bytes into the header sector
+        // that were never written before, which is a behavior change this fix
+        // should not smuggle in.
+
+        // The BAM/header sector and the first directory sector are allocated by
+        // initializeDirectory(), which runs before this. Allocating them again
+        // here would fail: setBlockAllocation() returns false for a block that
+        // is already allocated.
+
+        return true;
+    }
+
     // bool initializeDirectory()
     // {
     //     Debug_printv("initialize directory");
     //     seekSector( 
-    //         partitions[partition].header_track, 
-    //         partitions[partition].header_sector, 
+    //         curPartition().header_track, 
+    //         curPartition().header_sector, 
     //         0
     //     );
 
     //     // Set default values in sector 0
-    //     uint8_t track = partitions[partition].directory_track;
-    //     uint8_t sector = partitions[partition].directory_sector;
+    //     uint8_t track = curPartition().directory_track;
+    //     uint8_t sector = curPartition().directory_sector;
     //     uint8_t data = 0x41;
 
     //     writeContainer((uint8_t*)&track, 1);
@@ -484,9 +695,9 @@ protected:
 
     //     // Set T/S link in first sector to 0x00 0xFF
     //     seekSector( 
-    //         partitions[partition].directory_track,
-    //         partitions[partition].directory_sector,
-    //         partitions[partition].directory_offset
+    //         curPartition().directory_track,
+    //         curPartition().directory_sector,
+    //         curPartition().directory_offset
     //     );
     //     data = 0x00;
     //     writeContainer((uint8_t*)&data, 1);
@@ -504,33 +715,73 @@ protected:
     bool initializeDirectory()
     {
         Debug_printv("initialize directory");
-        if (!seekSector(partitions[partition].header_track, partitions[partition].header_sector, 0)) {
+        if (!seekSector(curPartition().header_track, curPartition().header_sector, 0)) {
             return false;
         }
-        uint8_t track = partitions[partition].directory_track;
-        uint8_t sector = partitions[partition].directory_sector;
-        uint8_t data = 0x41; // DOS version
+        uint8_t track = curPartition().directory_track;
+        uint8_t sector = curPartition().directory_sector;
+        uint8_t data = dos_version; // DOS version
         if (!writeContainer(&track, 1) || !writeContainer(&sector, 1) || !writeContainer(&data, 1)) {
             return false;
         }
-        if (!seekSector(partitions[partition].directory_track, partitions[partition].directory_sector, partitions[partition].directory_offset)) {
+        if (!seekSector(curPartition().directory_track, curPartition().directory_sector, curPartition().directory_offset)) {
             return false;
         }
         data = 0x00; // End of directory chain
         if (!writeContainer(&data, 1)) return false;
         data = 0xFF;
         if (!writeContainer(&data, 1)) return false;
-        // Clear directory entries (e.g., 8 entries per sector)
-        uint8_t emptyEntry[32] = {0}; // 32 bytes per entry
-        for (int i = 0; i < 8; i++) {
-            if (!writeContainer(emptyEntry, 32)) return false;
+        // Clear the rest of the sector. A directory sector holds 8 x 32-byte
+        // entries = 256 bytes TOTAL, and the 2-byte T/S link written above
+        // occupies the head of the first entry slot - so only 254 bytes may
+        // follow it. Writing a full 8 x 32 here overran the sector by 2 bytes
+        // and clobbered the NEXT sector's T/S link.
+        std::vector<uint8_t> empty(block_size - 2, 0);
+        if (writeContainer(empty.data(), empty.size()) != empty.size()) return false;
+
+        // Allocate EVERY sector the BAM itself occupies. Formats with more than
+        // one BAM record spread them over several sectors - D71 has 18/0 plus
+        // 53/0 for side 2, D80 has 38/0 and 38/3, D82 adds 38/6 and 38/9 - and
+        // leaving those unallocated makes the BAM advertise its own storage as
+        // free. Records can share a sector, so skip one that is already taken
+        // rather than letting setBlockAllocation() fail on a double allocation.
+        for (auto &bam : curPartition().block_allocation_map)
+        {
+            if (!isBlockFree(bam.track, bam.sector))
+                continue;
+            if (!setBlockAllocation(bam.track, bam.sector, true))
+                return false;
         }
+
+        // ...and the header sector. On a D64/D71 that IS block_allocation_map[0]
+        // (18/0) so the loop above already took it, but on a D80/D82 the header
+        // lives at 39/0 while the BAM sits on track 38 - it is not in the map at
+        // all and would otherwise never be allocated.
+        if (isBlockFree(curPartition().header_track,
+                        curPartition().header_sector))
+        {
+            if (!setBlockAllocation(curPartition().header_track,
+                                    curPartition().header_sector, true))
+                return false;
+        }
+
+        // ...and the first directory sector (e.g. 18/1 on D64). Without this
+        // the BAM claims a sector the directory chain is actively using, so a
+        // later write can allocate it a second time and corrupt the directory.
+        if (!setBlockAllocation( curPartition().directory_track,
+                                 curPartition().directory_sector,
+                                 true ))
+            return false;
+
         return true;
     }
 
     // Container
     friend class D8BMFile;
     friend class DFIMFile;
+
+    // Test-only structural invariant checker (test/native/test_disk_write)
+    friend struct ImageInvariantChecker;
 
     // Disk
     friend class D64MFile;
@@ -574,8 +825,22 @@ public:
     virtual bool rewindDirectory() override;
     MFile* getNextFileInDir() override;
 
+    // Builds the URL for one entry of THIS directory. Virtual so a subclass can
+    // inject a component the base class knows nothing about - DHDPartitionMFile
+    // re-inserts the partition, without which a listing of a non-selected
+    // partition would emit entries that resolve into the selected one.
+    virtual std::string entryUrlFor(const std::string& filename);
+
+    // The URL handed to ImageBroker::obtain(). The broker rebuilds the stream
+    // from this URL, so a subclass whose stream depends on more than the
+    // container must include that here - DHDPartitionMFile appends the CMD
+    // partition number, without which the rebuilt stream decodes whichever
+    // partition happens to be selected.
+    virtual std::string brokerUrl() { return url; }
+
     bool isDirectory() override;
     bool exists() override;
+    bool remove() override;
     bool rename(std::string dest) override { return false; };
     time_t getLastWrite() override;
     time_t getCreationTime() override;

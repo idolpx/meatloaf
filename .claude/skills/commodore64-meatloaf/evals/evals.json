@@ -1,0 +1,23 @@
+{
+  "skill_name": "meatloaf-dos",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "i've got my c64 hooked up to a meatloaf on device 8 and i want to browse through the directories on my sd card using basic. what commands do i need to navigate around? show me how to go to the sd root, list a dir called 'games', go up a level, and check where i currently am.",
+      "expected_output": "Explanation of cd, pwd, and $ directory listing with BASIC V2 examples using lowercase keywords",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "my meatloaf build has jiffydos, epyx fastload, and dolphin dos all compiled in. i want to understand which fast loaders meatloaf supports and how to turn them on/off from basic. also which one should i use first?",
+      "expected_output": "Listing of all fast-loader toggles (ej+, ee+, ea+, ef+, ed+) with BASIC V2 examples and guidance on which to try first",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "i want to read the current time from my meatloaf's rtc and display it on screen in my c64 basic program. what meatloaf dos command reads the clock, and what format do the different variants give me? show me how to read it and print it in plain text format.",
+      "expected_output": "Explanation of t-ra, t-ri, t-rd, t-rb, t-rz commands with BASIC V2 example using t-ra for ASCII time",
+      "files": []
+    }
+  ]
+}

@@ -194,7 +194,7 @@ void pav_search(void)
    unsigned int byt;
 
    if(!quiet)
-      msgout("  Pavloda");
+      msgout("\r\n  Pavloda");
    
 
    for(i=20; i<tap.len-8; i++)

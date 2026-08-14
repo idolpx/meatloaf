@@ -23,18 +23,22 @@
 #include <cmath>
 #include <sstream>
 #include <iomanip>
+#ifndef TEST_NATIVE
 #include <mbedtls/version.h>
 #include <mbedtls/sha1.h>
 #include <mbedtls/base64.h>
 #include <esp_rom_crc.h>
+#endif
 
 //#include "../../include/petscii.h"
 #include "../../include/debug.h"
+#ifndef TEST_NATIVE
 #include "../meatloaf/hash/hash.h"
+#endif
 #include "U8Char.h"
 
 
-#if defined(_WIN32)
+#if defined(_WIN32) && !defined(TEST_NATIVE)
 #include "asprintf.h" // use asprintf from libsmb2
 #endif
 
@@ -76,6 +80,26 @@ namespace mstr {
             std::find_if(s.rbegin(), s.rend(), [](int ch) { return !isA0Space(ch); }).base(), s.end());
     }
 
+    // Strip the trailing padding of a fixed-width name field: PETSCII $A0,
+    // spaces, or a mix. rtrimA0() removes ONLY $A0, because in a CBM
+    // directory a trailing space can be part of the name (an LNX archive can
+    // hold "CLOUD KING" and "CLOUD KING      " as two different files). Use
+    // this one where the field is known to be space-padded instead - CBM tape
+    // headers, for example.
+    void rtrimPad(std::string &s)
+    {
+        while (!s.empty())
+        {
+            // isspace() is only defined for unsigned char values; $A0 in a
+            // signed char would be negative.
+            unsigned char ch = (unsigned char)s.back();
+            if (ch != 0xA0 && !std::isspace(ch))
+                break;
+
+            s.pop_back();
+        }
+    }
+
     // trim from both ends (in place)
     void trim(std::string &s)
     {
@@ -86,7 +110,7 @@ namespace mstr {
     // is space or petscii shifted space
     bool isA0Space(int ch)
     {
-        return ch == '\xA0' || std::isspace(ch);
+        return ch == '\xA0';
     }
 
     // is OSX/Windows junk system file
@@ -611,6 +635,7 @@ namespace mstr {
         return result;
     }
 
+#ifndef TEST_NATIVE
     std::string crc32(const std::string &s) {
         uint32_t crc = 0;
         crc = esp_rom_crc32_le(0, reinterpret_cast<const unsigned char*>(s.c_str()), s.size());
@@ -649,10 +674,11 @@ namespace mstr {
         // unsigned char output[64];
         // size_t outlen;
         // mbedtls_base64_encode(output, 64, &outlen, hash, 20);
-        
+
         std::string o(reinterpret_cast< char const* >(hash));
         return toHex(o);
     }
+#endif // TEST_NATIVE
 
     std::string urlDecode(const std::string& s)
     {

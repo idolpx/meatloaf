@@ -82,7 +82,7 @@ void turbo220_search (void)
 	lp = ft[THISLOADER].lp;
 
 	if (!quiet)
-		msgout("  Turbo 220");
+		msgout("\r\n  Turbo 220");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		eop = find_pilot(i, THISLOADER);

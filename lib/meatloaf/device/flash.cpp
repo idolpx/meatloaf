@@ -83,7 +83,7 @@ std::shared_ptr<MStream> FlashMFile::getSourceStream(std::ios_base::openmode mod
 
     std::shared_ptr<MStream> istream = std::make_shared<FlashMStream>(full_path, mode);
     //auto istream = StreamBroker::obtain<FlashMStream>(full_path, mode);
-    Debug_printv( ANSI_CYAN_BOLD_HIGH_INTENSITY "basepath[%s] path[%s] pathInStream[%s] mode[%d]", basepath.c_str(), path.c_str(), pathInStream.c_str(), mode);
+    //Debug_printv( ANSI_CYAN_BOLD_HIGH_INTENSITY "basepath[%s] path[%s] pathInStream[%s] mode[%d]", basepath.c_str(), path.c_str(), pathInStream.c_str(), mode);
     istream->open(mode);
     return istream;
 }
@@ -159,7 +159,7 @@ bool FlashMFile::remove() {
 
     int rc = ::remove( fullPath().c_str() );
     if (rc != 0) {
-        Debug_printv("remove: rc=%d path=`%s`\r\n", rc, path.c_str());
+        //Debug_printv("remove: rc=%d path=`%s`\r\n", rc, path.c_str());
         return false;
     }
 
@@ -183,7 +183,11 @@ bool FlashMFile::rename(std::string pathTo) {
 
 void FlashMFile::openDir(std::string path) 
 {
-    if (!isDirectory()) { 
+    if (!isDirectory()) {
+        // Clear the handle too, not just the flag: callers guard on `dir`
+        // being non-NULL, and leaving a stale or uninitialised value here is
+        // what turned a missing directory into a rewinddir() crash.
+        dir = nullptr;
         dirOpened = false;
         return;
     }
@@ -213,6 +217,7 @@ void FlashMFile::closeDir()
 {
     if(dirOpened) {
         closedir( dir );
+        dir = nullptr;   // closedir() frees it; don't leave it dangling
         dirOpened = false;
     }
 }
@@ -337,7 +342,7 @@ bool FlashMStream::open(std::ios_base::openmode mode) {
     if(isOpen())
         return true;
 
-    Debug_printv("trying to open flash fs [%s] mode[%d]", url.c_str(), mode);
+    //Debug_printv("trying to open flash fs [%s] mode[%d]", url.c_str(), mode);
     if(mode == std::ios_base::in)
         handle->obtain(url, "r");
     else if(mode == std::ios_base::out) {

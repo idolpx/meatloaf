@@ -51,7 +51,7 @@ description = The internet is a massive floppy drive for your C64 with Meatloaf!
 ;environment = adafruit_feather_esp32s3_tft ; Adafruit ESP32-S3 TFT Feather               (ESP32-S3, 4M Flash, 2M PSRAM)
 ;environment = esp32-s3-rgb                 ;                                             (ESP32-S3, 16M Flash, 8M PSRAM)
 ;environment = esp32-s3-dev-kit-n8r8        ; Waveshare ESP32-S3                          (ESP32-S3, 8M Flash, 8M PSRAM)
-environment = esp32-s3-makemagazin         ; Make Magazin Germany ESP32-S3-DevKitC-1     (ESP32-S3, 8M Flash, 8M PSRAM)
+;environment = esp32-s3-makemagazin         ; Make Magazin Germany ESP32-S3-DevKitC-1     (ESP32-S3, 8M Flash, 8M PSRAM)
 
 ; EXPERIMENTAL
 ; ESP32-C3
@@ -93,7 +93,8 @@ default_envs = ${meatloaf.environment}
 [esp32_base]
 ; Espressif32 PlatformIO Version to use for building
 ; https://github.com/platformio/platform-espressif32/releases
-platform = espressif32 @ 6.12.0
+platform = espressif32 @ 6.13.0
+;platform = espressif32 @ 7.0.1
 framework = espidf
 board_build.filesystem = littlefs
 test_filter = embedded/*
@@ -101,6 +102,9 @@ extra_scripts =
     pre:build_data.py
 ;    pre:build_version.py
 ;    pre:build_nvs.py
+    ; Applies fixes to the ESP-IDF package that upstream has not released yet.
+    ; Idempotent; see the script for what and why.
+    pre:patch_framework.py
 ;    post:build_firmwarezip.py
 
 [env]
@@ -182,10 +186,30 @@ build_unflags =
 ; https://blog.leon0399.ru/platformio-coverage-github-actions
 platform = native
 test_filter = native/*
-extra_scripts = gen_coverage.py
+lib_deps = throwtheswitch/Unity@^2.6.1
+extra_scripts =
+    gen_coverage.py
+    test/native/test_archive_extract/host/build_libarchive.py
 build_flags =
     ${env.build_flags}
     -D TEST_NATIVE
+    ; Header search paths for the disk-write engine sources pulled in by
+    ; test/native/test_disk_write/engine_sources.cpp (see that file for why
+    ; they're included directly instead of relying on PlatformIO's LDF).
+    -I lib/meatloaf
+    -I lib/utils
+    ; test_archive_extract additionally compiles lib/utils/utils.cpp and
+    ; lib/utils/peoples_url_parser.cpp, which need lib/compat and lib/sam.
+    ; Its C dependencies (libarchive, zlib, bzip2, lz4) are built by the
+    ; extra_script above - see that file for why they can't be unity-built.
+    -I lib/compat
+    -I lib/sam
+    ; test_archive_extract: libarchive's public headers, and the host shims
+    ; (mingw gaps, freertos/esp stubs, and the libarchive config override -
+    ; see test/native/test_archive_extract/host/config.h).
+    -I components/libarchive/lib
+    -I test/native/test_archive_extract/host
+    -include test/native/test_archive_extract/host/host_posix_compat.h
     ;-lgcov
     ;--coverage
     ;-fprofile-abs-path

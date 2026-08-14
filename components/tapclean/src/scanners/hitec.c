@@ -79,7 +79,7 @@ void hitec_search (void)
 	sv = ft[THISLOADER].sv;
 
 	if (!quiet)
-		msgout("  Hi-Tec tape");
+		msgout("\r\n  Hi-Tec tape");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		eop = find_pilot(i, THISLOADER);

@@ -170,7 +170,7 @@ void cyberload_f4_search(void)
       return;
 
    if(!quiet)
-      msgout("  Cyberload F4 (3 types)");
+      msgout("\r\n  Cyberload F4 (3 types)");
 
 
    for(i=20; i<tap.len-50; i++)

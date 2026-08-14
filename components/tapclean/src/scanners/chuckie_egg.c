@@ -140,7 +140,7 @@ void chuckieegg_search (void)
 	lp = ft[THISLOADER].lp;
 
 	if (!quiet)
-		msgout("  Chuckie Egg");
+		msgout("\r\n  Chuckie Egg");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		eop = find_pilot_bytes_ex(i, THISLOADER, chuckieegg_readbyte, BITSINABYTE);

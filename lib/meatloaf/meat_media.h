@@ -25,11 +25,14 @@
 #include <unordered_map>
 #include <sstream>
 #include <chrono>
+#include <algorithm>
 
 #include "../../include/debug.h"
 
+#ifndef TEST_NATIVE
 #include "../device/iec/meatloaf.h"
 #include "../device/iec/fuji.h"
+#endif
 #include "string_utils.h"
 
 
@@ -239,6 +242,9 @@ class ImageBroker {
 
     // Check if an entry is currently in use by any active drive
     static bool is_in_use(const std::string& key) {
+#ifdef TEST_NATIVE
+        return false;
+#else
         for (int i = 0; i < MAX_DISK_DEVICES; i++) {
             auto drive = Meatloaf.get_disks(i);
             if (drive != nullptr) {
@@ -258,6 +264,7 @@ class ImageBroker {
                 return true;
         }
         return false;
+#endif
     }
 
     // Evict oldest entries if over limit (skip entries that are in use)
@@ -317,6 +324,22 @@ public:
     {
         auto newFile = std::unique_ptr<MFile>(MFSOwner::File(url));
 
+        // Both of these are reachable for a path the resolver cannot make
+        // sense of, and neither used to be checked. MFSOwner::File() assigns
+        // sourceFile ONLY on its "look up path" branch, so a path it resolves
+        // without needing a container lookup legitimately comes back with a
+        // null sourceFile. Dereferencing it panicked the device
+        // (LoadProhibited, EXCVADDR 0x20 — the offset of `url`) on a real
+        // web.archive.org URL carrying a second scheme mid-path:
+        //   https://web.archive.org/web/20180901151341/http://vic20tapes.org/…zip
+        // Callers already handle a null return as "cannot read this", which is
+        // the right answer for a path that has no container to read from.
+        if (newFile == nullptr || newFile->sourceFile == nullptr) {
+            Debug_printv("no source for url[%s] — cannot obtain a %s stream",
+                         url.c_str(), type.c_str());
+            return nullptr;
+        }
+
         std::string key = type + newFile->sourceFile->url;
         if ( newFile->sourceFile->pathInStream.size() && newFile->sourceFile->pathInStream != "/" )
             key += "/" + newFile->sourceFile->pathInStream;
@@ -360,6 +383,20 @@ public:
             );
             image_repo.erase(it);
         }
+    }
+
+    // Drop whatever obtain(type, url) would have returned. The key is derived
+    // from the SOURCE file, so it cannot be spelled by callers - anyone
+    // invalidating a cached image stream needs this rather than a hand-built
+    // string that silently drifts from obtain()'s.
+    static void disposeFor(const std::string& type, const std::string& url) {
+        std::unique_ptr<MFile> f(MFSOwner::File(url));
+        if (f == nullptr || f->sourceFile == nullptr)
+            return;
+        std::string key = type + f->sourceFile->url;
+        if (f->sourceFile->pathInStream.size() && f->sourceFile->pathInStream != "/")
+            key += "/" + f->sourceFile->pathInStream;
+        dispose(key);
     }
 
     static void validate() {

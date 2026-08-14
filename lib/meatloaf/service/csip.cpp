@@ -368,8 +368,8 @@ bool CSIPMStream::open(std::ios_base::openmode mode) {
     // should we allow loading of * in any directory?
     // then we can LOAD and get available count from first 2 bytes in little endian
     // name here MUST BE UPPER CASE
-    // trim spaces from right of name too
-    mstr::rtrimA0(full_path);
+    // trim spaces from right of name too (rtrimA0() is $A0-only)
+    mstr::rtrimPad(full_path);
 
     // Check if path goes through a D64 container image - must INSERT it first
     std::string load_target = full_path;

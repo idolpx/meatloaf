@@ -74,6 +74,14 @@ bool T64MStream::seekEntry( std::string filename )
 
 bool T64MStream::seekEntry( uint16_t index )
 {
+    // The entry count comes from the header, and the constructor no longer
+    // reads it. Both the directory listing and a by-name lookup funnel through
+    // here, so this is where a stream that has not been through a directory
+    // listing gets its header - without it the bound below is whatever garbage
+    // `header` was allocated over.
+    if ( entry_count == (size_t)-1 && !readHeader() )
+        return false;
+
     if ( index > header.entry_count )
         return false;
 

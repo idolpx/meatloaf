@@ -142,7 +142,7 @@ void superpav_search(void)
 
       if(!quiet)
       {
-         sprintf(lin,"  Super Pavloda %s", lname[pass-1]);
+         sprintf(lin,"\r\n  Super Pavloda %s", lname[pass-1]);
          msgout(lin);
             
       }

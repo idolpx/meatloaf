@@ -85,7 +85,7 @@ static void megasave_search_core(int lt)
 	sv = ft[lt].sv;
 
 	if (!quiet) {
-		sprintf(lin, "  Mega-Save T%d", lt - MEGASAVE_T1 + 1);
+		sprintf(lin, "\r\n  Mega-Save T%d", lt - MEGASAVE_T1 + 1);
 		msgout(lin);
 	}
 

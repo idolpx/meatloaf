@@ -79,6 +79,7 @@ public:
         interleave = { 1, 1 }; // Directory, File
         has_subdirs = true;
         dos_rom = "dos1581";
+        dos_version = 0x44; // 'D' - CBM DOS 3.0 (1581)
 
         uint32_t size = containerStream->size();
         switch (size + media_header_size) 
@@ -92,12 +93,14 @@ public:
 
             // https://sourceforge.net/p/vice-emu/bugs/1890/
             case 829440:  // 81 tracks no errors
-                partitions[partition].block_allocation_map[1].end_track = 81;
+                curPartition().block_allocation_map[1].end_track = 81;
                 break;
         }
     };
 
     virtual uint8_t speedZone(uint8_t track) override { return 0; };
+
+    uint32_t defaultImageSize() override { return 819200; }
 
 protected:
 

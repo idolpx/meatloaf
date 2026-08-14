@@ -42,7 +42,7 @@ void ik_search(void)
 	int s, e, x;
 
 	if (!quiet)
-		msgout("  International Karate loader");
+		msgout("\r\n  International Karate loader");
          
 
 	for (i = 20; i < tap.len - 20; i++) {

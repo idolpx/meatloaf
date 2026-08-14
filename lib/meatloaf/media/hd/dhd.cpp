@@ -19,6 +19,7 @@
 
 #include "meat_media.h"
 #include <cstring>
+#include <cstdlib>
 #include <memory>
 
 std::map<std::string, DHDImageRegistry::Image> DHDImageRegistry::s_images;
@@ -136,6 +137,21 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
 
     uint32_t sys_base = 0xFFFFFFFF;
     uint32_t table_base = 0;
+    // A CMD HD holds a MAXIMUM OF 254 partitions. The loop below runs
+    // i <= maxpart over the table's PHYSICAL entries: entry 0 is the system
+    // partition (it supplies disk_label and is listed but never selectable),
+    // and entries 1..254 are the user partitions. There is no entry 255.
+    //
+    // This agrees with the vendored VICE code, which is the reference to trust
+    // here: lib/vdrive/vdrive.c:1180 caps at 254 with the comment "CMD HDs can
+    // access 254 partitions (255 is system)", and vdrive.c:1201 remaps physical
+    // entry 0 onto LOGICAL slot 255 (`k = (i == 0) ? 255 : i`) - so VICE's
+    // "255" is the system partition under a different numbering, NOT a 255th
+    // user partition. Raising this to 255 reads 32 bytes past the real table
+    // and can fabricate a phantom partition from whatever follows.
+    //
+    // Both this and the loop counter must stay uint16_t: as uint8_t, an
+    // "i <= 255" bound would never be false.
     uint16_t maxpart = 254;
 
     if (fd_sys != 0)
@@ -178,7 +194,8 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
 
     // Partition table on track 1 of the system partition: 32-byte entries,
     // 8 per 256-byte sector, laid out contiguously. Entry 0 is the system
-    // partition itself.
+    // partition itself; entries 1..254 are the selectable partitions (CMD FD
+    // caps at 31).
     uint8_t buf[32];
     for (uint16_t i = 0; i <= maxpart; i++)
     {
@@ -195,15 +212,23 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
         if (e != std::string::npos)
             name.resize(e);
 
+        uint8_t type = buf[2];
+
         if (i == 0)
         {
+            // Entry 0 is the system partition: it carries the drive label and
+            // the partition table itself. Its type byte is 0xFF in every real
+            // image (which is what vdrive's `ptype[part] == 255` test keys on),
+            // so it would never pass the 1..4 filter below - it is added
+            // explicitly instead, because it belongs in the partition listing.
+            // It is NOT selectable: select() refuses partition 0, since the
+            // system partition is not a mountable disk.
             img.disk_label = mstr::toUTF8(name);
+        }
+        else if (type < 1 || type > 4)
+        {
             continue;
         }
-
-        uint8_t type = buf[2];
-        if (type < 1 || type > 4)
-            continue;
 
         DHDPartition p;
         p.number = i;
@@ -218,14 +243,26 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
                      p.number, p.type, p.name.c_str(), p.start, p.size);
     }
 
-    if (img.parts.empty())
+    // parts[] now always holds the system partition (entry 0), so "is it empty"
+    // no longer answers "is anything mountable here" - count USER partitions.
+    uint8_t first_user = 0;
+    for (const DHDPartition &p : img.parts)
+    {
+        if (p.number != 0) { first_user = p.number; break; }
+    }
+
+    if (first_user == 0)
     {
         Debug_printv("No usable partitions in [%s]", containerUrl.c_str());
         return false;
     }
 
-    // First use: select the default partition
-    img.selected = img.byNumber(img.default_part) ? img.default_part : img.parts[0].number;
+    // First use: select the default partition, falling back to the first USER
+    // partition - never entry 0. parts[0] is the system partition now, so using
+    // it as the fallback would mount the partition table as if it were a disk.
+    img.selected = (img.default_part != 0 && img.byNumber(img.default_part))
+                 ? img.default_part
+                 : first_user;
     img.valid = true;
 
     Debug_printv("CMD %s [%s] label[%s] partitions[%d] selected[%d]",
@@ -240,6 +277,14 @@ bool DHDImageRegistry::select(const std::string &containerUrl, uint8_t number)
     if (img == nullptr)
         return false;
 
+    // Partition 0 is the system partition. It appears in the listing (it is a
+    // real table entry, and users want to see it), but it is not a mountable
+    // disk - it holds the partition table. Refusing it HERE rather than in each
+    // caller covers every route in: CP<n>, the console command's numeric form,
+    // and a by-NAME lookup, since byNumber(0)/byName("system") now resolve.
+    if (number == 0)
+        return false;
+
     const DHDPartition* p = img->byNumber(number);
     if (p == nullptr)
         return false;
@@ -251,15 +296,80 @@ bool DHDImageRegistry::select(const std::string &containerUrl, uint8_t number)
     Debug_printv("selected partition[%d] type[%d] name[%s]", p->number, p->type, p->name.c_str());
 
     // Drop the broker-cached image stream so the next access decodes the
-    // newly selected partition (key format mirrors ImageBroker::obtain)
-    std::unique_ptr<MFile> f(MFSOwner::File(containerUrl));
-    if (f != nullptr && f->sourceFile != nullptr)
-    {
-        std::string key = "d64" + f->sourceFile->url;
-        if (f->sourceFile->pathInStream.size() && f->sourceFile->pathInStream != "/")
-            key += "/" + f->sourceFile->pathInStream;
-        ImageBroker::dispose(key);
-    }
+    // newly selected partition. cached_part records what IS cached, so after
+    // discarding it that is nothing - not the partition we are about to use.
+    // getDecodedStream() sets it when a stream is actually built.
+    disposeCachedStream(containerUrl);
+    img->cached_part = 0;
 
     return true;
+}
+
+void DHDImageRegistry::disposeCachedStream(const std::string &containerUrl)
+{
+    // Key format mirrors ImageBroker::obtain(): type + the SOURCE file's url,
+    // plus its pathInStream when it has one. The broker derives its key from a
+    // freshly resolved MFile, so we must do the same to name the same entry.
+    ImageBroker::disposeFor("d64", containerUrl);
+}
+
+const DHDPartition* DHDResolvePartition(const std::string &containerUrl,
+                                        const std::string &in_path,
+                                        std::string *out_rest,
+                                        bool *out_explicit)
+{
+    if (out_rest) *out_rest = in_path;
+    if (out_explicit) *out_explicit = false;
+
+    DHDImageRegistry::Image *img = DHDImageRegistry::obtain(containerUrl);
+    if (img == nullptr || !img->valid)
+        return nullptr;
+
+    const DHDPartition *p = nullptr;
+
+    if (!in_path.empty())
+    {
+        std::string comp = in_path;
+        size_t slash = comp.find('/');
+        if (slash != std::string::npos)
+            comp = comp.substr(0, slash);
+
+        if (!comp.empty())
+        {
+            bool numeric = comp.find_first_not_of("0123456789") == std::string::npos;
+            if (numeric)
+            {
+                // Range-check before narrowing to uint8_t - an int silently
+                // truncated into byNumber() is what once made "1571" resolve to
+                // partition 35. v == 0 means "currently selected" and must NOT
+                // go through byNumber(), which would return table entry 0, the
+                // system partition.
+                char *end = nullptr;
+                long v = strtol(comp.c_str(), &end, 10);
+                if (end != comp.c_str() && *end == '\0' && v >= 0 && v <= 254)
+                    p = (v == 0) ? img->current() : img->byNumber((uint8_t)v);
+            }
+            else
+            {
+                p = img->byName(comp);
+                // byName() honours wildcards, so a bare "*" can match the
+                // system partition (entry 0). It is not mountable.
+                if (p != nullptr && p->number == 0)
+                    p = nullptr;
+            }
+
+            if (p != nullptr)
+            {
+                if (out_explicit) *out_explicit = true;
+                if (out_rest)
+                    *out_rest = (slash == std::string::npos) ? std::string()
+                                                            : in_path.substr(slash + 1);
+            }
+        }
+    }
+
+    if (p == nullptr)
+        p = img->current();
+
+    return p;
 }

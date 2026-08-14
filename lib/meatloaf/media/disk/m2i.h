@@ -86,6 +86,7 @@ protected:
     std::string title;
     std::vector<Entry> entries;
     Entry entry;                // currently selected entry
+    bool header_read = false;   // index parsed into entries
 
     // The host file being served after seekPath()
     std::shared_ptr<MStream> fileStream;
@@ -110,7 +111,7 @@ public:
 
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
     {
-        Debug_printv("[%s]", url.c_str());
+        //Debug_printv("[%s]", url.c_str());
 
         return std::make_shared<M2IMStream>(is);
     }

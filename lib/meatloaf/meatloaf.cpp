@@ -98,13 +98,13 @@
 #include "media/disk/d80.h"
 #include "media/disk/d81.h"
 #include "media/disk/d82.h"
-#include "media/disk/d90.h"
 #include "media/disk/dxm.h"
 #include "media/disk/g64.h"
 #include "media/disk/m2i.h"
 #include "media/disk/nib.h"
 
 // Hard Disk
+#include "media/hd/d90.h"
 #include "media/hd/dnp.h"
 #include "media/hd/dhd.h"
 #include "media/hd/hdd.h"
@@ -1228,22 +1228,25 @@ MFile* MFile::cd(std::string newDir)
             // Absolute local path; don't append to current URL
             return MFSOwner::File(newDir);
         }
+
+        std::string base = fullUrl();
+
         if ( newDir[0]=='/' )
             newDir = mstr::drop(newDir,1);
 
-        // Add new directory to path
-        if ( !mstr::endsWith(url, "/") && newDir.size() )
-            url.push_back('/');
-
         // Network Explorer
-        if ( url == "/" && newDir == "network") {
-            url = "mdns://";
+        if ( base == "/" && newDir == "network") {
+            base = "mdns://";
             newDir = "";
         }
 
         // Add new directory to path
-        //Debug_printv("url[%s] newDir[%s]", url.c_str(), newDir.c_str());
-        MFile* newPath = MFSOwner::File(url + newDir);
+        if ( !mstr::endsWith(base, "/") && !newDir.empty() )
+            base.push_back('/');
+
+        // Add new directory to path
+        //Debug_printv("base[%s] newDir[%s]", base.c_str(), newDir.c_str());
+        MFile* newPath = MFSOwner::File(base + newDir);
         if (newPath == nullptr) {
             return nullptr;
         }
@@ -1281,26 +1284,26 @@ MFile* MFile::cd(std::string newDir)
 
 MFile* MFile::cdParent(std::string plus) 
 {
-    Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
+    std::string currentFull = fullUrl();
+    Debug_printv("fullUrl[%s] plus[%s]", currentFull.c_str(), plus.c_str());
 
-    // drop last dir
-    // add plus
-    if(path.empty()) 
+    if(currentFull.empty() || currentFull == "/") 
     {
         // from here we can go only to flash root!
         return MFSOwner::File("/", true);
     }
     else 
     {
-        int lastSlash = path.find_last_of('/');
-        if ( lastSlash == path.size() - 1 ) 
-        {
-            if ( lastSlash == 0 )
-                return MFSOwner::File("/", true);
+        if (currentFull.size() > 1 && currentFull.back() == '/')
+            currentFull.pop_back();
 
-            lastSlash = path.find_last_of('/', path.size() - 2);
+        size_t lastSlash = currentFull.find_last_of('/');
+        if (lastSlash == std::string::npos || lastSlash == 0)
+        {
+            return MFSOwner::File("/", true);
         }
-        std::string newDir = mstr::dropLast(path, path.size() - lastSlash);
+
+        std::string newDir = currentFull.substr(0, lastSlash);
 
         // Strip leading / from plus, then consume any _ (CBM ←) characters as
         // additional "go up" steps — resolves _/_/dir by walking the path string
@@ -1315,19 +1318,18 @@ MFile* MFile::cdParent(std::string plus)
             // go up one more level in newDir
             auto ls = newDir.rfind('/');
             if (ls == std::string::npos || ls == 0) {
-                newDir = "";
+                newDir = "/";
                 break;
             }
             newDir = newDir.substr(0, ls);
         }
 
-        if (!plus.empty()) { newDir += '/'; newDir += plus; }
+        if (!plus.empty()) {
+            if (newDir != "/") newDir += '/';
+            newDir += plus;
+        }
 
-        path = newDir;
-        rebuildUrl();
-        //Debug_printv("url[%s]", url.c_str());
-
-        return MFSOwner::File(url);
+        return MFSOwner::File(newDir);
     }
 };
 
@@ -1361,9 +1363,21 @@ MFile* MFile::cdRoot(std::string plus)
     return MFSOwner::File( plus, true );
 };
 
-MFile* MFile::cdLocalRoot(std::string plus) 
+MFile* MFile::cdLocalRoot(std::string plus)
 {
     Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
+
+    // cd() must not mutate `this`. Callers do getCurrentPath()->cd(...) and only
+    // adopt the result if it turns out to be a directory - so mutating here moved
+    // the console's working directory to the new path even when the cd command
+    // rejected it and never called setCurrentPath(). That left the shell sitting
+    // in a non-existent directory.
+    //
+    // rebuildUrl() composes url from root() + path (and normalises path via
+    // cleanPath()), so it writes exactly these two members: save and restore them
+    // rather than duplicating that composition here.
+    std::string saved_path = path;
+    std::string saved_url = url;
 
     if ( path.empty() || sourceFile == nullptr ) {
         // from here we can go only to flash root!
@@ -1374,8 +1388,13 @@ MFile* MFile::cdLocalRoot(std::string plus)
     if (!plus.empty()) { path += '/'; path += plus; }
 
     rebuildUrl();
-    Debug_printv("url[%s]", url.c_str());
-    return MFSOwner::File( url );
+    std::string destUrl = url;
+    Debug_printv("url[%s]", destUrl.c_str());
+
+    path = saved_path;
+    url = saved_url;
+
+    return MFSOwner::File( destUrl );
 };
 
 // bool MFile::copyTo(MFile* dst) {
@@ -1435,8 +1454,8 @@ uint64_t MFile::getAvailableSpace()
 
         if (f_getfree("/", &fre_clust, &fsinfo) == 0)
         {
-            uint64_t total = ((uint64_t)(fsinfo->csize)) * (fsinfo->n_fatent - 2) * (fsinfo->ssize);
-            uint64_t used = ((uint64_t)(fsinfo->csize)) * ((fsinfo->n_fatent - 2) - (fsinfo->free_clst)) * (fsinfo->ssize);
+            uint64_t total = ((uint64_t)(fsinfo->csize)) * (fsinfo->n_fatent - 2) * fatfs_sector_size(fsinfo);
+            uint64_t used = ((uint64_t)(fsinfo->csize)) * ((fsinfo->n_fatent - 2) - (fsinfo->free_clst)) * fatfs_sector_size(fsinfo);
             uint64_t free = total - used;
             //Debug_printv("total[%llu] used[%llu free[%llu]", total, used, free);
             return free;

@@ -97,7 +97,7 @@ void rackit_search (void)
 
 
 	if (!quiet)
-		msgout("  Rack-It tape (+Variant)");
+		msgout("\r\n  Rack-It tape (+Variant)");
 
 	/*
 	 * First we retrieve loader variables from the CBM data block, 

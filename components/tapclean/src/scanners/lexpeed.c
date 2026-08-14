@@ -243,7 +243,7 @@ void lexpeed_search(void)
 	int cbm_index = 1;
 
 	if (!quiet)
-		msgout("  Lexpeed Fastsave System");
+		msgout("\r\n  Lexpeed Fastsave System");
 
 	for (;;) {
 		int match;

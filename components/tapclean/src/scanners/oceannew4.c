@@ -80,7 +80,7 @@ void oceannew4_search (void)
 	sv = ft[THISLOADER].sv;
 
 	if (!quiet)
-		msgout("  New Ocean Tape 4");
+		msgout("\r\n  New Ocean Tape 4");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		eop = find_pilot(i, THISLOADER);

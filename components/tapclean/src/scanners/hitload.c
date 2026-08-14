@@ -43,7 +43,7 @@ void hitload_search(void)
 	int z, lstart, lend, tmp, tcnt, hd[HDSZ];
 
 	if (!quiet)
-		msgout("  Hitload");
+		msgout("\r\n  Hitload");
          
 
 	for (i = 20; i < tap.len - 8; i++) {

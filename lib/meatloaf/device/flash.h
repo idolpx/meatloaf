@@ -152,7 +152,11 @@ public:
     bool readEntry( std::string filename );
 
 protected:
-    DIR* dir;
+    // MUST be initialised: openDir() returns early without assigning it when
+    // the path is not a directory, and rewindDirectory() only guards against
+    // NULL. Uninitialised, that guard passes on garbage and rewinddir() faults
+    // - an `ls` in any non-existent directory was a hard crash.
+    DIR* dir = nullptr;
     bool dirOpened = false;
 
     virtual void openDir(std::string path);

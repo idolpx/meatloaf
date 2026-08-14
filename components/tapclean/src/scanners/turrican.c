@@ -107,7 +107,7 @@ void turrican_search(void)
 	lp = ft[THISLOADER].lp;
 
 	if (!quiet)
-		msgout("  Turrican loader");
+		msgout("\r\n  Turrican loader");
 
 	state = STATE_SEARCH_HEADER;	/* Initially search for a Header */
 

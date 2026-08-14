@@ -83,7 +83,7 @@ void testape_search (void)
 	lp = ft[THISLOADER].lp;
 
 	if (!quiet)
-		msgout("  TES Tape");
+		msgout("\r\n  TES Tape");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		eop = find_pilot(i, THISLOADER);

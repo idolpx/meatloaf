@@ -54,6 +54,20 @@ class Archive {
 
     bool isOpen() { return m_archive != nullptr; }
     archive *getArchive() { return m_archive; }
+
+    // The original filename a gzip stream stores in its header (RFC 1952
+    // FNAME, flag bit 3), or "" if absent/incomplete. libarchive surfaces
+    // FNAME as the entry pathname, but only when a format reader produces an
+    // entry — for a compressed-only file archive_read_next_header() returns
+    // ARCHIVE_EOF, so the name has to be read from the header directly.
+    // `n` is however many leading bytes are available; a name that would run
+    // past them is rejected rather than truncated.
+    static std::string gzipNameFromHeader(const uint8_t *p, size_t n);
+
+    // The leading bytes of this archive, captured by cb_read at no extra I/O
+    // cost. Enough to hold a gzip header with a filename in it.
+    const uint8_t *firstBytes() const { return m_firstBytes; }
+    size_t firstBytesLen() const { return m_firstBytesLen; }
     bool hasCompressionFilter() { return m_hasCompressionFilter; }
     bool isRandomAccess() { return m_randomAccess; }
 
@@ -68,6 +82,13 @@ class Archive {
     std::shared_ptr<MStream> m_srcStream = nullptr;  // a stream that is able to serve bytes of this archive
     bool m_hasCompressionFilter = false;  // True when gzip/bz2/xz/etc filter is active (disables raw seeking)
     bool m_randomAccess = false;  // True for directory listing (seekable reader); false for streaming extraction
+
+    // First bytes handed to libarchive this open, recorded by cb_read. Used
+    // for two things: reported when no format recognizes the stream (see
+    // cb_read()), and parsed for a gzip FNAME when the file is compressed-only.
+    // 256 is sized for the latter — a gzip header plus a long stored filename.
+    uint8_t m_firstBytes[256] = {0};
+    size_t m_firstBytesLen = 0;
 
   // 32KB source read block: cb_read pulls this much per libarchive callback.
   // Larger blocks mean far fewer HTTP range requests when the archive source
@@ -222,7 +243,14 @@ class ArchiveMStream : public MMediaStream {
 
     struct archive_entry *a_entry;
     struct Entry {
+        // The entry's basename. Directory listings are flat - a CBM directory
+        // has no notion of nested paths - so this is what browsing shows.
         std::string filename;
+        // The path as STORED in the archive, e.g. "docs/manual/readme.txt".
+        // Kept separately because basename() throws it away and extraction
+        // needs it to recreate the directory structure. Empty if the archive
+        // stored no path component.
+        std::string pathname;
         uint32_t size;
     };
     Entry entry;
@@ -313,7 +341,15 @@ class ArchiveMFile : public MFile {
                 // so we must seek the single inner entry here to produce a ready-to-read stream.
                 auto archiveStream = std::make_shared<ArchiveMStream>(is);
                 if (archiveStream->seekPath("*")) {
-                    Debug_printv("url[%s] base[%s] inner[%s]", url.c_str(), base().c_str(), innerFilename.c_str());
+                    // Remember what the entry actually resolved to. It is the
+                    // gzip header's stored FNAME when there is one, or the URL
+                    // basename percent-decoded — either way a better name than
+                    // `name`, which is the raw URL basename and is about to be
+                    // emptied by resetURL() below. getDownloadFilename() hands
+                    // it to callers that write the decompressed file to disk.
+                    m_resolvedName = archiveStream->entry.filename;
+                    Debug_printv("url[%s] base[%s] inner[%s] resolved[%s]", url.c_str(),
+                                 base().c_str(), innerFilename.c_str(), m_resolvedName.c_str());
                     Debug_printv("stream->url[%s]", archiveStream->url.c_str());
                     resetURL(base());
                     return archiveStream;
@@ -348,6 +384,14 @@ class ArchiveMFile : public MFile {
             if (mstr::endsWith(name, singleFileExts[i], false)) return true;
         }
         return false;
+    }
+
+    // The name a caller should write the decompressed content under: what the
+    // entry actually resolved to once the stream was opened (gzip FNAME, or
+    // the URL basename percent-decoded). Falls back to MFile's answer before
+    // that has happened. Same hook wget uses for Content-Disposition.
+    std::string getDownloadFilename() override {
+        return m_resolvedName.empty() ? MFile::getDownloadFilename() : m_resolvedName;
     }
 
     // Strip the outermost compression extension to get the inner filename.
@@ -416,6 +460,8 @@ class ArchiveMFile : public MFile {
    private:
     Archive *m_archive = nullptr;
     MFile   *m_innerFile = nullptr;
+    // Entry name resolved by getDecodedStream(); see getDownloadFilename().
+    std::string m_resolvedName;
 };
 
 /********************************************************
@@ -439,8 +485,8 @@ public:
                 ".iso",     // ISO 9660 Optical Disc Image
 
                 // Multi-format archives (have to check file header to determine format)
-                ".arc",     // Have to find a way to distinquish between PC/C64 ARC file
-                ".ark",     // Have to find a way to distinquish between PC/C64 ARK file
+                //".arc",     // Have to find a way to distinquish between PC/C64 ARC file
+                //".ark",     // Have to find a way to distinquish between PC/C64 ARK file
                 ".arj",
                 ".lha",     // Have to find a way to distinquish between PC/C64 LHA/LXH/SFX file
                 ".lzh",

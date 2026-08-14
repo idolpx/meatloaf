@@ -43,6 +43,8 @@
 #include "meat_media.h"
 
 #include <ctime>
+#include <map>
+#include <vector>
 
 
 /********************************************************
@@ -91,12 +93,14 @@ public:
         }
     } __attribute__((packed));
 
-    // Boot sector (sector 0)
+    // Boot sector (sector 0). Offsets per the CFS 0.11 spec, whose table is
+    // colspan-encoded: "Unused" spans $00-$02, DP is $03, and @Last disk
+    // sector spans $04-$07. Confirmed against every image in .archive/hdd/,
+    // where @Last disk sector is @Partition directory backup + 1.
     struct BootSector {
-        uint8_t reserved0;          // $00
-        uint8_t default_partition;  // $01: DP (0-15)
-        Pointer last_sector;        // $02-$05
-        uint8_t reserved1[2];       // $06-$07
+        uint8_t reserved0[3];       // $00-$02: unused
+        uint8_t default_partition;  // $03: DP (0-15)
+        Pointer last_sector;        // $04-$07
         char id[16];                // $08-$17: "C64 CFS V 0.11B "
         Pointer part_dir;           // $18-$1B: Partition directory pointer
         Pointer part_dir_backup;    // $1C-$1F: Backup location
@@ -160,6 +164,16 @@ public:
 
     enum PathResult { PATH_NOT_FOUND, PATH_FILE, PATH_DIR };
 
+    // The partition NUMBER (1-based over valid entries) this stream treats as
+    // its root. 0 means "no selection - use the boot sector's default", which
+    // is unambiguous precisely because partitions are numbered from 1. A
+    // directly constructed stream (tests, ImageBroker rebuilds) gets 0;
+    // HDDMFile overwrites it with whatever the registry or the path resolved.
+    //
+    // The stream deliberately does NOT consult HDDImageRegistry itself: that
+    // would need MFSOwner::File(), which the native test stubs abort on.
+    uint8_t selected_partition = 0;
+
     // Path navigation: [PARTITION/]DIR/.../FILE
     bool seekDirectory(std::string path);
     PathResult resolvePath(std::string path);
@@ -184,6 +198,7 @@ protected:
 
     BootSector boot_sector;
     PartitionEntry partition_entries[16];
+    bool header_read = false;       // boot sector + partition directory parsed
 
     bool partition_list = false;    // at image root: list partitions
     uint32_t dir_start_lba = 0;     // first sector of the current directory
@@ -210,6 +225,8 @@ protected:
     bool readSector(uint32_t lba, uint8_t *buf);
 
     bool selectPartitionByName(std::string name);   // "" = default partition
+    bool selectPartitionByNumber(uint8_t number);   // 1-based, valid entries only
+    bool selectCurrentPartition();
     bool seekPartitionEntry(uint16_t index);
     bool enterDirectory(std::string name);
 
@@ -236,6 +253,103 @@ private:
 
 
 /********************************************************
+ * Partition registry
+ ********************************************************/
+
+// TWO numbering spaces, and they must not be confused:
+//   number - 1-based, counting only VALID table entries. What paths, CP<n>,
+//            "$=P" and the `partition` command all speak. Never 0: that
+//            number means "the currently selected partition", as in DHD.
+//   slot   - the raw 0-15 index into the 16-entry partition directory, and
+//            what the boot sector's DP byte holds. Converted into `number`
+//            once, at parse time; nothing downstream sees a slot.
+struct HDDPartition {
+    uint8_t     number;      // 1-based over valid entries
+    uint8_t     slot;        // raw table index, 0-15
+    uint8_t     type;        // 0=unformatted, 1=CFS, 2=GEOS, 3-11 reserved
+    std::string name;        // ASCII, $00 padding trimmed
+    uint32_t    root_lba;    // @Root directory (entry +$1C)
+    uint32_t    size;        // bytes: (end - start + 1) * 512
+    bool        hidden;      // @Start bit 5: excluded from a plain listing
+    bool        writeable;   // @Start bit 4 (recorded; CFS support is read-only)
+};
+
+// Per-image partition table and selection state, keyed by container URL.
+//
+// Deliberately SMALLER than DHDImageRegistry: there is no cached_part, no
+// brokerUrl() and no dispose-on-select. DHD needs those because ImageBroker
+// caches one DECODED D64/D71/D81/DNP stream per image and cannot tell
+// partitions apart. HDDMStream re-derives its whole position from
+// seekDirectory(pathInStream) on every operation, so a cached stream holds no
+// partition identity that could go stale.
+class HDDImageRegistry {
+public:
+    struct Image {
+        bool        valid = false;
+        uint8_t     default_part = 0;
+        uint8_t     selected = 0;
+        std::string disk_label;
+        std::vector<HDDPartition> parts;
+
+        const HDDPartition* byNumber(uint8_t number) const;
+        const HDDPartition* byName(std::string name) const;
+        const HDDPartition* current() const { return byNumber(selected); }
+
+        // Selects a partition if it exists and is CFS. Leaves the selection
+        // untouched and returns false otherwise - including for 0, which
+        // means "the currently selected partition" and is never a real one.
+        bool trySelect(uint8_t number);
+    };
+
+    // Parses a boot sector + partition directory from an ALREADY OPEN stream.
+    // Split out from parse() so the registry is testable natively, where
+    // MFSOwner::File() aborts.
+    static bool parseInto(MStream* s, Image& img);
+
+    static Image* obtain(const std::string& containerUrl);
+    static bool   select(const std::string& containerUrl, uint8_t number);
+
+    // True while the registry reads the raw image bytes, so
+    // HDDMFileSystem::handles() declines the path and the underlying
+    // filesystem serves them instead of another HDDMFile.
+    static bool probing() { return s_probing; }
+
+    // Path of the ".hdd" container within 'path', or "" if none.
+    static std::string containerOf(const std::string& path);
+
+private:
+    static bool parse(const std::string& containerUrl, Image& img);
+
+    static std::map<std::string, Image> s_images;
+    static bool s_probing;
+};
+
+// Resolve which partition an in-image path refers to, WITHOUT changing the
+// image's selected partition.
+//
+// Resolution order for the FIRST component: an in-range partition number
+// 0-16, then byName(), otherwise it is not a partition and the current
+// selection applies. A partition wins over a same-named file; such a file
+// stays reachable as "<image>/<number>/<file>".
+//
+// As in DHD, a partition number of 0 means "the currently selected
+// partition" - it is NOT a table entry, and must never reach byNumber().
+//
+// hddResolvePartitionIn() is the pure core, taking an already-parsed image so
+// it can be tested without MFSOwner. HDDResolvePartition() is the wrapper the
+// firmware calls.
+const HDDPartition* hddResolvePartitionIn(const HDDImageRegistry::Image& img,
+                                          const std::string& in_path,
+                                          std::string* out_rest = nullptr,
+                                          bool* out_explicit = nullptr);
+
+const HDDPartition* HDDResolvePartition(const std::string& containerUrl,
+                                        const std::string& in_path,
+                                        std::string* out_rest = nullptr,
+                                        bool* out_explicit = nullptr);
+
+
+/********************************************************
  * File implementations
  ********************************************************/
 
@@ -254,8 +368,11 @@ public:
 
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
     {
+        normalizePath();
         Debug_printv("[%s]", url.c_str());
-        return std::make_shared<HDDMStream>(is);
+        auto stream = std::make_shared<HDDMStream>(is);
+        applyPartition(stream);
+        return stream;
     }
 
     bool rewindDirectory() override;
@@ -266,6 +383,31 @@ public:
 
     bool isDir = true;
     bool dirIsOpen = false;
+
+protected:
+    // Handle the partition part of pathInStream once per MFile. "$=P"
+    // switches to partition-list mode; a leading component naming a partition
+    // binds THIS path to it and is stripped, so the rest resolves inside it.
+    // It deliberately does NOT call select(): naming a partition in a path
+    // must not change what the image has selected.
+    void normalizePath();
+
+    // The partition this MFile operates on, or nullptr when the image has no
+    // usable partition table.
+    const HDDPartition* effectivePartition();
+
+    // Writes the resolved partition into the stream, which is how the stream
+    // learns which directory is its root. Safe to call with a null stream.
+    void applyPartition(const std::shared_ptr<HDDMStream>& image);
+
+    bool normalized = false;
+    bool listing_partitions = false;
+    uint16_t part_index = 0;
+
+    // The partition NUMBER this MFile's path names. 0 = the path named none,
+    // so the image's current selection applies - the same convention and the
+    // same sentinel value DHDPartitionMFile::m_part uses.
+    uint8_t m_part = 0;
 };
 
 
@@ -279,6 +421,9 @@ public:
     HDDMFileSystem(): MFileSystem("hdd") {};
 
     bool handles(std::string fileName) override {
+        // Decline while the registry reads the raw image bytes
+        if (HDDImageRegistry::probing())
+            return false;
         return byExtension(".hdd", fileName);
     }
 

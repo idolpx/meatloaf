@@ -80,7 +80,7 @@ void anirog_search (void)
 	lp = ft[THISLOADER].lp;
 
 	if (!quiet)
-		msgout("  Anirog tape (+clones)");
+		msgout("\r\n  Anirog tape (+clones)");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		eop = find_pilot(i, THISLOADER);

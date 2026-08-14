@@ -230,7 +230,7 @@ void bleep_spc_search(void)
 	int pv;				/* encoding parameters */
 
 	if (!quiet)
-		msgout("  Bleepload Special");
+		msgout("\r\n  Bleepload Special");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		ft[THISLOADER].pv = 1;

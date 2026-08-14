@@ -15,6 +15,10 @@
 #include <esp_heap_caps.h>
 #include <zlib.h>
 #include "../../meatloaf/network/http.h"
+#include "../../meatloaf/media/hd/partition_select.h"
+
+// Defined further down; cp() needs it and sits above the definition.
+static std::string resolve_path(const char *arg);
 
 static inline void *psram_malloc(size_t sz) {
     void *p = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -31,7 +35,6 @@ static inline void *psram_malloc(size_t sz) {
 #include "../Console.h"
 #include "../Helpers/PWDHelpers.h"
 #include "../ute/ute.h"
-#include "../../device/iec/meatloaf.h"
 #include "../../www/ws/activity.h"
 #include "mlff.h"
 #include "mlConfig.h"
@@ -152,7 +155,7 @@ int hex(int argc, char **argv)
                     }
                 }
                 Serial.printf("\r\n");
-                Serial.printf("url[%s] size[%u]\r\n", path->url.c_str(), size);
+                Serial.printf("url[%s] size[%u]\r\n", path->url.c_str(), --size);
             }
             istream.close();
         }
@@ -166,7 +169,7 @@ int hex(int argc, char **argv)
 
 int pwd(int argc, char **argv)
 {
-    Serial.printf("%s\r\n", getCurrentPath()->url.c_str());
+    Serial.printf("%s\r\n", getCurrentPath()->fullUrl().c_str());
     return EXIT_SUCCESS;
 }
 
@@ -207,22 +210,44 @@ int ls(int argc, char **argv)
 {
     MFile* listPath = nullptr;
     const char *path_arg = nullptr;
+    bool show_hidden = false;
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] != '-')
             path_arg = argv[i];
-        // flags like -la, -l, -a are silently ignored
+        else
+        {
+            // -a shows hidden entries. Other flags (-l, -h, ...) are accepted
+            // and ignored so habitual "ls -la" still works.
+            for (const char *p = argv[i] + 1; *p; p++)
+                if (*p == 'a' || *p == 'A') show_hidden = true;
+        }
     }
 
-    if (path_arg == nullptr)
+    // A wildcard in the LAST component filters the listing instead of naming
+    // something to descend into ("ls fb*", "ls /sd/games/*.d64"). Without this
+    // the pattern reaches cd(), which resolves it to the FIRST matching entry
+    // and then lists that single file as though it were a directory.
+    std::string arg = (path_arg == nullptr) ? "" : path_arg;
+    size_t slash = arg.find_last_of('/');
+    std::string pattern = (slash == std::string::npos) ? arg : arg.substr(slash + 1);
+    bool filtered = pattern.find('*') != std::string::npos ||
+                    pattern.find('?') != std::string::npos;
+
+    if (filtered && slash != std::string::npos)
     {
-        listPath = MFSOwner::File(getCurrentPath()->url);
+        // Keep the trailing '/' so a rooted "/fb*" still resolves to "/"
+        listPath = getCurrentPath()->cd(arg.substr(0, slash + 1));
+    }
+    else if (filtered || path_arg == nullptr)
+    {
+        listPath = MFSOwner::File(getCurrentPath()->fullUrl());
     }
     else
     {
         listPath = getCurrentPath()->cd(path_arg);
     }
 
-    Debug_printv("ls path[%s]", listPath->url.c_str());
+    //Debug_printv("ls path[%s]", listPath->url.c_str());
     std::unique_ptr<MFile> destPath(listPath);
     std::unique_ptr<MFile> entry(destPath->getNextFileInDir());
 
@@ -234,22 +259,210 @@ int ls(int argc, char **argv)
     // If sd card is mounted and we are at root
     if( getCurrentPath()->url.size() == 1 )
     {
-        if ( fnSDFAT.running() )
+        if ( fnSDFAT.running() && ( !filtered || mstr::compare("sd", pattern, false) ) )
             Serial.printf("d %8lu  \"sd\"\r\n", 0);
 
-        Serial.printf("d %8lu  \"network\"\r\n", 0);
+        if ( !filtered || mstr::compare("network", pattern, false) )
+            Serial.printf("d %8lu  \"network\"\r\n", 0);
     }
 
     while(entry.get() != nullptr) {
-        if ( entry->isPETSCII )
-            entry->name = mstr::toUTF8(entry->name);
+        // An unnamed entry is a free or scratched directory slot, not a file.
+        // A CBM directory is a fixed array of slots, so the tail of one is
+        // normally full of them - listing them made a healthy image look
+        // corrupt. They are never shown, not even with -a: there is nothing
+        // there to show.
+        bool nameless = entry->name.empty();
 
-        mstr::replaceAll(entry->name, "\"", "\\\""); // Escape double quotes
-        Serial.printf("%c %8lu  \"%s\"\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str());
+        // Compare against the raw entry name, before the UTF-8 conversion
+        // below rewrites it (same basis rm's wildcard branch matches on).
+        if ( !nameless &&
+             (show_hidden || !entry->is_hidden) &&
+             ( !filtered || mstr::compare(entry->name, pattern, false) ) )
+        {
+            if ( entry->isPETSCII )
+                entry->name = mstr::toUTF8(entry->name);
+
+            mstr::replaceAll(entry->name, "\"", "\\\""); // Escape double quotes
+
+            // 'd' directory, 'h' hidden (only reachable with -a), '-' regular.
+            char kind = entry->isDirectory() ? 'd' : (entry->is_hidden ? 'h' : '-');
+            Serial.printf("%c %8lu  \"%s\"\r\n", kind, entry->size, entry->name.c_str());
+        }
         entry.reset(destPath->getNextFileInDir());
     }
 
     return EXIT_SUCCESS;
+}
+
+// Switch the selected partition of the CMD HD/FD or IDE64 CFS image the
+// console is inside. The selection belongs to the IMAGE, not to any one
+// MFile, which is why this takes no image argument: it always acts on the
+// container in the current path. This is the console's equivalent of CP<n>.
+int partition(int argc, char **argv)
+{
+    hdpart::Target t = hdpart::targetFor(getCurrentPath()->url);
+    if (!t)
+    {
+        Serial.printf("partition: not inside a partitioned disk image\r\n");
+        return EXIT_FAILURE;
+    }
+
+    std::vector<hdpart::View> parts;
+    std::string disk_label;
+    if (!hdpart::list(t, parts, disk_label))
+    {
+        Serial.printf("partition: cannot read the partition table of '%s'\r\n",
+                      t.container.c_str());
+        return EXIT_FAILURE;
+    }
+
+    // No argument: list. CMD names are PETSCII on disk and are already
+    // converted to UTF-8 by hdpart::list(), which is what `ls` shows and what
+    // the name lookup matches against.
+    if (argc < 2)
+    {
+        Serial.printf("   #  type   name\r\n");
+        for (const auto &p : parts)
+        {
+            Serial.printf("%c%3u  %-5s  \"%s\"\r\n",
+                          p.selected ? '*' : ' ',
+                          (unsigned)p.number,
+                          p.type_label.c_str(),
+                          p.name.c_str());
+        }
+        return EXIT_SUCCESS;
+    }
+
+    std::string arg = argv[1];
+    int number = hdpart::resolve(t, arg);
+    if (number < 0)
+    {
+        Serial.printf("partition: no such partition: %s\r\n", arg.c_str());
+        return EXIT_FAILURE;
+    }
+
+    // Copy what we need before select(), which may dispose cached streams.
+    std::string name;
+    std::string type_label;
+    bool selectable = false;
+    for (const auto &p : parts)
+    {
+        if (p.number == (uint8_t)number)
+        {
+            name = p.name;
+            type_label = p.type_label;
+            selectable = p.selectable;
+            break;
+        }
+    }
+
+    // Reachable both by number and by name, since every table entry is listed.
+    if (!selectable)
+    {
+        Serial.printf("partition: %u \"%s\" (%s) cannot be selected\r\n",
+                      (unsigned)number, name.c_str(), type_label.c_str());
+        return EXIT_FAILURE;
+    }
+
+    if (!hdpart::select(t, number))
+    {
+        Serial.printf("partition: could not select partition %u\r\n", (unsigned)number);
+        return EXIT_FAILURE;
+    }
+
+    // The old cwd may name a subdirectory that existed only in the previous
+    // partition, so drop back to the image root.
+    setCurrentPath(MFSOwner::File(t.container));
+
+    Serial.printf("Selected partition %u \"%s\" (%s)\r\n",
+                  (unsigned)number, name.c_str(), type_label.c_str());
+    return EXIT_SUCCESS;
+}
+
+// Shared by cp and mv. Resolves both sides through MFSOwner, so either end may
+// be inside a disk image or an archive, or a URL. Returns false having already
+// printed the reason. 'verb' only names the caller in messages.
+static bool copy_via_mfile(const char *verb,
+                           const std::string &src, std::string &dst,
+                           size_t *out_total)
+{
+    std::unique_ptr<MFile> srcFile(MFSOwner::File(src));
+    if (!srcFile || !srcFile->exists())
+    {
+        Serial.printf("%s: cannot open '%s': No such file or directory\r\n", verb, src.c_str());
+        return false;
+    }
+    if (srcFile->isDirectory())
+    {
+        Serial.printf("%s: '%s' is a directory\r\n", verb, src.c_str());
+        return false;
+    }
+
+    // "<verb> file dir" puts it INSIDE dir, as cp(1)/mv(1) do.
+    {
+        std::unique_ptr<MFile> dstProbe(MFSOwner::File(dst));
+        if (dstProbe && dstProbe->exists() && dstProbe->isDirectory())
+        {
+            // Take the name from the source PATH, not srcFile->name. For a
+            // path inside a container, MFile::name is the CONTAINER's name -
+            // only getNextFileInDir() overrides it with the entry's name (see
+            // the comment in D64MFile::getNextFileInDir). Using it turned
+            // "cp raw/digiplayer.mod ." into a file called "hdbackup.dhd".
+            size_t s = src.find_last_of('/');
+            std::string base = (s == std::string::npos) ? src : src.substr(s + 1);
+            if (base.empty())
+            {
+                Serial.printf("%s: cannot derive a name from '%s'\r\n", verb, src.c_str());
+                return false;
+            }
+            while (dst.size() > 1 && dst.back() == '/') dst.pop_back();
+            dst += "/" + base;
+        }
+    }
+
+    auto in = srcFile->getSourceStream(std::ios_base::in);
+    if (!in || !in->isOpen())
+    {
+        Serial.printf("%s: cannot read '%s'\r\n", verb, src.c_str());
+        return false;
+    }
+
+    std::unique_ptr<MFile> dstFile(MFSOwner::File(dst));
+    auto out = dstFile ? dstFile->getSourceStream(std::ios_base::out) : nullptr;
+    if (!out || !out->isOpen())
+    {
+        Serial.printf("%s: cannot create '%s'\r\n", verb, dst.c_str());
+        return false;
+    }
+
+    const uint32_t bufSize = 4096;
+    uint8_t *buf = (uint8_t *)psram_malloc(bufSize);
+    if (!buf)
+    {
+        Serial.printf("%s: out of memory\r\n", verb);
+        return false;
+    }
+
+    size_t total = 0;
+    bool ok = true;
+    uint32_t n;
+    while ((n = in->read(buf, bufSize)) > 0)
+    {
+        if (out->write(buf, n) != n)
+        {
+            Serial.printf("%s: write failed after %zu bytes\r\n", verb, total);
+            ok = false;
+            break;
+        }
+        total += n;
+    }
+
+    free(buf);
+    out->close();
+
+    if (out_total) *out_total = total;
+    return ok;
 }
 
 int mv(int argc, char **argv)
@@ -257,82 +470,70 @@ int mv(int argc, char **argv)
     if (argc != 3)
     {
         Serial.printf("Syntax is mv [ORIGIN] [TARGET]\r\n");
-        return 1;
-    }
-
-    char old_name[PATH_MAX], new_name[PATH_MAX];
-
-    // Resolve arguments to full path
-    ESP32Console::console_realpath(argv[1], old_name);
-    ESP32Console::console_realpath(argv[2], new_name);
-
-    // Do rename
-    if (rename(old_name, new_name))
-    {
-        Serial.printf("Error moving: %s\r\n", strerror(errno));
         return EXIT_FAILURE;
     }
 
+    std::string src = resolve_path(argv[1]);
+    std::string dst = resolve_path(argv[2]);
+
+    // Same directory: this is a pure rename, which every filesystem can do
+    // in place. MFile::rename() takes a NAME relative to the file's own
+    // directory (see FlashMFile::rename), not a path, so only this case can
+    // use it.
+    size_t s_slash = src.find_last_of('/');
+    size_t d_slash = dst.find_last_of('/');
+    if (s_slash != std::string::npos && d_slash != std::string::npos &&
+        src.compare(0, s_slash, dst, 0, d_slash) == 0 && s_slash == d_slash)
+    {
+        std::unique_ptr<MFile> srcFile(MFSOwner::File(src));
+        if (srcFile && srcFile->exists() && srcFile->rename(dst.substr(d_slash + 1)))
+            return EXIT_SUCCESS;
+        // Fall through: media filesystems return false from rename() rather
+        // than implementing it, so a failure here is expected, not fatal.
+    }
+
+    // Anything else - a different directory, or crossing between SD, flash,
+    // a disk image or an archive - is a copy followed by a delete. rename(2)
+    // cannot move data across those boundaries at all.
+    size_t total = 0;
+    if (!copy_via_mfile("mv", src, dst, &total))
+        return EXIT_FAILURE;
+
+    // Only unlink the source once the copy has fully succeeded, so a failed
+    // move never destroys the original.
+    std::unique_ptr<MFile> srcFile(MFSOwner::File(src));
+    if (!srcFile || !srcFile->remove())
+    {
+        Serial.printf("mv: copied to '%s' but could not remove '%s' - left both\r\n",
+                      dst.c_str(), src.c_str());
+        return EXIT_FAILURE;
+    }
+
+    Serial.printf("%s -> %s (%zu bytes)\r\n", src.c_str(), dst.c_str(), total);
     return EXIT_SUCCESS;
 }
 
 int cp(int argc, char **argv)
 {
-    //TODO: Shows weird error message
     if (argc != 3)
     {
         Serial.printf("Syntax is cp [ORIGIN] [TARGET]\r\n");
-        return 1;
+        return EXIT_FAILURE;
     }
 
-    char old_name[PATH_MAX], new_name[PATH_MAX];
+    // Goes through MFile, not fopen(). The POSIX path only sees real files on
+    // flash and SD, so copying out of a disk image, an archive or a URL was
+    // impossible - "cp bible/read.me x" inside a .dhd failed with ENOENT
+    // because that path exists only to the media layer. cat/hex/ls/wget all
+    // resolve through MFSOwner already; cp and mv were the holdouts.
+    std::string src = resolve_path(argv[1]);
+    std::string dst = resolve_path(argv[2]);
 
-    // Resolve arguments to full path
-    ESP32Console::console_realpath(argv[1], old_name);
-    ESP32Console::console_realpath(argv[2], new_name);
+    size_t total = 0;
+    if (!copy_via_mfile("cp", src, dst, &total))
+        return EXIT_FAILURE;
 
-    // Do copy
-    FILE *origin = fopen(old_name, "r");
-    if (!origin)
-    {
-        Serial.printf("Error opening origin file: %s\r\n", strerror(errno));
-        return 1;
-    }
-
-    FILE *target = fopen(new_name, "w");
-    if (!target)
-    {
-        fclose(origin);
-        Serial.printf("Error opening target file: %s\r\n", strerror(errno));
-        return 1;
-    }
-
-    int buffer;
-
-    // Clear existing errors
-    auto error = errno;
-
-    while ((buffer = getc(origin)) != EOF)
-    {
-        if(fputc(buffer, target) == EOF) {
-            Serial.printf("Error writing: %s\r\n", strerror(errno));
-            fclose(origin); fclose(target);
-            return 1;
-        }
-    }
-
-    error = errno;
-    if (error && !feof(origin))
-    {
-        Serial.printf("Error copying: %s\r\n", strerror(error));
-        fclose(origin);
-        fclose(target);
-        return 1;
-    }
-
-    fclose(origin);
-    fclose(target);
-
+    Serial.printf("%s -> %s (%zu bytes)\r\n", src.c_str(), dst.c_str(), total);
     return EXIT_SUCCESS;
 }
 
@@ -449,8 +650,11 @@ int rm(int argc, char **argv)
                 std::unique_ptr<MFile> entry(rawEntry);
                 if (entry->name == "." || entry->name == "..")
                     continue;
+                // fullUrl(), not url: inside a container url is the CONTAINER's
+                // path and the part within it lives in pathInStream. See the
+                // comment on the non-wildcard branch below.
                 if (mstr::compare(entry->name, pattern, false))
-                    matches.emplace_back((cwd->url + "/" + entry->name).c_str());
+                    matches.emplace_back((cwd->fullUrl() + "/" + entry->name).c_str());
             }
 
             if (matches.empty() && !force)
@@ -463,7 +667,14 @@ int rm(int argc, char **argv)
         else
         {
             std::unique_ptr<MFile> target(getCurrentPath()->cd(argv[argi]));
-            if (!target || !rm_path(target->url, recursive, force))
+
+            // fullUrl(), NOT url. For anything inside a container, url is the
+            // CONTAINER's path and the part within it is held separately in
+            // pathInStream - so passing url alone silently rewrites
+            // "rm fb" inside hdbackup.dhd into "rm hdbackup.dhd" and deletes
+            // the whole image. rm_path() takes a string and re-resolves it, so
+            // it can only see what the string carries.
+            if (!target || !rm_path(target->fullUrl(), recursive, force))
                 anyFailed = true;
         }
     }
@@ -536,7 +747,7 @@ int mount(int argc, char **argv)
 
     std::string filename;
     // filename.reserve(getCurrentPath()->url.size() + 1);
-    filename = getCurrentPath()->url;
+    filename = getCurrentPath()->fullUrl();   // see resolve_path()
     if ( argc > 2 )
     {
         // Use current path + filename
@@ -598,7 +809,7 @@ int wget(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    std::string pwd = getCurrentPath()->url;
+    std::string pwd = getCurrentPath()->fullUrl();   // see resolve_path()
 
     if (insecure)
         http_set_insecure(true);
@@ -713,31 +924,6 @@ int update(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
-int enable(int argc, char **argv)
-{
-    if (argc != 2)
-    {
-        Serial.printf("enable {id_1}|{id_1},{id_2},...\r\n");
-        return EXIT_SUCCESS;
-    }
-
-    Meatloaf.enable(argv[1]);
-
-    return EXIT_SUCCESS;
-}
-
-int disable(int argc, char **argv)
-{
-    if (argc != 2)
-    {
-        Serial.printf("disable {id_1}|{id_1},{id_2},...\r\n");
-        return EXIT_SUCCESS;
-    }
-
-    Meatloaf.disable(argv[1]);
-
-    return EXIT_SUCCESS;
-}
 
 static void df_print_row(const char *label, const char *path, uint64_t total, uint64_t avail)
 {
@@ -798,6 +984,16 @@ static int df(int argc, char **argv)
 /* Volatile scan state — written by the scan task, read by locate/updatedb. */
 static volatile int    s_scan_running = 0;
 static volatile int    s_scan_stop    = 0;  // set to 1 to request cancellation
+
+// Exported so the console shells can cancel a scan that is occupying the
+// executor task — see the declaration in VFSCommands.h.
+bool updatedb_request_stop()
+{
+    if (!s_scan_running)
+        return false;
+    s_scan_stop = 1;
+    return true;
+}
 static volatile int    s_scan_resume  = 0;  // set to 1 to resume from existing DB
 static volatile int    s_scan_files   = 0;
 static volatile int    s_scan_dirs    = 0;
@@ -948,11 +1144,14 @@ static void updatedb_scan(sqlite3 *db,
 
             int total = s_scan_files + s_scan_dirs;
             if (total % 100 == 0)
-                Serial.printf("  %d dirs, %d files — free=%lu dma_max=%lu\r\n",
-                              (int)s_scan_dirs, (int)s_scan_files,
-                              esp_get_free_internal_heap_size(),
-                              (unsigned long)heap_caps_get_largest_free_block(
-                                  MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
+                Serial.printf("  %d dirs, %d files\r\n",
+                              (int)s_scan_dirs, (int)s_scan_files);
+
+                // Serial.printf("  %d dirs, %d files — free=%lu dma_max=%lu\r\n",
+                //               (int)s_scan_dirs, (int)s_scan_files,
+                //               esp_get_free_internal_heap_size(),
+                //               (unsigned long)heap_caps_get_largest_free_block(
+                //                   MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
         }
         closedir(d);
         mark_scanned(cur_rel);
@@ -1111,17 +1310,43 @@ static void updatedb_compress_gz(void)
     Serial.printf("updatedb: %s.gz written\r\n", LOCATE_DB_PATH);
 }
 
-static void updatedb_fts_task(void *arg)
+static void updatedb_fts_run(void)
 {
     updatedb_fts_rebuild();
     s_scan_running = 0;
-    vTaskDelete(NULL);
+
 }
 
-static void updatedb_task(void *arg)
+// Runs on the CALLING task. Console commands already execute on console_exec,
+// which has a 16 KB internal stack, so this used to spawn a second 8 KB task
+// for no benefit - and task stacks are internal-DRAM only, with no PSRAM
+// fallback. Claiming that block ON DEMAND is what left the lazily-started web
+// server unable to find a contiguous stack (ESP_ERR_HTTPD_TASK reporting
+// free_internal=17116 but largest_internal_block=8180 - fragmentation, not
+// exhaustion), which is the failure mode AGENTS.md warns about for on-demand
+// task creation.
+//
+// The trade is that the console blocks for the whole scan. "updatedb stop" is
+// intercepted shell-side in Console.cpp so cancelling still works, the same way
+// "exit" and "reboot" are - the scan polls s_scan_stop and yields once per
+// directory, so the REPL keeps reading input.
+static void updatedb_run(void)
 {
     // SQLITE_OMIT_AUTOINIT: must init before sqlite3_open().
     sqlite_one_time_init();
+
+    // Swap SQLite to the PSRAM allocator for the whole scan, for the same
+    // reason updatedb_fts_rebuild() does it (see sqlite3_esp32.h): FTS5's
+    // token hash is thousands of sub-512-byte allocations, and
+    // CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=512 puts every one of them in
+    // internal DRAM. That starves the DMA-capable heap, and the SDMMC driver
+    // needs a 512-byte MALLOC_CAP_DMA bounce buffer for EVERY sector it
+    // writes (sdmmc_cmd.c, sdmmc_write_sectors). Creating the files_fts
+    // shadow tables was failing with ESP_ERR_NO_MEM for exactly that reason -
+    // the rebuild path was protected, this one was not.
+    // enter/exit are stateless swaps of the allocator saved at init, so the
+    // nested enter inside updatedb_fts_rebuild() below is harmless.
+    sqlite3_esp32_psram_malloc_enter();
 
     sqlite3      *db            = nullptr;
     sqlite3_stmt *dir_ins_stmt  = nullptr;   // INSERT OR IGNORE INTO dirs (path)
@@ -1142,7 +1367,7 @@ static void updatedb_task(void *arg)
                           db ? sqlite3_errmsg(db) : "out of memory");
             if (db) sqlite3_close(db);
             s_scan_running = 0;
-            vTaskDelete(NULL);
+            sqlite3_esp32_psram_malloc_exit();
             return;
         }
 
@@ -1195,7 +1420,7 @@ static void updatedb_task(void *arg)
             sqlite3_free(errmsg);
             sqlite3_close(db);
             s_scan_running = 0;
-            vTaskDelete(NULL);
+            sqlite3_esp32_psram_malloc_exit();
             return;
         }
 
@@ -1208,7 +1433,7 @@ static void updatedb_task(void *arg)
                           db ? sqlite3_errmsg(db) : "out of memory");
             if (db) sqlite3_close(db);
             s_scan_running = 0;
-            vTaskDelete(NULL);
+            sqlite3_esp32_psram_malloc_exit();
             return;
         }
 
@@ -1224,7 +1449,7 @@ static void updatedb_task(void *arg)
                 Serial.printf("updatedb: schema outdated — run 'updatedb start' to rebuild.\r\n");
                 sqlite3_close(db);
                 s_scan_running = 0;
-                vTaskDelete(NULL);
+                sqlite3_esp32_psram_malloc_exit();
                 return;
             }
         }
@@ -1289,7 +1514,8 @@ static void updatedb_task(void *arg)
         sqlite3_finalize(mark_stmt);
         sqlite3_close(db);
         s_scan_running = 0;
-        vTaskDelete(NULL);
+        sqlite3_esp32_psram_malloc_exit();
+        return;
     };
 
     if (sqlite3_prepare_v2(db,
@@ -1374,13 +1600,19 @@ static void updatedb_task(void *arg)
         Serial.printf("updatedb: done — %d directories, %d files, %d errors, %s.\r\n",
                       (int)s_scan_dirs, (int)s_scan_files,
                       (int)s_scan_errors, mstr::formatDuration(s_scan_end - s_scan_start).c_str());
-    vTaskDelete(NULL);
+
+    // Restore explicitly rather than relying on updatedb_fts_rebuild() having
+    // done it: leaving SQLite on the PSRAM allocator would be a system-wide
+    // change made by a task that has finished. exit() is a stateless restore of
+    // the allocator saved at init, so calling it twice costs nothing.
+    sqlite3_esp32_psram_malloc_exit();
+    return;
 }
 
 int updatedb(int argc, char **argv)
 {
-    // ── updatedb (no args) → show persistent status ──────────────────────────
-    if (argc < 2) {
+    // -- updatedb status -- persistent status read back from the database ----
+    if (argc > 1 && strcmp(argv[1], "status") == 0) {
         if (s_scan_running) {
             time_t elapsed = time(nullptr) - s_scan_start;
             Serial.printf("Scan in progress: %d directories, %d files (%s elapsed)\r\n",
@@ -1426,7 +1658,7 @@ int updatedb(int argc, char **argv)
     }
 
     // ── updatedb stop ─────────────────────────────────────────────────────────
-    if (strcmp(argv[1], "stop") == 0) {
+    if (argc > 1 && strcmp(argv[1], "stop") == 0) {
         if (!s_scan_running) {
             Serial.printf("updatedb: no scan in progress\r\n");
             return EXIT_FAILURE;
@@ -1437,7 +1669,7 @@ int updatedb(int argc, char **argv)
     }
 
     // ── updatedb resume ───────────────────────────────────────────────────────
-    if (strcmp(argv[1], "resume") == 0) {
+    if (argc > 1 && strcmp(argv[1], "resume") == 0) {
         if (!fnSDFAT.running()) {
             Serial.printf("updatedb: SD card not mounted\r\n");
             return EXIT_FAILURE;
@@ -1461,13 +1693,15 @@ int updatedb(int argc, char **argv)
         s_scan_end          = 0;
         s_scan_last_folder  = "";
         s_scan_running      = 1;
-        Serial.printf("Resuming locate database scan in background...\r\n");
-        xTaskCreate(updatedb_task, "updatedb", 8192, nullptr, 5, nullptr);
+        Serial.printf("Resuming locate database scan (console blocked; 'updatedb stop' to cancel)...\r\n");
+        updatedb_run();   // on console_exec's stack - see the comment above
         return EXIT_SUCCESS;
     }
 
     // ── updatedb start ────────────────────────────────────────────────────────
-    if (strcmp(argv[1], "start") == 0) {
+    // Bare "updatedb" scans, same as "updatedb start" - the common case does
+    // not need a subcommand. Status moved to "updatedb status" above.
+    if (argc < 2 || strcmp(argv[1], "start") == 0) {
         if (!fnSDFAT.running()) {
             Serial.printf("updatedb: SD card not mounted\r\n");
             return EXIT_FAILURE;
@@ -1486,13 +1720,13 @@ int updatedb(int argc, char **argv)
         s_scan_end          = 0;
         s_scan_last_folder  = "";
         s_scan_running      = 1;
-        Serial.printf("Building locate database in background...\r\n");
-        xTaskCreate(updatedb_task, "updatedb", 8192, nullptr, 5, nullptr);
+        Serial.printf("Building locate database (console blocked; 'updatedb stop' to cancel)...\r\n");
+        updatedb_run();   // on console_exec's stack - see the comment above
         return EXIT_SUCCESS;
     }
 
     // ── updatedb fts ─────────────────────────────────────────────────────────
-    if (strcmp(argv[1], "fts") == 0) {
+    if (argc > 1 && strcmp(argv[1], "fts") == 0) {
         if (!fnSDFAT.running()) {
             Serial.printf("updatedb: SD card not mounted\r\n");
             return EXIT_FAILURE;
@@ -1507,12 +1741,12 @@ int updatedb(int argc, char **argv)
             return EXIT_FAILURE;
         }
         s_scan_running = 1;
-        Serial.printf("Rebuilding FTS index in background...\r\n");
-        xTaskCreate(updatedb_fts_task, "updatedb_fts", 8192, nullptr, 5, nullptr);
+        Serial.printf("Rebuilding FTS index (console blocked)...\r\n");
+        updatedb_fts_run();   // on console_exec's stack - see the comment above
         return EXIT_SUCCESS;
     }
 
-    Serial.printf("Usage: updatedb [start|stop|resume|fts]\r\n");
+    Serial.printf("Usage: updatedb [start|status|stop|resume|fts]  (no argument = start)\r\n");
     return EXIT_FAILURE;
 }
 
@@ -1689,7 +1923,11 @@ int format_sd(int argc, char **argv)
 static std::string resolve_path(const char *arg)
 {
     if (arg[0] == '/') return arg;
-    std::string pwd = getCurrentPath()->url;
+    // fullUrl(), not url: inside a container url is only the CONTAINER's
+    // path, with the position within it held in pathInStream. Using url
+    // alone resolves every relative name against the container root, so a
+    // path inside a subdirectory silently points somewhere else.
+    std::string pwd = getCurrentPath()->fullUrl();
 
     // If this is a new url then use it
     if ( mstr::contains(arg, "://") )
@@ -1701,6 +1939,7 @@ static std::string resolve_path(const char *arg)
     return pwd + '/' + arg;
 }
 
+#ifndef MIN_CONFIG
 // ─── gzip ─────────────────────────────────────────────────────────────────────
 static int cmd_gzip(int argc, char **argv)
 {
@@ -1766,20 +2005,37 @@ static int cmd_gzip(int argc, char **argv)
 }
 
 // ─── unzipx ────────────────────────────────────────────────────────────────────
-#ifndef MIN_CONFIG
-
 // Creates every path segment (mkdir -p semantics) via MFile::mkDir(), so it
 // works for any MFSOwner-addressable destination, not just local flash/SD.
 // Intermediate segments that already exist are expected to fail — ignored,
 // matching the previous POSIX mkdir()-based behavior.
-static void unzip_mkdirs(const std::string &path)
+// `last_dir` is the directory the previous entry went into. Archives list
+// entries grouped by directory, so remembering just the last one skips the
+// whole walk for every entry after the first in each directory.
+//
+// It matters for memory, not speed. Each MFSOwner::File() here probes for a
+// `.config` at every level above it, and that cache holds 64 entries and
+// clears wholesale on overflow - which a deep archive triggers, so the probes
+// fall through to real fopen()s on SD. Each of those needs a 512-byte
+// MALLOC_CAP_DMA bounce buffer per sector plus a newlib FILE lock, both
+// internal-DRAM-only. That storm is what turned an archive with a deep tree
+// into `sdmmc_read_sectors: not enough mem` and then an abort() inside
+// fopen(). (A std::set of every segment created would skip marginally more
+// work, but instantiating one costs ~1 KB of flash text - enough to push
+// fujiloaf-rev0 past its iram0_2_seg limit.)
+static void unzip_mkdirs(const std::string &path, std::string &last_dir)
 {
+    if (path == last_dir)
+        return;
+
     for (size_t pos = path.find('/', 1); pos != std::string::npos; pos = path.find('/', pos + 1)) {
         std::unique_ptr<MFile> dir(MFSOwner::File(path.substr(0, pos)));
         if (dir) dir->mkDir();
     }
     std::unique_ptr<MFile> dir(MFSOwner::File(path));
     if (dir) dir->mkDir();
+
+    last_dir = path;
 }
 
 // Mirrors ArchiveMFile::isSingleFileCompression()/getInnerFilename() without
@@ -1819,16 +2075,49 @@ static std::string strip_compression_ext(const std::string &name)
 // creating parent directories as needed. Prints progress for large entries.
 // readFn(buf, n) returns bytes read, 0 at end-of-entry. Returns bytes copied,
 // or -1 on error.
+// Make an archive-stored entry path safe to append to a destination folder.
+//
+// An archive can name an entry "../../etc/passwd" or "/etc/passwd", and unzipx
+// extracts from http:// and smb:// sources as readily as from local ones - so
+// honouring stored paths verbatim would let a hostile archive write anywhere on
+// the device (the classic zip-slip). Leading separators are dropped, "." is
+// skipped, and ".." pops the previous component but can never climb above the
+// destination. Backslashes are treated as separators too: archives written on
+// Windows sometimes store them.
+//
+// Returns "" when nothing usable is left, in which case the entry is skipped.
+static std::string unzip_safe_relpath(const std::string &name)
+{
+    std::string out;
+    size_t i = 0;
+    while (i < name.size()) {
+        size_t j = name.find_first_of("/\\", i);
+        std::string comp = (j == std::string::npos) ? name.substr(i) : name.substr(i, j - i);
+        i = (j == std::string::npos) ? name.size() : j + 1;
+
+        if (comp.empty() || comp == ".") continue;
+        if (comp == "..") {
+            size_t s = out.rfind('/');
+            out = (s == std::string::npos) ? std::string() : out.substr(0, s);
+            continue;   // popping an empty path is a no-op, so dest is the floor
+        }
+        if (!out.empty()) out += '/';
+        out += comp;
+    }
+    return out;
+}
+
 static int64_t unzip_write_entry(uint8_t *buf, size_t bufSize,
                                   const std::function<uint32_t(uint8_t *, uint32_t)> &readFn,
-                                  const std::string &destPath, int64_t entry_size)
+                                  const std::string &destPath, int64_t entry_size,
+                                  std::string &last_dir)
 {
     const int64_t kProgressThreshold = 512 * 1024;
     const size_t kReport = 256 * 1024;
 
     size_t slash = destPath.rfind('/');
     if (slash != std::string::npos)
-        unzip_mkdirs(destPath.substr(0, slash));
+        unzip_mkdirs(destPath.substr(0, slash), last_dir);
 
     std::unique_ptr<MFile> outFile(MFSOwner::File(destPath));
     std::shared_ptr<MStream> outStream = outFile ? outFile->getSourceStream(std::ios_base::out) : nullptr;
@@ -1855,12 +2144,29 @@ static int64_t unzip_write_entry(uint8_t *buf, size_t bufSize,
 
 static int cmd_unzipx(int argc, char **argv)
 {
-    if (argc < 2) {
-        Serial.printf("usage: unzipx <archive> [dest_folder]\r\n");
+    // -j ("junk paths") extracts every entry straight into the destination.
+    // Without it the archive's stored directory structure is recreated, which
+    // is what unzip(1) does by default.
+    bool junk_paths = false;
+    int argi = 1;
+    while (argi < argc && argv[argi][0] == '-' && argv[argi][1] != '\0') {
+        for (const char *p = argv[argi] + 1; *p; p++) {
+            if (*p == 'j') junk_paths = true;
+            else {
+                Serial.printf("unzipx: invalid option -- '%c'\r\n", *p);
+                return EXIT_FAILURE;
+            }
+        }
+        argi++;
+    }
+
+    if (argi >= argc) {
+        Serial.printf("usage: unzipx [-j] <archive> [dest_folder]\r\n");
+        Serial.printf("  -j  junk paths: extract all files into the destination folder\r\n");
         return EXIT_FAILURE;
     }
 
-    std::string src = resolve_path(argv[1]);
+    std::string src = resolve_path(argv[argi]);
 
     std::unique_ptr<MFile> srcFile(MFSOwner::File(src));
     if (!srcFile || !srcFile->exists()) {
@@ -1869,8 +2175,8 @@ static int cmd_unzipx(int argc, char **argv)
     }
 
     std::string dest;
-    if (argc >= 3) {
-        dest = resolve_path(argv[2]);
+    if (argc > argi + 1) {
+        dest = resolve_path(argv[argi + 1]);
     } else if (!srcFile->scheme.empty()) {
         // Network source (http, https, ftp, smb, ...): "same directory as
         // source" would try to write the extracted files back to the remote
@@ -1890,8 +2196,19 @@ static int cmd_unzipx(int argc, char **argv)
 
     int count = 0;
     size_t total_bytes = 0;
+    // Directory the previous entry was written into, so a deep archive does
+    // not re-walk (and re-probe for .config) the same tree for every entry.
+    std::string last_dir;
 
     if (is_single_file_compression(srcFile->name)) {
+        // Take the output name BEFORE opening the stream. For a single-file
+        // compression ArchiveMFile::getDecodedStream() ends with
+        // resetURL(base()) — it repoints the MFile at the containing
+        // directory so the CWD is right after a LOAD — which leaves
+        // srcFile->name empty. Reading it afterwards produced a path of
+        // "<dest>/", and fopen() on a directory fails with EACCES.
+        const std::string out_name = strip_compression_ext(srcFile->name);
+
         // .gz/.bz2/etc: exactly one decompressed entry. getSourceStream()
         // already resolves this transparently — the same path LOAD uses.
         std::shared_ptr<MStream> srcStream = srcFile->getSourceStream(std::ios_base::in);
@@ -1901,14 +2218,21 @@ static int cmd_unzipx(int argc, char **argv)
             return EXIT_FAILURE;
         }
 
-        std::string path = dest + "/" + strip_compression_ext(srcFile->name);
+        // Prefer what the archive says the content is called, now that the
+        // stream is open and the entry resolved: a .gz stores the original
+        // filename in its header, and a URL basename is percent-encoded
+        // (`ordeal%2b2100p.d64.gz` on the server is
+        // `ordeal +2 100% (ntsc pal) wanderer.d64` inside). out_name, taken
+        // from the URL before opening, is the fallback.
+        std::string resolved = srcFile->getDownloadFilename();
+        std::string path = dest + "/" + (resolved.empty() ? out_name : resolved);
         int64_t entry_size = (int64_t)srcStream->size();
         Serial.printf("  %s  (%lld bytes)\r\n", path.c_str(), (long long)entry_size);
 
         int64_t written = unzip_write_entry(
             buf, 4096,
             [srcStream](uint8_t *b, uint32_t n) { return srcStream->read(b, n); },
-            path, entry_size);
+            path, entry_size, last_dir);
         if (written < 0) {
             free(buf);
             return EXIT_FAILURE;
@@ -1926,9 +2250,23 @@ static int cmd_unzipx(int argc, char **argv)
         bool ok = srcFile->extractAll(
             [&](const std::string &name, uint32_t size,
                 const std::function<uint32_t(uint8_t *, uint32_t)> &read) -> bool {
-                std::string path = dest + "/" + name;
+                // 'name' is the path as stored in the archive. Sanitise it so a
+                // hostile entry cannot write outside dest, then flatten it if
+                // -j was given. unzip_write_entry() creates any missing parent
+                // directories, which is what recreates the structure.
+                std::string rel = unzip_safe_relpath(name);
+                if (junk_paths) {
+                    size_t s = rel.rfind('/');
+                    if (s != std::string::npos) rel = rel.substr(s + 1);
+                }
+                if (rel.empty()) {
+                    Serial.printf("  (skipped unsafe entry '%s')\r\n", name.c_str());
+                    return true;
+                }
+
+                std::string path = dest + "/" + rel;
                 Serial.printf("  %s  (%u bytes)\r\n", path.c_str(), size);
-                int64_t written = unzip_write_entry(buf, 4096, read, path, (int64_t)size);
+                int64_t written = unzip_write_entry(buf, 4096, read, path, (int64_t)size, last_dir);
                 if (written >= 0) {
                     total_bytes += (size_t)written;
                     count++;
@@ -1974,7 +2312,14 @@ namespace ESP32Console::Commands
 
     const ConsoleCommand getLsCommand()
     {
-        return ConsoleCommand("ls", &ls, "List the contents of the given path");
+        return ConsoleCommand("ls", &ls,
+            "List the contents of the given path. Usage: ls [-a] [path]  (-a shows hidden entries)");
+    }
+
+    const ConsoleCommand getPartitionCommand()
+    {
+        return ConsoleCommand("partition", &partition,
+            "List or switch CMD HD/FD or IDE64 CFS partitions. Usage: partition [number|name]");
     }
 
     const ConsoleCommand getMvCommand()
@@ -2032,24 +2377,16 @@ namespace ESP32Console::Commands
         return ConsoleCommand("df", &df, "Show filesystem disk space usage");
     }
 
-    const ConsoleCommand getEnableCommand()
-    {
-        return ConsoleCommand("enable", &enable, "Enable virtual drive");
-    }
-    const ConsoleCommand getDisableCommand()
-    {
-        return ConsoleCommand("disable", &disable, "Disable virtual drive");
-    }
-
+#ifndef MIN_CONFIG
     const ConsoleCommand getGzipCommand()
     {
         return ConsoleCommand("gzip", &cmd_gzip, "Compress a file to .gz (level 9)");
     }
 
-#ifndef MIN_CONFIG
     const ConsoleCommand getUnzipxCommand()
     {
-        return ConsoleCommand("unzipx", &cmd_unzipx, "Extract an archive to a folder");
+        return ConsoleCommand("unzipx", &cmd_unzipx,
+            "Extract an archive, recreating its directory structure. Usage: unzipx [-j] <archive> [dest]");
     }
 #endif
 
@@ -2061,7 +2398,8 @@ namespace ESP32Console::Commands
 
     const ConsoleCommand getUpdatedbCommand()
     {
-        return ConsoleCommand("updatedb", &updatedb, "Build the locate database from the SD card");
+        return ConsoleCommand("updatedb", &updatedb,
+            "Build the locate database from the SD card. Usage: updatedb [start|status|stop|resume|fts]");
     }
 
     const ConsoleCommand getLocateCommand()

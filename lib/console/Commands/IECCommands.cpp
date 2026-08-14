@@ -4,6 +4,7 @@
 #include "../../bus/iec/iec.h"
 #include "../Console.h"
 #include "../../www/ws/activity.h"
+#include "../../device/iec/meatloaf.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -195,11 +196,46 @@ static int iec(int argc, char **argv)
 }
 #endif
 
+int enable(int argc, char **argv)
+{
+    if (argc != 2)
+    {
+        Serial.printf("enable {id_1}|{id_1},{id_2},...\r\n");
+        return EXIT_SUCCESS;
+    }
+
+    Meatloaf.enable(argv[1]);
+
+    return EXIT_SUCCESS;
+}
+
+int disable(int argc, char **argv)
+{
+    if (argc != 2)
+    {
+        Serial.printf("disable {id_1}|{id_1},{id_2},...\r\n");
+        return EXIT_SUCCESS;
+    }
+
+    Meatloaf.disable(argv[1]);
+
+    return EXIT_SUCCESS;
+}
+
+
 namespace ESP32Console::Commands
 {
     const ConsoleCommand getIECCommand()
     {
         return ConsoleCommand("iec", &iec,
             "Show/control the IEC bus. Usage: iec [sleep|wake|scan [start] [end]]");
+    }
+    const ConsoleCommand getEnableCommand()
+    {
+        return ConsoleCommand("enable", &enable, "Enable virtual device");
+    }
+    const ConsoleCommand getDisableCommand()
+    {
+        return ConsoleCommand("disable", &disable, "Disable virtual device");
     }
 }

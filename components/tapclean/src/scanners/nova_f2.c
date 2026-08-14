@@ -38,7 +38,7 @@ void nova_spc_search(void)
    int b,b2, done;
 
    if(!quiet)
-      msgout("  Novaload Special");
+      msgout("\r\n  Novaload Special");
          
 
    for(i=20; i>0 && i<tap.len-200; i++)

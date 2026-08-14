@@ -37,7 +37,7 @@ void pause_search(void)
 	unsigned char b;
 
 	if (!quiet)
-		msgout("  Pauses");
+		msgout("\r\n  Pauses");
 
 	for (i = 20; i < tap.len && dr != DBFULL; i++) {
 		b = tap.tmem[i];

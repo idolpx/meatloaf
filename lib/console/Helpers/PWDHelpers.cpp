@@ -43,7 +43,7 @@ namespace ESP32Console
         std::lock_guard<std::mutex> lock(s_path_mutex);
         if (currentPath == nullptr)
             return "/";
-        return currentPath->url;
+        return currentPath->fullUrl();
     }
 
     // const char *console_getpwd()
@@ -62,7 +62,7 @@ namespace ESP32Console
     const char *console_realpath(const char *path, char *resolvedPath)
     {
         std::string in = std::string(path);
-        std::string pwd = getCurrentPath()->url; //std::string(console_getpwd());
+        std::string pwd = getCurrentPathUrl();
         std::string result;
 
         mstr::replaceAll(in, "'", "");

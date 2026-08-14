@@ -40,7 +40,7 @@ void turbotape_fast_search(void)
    int hd[HDSZ];
 
    if(!quiet)
-      msgout("  Turbotape 64 Fast");
+      msgout("\r\n  Turbotape 64 Fast");
 
 
    for(i=20; i<tap.len-8; i++)

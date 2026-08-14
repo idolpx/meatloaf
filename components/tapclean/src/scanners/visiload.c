@@ -439,7 +439,7 @@ void visiload_search(void)
 	int cbm_index = 1;
 
 	if(!quiet)
-		msgout("  Visiload");
+		msgout("\r\n  Visiload");
 
 	for (;;) {
 

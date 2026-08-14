@@ -569,7 +569,7 @@ uint64_t FileSystemSDFAT::total_bytes()
 	if (f_getfree("0:", &fre_clust, &fsinfo) == 0)
     {
         // cluster_size * num_clusters * sector_size
-        size = ((uint64_t)(fsinfo->csize)) * (fsinfo->n_fatent - 2) * (fsinfo->ssize);
+        size = ((uint64_t)(fsinfo->csize)) * (fsinfo->n_fatent - 2) * fatfs_sector_size(fsinfo);
     }
 #endif
 	return size;
@@ -585,7 +585,7 @@ uint64_t FileSystemSDFAT::used_bytes()
 	if(f_getfree("0:", &fre_clust, &fsinfo) == 0)
     {
         // cluster_size * (num_clusters - free_clusters) * sector_size
-	    size = ((uint64_t)(fsinfo->csize)) * ((fsinfo->n_fatent-2)-(fsinfo->free_clst)) * (fsinfo->ssize);
+	    size = ((uint64_t)(fsinfo->csize)) * ((fsinfo->n_fatent-2)-(fsinfo->free_clst)) * fatfs_sector_size(fsinfo);
     }
 #endif
 	return size;
@@ -625,10 +625,21 @@ bool FileSystemSDFAT::start()
     // Set our basepath
     strlcpy(_basepath, "/sd", sizeof(_basepath));
 
-    // Fat FS configuration options
-    esp_vfs_fat_mount_config_t mount_config;
+    // Fat FS configuration options.
+    // MUST be zero-initialised: the struct carries more fields than the ones
+    // set below (allocation_unit_size, disk_status_check_enable, use_one_fat),
+    // and a bare stack declaration leaves those reading whatever happened to
+    // be on the stack - so behaviour differed from boot to boot. The
+    // -Wmissing-field-initializers pragma at the top of this file is why that
+    // never produced a warning.
+    esp_vfs_fat_mount_config_t mount_config = {};
     mount_config.format_if_mount_failed = false;
     mount_config.max_files = 16;
+    // Use the real ff_disk_status() implementation for the card. Costs a
+    // little IO performance, but it is what lets FATFS notice a card that was
+    // pulled or was not cleanly unmounted, instead of writing on into a stale
+    // mount. ESP-IDF recommends it for exactly these symptoms.
+    mount_config.disk_status_check_enable = true;
 
     // This is the information we'll be given in return
     sdmmc_card_t *sdcard_info;
@@ -697,7 +708,31 @@ bool FileSystemSDFAT::start()
     slot_config.gpio_cs = PIN_SD_HOST_CS;
     slot_config.host_id = SDSPI_DEFAULT_HOST;
 
-    esp_err_t e = esp_vfs_fat_sdspi_mount(_basepath, &host_config, &slot_config, &mount_config, &sdcard_info);
+    // A single transient failure on the SPI link (ESP_ERR_INVALID_CRC during
+    // sdmmc_card_init, typically a marginal contact or a supply dip on the
+    // card's power-up inrush) used to disable the card for the WHOLE session,
+    // because nothing ever retried - only a power cycle brought it back.
+    // Retry, and drop the clock after the first failure: marginal cards and
+    // wiring that fail at the 20MHz SDSPI_HOST_DEFAULT() rate usually
+    // enumerate reliably at half that. esp_vfs_fat_sdspi_mount() unwinds
+    // everything it allocated on its own failure path, so a retry starts from
+    // a clean state.
+    const int max_attempts = 3;
+    esp_err_t e = ESP_FAIL;
+    for (int attempt = 1; attempt <= max_attempts; attempt++)
+    {
+        if (attempt > 1)
+        {
+            host_config.max_freq_khz = SDMMC_FREQ_DEFAULT / 2;
+            vTaskDelay(pdMS_TO_TICKS(100));
+            Debug_printf("SD mount attempt %d/%d at %dkHz\r\n",
+                         attempt, max_attempts, host_config.max_freq_khz);
+        }
+
+        e = esp_vfs_fat_sdspi_mount(_basepath, &host_config, &slot_config, &mount_config, &sdcard_info);
+        if (e == ESP_OK)
+            break;
+    }
 
 #endif /* SDMMC_HOST_WIDTH */
 
@@ -727,6 +762,33 @@ bool FileSystemSDFAT::start()
     }
 
     return _started;
+}
+
+bool FileSystemSDFAT::stop()
+{
+    if(!_started)
+        return true;
+
+    // Unmounts the FATFS volume, which flushes its cached FAT and directory
+    // sectors, then releases the card. Skipping this (as every reboot used to)
+    // leaves those cached sectors unwritten - the card is then dirty on disk
+    // even though nothing was physically wrong with it.
+    esp_err_t e = esp_vfs_fat_sdcard_unmount(_basepath, _sdcard_info);
+
+    // The card is gone either way as far as we are concerned; don't leave a
+    // dangling _sdcard_info that a later call could dereference.
+    _started = false;
+    _sdcard_info = nullptr;
+    _card_capacity = 0;
+
+    if(e != ESP_OK)
+    {
+        Debug_printf("SD unmount failed with code #%d, \"%s\"\r\n", e, esp_err_to_name(e));
+        return false;
+    }
+
+    Debug_println("SD unmounted.");
+    return true;
 }
 #else
 // !ESP_PLATFORM

@@ -42,7 +42,7 @@ void oceannew2_search(void)
 	unsigned int s,e,x;
 
 	if(!quiet)
-		msgout("  New Ocean Tape 2");
+		msgout("\r\n  New Ocean Tape 2");
 				 
 	 
 	for(i=20; i<tap.len-8; i++) {

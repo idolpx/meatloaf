@@ -1,0 +1,44 @@
+{
+  "skill_name": "c64-jiffydos",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "hey i just booted up my c64 emulator and i'm not sure if jiffydos is running. the screen shows the blue boot screen but it went by too fast to read. how can i check if it's loaded? and if it is, how do i see what files are on the disk in drive 8?",
+      "expected_output": "Step-by-step instructions for checking if JiffyDOS is active, followed by the directory listing command",
+      "files": [],
+      "expectations": [
+        "Shows the `@` test to check for JiffyDOS",
+        "Explains the boot screen difference between JiffyDOS and stock",
+        "Uses `@$` to list the directory",
+        "Mentions that `@$` doesn't overwrite memory like stock `load\"$\",8`",
+        "All JiffyDOS commands and BASIC keywords are written in lowercase"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "ok i wrote a basic program and saved it as 'game' but then i made a bunch of changes and i want to save the new version as 'game2' and delete the old 'game'. the problem is i keep getting disk errors when i try to save. how do i check what went wrong and get this sorted?",
+      "expected_output": "Instructions for checking the disk error channel, saving a new copy, renaming, and deleting the old file",
+      "files": [],
+      "expectations": [
+        "Uses `@` to read the disk error channel",
+        "Shows how to save with `←filename`",
+        "Shows how to delete with `@s:filename`",
+        "Explains how to rename with `@r:newname=oldname`",
+        "All JiffyDOS commands and BASIC keywords are written in lowercase"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "dude my disk is messed up. i did a `@$` and it shows the directory fine but when i try to load any program with `/` it says 'file not found'. i think the disk got corrupted. what can i do to fix this? i have jiffydos installed.",
+      "expected_output": "Diagnosis and repair steps using JiffyDOS commands",
+      "files": [],
+      "expectations": [
+        "Suggests `@` first to check the error channel",
+        "Suggests `@v` to validate/repair the disk",
+        "Explains what `@v` does (rebuilds BAM)",
+        "Suggests `@i` to reinitialize the drive as an alternative",
+        "All JiffyDOS commands and BASIC keywords are written in lowercase"
+      ]
+    }
+  ]
+}
