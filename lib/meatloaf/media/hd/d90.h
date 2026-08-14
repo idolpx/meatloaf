@@ -58,7 +58,7 @@ public:
             76,    // track
             20,    // sector
             0x06,  // header_offset
-            76,    // directory_track
+            76,    // directory_track - 0x390000
             10,    // directory_sector
             0x00,  // directory_offset
             0,     // parent_header_track

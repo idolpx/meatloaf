@@ -19,6 +19,7 @@
 //
 // https://singularcrew.hu/idedos/cfs.html
 // https://singularcrew.hu/ide64warez/site/other-OS/Windows/fusecfs-2.0.4-win.zip
+// https://www.ide64.org/vice_ide64_howto_rev2.txt
 //
 
 //  CFS Format Support
