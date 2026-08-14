@@ -42,10 +42,6 @@ namespace ESP32Console::Commands
 
     const ConsoleCommand getPartitionCommand();
 
-    const ConsoleCommand getEnableCommand();
-
-    const ConsoleCommand getDisableCommand();
-
     const ConsoleCommand getGzipCommand();
 
 #ifndef MIN_CONFIG
