@@ -14,7 +14,7 @@
 
 - **Partitions are numbered from 1, counting only VALID table entries.** An invalid slot is skipped rather than consuming a number. This is already what `HDDMStream::seekPartitionEntry()` does, and the registry must agree with it entry for entry.
 - **Two numbering spaces, never to be confused.** The **slot index** 0-15 is how the partition directory is physically laid out and what the boot sector's DP byte holds. The **partition number** 1-N is what paths, `CP<n>`, `$=P` and the `partition` command speak. `parse()` converts DP from the first space to the second exactly once; nothing downstream sees a slot index.
-- **Partition 0 behaves exactly as in DHD.** `0` in a path means "the currently selected partition" — copy `DHDResolvePartition()`'s `v == 0` case verbatim. `select()` refuses 0, so `CP0` is a syntax error.
+- **Partition 0 behaves exactly as in DHD.** `0` in a path means "the currently selected partition" — copy `DHDResolvePartition()`'s `v == 0` case verbatim. `select()` refuses 0, so `CP0` fails with `77 SELECTED PARTITION ILLEGAL` (it is a well-formed number naming no real partition); `30 SYNTAX ERROR` is reserved for input that is not a partition number at all.
 - **Never call `select()` while resolving a path.** Only `CP<n>` and the `partition` console command change the selection.
 - **Never use `atoi`/`std::stoi`** on C64- or network-sourced input. Use `strtol`, check `end != start && *end == '\0'`, and range-check **before** narrowing to `uint8_t`. An unchecked `int` truncated into `byNumber()` is the bug that once made `1571` resolve to partition 35 in DHD.
 - **A partition is selectable only when `type == 1` (CFS).** Unformatted (0), GEOS (2) and reserved (3-11) are listed, never selected.

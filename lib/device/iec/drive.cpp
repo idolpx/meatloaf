@@ -2363,13 +2363,35 @@ void iecDrive::tapeCommand(std::string command)
 
 // CMD "CP<n>" - change the selected partition of the mounted image. Works on
 // a CMD HD/FD image (DHD, D1M/D2M/D4M) and on an IDE64 CFS image (.hdd); the
-// valid range differs per format and lives in hdpart::select().
+// per-format bound on which partitions actually EXIST lives in hdpart::select().
+//
+// The two error codes answer different questions, and the split is by what the
+// number could ever mean rather than by what this image happens to hold:
+//
+//   30 SYNTAX ERROR  - the argument is not a partition number at all: it did
+//                      not parse, or it cannot fit the one-byte partition
+//                      number a CBM drive uses (CP256 and up).
+//   77 SELECTED PARTITION ILLEGAL
+//                    - it IS a well-formed partition number (0-255) but this
+//                      image has no such partition. That covers CP0, which is
+//                      reserved for "the currently selected partition" and is
+//                      therefore never a real one, and every unused number up
+//                      to 255 - including 17-255 on a CFS image, whose table
+//                      only ever holds 16.
 void iecDrive::changePartition(int pnum)
 {
     hdpart::Target t = hdpart::targetFor(m_cwd != nullptr ? m_cwd->url : "");
     Debug_printv("change partition pnum[%d] container[%s]", pnum, t.container.c_str());
 
     if (!t)
+    {
+        setStatusCode(ST_SYNTAX_INVALID);
+        return;
+    }
+
+    // Not a partition number: unparseable (the caller's -1 sentinel) or beyond
+    // the one-byte range a partition number can occupy.
+    if (pnum < 0 || pnum > 255)
     {
         setStatusCode(ST_SYNTAX_INVALID);
         return;

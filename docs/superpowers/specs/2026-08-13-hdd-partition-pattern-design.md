@@ -131,7 +131,13 @@ gives it:
 - **`0` in a path means "the currently selected partition"**, so
   `DHDResolvePartition()`'s `v == 0` case is copied verbatim rather than
   dropped.
-- **`select()` refuses 0**, so `CP0` is a syntax error, as on a CMD HD.
+- **`select()` refuses 0**, so `CP0` fails — with `77 SELECTED PARTITION
+  ILLEGAL`, not a syntax error. 0 is a well-formed partition number that this
+  (and every) image simply does not have, since it is reserved for "the
+  currently selected partition". `30 SYNTAX ERROR` is reserved for input that
+  is not a partition number at all: unparseable, or beyond the one-byte range
+  (`CP256` and up). The same split applies to a CFS image's 17-255, which are
+  well-formed but never present in a 16-entry table.
 
 **The one real divergence: no `cached_part`, no `brokerUrl()`, no
 dispose-on-select.** DHD needs all
