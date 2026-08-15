@@ -144,7 +144,10 @@ bool T64MStream::seekPath(std::string path) {
 
         // Load Address
         _load_address[0] = entry.start_address & 0xFF;
-        _load_address[1] = entry.start_address & 0xFF00;
+        // Shift, don't mask: _load_address is uint8_t[2], and the low 8 bits of
+        // (start_address & 0xFF00) are always zero, so masking stored 0 for
+        // EVERY entry - a PRG at $0801 loaded to $0001.
+        _load_address[1] = ( entry.start_address >> 8 ) & 0xFF;
         Debug_printv("load00[%d] load01[%d]", _load_address[0], _load_address[1]);
 
         // Set position to beginning of file

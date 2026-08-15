@@ -216,6 +216,7 @@ private:
     friend class P00MFile;
 
     // CASSETTE TAPE
+    friend class CSMMFile;
     friend class T64MFile;
     friend class TCRTMFile;
 };

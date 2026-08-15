@@ -513,6 +513,57 @@ When implementing a new stream:
 6. Verify ImageBroker caching works correctly
 7. Check memory leaks with stream chains
 
+## Recent Changes (August 15, 2026)
+
+- **CSM cassette images** (`media/tape/csm.h/cpp`, new; registered as `csmFS`): a CSM holds
+  **already-decoded** CBM tape blocks, so despite being a tape format it is modeled on **T64**, not
+  TAP — no TAPClean, no pulse decoding, no PSRAM requirement. Layout is
+  `[192-byte header block][data block]` repeated, terminated by a type-`$05` header with **no data
+  block after it**; the header carries type at 0, start/end address LE at 1-4 and a 16-byte
+  space-padded PETSCII name at 5-20. **The data block is raw program bytes with NO load-address
+  prefix** — the two bytes a PRG begins with are synthesized from the header's start address, the
+  same thing `T64MStream::readFile()` does. The high byte is `(start >> 8) & 0xFF` — see the T64
+  entry below for why that spelling matters.
+- **A CSM has no directory — entry *n*'s offset is the sum of every preceding block**, so
+  `readHeader()` WALKS the container to build the entry list. It is idempotent via `entry_count`
+  (assigned unconditionally, `(size_t)-1` meaning "not yet walked") because `rewindDirectory()`
+  calls it on every listing and each step is a seek plus a read — one HTTP range request per entry
+  over the network. An empty result must still mark the container walked, or a broken file re-walks
+  forever.
+- **The `$05` end-of-tape block's address fields are not a length.** The jsvic20 reference decoder
+  (`.reference/jsvic20-csm/`, minified line 1303, class `Kbe`) has no case for it and reads them as
+  one, running off the end — four of the twelve corpus samples end this way. The walk also stops on
+  `end < start`, a short read, a header block that does not fit in what remains, and a 256-entry cap;
+  a final entry whose data runs past EOF is clamped to the bytes that exist.
+- **Names are padding-trimmed with `mstr::rtrimPad()`** ($A0 *and* trailing spaces — its own comment
+  cites CBM tape headers), but nothing else is done to them: blanks stay blank and duplicates stay
+  duplicated, first match winning. Real tapes carry both (`Wacky Waiters` has an unnamed entry,
+  `Abductor` has two `ABDUCTOR` entries — a BASIC loader and its payload).
+- **Every T64 entry loaded to the wrong address** (`media/tape/t64.cpp`, `seekPath()`): the load
+  address high byte was `entry.start_address & 0xFF00` assigned into `_load_address`, which is
+  `uint8_t[2]`. That mask clears exactly the eight bits the assignment keeps, so it stored **0 for
+  every possible address** — a PRG at `$0801` loaded to `$0001`. Now `(start_address >> 8) & 0xFF`.
+  The low byte was always correct, which is what made this survive: the file loaded, just into the
+  wrong page. Pinned by `test/native/test_t64_read/`.
+- **OPEN: T64 never trims the 16-byte filename field, so exact-name lookup fails on `$20`-padded
+  images.** `seekEntry(std::string)` compares the query against the raw field (the `rtrimA0()` call
+  is commented out), and `std::string entryFilename = entry.filename` on a `char[16]` with no
+  terminator also over-reads past the struct. For a `$00`-padded T64 the string constructor stops at
+  the NUL and the name comes out clean — which is why this goes unnoticed, most files in the wild
+  being `$00`-padded — but the T64 spec specifies `$20`, and on those images the entry compares as
+  `"himem           "` and only `LOAD"*"` or a wildcard can reach it. Not fixed because it is a
+  behaviour change with a real trade-off: a trailing space can be part of a CBM name, which is
+  exactly why `mstr::rtrimA0()` strips only `$A0` and `mstr::rtrimPad()` exists as the opt-in for
+  fixed-width fields (CSM uses the latter). `test_space_padded_name_lookup` is
+  `TEST_IGNORE_MESSAGE`'d with its body intact — lift the guard and re-run to verify a fix.
+- **Host tests**: `test/native/test_csm_read/` — 21 synthesized-image cases plus one that walks every
+  sample in `.archive/csm` and asserts each consumes to exactly EOF, which is the invariant that
+  pins the layout. Note `compareFilename()` matches against `mstr::toUTF8(entry.filename)`, so a
+  test passing a bare ASCII literal asks a question the drive never asks; and
+  `MMediaStream::write()` only reaches `writeFile()` once `seekCalled` is set, so a read-only
+  assertion needs a `seekPath()` first. `CSMMFile` itself is out of reach natively — `MFSOwner::File()`
+  aborts under the stubs, as for the M2I and HDD suites.
+
 ## Recent Changes (August 13, 2026)
 
 - **IDE64 CFS gained the CMD partition model** (`media/hd/hdd.h/.cpp`, new `media/hd/partition_select.h/.cpp`): `HDDImageRegistry` mirrors `DHDImageRegistry` — per-image table and selection keyed on the container URL, `HDDResolvePartition()` binding a partition to a path without calling `select()`, `$=P` listing on `HDDMFile`, and entry URLs that name the partition BY NUMBER. The image root is now the SELECTED partition's directory rather than the partition list; that is the one visible regression, and `partition` / `$=P` are how the list is reached. See the three divergences from DHD in `AGENTS.md` before touching any of it.

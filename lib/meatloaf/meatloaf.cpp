@@ -110,6 +110,7 @@
 #include "media/hd/hdd.h"
 
 // Tape
+#include "media/tape/csm.h"
 #include "media/tape/tap.h"
 #include "media/tape/t64.h"
 #include "media/tape/tcrt.h"
@@ -374,6 +375,7 @@ DHDMFileSystem dhdFS;
 HDDMFileSystem hddFS;
 
 // Tape
+CSMMFileSystem csmFS;
 TAPMFileSystem tapFS;
 T64MFileSystem t64FS;
 TCRTMFileSystem tcrtFS;
@@ -431,7 +433,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &dnpFS, &dhdFS, &hddFS,
 
     // Tape
-    &tapFS, &t64FS, &tcrtFS,
+    &csmFS, &tapFS, &t64FS, &tcrtFS,
 
     // File
 //    &prgFS,         // needs to be on top to be picked first
