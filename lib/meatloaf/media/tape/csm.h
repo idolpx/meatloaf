@@ -28,9 +28,22 @@
 // is (end - start) RAW program bytes - the two-byte load address is NOT
 // stored, it lives in the header and is synthesized on read.
 //
-// Because an entry's offset depends on every preceding entry's size, entries
-// are found by WALKING the file, not by indexing it. Unlike TAP there are no
-// pulses here and nothing to decode, so this is modeled on T64.
+// Unlike TAP there are no pulses here and nothing to decode: the blocks are
+// already the program bytes, so an entry is found by WALKING the file (each
+// entry's offset is the sum of every preceding block) rather than by scanning
+// for loaders. The BEHAVIOUR, however, is a datasette exactly as .TAP is: a
+// directory request returns ONE entry - the next program on the tape - and
+// leaves it ready to load (LOAD"*",8, or console cat/hex "*"; the tape state
+// is shared across stream instances). The next request returns the next entry;
+// at the end of the tape a "no more entries" line is shown and the tape
+// rewinds for the following request. Loads search forward from the current
+// position and wrap once, so a tape carrying the same name twice - a BASIC
+// loader and its payload, which is the norm - resolves positionally rather
+// than ambiguously.
+//
+// Read-only.
+//
+// https://en.wikipedia.org/wiki/Commodore_Datasette
 //
 
 
@@ -40,6 +53,8 @@
 #include "meatloaf.h"
 #include "meat_media.h"
 
+#include <memory>
+#include <string>
 #include <vector>
 
 
@@ -47,11 +62,81 @@
  * Streams
  ********************************************************/
 
+// One entry as the tape carries it: the header block's fields plus where its
+// data block sits in the container.
+struct CSMEntry {
+    uint8_t     file_type = 0;
+    uint16_t    start_address = 0;
+    uint16_t    end_address = 0;
+    std::string name;               // padding-trimmed; may legitimately be empty
+    uint32_t    data_offset = 0;
+    uint32_t    data_length = 0;    // clamped to what the container holds
+};
+
+// Tape state shared by every CSMMStream on the same image: the walked entry
+// list and the datasette position. File opens create fresh CSMMStream
+// instances (MFile::getSourceStream -> getDecodedStream) while directory
+// listings use the ImageBroker instance - sharing this state is what makes
+// LOAD"*",8 / console "cat *" serve the program at the current tape position,
+// and stops the container being re-walked on every open (each step of the walk
+// is a seek plus a read: one HTTP range request per entry over the network).
+struct CSMState {
+    std::vector<CSMEntry> entries;
+    bool walked = false;
+
+    size_t tape_index = 0;      // index of the next entry to serve
+    bool tape_ended = false;
+
+    CSMEntry current;           // last entry found (ready to load)
+    bool have_current = false;
+
+    // Registry of live states keyed by container URL
+    static std::shared_ptr<CSMState> obtain(const std::string &url);
+};
+
+
 class CSMMStream : public MMediaStream {
-    // override everything that requires overriding here
+
+protected:
+    // Shared per-image state; the references below alias into it so the rest
+    // of the class (and CSMMFile) reads like plain members. Declaration order
+    // matters - they are bound in the constructor's init list, after `state`.
+    std::shared_ptr<CSMState> state;
+    std::vector<CSMEntry> &entries;
+    bool &walked;
+    size_t &tape_index;
+    bool &tape_ended;
 
 public:
-    CSMMStream(std::shared_ptr<MStream> is) : MMediaStream(is) {};
+    CSMEntry &current;          // last entry found (ready to load)
+    bool &have_current;
+
+    CSMMStream(std::shared_ptr<MStream> is) : MMediaStream(is),
+        state(CSMState::obtain(is != nullptr ? is->url : "")),
+        entries(state->entries),
+        walked(state->walked),
+        tape_index(state->tape_index),
+        tape_ended(state->tape_ended),
+        current(state->current),
+        have_current(state->have_current)
+    {
+        // The container is walked lazily on first use
+    };
+
+    // Name used for entries the tape leaves unnamed (the media file's name)
+    void setDefaultName(std::string name) { default_name = name; };
+
+    // --- Sequential tape access ---
+    // Advance to the next entry on the tape; fills 'current' and leaves it
+    // ready to load. Returns false at the end of the tape (tapeEnded()).
+    bool nextTapeEntry();
+    void resetTape();
+    bool tapeEnded() { return tape_ended; };
+
+    // Display name for an entry (media name when the tape leaves it unnamed)
+    std::string entryDisplayName(const CSMEntry &e);
+
+    bool seekPath(std::string path) override;
 
 protected:
     // Size of an on-tape header block, and of the part of it that carries
@@ -60,43 +145,29 @@ protected:
     static constexpr uint32_t header_field_size = 21;
 
     // CBM tape header block types.
-    static constexpr uint8_t type_basic     = 1;    // relocatable program
-    static constexpr uint8_t type_seq_data  = 2;
-    static constexpr uint8_t type_program   = 3;    // non-relocatable program
-    static constexpr uint8_t type_seq_header= 4;
-    static constexpr uint8_t type_end_tape  = 5;    // no data block follows
+    static constexpr uint8_t type_basic      = 1;   // relocatable program
+    static constexpr uint8_t type_seq_data   = 2;
+    static constexpr uint8_t type_program    = 3;   // non-relocatable program
+    static constexpr uint8_t type_seq_header = 4;
+    static constexpr uint8_t type_end_tape   = 5;   // no data block follows
 
-    // A tape with more entries than this is corrupt, not ambitious - the
-    // walk is bounded so a garbage image cannot spin.
+    // A tape with more entries than this is corrupt, not ambitious - the walk
+    // is bounded so a garbage image cannot spin.
     static constexpr size_t max_entries = 256;
 
-    struct Entry {
-        uint8_t     file_type;
-        uint16_t    start_address;
-        uint16_t    end_address;
-        char        filename[17];   // 16 stored bytes + terminator
-        uint32_t    data_offset;    // absolute offset of the data block
-        uint32_t    data_length;    // clamped to what the container holds
-    };
-
-    // Walks the container building `entries`. Idempotent - `entry_count` is
-    // the marker for "already walked", since it is assigned unconditionally
-    // below. rewindDirectory() calls this on every listing, and each step of
-    // the walk is a seek plus a read: one HTTP range request per entry over
-    // the network.
+    // Walks the container building `entries`. Idempotent via the shared
+    // `walked` flag, which is set even when the walk yields nothing so a
+    // broken image is not re-walked on every listing.
     bool readHeader() override;
-
-    bool seekEntry( std::string filename ) override;
-    bool seekEntry( uint16_t index ) override;
 
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
     uint32_t writeFile(uint8_t* buf, uint32_t size) override { return 0; };
-    bool seekPath(std::string path) override;
+
+    void serveCurrent();        // expose 'current' as the loaded file
 
     std::string decodeType(uint8_t file_type, bool show_hidden = false) override;
 
-    std::vector<Entry> entries;
-    Entry entry = { 0, 0, 0, "", 0, 0 };
+    std::string default_name = "csm file";
 
 private:
     friend class CSMMFile;
@@ -120,18 +191,19 @@ public:
         // don't close the stream here! It will be used by shared ptr to keep reading image params
     }
 
-    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
-    {
-        Debug_printv("[%s]", url.c_str());
-
-        return std::make_shared<CSMMStream>(is);
-    }
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override;
 
     bool rewindDirectory() override;
     MFile* getNextFileInDir() override;
 
+    bool isDirectory() override;
+    bool exists() override;
+
     bool isDir = true;
     bool dirIsOpen = false;
+
+protected:
+    uint16_t entry_index = 0;
 };
 
 

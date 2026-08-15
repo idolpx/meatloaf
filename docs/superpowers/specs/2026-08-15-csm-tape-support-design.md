@@ -1,7 +1,7 @@
 # CSM tape image support
 
 **Date:** 2026-08-15
-**Status:** Approved
+**Status:** Approved (revised 2026-08-15 — see *Revision*)
 
 ## Problem
 
@@ -57,34 +57,40 @@ reused. Two behaviours are deliberately not copied:
 
 ### Architecture
 
-CSM is a decoded, random-access container, so it is modeled on **T64**, not TAP. Nothing
-from `tape_decoder` / TAPClean is involved and CSM does not require PSRAM.
+CSM behaves as a **datasette, exactly as TAP does**. It differs from TAP only
+internally: the blocks are already decoded, so nothing from `tape_decoder` / TAPClean is
+involved and CSM does not require PSRAM.
 
 New `lib/meatloaf/media/tape/csm.h` and `csm.cpp`:
 
 **`CSMMStream : MMediaStream`**
 
-- `readHeader()` — walks the container once, building a `std::vector<Entry>` of
-  `{file_type, start_address, end_address, filename, data_offset, data_length}`.
-  Idempotent: returns early when the index is already built, because
+- `readHeader()` — walks the container once, building a `std::vector<CSMEntry>` of
+  `{file_type, start_address, end_address, name, data_offset, data_length}`. Idempotent
+  via the shared `walked` flag, which is set even when the walk yields nothing, because
   `rewindDirectory()` calls it on every listing and each walk step costs a seek plus a
-  read — one HTTP range request per entry over the network. Publishes `entry_count` so
-  `seekEntry()` can distinguish a read header from an unread one, per the existing
-  `T64MStream` note.
-- `seekEntry(uint16_t)` — index into the vector.
-- `seekEntry(std::string)` — linear scan via `mstr::compareFilename` with wildcard
-  support. **First match wins**, so `Abductor`'s two `ABDUCTOR` entries resolve to the
-  earlier one.
-- `seekPath()` — sets `_size = data_length + 2`, `_load_address` from `start_address`,
-  and seeks the container to the entry's data offset.
+  read — one HTTP range request per entry over the network.
+- `nextTapeEntry()` / `resetTape()` / `tapeEnded()` — the datasette head. One entry per
+  advance, in tape order.
+- `seekPath()` — serves the entry the last directory request left ready if it matches;
+  otherwise searches forward from the head, wrapping **once**.
+- `serveCurrent()` — sets `_size = data_length + 2`, `_load_address` from
+  `start_address`, seeks the container to the data offset, and **clears `have_current`**,
+  since serving moves the head past the entry.
 - `readFile()` — emits the two synthesized load-address bytes, then streams raw bytes
   from the container.
-- `writeFile()` — returns 0. Read-only, as T64 is.
+- `writeFile()` — returns 0. Read-only.
 - `decodeType()` — `1`/`3` → PRG, `2`/`4` → SEQ.
 
+**`CSMState`** — the walked entry list plus the tape position, shared per container URL
+through a weak_ptr registry, copied from `TapeState` and for the same reason:
+`MFile::getSourceStream()` builds a fresh stream per open while directory listings use the
+ImageBroker instance, so a per-instance position would rewind on every load.
+
 **`CSMMFile : MFile`** — `rewindDirectory()` / `getNextFileInDir()` over
-`ImageBroker::obtain<CSMMStream>("csm", url)`. `media_id = " CSM "`; `media_header` comes
-from the image's own name, since CSM carries no tape title.
+`ImageBroker::obtain<CSMMStream>("csm", url)`, returning ONE entry per listing and an
+`END OF TAPE` marker at the end. `media_id = " CSM "`; `media_header` comes from the
+image's own name, since CSM carries no tape title.
 
 **`CSMMFileSystem`** — `byExtension(".csm")`, registered as `csmFS` beside `t64FS` in
 `meatloaf.cpp`. No existing filesystem claims `.csm`.
@@ -96,9 +102,8 @@ newer `media/hd/` code and avoiding alignment assumptions for a five-field heade
 
 Listed as the tape stores them, with only the fixed-width padding removed via
 `mstr::rtrimPad()` (`$A0` and trailing spaces — its own comment names CBM tape headers as
-its use case). Blank names stay blank and duplicates stay duplicated; nothing is
-synthesized or disambiguated. An entry unreachable by name is still reachable by
-`LOAD"*"` and by index from the console.
+its use case). An entry the tape leaves unnamed lists under the media file's name, as TAP
+does. Duplicates need no disambiguation: the sequential model resolves them positionally.
 
 ### Corrupt input
 
@@ -114,13 +119,22 @@ an empty listing — no fallback and no fabricated entry.
 from `test_disk_write`, and a subclass exposing the protected members. Images are
 synthesized by `setUp()` and removed in `tearDown()`.
 
-Cases: the multi-entry walk, `$05` termination, the synthesized load-address prefix, size
-and type decoding, blank-name and duplicate-name resolution, wildcard lookup, and the
-corrupt-input guards.
+Cases in four groups: the walk (multi-entry, `$05` termination, padding trims), the
+datasette behaviour (sequential listing, wrap, positional duplicate resolution, forward
+search with one wrap, shared tape position across streams), reading (synthesized
+load-address prefix, later-entry offsets, write refusal), and the corrupt-input guards.
+Plus one case walking every sample in `.archive/csm`, asserting each consumes to exactly
+EOF.
 
-Tests must set `mode` explicitly before `seekPath()` — a directly constructed
-`MMediaStream` leaves it uninitialised, and garbage carrying the `out` bit makes
-`seekPath()` *create* the entry it was asked to find.
+Three constraints the tests must respect:
+
+- Set `mode` explicitly before `seekPath()` — a directly constructed `MMediaStream` leaves
+  it uninitialised.
+- Query names through `mstr::toUTF8()`, which is what `compareFilename()` matches against.
+- **Give each test its own container path.** Unity's `TEST_ASSERT` failure path is a
+  `longjmp` and does not unwind C++ destructors, so a failing test leaks its stream, the
+  `CSMState` never expires from the registry, and every later test on that URL inherits a
+  stale tape — turning one real failure into a dozen fictitious ones.
 
 `CSMMFile` itself is not covered natively: `MFSOwner::File()` aborts under the native
 stubs, as it does for the M2I and HDD suites.
@@ -129,6 +143,25 @@ stubs, as it does for the M2I and HDD suites.
 
 Write support, the `T-C` / `T-I` tape-counter commands, `.idx` sidecars, and any change to
 TAP, T64 or TCRT.
+
+## Revision — sequential listing
+
+The first version of this design used a **T64-style full directory** with random access,
+on the reasoning that CSM is already decoded so random access is free. That was reversed:
+CSM should behave as a datasette like TAP — a listing shows one file at a time until the
+end of tape, then wraps.
+
+The decisive argument is that it dissolves a problem the random-access design could only
+paper over. Real CSM tapes carry a BASIC loader and its payload under the **same name**
+(`Abductor.csm`), and with a full directory that is an ambiguity needing an arbitrary
+first-match-wins rule, leaving the payload unreachable by name. Under sequential
+semantics it is not a problem at all: loads search forward from the head, so the loader
+and then the payload come out in tape order. Blank names stop mattering for the same
+reason — they list under the media name and load positionally.
+
+Implementation cost was low, since the file layer is a direct copy of TAP's. The one
+substantive divergence from TAP is that `serveCurrent()` clears `have_current`; see the
+`lib/meatloaf/AGENTS.md` entry.
 
 ## Note on an adjacent pre-existing bug
 

@@ -18,6 +18,37 @@
 #include "csm.h"
 
 #include <cstring>
+#include <map>
+#include <mutex>
+
+/********************************************************
+ * Shared tape state
+ ********************************************************/
+
+std::shared_ptr<CSMState> CSMState::obtain(const std::string &url)
+{
+    static std::map<std::string, std::weak_ptr<CSMState>> registry;
+    static std::mutex mtx;
+
+    std::lock_guard<std::mutex> lock(mtx);
+
+    for (auto it = registry.begin(); it != registry.end(); )
+    {
+        if (it->second.expired())
+            it = registry.erase(it);
+        else
+            ++it;
+    }
+
+    auto &slot = registry[url];
+    auto state = slot.lock();
+    if (state == nullptr)
+    {
+        state = std::make_shared<CSMState>();
+        slot = state;
+    }
+    return state;
+}
 
 /********************************************************
  * Streams
@@ -39,22 +70,30 @@ std::string CSMMStream::decodeType(uint8_t file_type, bool show_hidden)
     }
 }
 
+std::string CSMMStream::entryDisplayName(const CSMEntry &e)
+{
+    if ( !e.name.empty() )
+        return e.name;
+
+    // Unnamed entries take the media file's name (duplicates resolve
+    // positionally: loads search forward from the current tape position)
+    return default_name;
+}
+
 bool CSMMStream::readHeader()
 {
-    // entry_count is assigned unconditionally at the end, so it doubles as the
-    // "this container has already been walked" marker - including for a file
-    // that yielded no entries at all, which must not be re-walked on every
-    // listing.
-    if ( entry_count != (size_t)-1 )
+    // `walked` lives in the shared state and is set even when the walk yields
+    // nothing, so a broken image is not re-walked on every listing - and a
+    // freshly constructed stream over an already-walked container does no I/O
+    // at all.
+    if ( walked )
         return !entries.empty();
 
+    walked = true;
     entries.clear();
 
     if ( containerStream == nullptr )
-    {
-        entry_count = 0;
         return false;
-    }
 
     const uint32_t container_size = containerStream->size();
     uint32_t offset = 0;
@@ -75,7 +114,7 @@ bool CSMMStream::readHeader()
         if ( hdr[0] == type_end_tape )
             break;
 
-        Entry e;
+        CSMEntry e;
         e.file_type     = hdr[0];
         e.start_address = (uint16_t)hdr[1] | ((uint16_t)hdr[2] << 8);
         e.end_address   = (uint16_t)hdr[3] | ((uint16_t)hdr[4] << 8);
@@ -85,17 +124,12 @@ bool CSMMStream::readHeader()
         if ( e.end_address < e.start_address )
             break;
 
-        memcpy(e.filename, hdr + 5, 16);
-        e.filename[16] = '\0';
-
         // The name is a fixed-width field padded with spaces, and sometimes
         // with $A0. rtrimPad() strips both - a CBM tape header is the case its
-        // own comment cites. A name that is all padding trims to empty, which
-        // is what several real tapes carry and what gets listed.
-        std::string trimmed(e.filename);
-        mstr::rtrimPad(trimmed);
-        strncpy(e.filename, trimmed.c_str(), sizeof(e.filename) - 1);
-        e.filename[sizeof(e.filename) - 1] = '\0';
+        // own comment cites. A name that is all padding trims to empty, and
+        // such an entry is listed under the media file's name.
+        e.name.assign((const char *)hdr + 5, 16);
+        mstr::rtrimPad(e.name);
 
         e.data_offset = offset + header_block_size;
         e.data_length = e.end_address - e.start_address;
@@ -121,57 +155,62 @@ bool CSMMStream::readHeader()
     return !entries.empty();
 }
 
-bool CSMMStream::seekEntry( std::string filename )
+void CSMMStream::resetTape()
 {
-    if ( filename.size() )
-    {
-        size_t index = 1;
-        mstr::replaceAll(filename, "\\", "/");
-        bool wildcard = ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
-
-        // First match wins: a tape can legitimately carry the same name twice
-        // (the two ABDUCTOR entries of Abductor.csm are a header loader and its
-        // payload), and the earlier one is the one a LOAD wants.
-        while ( seekEntry( index ) )
-        {
-            std::string entryFilename = entry.filename;
-            entryFilename = mstr::toUTF8(entryFilename);
-
-            if ( mstr::compareFilename(entryFilename, filename, wildcard) )
-                return true;
-
-            index++;
-        }
-    }
-
-    entry.filename[0] = '\0';
-
-    return false;
+    tape_index = 0;
+    tape_ended = false;
+    have_current = false;
 }
 
-bool CSMMStream::seekEntry( uint16_t index )
+bool CSMMStream::nextTapeEntry()
 {
-    // The entry list is built by walking the container, and a stream that has
-    // gone straight to a LOAD has never been through a directory listing - so
-    // this is where it gets walked.
-    if ( entry_count == (size_t)-1 && !readHeader() )
+    if ( !readHeader() )
+    {
+        tape_ended = true;
+        have_current = false;
         return false;
+    }
 
-    if ( index == 0 || index > entries.size() )
+    if ( tape_index >= entries.size() )
+    {
+        tape_ended = true;
+        have_current = false;
         return false;
+    }
 
-    entry = entries[index - 1];
-    entry_index = index;
-
+    current = entries[tape_index++];
+    have_current = true;
     return true;
+}
+
+void CSMMStream::serveCurrent()
+{
+    // data_length is the clamped one, so a truncated tape serves the size it
+    // can actually deliver.
+    _size = current.data_length + 2;    // 2 bytes for load address
+
+    // CSM data blocks hold raw program bytes - the load address lives in the
+    // header block, so the two bytes a PRG starts with are synthesized here.
+    _load_address[0] = current.start_address & 0xFF;
+    _load_address[1] = ( current.start_address >> 8 ) & 0xFF;
+
+    _position = 0;
+    if ( containerStream != nullptr )
+        containerStream->seek(current.data_offset);
+
+    // Serving an entry moves the head past it, so the "already ready" shortcut
+    // in seekPath() must not fire for it again. Without this, loading the same
+    // name twice re-serves the same entry - and a tape whose loader and payload
+    // share a name (Abductor.csm, and the norm for multi-part tapes) could
+    // never reach the payload. `current` itself stays valid: readFile() works
+    // from _load_address and the container position, not from it.
+    have_current = false;
 }
 
 uint32_t CSMMStream::readFile(uint8_t* buf, uint32_t size)
 {
     uint32_t bytesRead = 0;
 
-    // CSM data blocks hold raw program bytes - the load address is in the
-    // header block, so the two bytes a PRG starts with are synthesized here.
     if ( _position < 2 )
     {
         if ( size > 1 )
@@ -192,39 +231,68 @@ uint32_t CSMMStream::readFile(uint8_t* buf, uint32_t size)
 
 bool CSMMStream::seekPath(std::string path)
 {
-    // Implement this to skip a queue of file streams to start of file by name
-    // this will cause the next read to return bytes of 'path'
     seekCalled = true;
+    _position = 0;
+    _size = 0;
 
-    entry_index = 0;
-
-    if ( seekEntry(path) )
+    if ( mode == std::ios_base::out )
     {
-        Debug_printv("filename[%s] type[%s] start_address[%u] end_address[%u] data_offset[%lu]",
-                     entry.filename, decodeType(entry.file_type).c_str(),
-                     entry.start_address, entry.end_address, entry.data_offset);
-
-        // data_length is the clamped one, so a truncated tape reports the size
-        // it can actually serve.
-        _size = entry.data_length + 2; // 2 bytes for load address
-
-        // Load Address
-        _load_address[0] = entry.start_address & 0xFF;
-        _load_address[1] = ( entry.start_address >> 8 ) & 0xFF;
-
-        // Set position to beginning of file
-        _position = 0;
-        containerStream->seek(entry.data_offset);
-
-        Debug_printv("File Size: size[%lu] available[%lu] position[%lu]", _size, available(), _position);
-
-        return true;
-    }
-    else
-    {
-        Debug_printv( "Not found! [%s]", path.c_str());
+        Debug_printv("Writing to tape images is not supported");
+        return false;
     }
 
+    mstr::replaceAll(path, "\\", "/");
+    bool wildcard = ( mstr::contains(path, "*") || mstr::contains(path, "?") );
+
+    // Sequential: the entry found by the last directory request is ready
+    if ( have_current )
+    {
+        std::string entryName = mstr::toUTF8(entryDisplayName(current));
+        if ( mstr::compareFilename(entryName, path, wildcard) )
+        {
+            serveCurrent();
+            Debug_printv("Loaded [%s] size[%lu] (current)", entryName.c_str(), _size);
+            return true;
+        }
+    }
+
+    // Otherwise search forward from the current tape position, wrapping around
+    // to the beginning once. This is what makes a tape carrying the same name
+    // twice resolve positionally instead of ambiguously.
+    bool wrapped = false;
+    if ( tape_ended )
+    {
+        resetTape();
+        wrapped = true;
+    }
+    size_t scan_start = tape_index;
+
+    while ( true )
+    {
+        if ( !nextTapeEntry() )
+        {
+            if ( wrapped || scan_start == 0 )
+                break;  // searched the whole tape
+            resetTape();
+            wrapped = true;
+            continue;
+        }
+
+        std::string entryName = mstr::toUTF8(entryDisplayName(current));
+        if ( mstr::compareFilename(entryName, path, wildcard) )
+        {
+            serveCurrent();
+            Debug_printv("Loaded [%s] size[%lu]", entryName.c_str(), _size);
+            return true;
+        }
+
+        // tape_index has already advanced past `current`, so this is the index
+        // of the entry just examined.
+        if ( wrapped && ( tape_index - 1 ) >= scan_start )
+            break;  // wrapped past where the search began
+    }
+
+    Debug_printv( "Not found! [%s]", path.c_str());
     return false;
 };
 
@@ -232,24 +300,27 @@ bool CSMMStream::seekPath(std::string path)
  * File implementations
  ********************************************************/
 
+std::shared_ptr<MStream> CSMMFile::getDecodedStream(std::shared_ptr<MStream> is)
+{
+    auto stream = std::make_shared<CSMMStream>(is);
+    stream->setDefaultName(name);
+    return stream;
+}
+
 bool CSMMFile::rewindDirectory()
 {
     dirIsOpen = true;
+    entry_index = 0;
 
     auto image = ImageBroker::obtain<CSMMStream>("csm", url);
     if (image == nullptr)
         return false;
 
-    if ( !image->readHeader() )
-    {
-        dirIsOpen = false;
-        return false;
-    }
+    image->setDefaultName(name);
 
-    image->resetEntryCounter();
-
-    // Set Media Info Fields. A CSM carries no tape title, so the image's own
-    // name stands in for one.
+    // Set Media Info Fields. The tape position is NOT reset - listings advance
+    // through the tape sequentially. A CSM carries no tape title, so the
+    // image's own name stands in for one.
     media_header = name;
     auto dot = media_header.find_last_of('.');
     if ( dot != std::string::npos )
@@ -272,32 +343,72 @@ bool CSMMFile::rewindDirectory()
 
 MFile* CSMMFile::getNextFileInDir()
 {
-    // A failed rewind has already reset the entry counter on the shared
-    // ImageBroker stream, so reading on would hand back entry 0 forever.
-    if ( !dirIsOpen && !rewindDirectory() )
-        return nullptr;
+    if (!dirIsOpen)
+        rewindDirectory();
 
     auto image = ImageBroker::obtain<CSMMStream>("csm", url);
-    if ( image == nullptr )
-        goto exit;
-
-    if ( image->getNextImageEntry() )
+    if (image == nullptr)
     {
-        std::string filename = image->entry.filename;
+        dirIsOpen = false;
+        return nullptr;
+    }
+
+    // Sequential tape: each directory request returns ONE entry - the next
+    // program on the tape - and leaves it ready to load
+    if (entry_index > 0)
+    {
+        dirIsOpen = false;
+        return nullptr;
+    }
+    entry_index++;
+
+    // The previous request reached the end of the tape: start over
+    if (image->tapeEnded())
+        image->resetTape();
+
+    if (image->nextTapeEntry())
+    {
+        std::string filename = image->entryDisplayName(image->current);
         mstr::replaceAll(filename, "/", "\\");
 
         auto file = MFSOwner::File(url + "/" + filename);
-        file->name = filename;  // Use actual entry name, not container image name
-        file->extension = image->decodeType(image->entry.file_type);
-        file->size = image->entry.data_length + 2; // 2 bytes for load address
+        file->name = filename;
+        file->extension = image->decodeType(image->current.file_type);
+        file->size = image->current.data_length + 2; // 2 bytes for load address
         file->is_dir = 0;
 
-        Debug_printv( "entry[%s] ext[%s] size[%lu]", filename.c_str(), file->extension.c_str(), file->size);
-
+        Debug_printv("Tape entry: name[%s] addr[%04X-%04X] size[%lu]",
+                     filename.c_str(), image->current.start_address,
+                     image->current.end_address, file->size);
         return file;
     }
 
-exit:
-    dirIsOpen = false;
-    return nullptr;
+    // End of the tape reached
+    std::string marker = "END OF TAPE";
+    auto file = MFSOwner::File(url + "/" + marker);
+    file->name = marker;
+    file->extension = " NFO";
+    file->size = 0;
+    file->is_dir = 0;
+    return file;
+}
+
+bool CSMMFile::isDirectory()
+{
+    if (is_dir != -1)
+        return is_dir == 1;
+
+    // The image itself is a directory; entries inside it are files
+    return pathInStream.empty() || pathInStream == "/";
+}
+
+bool CSMMFile::exists()
+{
+    auto stream = ImageBroker::obtain<CSMMStream>("csm", url);
+    if (stream == nullptr)
+        return false;
+
+    // Sequential tapes resolve names when loading (seekPath scans forward and
+    // wraps), so an entry name cannot be answered for without moving the tape.
+    return true;
 }
