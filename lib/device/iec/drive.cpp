@@ -613,7 +613,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
             // Convert to PETSCII and set extension
             if ( !m_dir->isPETSCII )
             {
-                //Debug_printv("original name[%s] ext[%s]", name.c_str(), ext.c_str());
+                Debug_printv("original name[%s] ext[%s]", name.c_str(), ext.c_str());
                 name = U8Char::encodeACE(name);
                 name = mstr::toPETSCII2( name );
 
@@ -635,7 +635,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
                     ext = "PRG";
                 }
                 ext = " " + ext + " "; // Clear closed and locked status display
-                //Debug_printv("converted name[%s] ext[%s]", name.c_str(), ext.c_str());
+                Debug_printv("converted name[%s] ext[%s]", name.c_str(), ext.c_str());
             }
             else
             {
@@ -704,28 +704,33 @@ uint8_t iecChannelHandlerDir::readBufferData()
         }
         else
         {
-            // no more entries => footer
+            if (m_dir->media_partition != 0xFF) // Only show BLOCKS FREE footer if a partition is selected
+            {
+                // no more entries => footer
 #ifdef IEC_FP_DOLPHIN
-            // DolphinDos' MultiDubTwo copy program needs the "BLOCKS FREE" footer line, otherwise it aborts when reading source
-            uint32_t free = m_dir->media_image.size() ? m_dir->media_blocks_free : std::min((int) m_dir->getAvailableSpace()/254, 65535);
-            m_data[0] = 1;          // BASIC line pointer low byte
-            m_data[1] = 1;          // BASIC line pointer high byte
-            m_data[2] = free&255;   // Block count low byte
-            m_data[3] = free/256;   // Block count high byte
-            strcpy((char *) m_data+4, "BLOCKS FREE.");
-#else
-            uint32_t free = m_dir->media_image.size() ? m_dir->media_blocks_free : 0;
-            m_data[0] = 1;          // BASIC line pointer low byte
-            m_data[1] = 1;          // BASIC line pointer high byte
-            m_data[2] = free&255;   // Block count low byte
-            m_data[3] = free/256;   // Block count high byte
-            if( m_dir->media_image.size() )
+                // DolphinDos' MultiDubTwo copy program needs the "BLOCKS FREE" footer line, otherwise it aborts when reading source
+                uint32_t free = m_dir->media_image.size() ? m_dir->media_blocks_free : std::min((int) m_dir->getAvailableSpace()/254, 65535);
+                m_data[0] = 1;          // BASIC line pointer low byte
+                m_data[1] = 1;          // BASIC line pointer high byte
+                m_data[2] = free&255;   // Block count low byte
+                m_data[3] = free/256;   // Block count high byte
                 strcpy((char *) m_data+4, "BLOCKS FREE.");
-            else
-                sprintf((char *) m_data+4, CBM_DELETE CBM_DELETE "%sBYTES FREE.", mstr::formatBytes(m_dir->getAvailableSpace()).c_str());
+#else
+                uint32_t free = m_dir->media_image.size() ? m_dir->media_blocks_free : 0;
+                m_data[0] = 1;          // BASIC line pointer low byte
+                m_data[1] = 1;          // BASIC line pointer high byte
+                m_data[2] = free&255;   // Block count low byte
+                m_data[3] = free/256;   // Block count high byte
+                if( m_dir->media_image.size() )
+                    strcpy((char *) m_data+4, "BLOCKS FREE.");
+                else
+                    sprintf((char *) m_data+4, CBM_DELETE CBM_DELETE "%sBYTES FREE.", mstr::formatBytes(m_dir->getAvailableSpace()).c_str());
 #endif
-            int n = 4+strlen((char *) m_data+4);
-            while( n<29 ) m_data[n++]=' ';
+                int n = 4+strlen((char *) m_data+4);
+                while( n<29 ) m_data[n++]=' ';
+            }
+
+            // no more entries => end of program
             m_data[29] = 0;  // End of program
             m_data[30] = 0;  // End of program
             m_data[31] = 0;  // End of program

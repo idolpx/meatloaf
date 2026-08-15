@@ -359,7 +359,7 @@ public:
     HDDMFile(std::string path, bool is_dir = true): MFile(path) {
         isDir = is_dir;
         media_image = name;
-        isPETSCII = false;  // CFS uses ASCII
+        isPETSCII = true;  // CFS uses ASCII but filenames are PETSCII
     };
 
     ~HDDMFile() {

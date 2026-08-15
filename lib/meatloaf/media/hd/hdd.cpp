@@ -359,11 +359,11 @@ bool HDDMStream::seekEntry(uint16_t index)
         {
             switch (de.getFileType())
             {
-                case 0: entry.type = "DEL"; break;
-                case 1: entry.type = "PRG"; break;
-                case 2: entry.type = "REL"; break;
-                case 3: entry.type = "DIR"; break;
-                case 4: entry.type = "LNK"; break;
+                case 0: entry.type = "del"; break;
+                case 1: entry.type = "prg"; break;
+                case 2: entry.type = "rel"; break;
+                case 3: entry.type = "dir"; break;
+                case 4: entry.type = "lnk"; break;
                 default: entry.type = "???"; break;
             }
         }
@@ -375,8 +375,8 @@ bool HDDMStream::seekEntry(uint16_t index)
 
         entry_index = index;
 
-        //Debug_printv("Entry[%d]: %s Type:%s Size:%lu IsDir:%d",
-        //    index, entry.filename.c_str(), entry.type.c_str(), entry.size, entry.is_directory);
+        // Debug_printv("Entry[%d]: %s Type:%s Size:%lu IsDir:%d IsHidden:%d",
+        //              index, entry.filename.c_str(), entry.type.c_str(), entry.size, entry.is_directory, entry.is_hidden);
 
         return true;
     }
@@ -388,6 +388,7 @@ bool HDDMStream::seekEntry(std::string filename)
         return false;
 
     mstr::replaceAll(filename, "\\", "/");
+    filename = mstr::toPETSCII2(filename); // CFS uses ASCII, but the stream is PETSCII
     bool wildcard = (mstr::contains(filename, "*") || mstr::contains(filename, "?"));
 
     uint16_t index = 1;
@@ -1027,10 +1028,11 @@ bool HDDMFile::rewindDirectory()
         }
         part_index = 0;
         media_header = img->disk_label;
-        media_id = "cfs";
+        media_id = "IDE64";
         media_blocks_free = 0;
         media_block_size = 512;
         media_image = name;
+        media_partition = 255; // system partition
         return true;
     }
 
@@ -1060,10 +1062,11 @@ bool HDDMFile::rewindDirectory()
 
     // Set Media Info Fields
     media_header = image->dir_label.empty() ? image->header.disk_label : image->dir_label;
-    media_id = "cfs";
+    media_id = "IDE64";
     media_blocks_free = 0;  // TODO: count usage bitmap bits
     media_block_size = image->block_size;
     media_image = name;
+    media_partition = image->selected_partition;
     if ( !sourceFile->media_archive.empty() )
         media_archive = sourceFile->media_archive;
 
@@ -1093,12 +1096,13 @@ MFile* HDDMFile::getNextFileInDir()
 
         // By NUMBER, not name: CFS names are 16 bytes that may contain '/'
         // and spaces, which do not survive a URL path component.
-        auto file = MFSOwner::File(url + "/" + std::to_string((unsigned)p.number));
+        //auto file = MFSOwner::File(url + "/" + std::to_string((unsigned)p.number));
+        auto file = MFSOwner::File(url + "/" + p.name);
         file->name = fname;
-        file->extension = (p.type == 1) ? "CFS"
-                        : (p.type == 2) ? "GEOS"
-                        : (p.type == 0) ? "----" : "?";
-        file->size = p.size;
+        file->extension = (p.type == 1) ? "*CFS"
+                        : (p.type == 2) ? " GEOS"
+                        : (p.type == 0) ? " ----" : "?";
+        file->size = p.number * 256;  // fake size to show partition number
         file->is_dir = (p.type == 1) ? 1 : 0;   // only CFS is browsable
         file->is_hidden = p.hidden;
         return file;
@@ -1130,10 +1134,14 @@ MFile* HDDMFile::getNextFileInDir()
 
         auto file = MFSOwner::File(entryUrl);
         file->name = filename;  // Use actual entry name, not container image name
-        file->extension = image->entry.type;
-        file->size = image->entry.size;
+        file->extension = " " + image->entry.type;
+        file->size = image->entry.size + (image->entry.is_directory ? 0 : 256); // real listing shows 256 more bytes for a file than the actual size, so add it back for display
         file->is_dir = image->entry.is_directory;
         file->is_hidden = image->entry.is_hidden;
+
+        // Debug_printv("getNextFileInDir: %s Type:%s Size:%lu IsDir:%d IsHidden:%d",
+        //              file->name.c_str(), file->extension.c_str(),
+        //              file->size, file->is_dir, file->is_hidden);
 
         return file;
     }

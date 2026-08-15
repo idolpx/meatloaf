@@ -38,7 +38,7 @@
 // select() refuses it - it is not a mountable disk. There is no entry 255:
 // vdrive.c's logical slot 255 is this same entry 0 under its own numbering.
 //
-// https://vice-emu.sourceforge.io/vice_17.html#SEC432
+// https://vice-emu.sourceforge.io/vice_17.html#SEC440
 // https://sourceforge.net/p/vice-emu/patches/253/
 // https://github.com/c64pectre/c64-cmd-hd
 // https://www.pipesup.ca/cmdhd-in-vice/
@@ -261,12 +261,14 @@ public:
                 return false;
             part_index = 0;
             this->dirIsOpen = true;
-            this->media_header = img->disk_label;
-            this->media_id = "cmd";
+            this->media_header = "CMD HD"; //img->disk_label;
+            this->media_id = "HD 1H";
             this->media_blocks_free = 0;
             this->media_image = this->name;
+            this->media_partition = 255; // system partition
             return true;
         }
+        this->media_partition = effectivePartition() ? effectivePartition()->number : 0;
         return BASE::rewindDirectory();
     }
 
@@ -290,13 +292,14 @@ public:
 
             auto file = MFSOwner::File(this->url + "/" + fname);
             file->name = fname;
-            static const char *type_label[5] = { "???", "nat", "41", "71", "81" };
+            static const char *type_label[5] = { " ???", " NAT", " 41", " 71", " 81" };
             // Type $FF is the system partition (entry 0), which is listed but
             // not selectable; everything else outside 1..4 is an unknown type.
-            file->extension = (p.type == 0xFF) ? "sys"
+            file->extension = (p.type == 0xFF) ? " SYS"
                                                : type_label[(p.type <= 4) ? p.type : 0];
-            file->size = p.size;
+            file->size = p.number * 256; // fake size to make the listing show partition number
             file->is_dir = 1;
+            //Debug_printv("DHDPartitionMFile::getNextFileInDir() returning partition file[%s] type[%s] size[%d]", file->url.c_str(), file->extension.c_str(), file->size);
             return file;
         }
         return BASE::getNextFileInDir();
