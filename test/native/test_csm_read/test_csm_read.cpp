@@ -103,7 +103,7 @@ static void writeStandardImage()
     writeImage(img);
 }
 
-// seekPath() compares the query against mstr::toUTF8(the entry name), because
+// Name matching compares against mstr::toUTF8(the entry name), because
 // what arrives from the drive is PETSCII that has been through the same
 // conversion. A test that passes a bare ASCII literal is asking a question the
 // drive never asks.
@@ -124,10 +124,34 @@ static std::shared_ptr<TestCSMStream> openImage()
     auto image = std::make_shared<TestCSMStream>(src);
     // A directly constructed media stream has an uninitialised `mode` - only
     // MFile::getSourceStream() sets it, and garbage carrying the `out` bit
-    // makes seekPath() refuse as a write.
+    // makes seekNextEntry() refuse as a write.
     image->mode = std::ios_base::in;
     image->setDefaultName("TAPEIMAGE");
     return image;
+}
+
+// Drives the stream exactly as MFile::getSourceStream()'s browsable branch
+// does, so these tests exercise the real resolution path rather than a
+// convenient shortcut. On success the stream has already been served and is
+// ready to read.
+//
+// Note this takes a FRESH stream per call in the tests below, because that is
+// what the drive does - a new decoded stream is built for every open, which is
+// why the scan bookkeeping is per-instance while the tape position is shared.
+static bool loadByName(std::shared_ptr<TestCSMStream>& image, const char* want)
+{
+    std::string wanted = q(want);
+    bool wildcard = (mstr::contains(wanted, "*") || mstr::contains(wanted, "?"));
+
+    std::string pointed = image->seekNextEntry();
+    while (!pointed.empty())
+    {
+        std::string entryName = mstr::toUTF8(pointed);
+        if (mstr::compareFilename(entryName, wanted, wildcard))
+            return true;
+        pointed = image->seekNextEntry();
+    }
+    return false;
 }
 
 // Reads a selected entry to completion. MStream::read() returns at most one
@@ -339,27 +363,28 @@ void test_duplicate_names_resolve_positionally(void)
     appendHeader(img, 5, 0, 0, "");
     writeImage(img);
 
-    auto image = openImage();
-    TEST_ASSERT_NOT_NULL(image.get());
+    // Two separate opens, as two LOADs really are - fresh streams sharing one
+    // tape position through the registry.
+    auto first = openImage();
+    TEST_ASSERT_NOT_NULL(first.get());
+    TEST_ASSERT_TRUE(loadByName(first, "ABDUCTOR"));
+    TEST_ASSERT_EQUAL_UINT32(258, first->size());
+    uint8_t a[8];
+    TEST_ASSERT_TRUE(readAll(first, a, sizeof(a)) > 2);
+    TEST_ASSERT_EQUAL_HEX8(0xAA, a[2]);
 
-    // First load: the loader.
-    TEST_ASSERT_TRUE(image->seekPath(q("ABDUCTOR")));
-    TEST_ASSERT_EQUAL_UINT32(258, image->size());
-    uint8_t first[8];
-    TEST_ASSERT_TRUE(readAll(image, first, sizeof(first)) > 2);
-    TEST_ASSERT_EQUAL_HEX8(0xAA, first[2]);
-
-    // Second load, tape not rewound: the payload, not the loader again.
-    TEST_ASSERT_TRUE(image->seekPath(q("ABDUCTOR")));
-    TEST_ASSERT_EQUAL_UINT32(514, image->size());
-    uint8_t second[8];
-    TEST_ASSERT_TRUE(readAll(image, second, sizeof(second)) > 2);
-    TEST_ASSERT_EQUAL_HEX8(0xBB, second[2]);
+    auto second = openImage();
+    TEST_ASSERT_NOT_NULL(second.get());
+    TEST_ASSERT_TRUE(loadByName(second, "ABDUCTOR"));
+    TEST_ASSERT_EQUAL_UINT32(514, second->size());
+    uint8_t b[8];
+    TEST_ASSERT_TRUE(readAll(second, b, sizeof(b)) > 2);
+    TEST_ASSERT_EQUAL_HEX8(0xBB, b[2]);
 }
 
 // A load searches forward from the current position, so a name behind the head
-// is only reached by wrapping - and the wrap happens exactly once.
-void test_load_searches_forward_and_wraps_once(void)
+// is only reached by wrapping.
+void test_load_searches_forward_and_wraps(void)
 {
     std::vector<uint8_t> img;
     appendHeader(img, 1, 0x1001, 0x1101, "FIRST");
@@ -369,31 +394,55 @@ void test_load_searches_forward_and_wraps_once(void)
     appendHeader(img, 5, 0, 0, "");
     writeImage(img);
 
-    auto image = openImage();
-    TEST_ASSERT_NOT_NULL(image.get());
-
     // Move the head past FIRST.
-    TEST_ASSERT_TRUE(image->seekPath(q("SECOND")));
+    auto ahead = openImage();
+    TEST_ASSERT_NOT_NULL(ahead.get());
+    TEST_ASSERT_TRUE(loadByName(ahead, "SECOND"));
 
     // FIRST is now behind the head; reaching it requires the wrap.
-    TEST_ASSERT_TRUE(image->seekPath(q("FIRST")));
-    TEST_ASSERT_EQUAL_UINT32(258, image->size());
+    auto back = openImage();
+    TEST_ASSERT_NOT_NULL(back.get());
+    TEST_ASSERT_TRUE(loadByName(back, "FIRST"));
+    TEST_ASSERT_EQUAL_UINT32(258, back->size());
 
     uint8_t buf[8];
-    TEST_ASSERT_TRUE(readAll(image, buf, sizeof(buf)) > 2);
+    TEST_ASSERT_TRUE(readAll(back, buf, sizeof(buf)) > 2);
     TEST_ASSERT_EQUAL_HEX8(0x01, buf[0]);
     TEST_ASSERT_EQUAL_HEX8(0x10, buf[1]);
     TEST_ASSERT_EQUAL_HEX8(0xAA, buf[2]);
 }
 
-// A name that is not on the tape must terminate, not loop forever around it.
+// The end of the tape is not the end of a scan: the head runs back to the
+// start. "" comes only after a full lap, which is what stops a miss looping.
+void test_scan_wraps_past_end_of_tape(void)
+{
+    writeStandardImage();
+
+    // A listing leaves the head on the LAST entry.
+    auto listing = openImage();
+    TEST_ASSERT_NOT_NULL(listing.get());
+    TEST_ASSERT_TRUE(listing->nextTapeEntry());
+    TEST_ASSERT_TRUE(listing->nextTapeEntry());
+
+    auto load = openImage();
+    TEST_ASSERT_NOT_NULL(load.get());
+
+    // The entry left ready - the last one, which is unnamed.
+    TEST_ASSERT_EQUAL_STRING("TAPEIMAGE", load->seekNextEntry().c_str());
+    // Past the end: wraps to the start rather than reporting the end.
+    TEST_ASSERT_EQUAL_STRING("LOADER", load->seekNextEntry().c_str());
+    // A full lap done - now the scan terminates.
+    TEST_ASSERT_EQUAL_STRING("", load->seekNextEntry().c_str());
+}
+
+// A name that is not on the tape must terminate, not circle it forever.
 void test_missing_name_terminates(void)
 {
     writeStandardImage();
     auto image = openImage();
     TEST_ASSERT_NOT_NULL(image.get());
 
-    TEST_ASSERT_FALSE(image->seekPath(q("NOPE")));
+    TEST_ASSERT_FALSE(loadByName(image, "NOPE"));
 }
 
 // LOAD"*" takes whatever is at the current position - the entry the last
@@ -401,15 +450,29 @@ void test_missing_name_terminates(void)
 void test_wildcard_takes_the_current_entry(void)
 {
     writeStandardImage();
+
+    // As a listing would: advance to the second entry.
+    auto listing = openImage();
+    TEST_ASSERT_NOT_NULL(listing.get());
+    TEST_ASSERT_TRUE(listing->nextTapeEntry());
+    TEST_ASSERT_TRUE(listing->nextTapeEntry());
+
+    auto load = openImage();
+    TEST_ASSERT_NOT_NULL(load.get());
+    TEST_ASSERT_TRUE(loadByName(load, "*"));
+    TEST_ASSERT_EQUAL_UINT32(1026, load->size());   // the 1024-byte entry
+}
+
+// A tape is a datasette, not a directory: getSourceStream() must take the
+// browsable branch and drive seekNextEntry(), never seekPath().
+void test_stream_is_browsable_not_random_access(void)
+{
+    writeStandardImage();
     auto image = openImage();
     TEST_ASSERT_NOT_NULL(image.get());
 
-    // As a listing would: advance to the second entry, then LOAD"*".
-    TEST_ASSERT_TRUE(image->nextTapeEntry());
-    TEST_ASSERT_TRUE(image->nextTapeEntry());
-
-    TEST_ASSERT_TRUE(image->seekPath(q("*")));
-    TEST_ASSERT_EQUAL_UINT32(1026, image->size());  // the 1024-byte entry
+    TEST_ASSERT_TRUE(image->isBrowsable());
+    TEST_ASSERT_FALSE(image->isRandomAccess());
 }
 
 // File opens create a FRESH stream while listings use the ImageBroker
@@ -449,7 +512,7 @@ void test_read_prepends_synthesized_load_address(void)
     auto image = openImage();
     TEST_ASSERT_NOT_NULL(image.get());
 
-    TEST_ASSERT_TRUE(image->seekPath(q("LOADER")));
+    TEST_ASSERT_TRUE(loadByName(image, "LOADER"));
     TEST_ASSERT_EQUAL_UINT32(258, image->size());   // 256 data + 2 synthesized
 
     uint8_t buf[258];
@@ -478,7 +541,7 @@ void test_later_entry_reads_its_own_bytes(void)
     auto image = openImage();
     TEST_ASSERT_NOT_NULL(image.get());
 
-    TEST_ASSERT_TRUE(image->seekPath(q("SECOND")));
+    TEST_ASSERT_TRUE(loadByName(image, "SECOND"));
     TEST_ASSERT_EQUAL_UINT32(258, image->size());
 
     uint8_t buf[258];
@@ -492,7 +555,7 @@ void test_later_entry_reads_its_own_bytes(void)
 }
 
 // CSM is read-only. MMediaStream::write() only routes through writeFile() once
-// a file has been selected - without the seekPath() it writes container bytes
+// a file has been selected - without the load it writes container bytes
 // verbatim, which is the base class's behaviour and not the question here.
 void test_write_to_selected_file_is_refused(void)
 {
@@ -500,7 +563,7 @@ void test_write_to_selected_file_is_refused(void)
     auto image = openImage();
     TEST_ASSERT_NOT_NULL(image.get());
 
-    TEST_ASSERT_TRUE(image->seekPath(q("LOADER")));
+    TEST_ASSERT_TRUE(loadByName(image, "LOADER"));
 
     uint8_t buf[4] = { 1, 2, 3, 4 };
     TEST_ASSERT_EQUAL_UINT32(0, image->write(buf, sizeof(buf)));
@@ -546,7 +609,7 @@ void test_truncated_data_block_is_clamped(void)
     TEST_ASSERT_EQUAL_UINT32(1, (uint32_t)image->entries.size());
     TEST_ASSERT_EQUAL_UINT32(100, image->entries[0].data_length);
 
-    TEST_ASSERT_TRUE(image->seekPath(q("CUTOFF")));
+    TEST_ASSERT_TRUE(loadByName(image, "CUTOFF"));
     TEST_ASSERT_EQUAL_UINT32(102, image->size());
 }
 
@@ -606,8 +669,8 @@ void test_load_on_empty_tape_terminates(void)
     auto image = openImage();
     TEST_ASSERT_NOT_NULL(image.get());
 
-    TEST_ASSERT_FALSE(image->seekPath(q("ANYTHING")));
-    TEST_ASSERT_FALSE(image->seekPath(q("*")));
+    TEST_ASSERT_FALSE(loadByName(image, "ANYTHING"));
+    TEST_ASSERT_FALSE(loadByName(image, "*"));
 }
 
 
@@ -685,7 +748,9 @@ int main(int argc, char** argv)
     RUN_TEST(test_tape_wraps_after_end);
     RUN_TEST(test_unnamed_entry_uses_media_name);
     RUN_TEST(test_duplicate_names_resolve_positionally);
-    RUN_TEST(test_load_searches_forward_and_wraps_once);
+    RUN_TEST(test_load_searches_forward_and_wraps);
+    RUN_TEST(test_scan_wraps_past_end_of_tape);
+    RUN_TEST(test_stream_is_browsable_not_random_access);
     RUN_TEST(test_missing_name_terminates);
     RUN_TEST(test_wildcard_takes_the_current_entry);
     RUN_TEST(test_streams_share_tape_position);

@@ -530,14 +530,33 @@ When implementing a new stream:
   `walked` flag, which is set even when the walk yields nothing (a broken image would otherwise be
   re-walked on every listing) — and each step of the walk is a seek plus a read, i.e. one HTTP range
   request per entry over the network.
-- **`CSMMStream::serveCurrent()` clears `have_current`, and that is load-bearing.** `seekPath()`
-  short-circuits when the entry the last directory request left ready already matches the name asked
-  for; serving it moves the head past it, so the flag must be consumed or a repeated
-  `LOAD"NAME"` re-serves the same entry forever. That is precisely the case CSM has to get right:
+- **Sequential media resolves a name through `seekNextEntry()`, NOT `seekPath()`** — the browsable
+  branch of `MFile::getSourceStream()`. Before 2026-08-15 that branch was unreachable dead code:
+  nothing overrode `seekNextEntry()` (`MMediaStream` hard-returned `""`) and nothing anywhere
+  returned `isBrowsable() == true`, because `MMediaStream::isRandomAccess()` is unconditionally
+  true, so every media format took the `seekPath()` branch — TAP included. `CSMMStream` and
+  `TAPMStream` now override `isBrowsable()`/`isRandomAccess()` and implement `seekNextEntry()`.
+  **TAP is idx-aware**: with a `.idx` sidecar it stays random-access and `seekPath()` still does the
+  work; without one it is a datasette and `seekNextEntry()` does. `drive.cpp` tests
+  `isRandomAccess() || isBrowsable()`, so the cwd-setting behaviour is unchanged either way.
+- **The `seekNextEntry()` contract**: advance the head by one, SERVE that entry (so the stream is
+  ready to read the instant the caller's name matches), return its display name. **At the end of the
+  media it WRAPS** — the end of the tape is not the end of a scan. It returns `""` only once it has
+  been all the way round, which is what lets a name behind the head still be found while a miss
+  still terminates. The generic loop only matches names; all tape semantics live in the stream.
+  Lap detection is per-STREAM (`scan_steps` on CSM, `scan_*` on TAP), deliberately not in the shared
+  state: a fresh decoded stream is built for every open, so it starts clean each search with no
+  reset to get wrong — which is also why the tape POSITION must be shared and this must not be.
+- **`serveCurrent()` clears `have_current` in both CSM and TAP, and that is load-bearing.** The
+  entry a listing left under the head is offered first so `LOAD"*"` after a listing gets what was
+  just listed; serving it moves the head past it, so the flag must be consumed or a repeated
+  `LOAD"NAME"` re-serves the same entry forever. That is precisely the case these have to get right:
   `Abductor.csm` carries a BASIC loader and its payload BOTH named `ABDUCTOR`, which is the norm for
-  multi-part tapes, and the payload is unreachable without this. `current` stays valid after the
-  clear — `readFile()` works from `_load_address` and the container position, not from it. **Note
-  `TAPMStream` does NOT do this**; whether TAP wants the same treatment is untested and unexamined.
+  multi-part tapes, and the payload is unreachable without it. **`TAPMStream::readFile()` guarded on
+  `have_current` and had to change** — testing it there made every read of a served file return 0.
+  It now guards on `current.prg` being non-empty. `serveCurrent()` also sets `seekCalled`, which
+  `seekPath()` used to do and which `MMediaStream::read()` needs to route through `readFile()` at
+  all.
 - **The datasette position lives in `CSMState`, shared per container URL via a weak_ptr registry**,
   copied from `TapeState` and for the same reason: `MFile::getSourceStream()` builds a FRESH stream
   on every open while directory listings use the ImageBroker instance, so a per-instance position

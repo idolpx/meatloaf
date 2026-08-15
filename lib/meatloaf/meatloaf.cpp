@@ -1112,13 +1112,27 @@ std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {
     }
     else if(decodedStream->isBrowsable() && pathInStream.size() > 0)
     {
-        // For files with no directory structure
-        // tap, crt, tar
+        // For sequential files with no directory structure - tap, csm, crt.
+        //
+        // seekNextEntry() advances the head by one, SERVES that entry (so the
+        // stream is ready to read the moment a name matches) and returns its
+        // name; it wraps at the end of the media and reports "" once it has
+        // been all the way round, so a name behind the head is still reachable
+        // and a miss still terminates. All of that is the stream's business -
+        // this loop only matches names.
+        std::string wanted = pathInStream;
+        bool wildcard = ( mstr::contains(wanted, "*") || mstr::contains(wanted, "?") );
+
         auto pointedFile = decodedStream->seekNextEntry();
 
         while (!pointedFile.empty())
         {
-            if(mstr::compare(pointedFile, pathInStream))
+            // Both sides go through toUTF8: what arrives from the drive is
+            // PETSCII that has already been converted, and compareFilename()
+            // is the same matcher the random-access formats use, so a wildcard
+            // behaves identically either side of this branch.
+            std::string entryName = mstr::toUTF8(pointedFile);
+            if(mstr::compareFilename(entryName, wanted, wildcard))
             {
                 //Debug_printv("returning decodedStream 1 [%s]", decodedStream->url.c_str());
                 return decodedStream;
@@ -1126,9 +1140,9 @@ std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {
 
             pointedFile = decodedStream->seekNextEntry();
         }
+
         //Debug_printv("path in stream not found!");
-        if(pointedFile.empty())
-            return nullptr;
+        return nullptr;
     }
 
     //Debug_printv("returning decodedStream 2 [%s][%s]", decodedStream->url.c_str(), pathInStream.c_str());

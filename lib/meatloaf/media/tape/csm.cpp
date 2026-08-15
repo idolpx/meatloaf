@@ -185,6 +185,10 @@ bool CSMMStream::nextTapeEntry()
 
 void CSMMStream::serveCurrent()
 {
+    // MMediaStream::read() only routes through readFile() once a file has been
+    // selected; without this it would hand back raw container bytes.
+    seekCalled = true;
+
     // data_length is the clamped one, so a truncated tape serves the size it
     // can actually deliver.
     _size = current.data_length + 2;    // 2 bytes for load address
@@ -229,71 +233,47 @@ uint32_t CSMMStream::readFile(uint8_t* buf, uint32_t size)
     return bytesRead;
 }
 
-bool CSMMStream::seekPath(std::string path)
+std::string CSMMStream::seekNextEntry()
 {
-    seekCalled = true;
-    _position = 0;
-    _size = 0;
-
     if ( mode == std::ios_base::out )
     {
         Debug_printv("Writing to tape images is not supported");
-        return false;
+        return "";
     }
 
-    mstr::replaceAll(path, "\\", "/");
-    bool wildcard = ( mstr::contains(path, "*") || mstr::contains(path, "?") );
+    if ( !readHeader() || entries.empty() )
+        return "";
 
-    // Sequential: the entry found by the last directory request is ready
+    // A full lap and the caller still has not stopped: report the end of the
+    // media so its search terminates. One step per entry covers the whole tape
+    // from wherever the head happened to be, so nothing is skipped and nothing
+    // is offered twice.
+    if ( scan_steps >= entries.size() )
+        return "";
+
     if ( have_current )
     {
-        std::string entryName = mstr::toUTF8(entryDisplayName(current));
-        if ( mstr::compareFilename(entryName, path, wildcard) )
-        {
-            serveCurrent();
-            Debug_printv("Loaded [%s] size[%lu] (current)", entryName.c_str(), _size);
-            return true;
-        }
+        // The entry the last directory request left under the head. Serve it
+        // before moving on, so a LOAD"*" straight after a listing gets what was
+        // just listed rather than the one after it. serveCurrent() consumes the
+        // flag, so the next step advances.
+        scan_steps++;
+        serveCurrent();
+        return entryDisplayName(current);
     }
 
-    // Otherwise search forward from the current tape position, wrapping around
-    // to the beginning once. This is what makes a tape carrying the same name
-    // twice resolve positionally instead of ambiguously.
-    bool wrapped = false;
-    if ( tape_ended )
-    {
+    // The end of the tape is not the end of the scan - the head runs back to
+    // the start rather than stopping there.
+    if ( tape_index >= entries.size() )
         resetTape();
-        wrapped = true;
-    }
-    size_t scan_start = tape_index;
 
-    while ( true )
-    {
-        if ( !nextTapeEntry() )
-        {
-            if ( wrapped || scan_start == 0 )
-                break;  // searched the whole tape
-            resetTape();
-            wrapped = true;
-            continue;
-        }
+    current = entries[tape_index++];
+    scan_steps++;
+    serveCurrent();
 
-        std::string entryName = mstr::toUTF8(entryDisplayName(current));
-        if ( mstr::compareFilename(entryName, path, wildcard) )
-        {
-            serveCurrent();
-            Debug_printv("Loaded [%s] size[%lu]", entryName.c_str(), _size);
-            return true;
-        }
+    Debug_printv("Tape entry [%s] size[%lu]", entryDisplayName(current).c_str(), _size);
 
-        // tape_index has already advanced past `current`, so this is the index
-        // of the entry just examined.
-        if ( wrapped && ( tape_index - 1 ) >= scan_start )
-            break;  // wrapped past where the search began
-    }
-
-    Debug_printv( "Not found! [%s]", path.c_str());
-    return false;
+    return entryDisplayName(current);
 };
 
 /********************************************************

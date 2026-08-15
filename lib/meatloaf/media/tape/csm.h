@@ -136,7 +136,19 @@ public:
     // Display name for an entry (media name when the tape leaves it unnamed)
     std::string entryDisplayName(const CSMEntry &e);
 
-    bool seekPath(std::string path) override;
+    // Sequential media resolves a name by SCANNING, not by seeking: this is
+    // the primitive MFile::getSourceStream() drives for a browsable stream.
+    // Advances the head by one, serves that entry so the stream is ready to
+    // read the moment the caller's name matches, and returns its display name.
+    // At the end of the tape it WRAPS; it returns "" only once it has been all
+    // the way round, so a name behind the head is still reachable and a miss
+    // still terminates.
+    std::string seekNextEntry() override;
+
+    // A tape, not a directory - so getSourceStream() takes the browsable
+    // branch and calls seekNextEntry() rather than seekPath().
+    bool isBrowsable() override { return true; };
+    bool isRandomAccess() override { return false; };
 
 protected:
     // Size of an on-tape header block, and of the part of it that carries
@@ -168,6 +180,13 @@ protected:
     std::string decodeType(uint8_t file_type, bool show_hidden = false) override;
 
     std::string default_name = "csm file";
+
+    // Entries handed out by seekNextEntry() during the caller's current scan,
+    // used to spot a full lap. Deliberately NOT in CSMState: this is search
+    // bookkeeping rather than tape position, and a fresh stream is built for
+    // every open (which is why the position has to be shared but this does
+    // not), so it starts at 0 on each search with no reset needed.
+    size_t scan_steps = 0;
 
 private:
     friend class CSMMFile;
