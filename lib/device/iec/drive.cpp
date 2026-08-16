@@ -728,13 +728,24 @@ uint8_t iecChannelHandlerDir::readBufferData()
 #endif
                 int n = 4+strlen((char *) m_data+4);
                 while( n<29 ) m_data[n++]=' ';
+
+                // no more entries => end of program
+                m_data[29] = 0;  // Terminate footer line
+                m_data[30] = 0;  // End of program
+                m_data[31] = 0;  // End of program
+                m_len = 32;
+            }
+            else
+            {
+                // No footer line. m_data still holds the LAST directory entry,
+                // so only zeroing the tail would send that line a second time
+                // (a single partition listed twice under $=P). Send just the
+                // end-of-program link.
+                m_data[0] = 0;
+                m_data[1] = 0;
+                m_len = 2;
             }
 
-            // no more entries => end of program
-            m_data[29] = 0;  // End of program
-            m_data[30] = 0;  // End of program
-            m_data[31] = 0;  // End of program
-            m_len = 32;
             m_headerLine = 0xFF;
         }
     }
@@ -2168,6 +2179,7 @@ void iecDrive::setStatusCode(uint8_t code, uint8_t trk, uint8_t sec)
     char statusMsg[64];
     getStatus(statusMsg, sizeof(statusMsg));
     notify_activity(activitySource(), "status", statusMsg);
+    Debug_printv("status: %s", getCStringLog(std::string(statusMsg)));
 }
 
 
