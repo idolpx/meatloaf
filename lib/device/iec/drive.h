@@ -142,6 +142,17 @@ public:
   int     id() { return m_devnr; };
   uint8_t getNumOpenChannels();
   std::string getCWD() { return m_cwd->url; }
+
+  // Console "use" support: point this drive at a directory the console has
+  // already resolved and validated, so set_cwd() can skip its own (network-
+  // expensive) verification pass.
+  void consoleSetCwd(const std::string &url) { set_cwd(url, true); }
+
+  // Console "exec" support: run a DOS command channel string and return the
+  // resulting status line, consuming it exactly as a C64 read of channel 15
+  // would.  *isError (when given) reports the status before it is consumed.
+  std::string consoleExecDos(const std::string &command, bool *isError = nullptr);
+
   uint8_t getStatusCode() { return m_statusCode; }
   void    setStatusCode(uint8_t code, uint8_t trk = 0, uint8_t sec = 0);
   // Overrides the canned getStatus() text.  For failures whose reason the

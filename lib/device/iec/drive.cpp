@@ -24,6 +24,7 @@
 
 #include "drive.h"
 
+#include <algorithm>
 #include <cstring>
 #include <ctime>
 #include <sstream>
@@ -2272,6 +2273,42 @@ void iecDrive::setStatusCode(uint8_t code, uint8_t trk, uint8_t sec)
     getStatus(statusMsg, sizeof(statusMsg));
     notify_activity(activitySource(), "status", statusMsg);
     Debug_printv("status: %s", getCStringLog(std::string(statusMsg)));
+}
+
+
+std::string iecDrive::consoleExecDos(const std::string &command, bool *isError)
+{
+    // executeData() is virtual: for device 30 this reaches iecMeatloaf, which
+    // answers FujiNet commands by filling the status buffer directly.
+    executeData((const uint8_t *) command.data(), (uint8_t) std::min<size_t>(command.size(), 255));
+
+    // Sample the error state before consuming the status - getStatusData()
+    // resets the code to OK, just as a channel-15 read does.
+    if (isError != nullptr)
+        *isError = hasError();
+
+    // Read the status the way the bus master would: a reply already pushed
+    // into the status buffer wins (iecMeatloaf answers FujiNet commands with
+    // setStatus()), and only an empty buffer falls through to getStatusData().
+    char buffer[IECFILEDEVICE_STATUS_BUFFER_SIZE];
+    std::string status;
+    uint8_t len = peekStatus(buffer, sizeof(buffer));
+    if( len > 0 )
+    {
+        status.assign(buffer, len);
+        clearStatus();   // consume it, as a channel-15 read would
+    }
+    else
+    {
+        bool eoi = false;
+        len = getStatusData(buffer, sizeof(buffer), &eoi);
+        status.assign(buffer, len);
+    }
+
+    while (!status.empty() && (status.back() == '\r' || status.back() == '\n'))
+        status.pop_back();
+
+    return status;
 }
 
 

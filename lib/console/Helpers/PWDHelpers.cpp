@@ -6,6 +6,7 @@
 #include "string_utils.h"
 
 #include "../Console.h"
+#include "../Commands/IECCommands.h"
 
 #include <mutex>
 
@@ -28,6 +29,9 @@ namespace ESP32Console
     void setCurrentPath(MFile* path) {
         if (path == nullptr)
             return;
+        // Read the url before publishing: once currentPath owns it, another
+        // task could replace (and delete) it out from under us.
+        std::string url = path->fullUrl();
         MFile* old;
         {
             std::lock_guard<std::mutex> lock(s_path_mutex);
@@ -37,6 +41,11 @@ namespace ESP32Console
         // Delete outside the lock: media MFile destructors can do real work
         if (old != nullptr && old != path)
             delete old;
+
+        // A device selected with "use" follows the console's working directory.
+        // No-op when nothing is selected. Outside the lock -- this can do
+        // network work.
+        iecSyncSelectedDeviceCwd(url);
     }
 
     std::string getCurrentPathUrl() {

@@ -3,9 +3,13 @@
 #include "../../bus/iec/IECHost.h"
 #include "../../bus/iec/iec.h"
 #include "../Console.h"
+#include "../Helpers/PWDHelpers.h"
 #include "../../www/ws/activity.h"
 #include "../../device/iec/meatloaf.h"
+#include "string_utils.h"
 
+#include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -196,6 +200,244 @@ static int iec(int argc, char **argv)
 }
 #endif
 
+// ------------------------------------------------------------------------
+// "use" / "exec" -- drive the currently selected device from the console.
+// ------------------------------------------------------------------------
+
+// Device id selected with "use", 0 when none.
+static uint8_t s_use_device = 0;
+
+// The drive devices live in the Meatloaf container, not in the bus's device
+// table, so resolve through it rather than IEC.findDevice() -- that returns
+// an IECDevice*, which cannot be narrowed to iecDrive* without RTTI.
+static iecDrive *findDrive(uint8_t devnr)
+{
+    for (int i = 0; i < MAX_DISK_DEVICES; i++)
+    {
+        fujiDisk *disk = Meatloaf.get_disks(i);
+        if (disk != nullptr && disk->disk_dev.id() == devnr)
+            return &disk->disk_dev;
+    }
+
+    // Meatloaf itself (device 30) is a drive too, but is not in _fnDisks.
+    iecDrive *ml = static_cast<iecDrive *>(&Meatloaf);
+    if (ml->id() == devnr)
+        return ml;
+
+    return nullptr;
+}
+
+// Resolve the selection, clearing it if the device has since gone away.
+static iecDrive *selectedDrive()
+{
+    if (s_use_device == 0)
+        return nullptr;
+
+    iecDrive *drive = findDrive(s_use_device);
+    if (drive == nullptr)
+        s_use_device = 0;
+
+    return drive;
+}
+
+static int use(int argc, char **argv)
+{
+    if (argc < 2)
+    {
+        iecDrive *drive = selectedDrive();
+        if (drive == nullptr)
+            Serial.printf("No device selected.\r\n");
+        else
+            Serial.printf("Using device #%u [%s]\r\n", s_use_device, drive->getCWD().c_str());
+        return EXIT_SUCCESS;
+    }
+
+    if (!mstr::isNumeric(argv[1]))
+    {
+        Serial.printf("Usage: use {device id}   (0 = none)\r\n");
+        return EXIT_FAILURE;
+    }
+
+    int value = atoi(argv[1]);
+    if (value < 0 || value > 30)
+    {
+        Serial.printf("Invalid device ID. Must be 0-30.\r\n");
+        return EXIT_FAILURE;
+    }
+
+    if (value == 0)
+    {
+        s_use_device = 0;
+        Serial.printf("No device selected.\r\n");
+        return EXIT_SUCCESS;
+    }
+
+    iecDrive *drive = findDrive(static_cast<uint8_t>(value));
+    if (drive == nullptr)
+    {
+        Serial.printf("No drive device #%d attached.\r\n", value);
+        return EXIT_FAILURE;
+    }
+
+    s_use_device = static_cast<uint8_t>(value);
+
+    // Take the device to where the console already is; setCurrentPath() keeps
+    // it there from now on.
+    drive->consoleSetCwd(ESP32Console::getCurrentPathUrl());
+    Serial.printf("Using device #%d [%s]\r\n", value, drive->getCWD().c_str());
+
+    return EXIT_SUCCESS;
+}
+
+// Encode a console-typed DOS command the way the C64 would put it on the wire.
+//
+// Text is PETSCII encoded: mstr::toPETSCII2() maps LOWERCASE ASCII onto the
+// $41-$5A range, which is what an unshifted C64 sends and what executeData()
+// dispatches on ("CD", "N0", "T-Z"), so the text is lowercased first and the
+// user can type either case.  Binary bytes -- M-R/M-W/B-P carry addresses and
+// data that are not text at all -- are written as "0xNN" and pass through
+// verbatim, unconverted.
+static std::string encodeDosCommand(const std::string &line)
+{
+    std::string out;
+    std::string text;   // pending text, converted on the next flush
+
+    auto flushText = [&out, &text]()
+    {
+        if (text.empty())
+            return;
+        mstr::toLower(text);
+        out += mstr::toPETSCII2(text);
+        text.clear();
+    };
+
+    for (size_t i = 0; i < line.size(); )
+    {
+        if (i + 4 <= line.size() && line[i] == '0' && (line[i + 1] == 'x' || line[i + 1] == 'X') &&
+            isxdigit(static_cast<unsigned char>(line[i + 2])) &&
+            isxdigit(static_cast<unsigned char>(line[i + 3])))
+        {
+            flushText();
+            char hex[3] = { line[i + 2], line[i + 3], '\0' };
+            out += static_cast<char>(strtol(hex, nullptr, 16));
+            i += 4;
+        }
+        else
+        {
+            text += line[i++];
+        }
+    }
+    flushText();
+
+    return out;
+}
+
+// Render a status line. M-R and friends answer with raw drive memory, so
+// anything that is not plain printable text is dumped as hex.
+static void printStatus(const std::string &status)
+{
+    bool printable = true;
+    for (unsigned char c : status)
+    {
+        if (c < 0x20 || c > 0x7E)
+        {
+            printable = false;
+            break;
+        }
+    }
+
+    if (printable)
+    {
+        Serial.printf("%s\r\n", status.c_str());
+        return;
+    }
+
+    for (size_t offset = 0; offset < status.size(); offset += 16)
+    {
+        size_t len = std::min<size_t>(16, status.size() - offset);
+
+        Serial.printf("%04X: ", static_cast<unsigned>(offset));
+        for (size_t i = 0; i < 16; i++)
+        {
+            if (i < len)
+                Serial.printf("%02X ", static_cast<unsigned char>(status[offset + i]));
+            else
+                Serial.printf("   ");
+        }
+
+        Serial.printf(" ");
+        for (size_t i = 0; i < len; i++)
+        {
+            unsigned char c = static_cast<unsigned char>(status[offset + i]);
+            Serial.printf("%c", (c >= 0x20 && c <= 0x7E) ? c : '.');
+        }
+        Serial.printf("\r\n");
+    }
+}
+
+static int execDos(int argc, char **argv)
+{
+    iecDrive *drive = selectedDrive();
+    if (drive == nullptr)
+    {
+        Serial.printf("No device selected. Run \"use {device id}\" first.\r\n");
+        return EXIT_FAILURE;
+    }
+
+    if (argc < 2)
+    {
+        // Spacing is sent exactly as typed: "B-P 2 0" wants its separators,
+        // "M-R" wants its address bytes butted straight up against the verb.
+        Serial.printf("Usage: exec {DOS command}\r\n");
+        Serial.printf("       text is PETSCII encoded; binary bytes are written 0xNN\r\n");
+        Serial.printf("       e.g. exec i0:            exec \"s0:filename\"\r\n");
+        Serial.printf("            exec m-r0x000x030x01\r\n");
+        return EXIT_FAILURE;
+    }
+
+    // The C64 owns the drive while it has channels open; stepping in from the
+    // console task would race the IEC bus task over the same drive state.
+    if (drive->getNumOpenChannels() > 0)
+    {
+        Serial.printf("Device #%u is busy (%u open channel(s)).\r\n",
+                      s_use_device, drive->getNumOpenChannels());
+        return EXIT_FAILURE;
+    }
+
+    // Rejoin the tokens the console split on whitespace.
+    std::string line;
+    for (int i = 1; i < argc; i++)
+    {
+        if (i > 1) line += ' ';
+        line += argv[i];
+    }
+
+    std::string command = encodeDosCommand(line);
+    if (command.size() > 255)
+        command.resize(255);
+
+    bool isError = false;
+    std::string status = drive->consoleExecDos(command, &isError);
+    printStatus(status);
+
+    return isError ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
+namespace ESP32Console
+{
+    int iecSelectedDeviceId()
+    {
+        return s_use_device;
+    }
+
+    void iecSyncSelectedDeviceCwd(const std::string &url)
+    {
+        iecDrive *drive = selectedDrive();
+        if (drive != nullptr)
+            drive->consoleSetCwd(url);
+    }
+}
+
 int enable(int argc, char **argv)
 {
     if (argc != 2)
@@ -237,5 +479,15 @@ namespace ESP32Console::Commands
     const ConsoleCommand getDisableCommand()
     {
         return ConsoleCommand("disable", &disable, "Disable virtual device");
+    }
+    const ConsoleCommand getUseCommand()
+    {
+        return ConsoleCommand("use", &use,
+            "Select the device the console drives. Usage: use [device id]  (0 = none)");
+    }
+    const ConsoleCommand getExecCommand()
+    {
+        return ConsoleCommand("exec", &execDos,
+            "Send a DOS command to the selected device (text is PETSCII encoded; write binary bytes as 0xNN). Usage: exec {DOS command}");
     }
 }

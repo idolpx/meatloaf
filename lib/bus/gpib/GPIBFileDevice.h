@@ -85,6 +85,13 @@ class GPIBFileDevice : public GPIBDevice
   // to be called again the next time the status channel is queried
   void clearStatus();
 
+  // can be called by derived class to read back the unread part of the status
+  // buffer, i.e. what the bus master would receive next if it read the status
+  // channel now. Returns the number of bytes stored in "buffer" (0 if the
+  // buffer is empty, in which case the next status channel read would call
+  // getStatusData()). Does not consume the data - call clearStatus() for that.
+  uint8_t peekStatus(char *buffer, uint8_t bufferSize);
+
   // clear the internal read buffer of the given channel, calling this will ensure
   // that the next TALK command will immediately call "read" to get new data instead 
   // of first sending the contents of the buffer

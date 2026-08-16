@@ -1001,9 +1001,20 @@ void IECFileDevice::setStatus(const char *data, uint8_t dataLen)
 }
 
 
-void IECFileDevice::clearStatus() 
-{ 
-  setStatus(NULL, 0); 
+void IECFileDevice::clearStatus()
+{
+  setStatus(NULL, 0);
+}
+
+
+uint8_t IECFileDevice::peekStatus(char *buffer, uint8_t bufferSize)
+{
+  if( m_statusBufferPtr >= m_statusBufferLen )
+    return 0;
+
+  uint8_t len = min((uint8_t) (m_statusBufferLen - m_statusBufferPtr), bufferSize);
+  memcpy(buffer, m_statusBuffer + m_statusBufferPtr, len);
+  return len;
 }
 
 
