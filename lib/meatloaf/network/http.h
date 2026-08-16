@@ -339,8 +339,22 @@ public:
 protected:
     std::shared_ptr<HTTPMSession> _session = nullptr;
 
+    // The session's I/O refcount is shared by every stream on the same
+    // host:port, so each stream must contribute at most one count — an
+    // unbalanced release would cancel out another stream's hold and expose
+    // it to the SessionBroker sweep. These make acquire/release idempotent
+    // per stream.
+    void acquireSessionIO() {
+        if (_session && !_io_held) { _session->acquireIO(); _io_held = true; }
+    }
+    void releaseSessionIO() {
+        if (_session && _io_held) { _session->releaseIO(); _io_held = false; }
+    }
+
 private:
     friend class HTTPMFile;
+
+    bool _io_held = false;
 
     HTTPRequestContext ctx;
     FullModeState fullMode = FullModeState::SIMPLE;

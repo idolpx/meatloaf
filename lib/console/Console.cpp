@@ -648,7 +648,7 @@ namespace ESP32Console
             mstr::replaceAll(prompt, "%pwd%", getCurrentPathUrl());
             // ...and the device id selected with "use" (empty when none)
             int dev = iecSelectedDeviceId();
-            mstr::replaceAll(prompt, "%dev%", dev ? std::to_string(dev) : std::string());
+            mstr::replaceAll(prompt, "%dev%", dev ? std::to_string(dev) + ":" : std::string());
             char *line = linenoise(prompt.c_str());
             if (line == NULL)
             {
@@ -870,7 +870,7 @@ namespace ESP32Console
             std::string p = prompt_;
             mstr::replaceAll(p, "%pwd%", getCurrentPathUrl());
             int dev = iecSelectedDeviceId();
-            mstr::replaceAll(p, "%dev%", dev ? std::to_string(dev) : std::string());
+            mstr::replaceAll(p, "%dev%", dev ? std::to_string(dev) + ":" : std::string());
             tcp_server.send(p);
         }
 #endif

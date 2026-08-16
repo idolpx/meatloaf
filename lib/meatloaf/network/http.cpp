@@ -445,10 +445,20 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
  * HTTPMSession implementation
  ********************************************************/
 
+// The key MUST be spelled exactly as SessionBroker::obtain() spells it —
+// getScheme() + "://" + host + ":" + port — or the session is filed in the
+// repo under one name while reporting another, and every log line about it
+// names a key that no lookup can find. This used to read
+// (port == 443 ? "https://" : "http://"), so an HTTPS session was created as
+// "https://host:443" and stored as "http://host:443".
+// HTTPS is deliberately NOT a separate scheme here: one session is pooled per
+// host:port and the port already distinguishes the two (ml.h disposes
+// "http://api.meatloaf.cc:443" by that exact spelling).
 HTTPMSession::HTTPMSession(std::string host, uint16_t port)
-    : MSession((port == 443 ? "https://" : "http://") + host + ":" + std::to_string(port), host, port)
+    : MSession(getScheme() + "://" + host + ":" + std::to_string(port), host, port)
 {
-    Debug_printv("HTTPMSession created for %s:%d", host.c_str(), port);
+    Debug_printv("HTTPMSession created for %s:%d (%s)", host.c_str(), port,
+                 port == 443 ? "TLS" : "plain");
 
     // MeatHttpClient handles its own initialization and configuration
     client = std::make_shared<MeatHttpClient>();
@@ -683,10 +693,19 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
         mstr::replaceAll(client.url, " ", "%20");
         client.init();
         client._is_open = true;
-        if (_session) _session->acquireIO();
+        acquireSessionIO();
         return true;
     }
 
+    // Hold the session busy across the REQUEST, not merely after it. The
+    // request is by far the longest I/O here — DNS, TLS handshake, redirect
+    // chain, response headers — and SessionBroker::service() disposes any
+    // session that is neither in use by a drive/console cwd nor busy once it
+    // has been idle past its grace period. A `wget` is not anybody's cwd, so
+    // isBusy() is the only thing protecting it, and acquiring after the call
+    // returned left the whole request unprotected: a GET slower than the
+    // 5 s grace period got its session disconnected out from under it.
+    acquireSessionIO();
 
     if(mode == (std::ios_base::out | std::ios_base::app))
         r = client.PUT(url);
@@ -714,8 +733,10 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
 
     //Debug_printv("r[%d] size[%d] url[%s] hurl[%s]", r, _size, url.c_str(), client.url.c_str());
 
-    if (r && _session) {
-        _session->acquireIO();
+    // On success the hold stays until close(); on failure release it here,
+    // since a stream whose open() failed is never closed.
+    if (!r) {
+        releaseSessionIO();
     }
 
     return r;
@@ -724,9 +745,7 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
 void HTTPMStream::close() {
     // Full mode: skip the auto-POST used by simple mode. User already sent 's'.
     if (fullMode != FullModeState::SIMPLE) {
-        if (_session) {
-            _session->releaseIO();
-        }
+        releaseSessionIO();
         fullMode = FullModeState::SIMPLE;
         ctx.clear();
         return;
@@ -739,9 +758,7 @@ void HTTPMStream::close() {
         auto client = _session->client.get();
         client->close();
     }
-    if (_session) {
-        _session->releaseIO();
-    }
+    releaseSessionIO();
 }
 
 bool HTTPMStream::seek(uint32_t pos, int mode) {

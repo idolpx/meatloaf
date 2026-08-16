@@ -183,7 +183,7 @@ void main_setup()
 #ifdef ENABLE_CONSOLE
     //You can change the console prompt before calling begin(). By default it is "ESP32>"
     // %dev% expands to the device id selected with "use" (empty when none)
-    console.setPrompt("meatloaf[%dev%:%pwd%]# ");
+    console.setPrompt("meatloaf[%dev%%pwd%]# ");
 
     //You can change the baud rate and pin numbers similar to Serial.begin() here.
     console.begin(DEBUG_SPEED);

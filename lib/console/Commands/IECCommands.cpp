@@ -291,12 +291,24 @@ static int use(int argc, char **argv)
 
 // Encode a console-typed DOS command the way the C64 would put it on the wire.
 //
-// Text is PETSCII encoded: mstr::toPETSCII2() maps LOWERCASE ASCII onto the
-// $41-$5A range, which is what an unshifted C64 sends and what executeData()
-// dispatches on ("CD", "N0", "T-Z"), so the text is lowercased first and the
-// user can type either case.  Binary bytes -- M-R/M-W/B-P carry addresses and
-// data that are not text at all -- are written as "0xNN" and pass through
-// verbatim, unconverted.
+// Text is PETSCII encoded and nothing else.  mstr::toPETSCII2() maps LOWERCASE
+// ASCII onto $41-$5A, which is exactly what an unshifted C64 sends and what
+// executeData() dispatches on ("CD", "N0", "T-Z") -- so TYPE THE COMMAND IN
+// LOWERCASE, as you would at the READY prompt, and the translation makes it
+// the right case on the wire.
+//
+// Nothing is case-folded here, and that is deliberate: commands and their
+// parameters can be mixed case, and lowercasing the line to make the VERB
+// match would corrupt every filename and path in it.  One encoding, no hidden
+// transforms.
+//
+// Uppercase input is therefore not equivalent -- it maps to the SHIFTED range
+// (measured: "M-R" -> CD 2D D2, "I0:" -> C9 30 3A), valid PETSCII that matches
+// no command.  It is not a silent trap: executeData() falls through to
+// ST_SYNTAX_INVALID, so "exec M-R" answers "31,INVALID COMMAND".
+//
+// Binary bytes -- M-R/M-W/B-P carry addresses and data that are not text at
+// all -- are written as "0xNN" and pass through verbatim, unconverted.
 static std::string encodeDosCommand(const std::string &line)
 {
     std::string out;
@@ -306,13 +318,14 @@ static std::string encodeDosCommand(const std::string &line)
     {
         if (text.empty())
             return;
-        mstr::toLower(text);
         out += mstr::toPETSCII2(text);
         text.clear();
     };
 
+    // Rejoin the tokens the console split on whitespace.
     for (size_t i = 0; i < line.size(); )
     {
+        // Hex bytes are written verbatim.
         if (i + 4 <= line.size() && line[i] == '0' && (line[i + 1] == 'x' || line[i + 1] == 'X') &&
             isxdigit(static_cast<unsigned char>(line[i + 2])) &&
             isxdigit(static_cast<unsigned char>(line[i + 3])))
@@ -389,7 +402,7 @@ static int execDos(int argc, char **argv)
         // Spacing is sent exactly as typed: "B-P 2 0" wants its separators,
         // "M-R" wants its address bytes butted straight up against the verb.
         Serial.printf("Usage: exec {DOS command}\r\n");
-        Serial.printf("       text is PETSCII encoded; binary bytes are written 0xNN\r\n");
+        Serial.printf("       type in lowercase (PETSCII); binary bytes are written 0xNN\r\n");
         Serial.printf("       e.g. exec i0:            exec \"s0:filename\"\r\n");
         Serial.printf("            exec m-r0x000x030x01\r\n");
         return EXIT_FAILURE;
@@ -488,6 +501,6 @@ namespace ESP32Console::Commands
     const ConsoleCommand getExecCommand()
     {
         return ConsoleCommand("exec", &execDos,
-            "Send a DOS command to the selected device (text is PETSCII encoded; write binary bytes as 0xNN). Usage: exec {DOS command}");
+            "Send a DOS command to the selected device (type lowercase; write binary bytes as 0xNN). Usage: exec {DOS command}");
     }
 }
