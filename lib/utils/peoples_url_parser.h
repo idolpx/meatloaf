@@ -58,6 +58,17 @@ public:
 
     uint16_t getPort();
 
+    /**
+     * @brief Does this string start with a URL scheme ("http:", "smb:", ...)?
+     *
+     * Not every colon introduces a scheme: CBM DOS separates a filename from
+     * its path with one ("/settings/:components.t"), so splitting on the first
+     * colon unconditionally made "/settings/" the scheme. A scheme is
+     * "alpha *( alpha / digit / '+' / '-' / '.' )" per RFC 3986, which a path
+     * component can never satisfy because it excludes '/'.
+     */
+    static bool hasScheme(const std::string &u);
+
     static std::unique_ptr<PeoplesUrlParser> parseURL(const std::string &u);
     void resetURL(const std::string u);
     std::string rebuildUrl(void);

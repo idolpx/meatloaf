@@ -154,12 +154,16 @@ void PeoplesUrlParser::processPath()
     // remove query and fragment part from path
     path = path.substr(0, pos);
 
-    // CBM DOS seperates filename from path with ':', so we need to check for that as well
+    // CBM DOS separates the filename from its path with a colon
+    // ("/settings/:components.t"). Take the name from after it and drop the
+    // colon FROM the path, so path keeps the shape it has in the plain case:
+    // the full path, with name being its last component. Leaving the name out
+    // of path (as this once did) lost it from the rebuilt url entirely.
     pos = path.find(":");
     if (pos != std::string::npos)
     {
         name = path.substr(pos + 1);
-        path = path.substr(0, pos);
+        path = path.substr(0, pos) + name;
     }
     else
     {
@@ -241,6 +245,26 @@ uint16_t PeoplesUrlParser::getPort() {
 }
 
 
+bool PeoplesUrlParser::hasScheme(const std::string &u) {
+    auto pos = u.find(':');
+    if (pos == std::string::npos || pos == 0)
+        return false;
+
+    // RFC 3986: scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ). A path
+    // cannot pass this test, since '/' is not in the set - which is what keeps
+    // a CBM "dir/:file" from being read as the scheme "dir/".
+    if (!isalpha((unsigned char)u[0]))
+        return false;
+
+    for (size_t i = 1; i < pos; i++) {
+        char c = u[i];
+        if (!isalnum((unsigned char)c) && c != '+' && c != '-' && c != '.')
+            return false;
+    }
+
+    return true;
+}
+
 std::unique_ptr<PeoplesUrlParser> PeoplesUrlParser::parseURL(const std::string &u) {
     // Directly creating a unique_ptr using a private constructor workaround. If direct constructor was available, this wouldn't be needed
     struct MakeUniqueEnabler : public PeoplesUrlParser {};
@@ -273,14 +297,14 @@ void PeoplesUrlParser::resetURL(const std::string u) {
     query = "";
     fragment = "";
 
-    auto byColon = mstr::split(url, ':', 2);
-
     std::string pastTheScheme;
-    if (byColon.size()==1) {
-        // no scheme
-        pastTheScheme = byColon[0];
+    if (!hasScheme(url)) {
+        // no scheme - and a colon here belongs to a CBM path, which
+        // processPath() deals with
+        pastTheScheme = url;
     }
     else {
+        auto byColon = mstr::split(url, ':', 2);
         scheme = byColon[0];
         pastTheScheme = byColon[1];
     }

@@ -868,6 +868,20 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
         if( mstr::startsWith(name, "0:") )
             name = mstr::drop(name, 2);
 
+        // A CBM file spec names its path relative to the current directory:
+        // "/SETTINGS/:COMPONENTS.T" descends from here, while "//DIR/:FILE"
+        // starts at the root of the image (cd() handles that form). Drop the
+        // single leading '/' so it is not read as a host-absolute path.
+        //
+        // Keyed on the CBM name separator "/:" because Meatloaf also accepts
+        // real host paths from the C64 - LOAD"/sd/games/x.d64",8 must still
+        // resolve at the SD root, and it never carries that separator.
+        if( name.size() > 1 && name[0] == '/' && name[1] != '/' &&
+            name.find("/:") != std::string::npos )
+        {
+            name = mstr::drop(name, 1);
+        }
+
         if( mstr::startsWith(name, "CD") )
         {
             if ( name.size() > 2 )
@@ -1274,8 +1288,19 @@ uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool 
             uint8_t bytes_read = handler->read(data, maxDataLen);
             if( m_statusCode==ST_FILE_NOT_FOUND)
             {
-                Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Subdir Change Directory Here! stream[%s] > base[%s]", m_cwd->url.c_str(), m_cwd->base().c_str());
-                set_cwd(m_cwd->base());
+                // base() is the container's PARENT directory for anything
+                // hosted by an image - it knows nothing of pathInStream - so
+                // backing out here would eject the drive from the image over a
+                // file that was merely absent. C64 OS probes for an optional
+                // /TEMPORARY/:UPDATER; that miss used to move the drive to the
+                // image's directory on SD and every open after it failed.
+                bool inContainer = m_cwd->sourceFile != nullptr &&
+                                   !m_cwd->sourceFile->pathInStream.empty();
+                if( !inContainer )
+                {
+                    Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Subdir Change Directory Here! stream[%s] > base[%s]", m_cwd->url.c_str(), m_cwd->base().c_str());
+                    set_cwd(m_cwd->base());
+                }
             }
 
             //Debug_printv("Read %d bytes from channel[%d]", bytes_read, channel);
@@ -1445,6 +1470,11 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                     mstr::trim(command);
                     mstr::replaceAll(command, "  ", " ");
                     std::vector<uint8_t> pti = util_tokenize_uint8(command);
+                    if ( pti.size() < 2 )
+                    {
+                        setStatusCode(ST_SYNTAX_UNKNOWN);
+                        return;
+                    }
                     Debug_printv("command[%s] channel[%d] position[%d]", command.c_str(), pti[0], pti[1]);
 
                     auto channel = m_channels[pti[0]];
@@ -1464,6 +1494,11 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                     mstr::trim(command);
                     mstr::replaceAll(command, "  ", " ");
                     std::vector<uint8_t> pti = util_tokenize_uint8(command);
+                    if ( pti.size() < 4 )
+                    {
+                        setStatusCode(ST_SYNTAX_UNKNOWN);
+                        return;
+                    }
                     Debug_printv("command[%s] channel[%d] media[%d] track[%d] sector[%d]", command.c_str(), pti[0], pti[1], pti[2], pti[3]);
 
                     auto channel = m_channels[pti[0]];
@@ -1675,26 +1710,43 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                 //Scratch();
                 // SCRATCH (delete)
                 uint8_t n = 0;
-                command = command.substr(colon_position + 1);
 
-                MFile *dir = MFSOwner::File(m_cwd->url);
-                if( dir!=nullptr )
+                // Everything between the command letter and the colon is a
+                // PATH ("S/TEMPORARY/:*" scratches inside TEMPORARY), and it
+                // used to be discarded - the pattern was then matched against
+                // the CURRENT directory, so C64 OS clearing its temp directory
+                // instead matched os/BOOTER. Nothing was lost only because
+                // MFile::remove() refuses a container-hosted entry; on a
+                // writable image it would have deleted the wrong files.
+                std::string dirPath = command.substr(1, colon_position - 1);
+                std::string pattern = command.substr(colon_position + 1);
+
+                // drive number prefix ("S0:...")
+                while( !dirPath.empty() && isdigit((unsigned char)dirPath.front()) )
+                    dirPath.erase(0, 1);
+
+                // As in open(): one leading '/' descends from the current
+                // directory, "//" starts at the root of the image.
+                if( dirPath.size() > 1 && dirPath[0] == '/' && dirPath[1] != '/' )
+                    dirPath.erase(0, 1);
+                while( !dirPath.empty() && dirPath.back() == '/' )
+                    dirPath.pop_back();
+
+                std::unique_ptr<MFile> dir(dirPath.empty()
+                                           ? MFSOwner::File(m_cwd->fullUrl())
+                                           : m_cwd->cd(dirPath));
+                if( dir!=nullptr && dir->isDirectory() )
                 {
-                    if( dir->isDirectory() )
+                    std::unique_ptr<MFile> entry;
+                    while( (entry=std::unique_ptr<MFile>(dir->getNextFileInDir()))!=nullptr )
                         {
-                        std::unique_ptr<MFile> entry;
-                        while( (entry=std::unique_ptr<MFile>(m_cwd->getNextFileInDir()))!=nullptr )
+                        if( !entry->isDirectory() && isMatch(mstr::toPETSCII2(entry->name), pattern) )
                             {
-                            if( !entry->isDirectory() && isMatch(mstr::toPETSCII2(entry->name), command) )
-                                {
-                                Debug_printv("DELETING %s", entry->name.c_str());
-                                if( entry->remove() ) n++;
-                                }
-                            //else Debug_printv("NOT DELETING %s", entry->name.c_str());
+                            Debug_printv("DELETING %s", entry->name.c_str());
+                            if( entry->remove() ) n++;
                             }
+                        //else Debug_printv("NOT DELETING %s", entry->name.c_str());
                         }
-
-                    delete dir;
                 }
 
                 setStatusCode(ST_SCRATCHED, n);
@@ -1710,6 +1762,11 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                 mstr::trim(command);
                 mstr::replaceAll(command, "  ", " ");
                 std::vector<uint8_t> pti = util_tokenize_uint8(command);
+                if ( pti.size() < 4 )
+                {
+                    setStatusCode(ST_SYNTAX_UNKNOWN);
+                    return;
+                }
                 Debug_printv("command[%s] channel[%d] media[%d] track[%d] sector[%d]", command.c_str(), pti[0], pti[1], pti[2], pti[3]);
 
                 auto channel = m_channels[pti[0]];
@@ -1933,6 +1990,11 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                 // Position channel pointer
                 command = mstr::drop(command, 1);
                 std::vector<uint8_t> pti = util_tokenize_uint8(command);
+                if ( pti.size() < 4 )
+                {
+                    setStatusCode(ST_SYNTAX_UNKNOWN);
+                    return;
+                }
                 Debug_printv("position channel[%d] hi[%d] mid[%d] low[%d]", pti[0], pti[1], pti[2], pti[3]);
                 auto channel = m_channels[(uint8_t)pti[0]];
                 if ( channel != nullptr )
@@ -2140,6 +2202,12 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
     // Meatloaf Extended Commands
     command = mstr::toUTF8(command);
     auto pt = util_tokenize(command, ':');
+
+    // util_tokenize() yields NO tokens for an empty command, and the C64 does
+    // send one - a lone 0x00 on the command channel arrives here as "". Reading
+    // pt[0] then faults (LoadProhibited comparing a std::string at address 0).
+    if ( pt.empty() )
+        return;
 
     if ( pt[0] == "auth" )
     {

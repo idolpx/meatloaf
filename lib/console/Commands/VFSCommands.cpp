@@ -750,8 +750,11 @@ int mount(int argc, char **argv)
     filename = getCurrentPath()->fullUrl();   // see resolve_path()
     if ( argc > 2 )
     {
-        // Use current path + filename
-        if ( mstr::contains(argv[2], ":") )
+        // Use current path + filename. An argument that is already absolute -
+        // a scheme ("http://...") or a leading '/' - names the target on its
+        // own; appending it to the cwd produced "///sd/x.hdd", which only
+        // resolved by accident when the drive was not sitting in an image.
+        if ( mstr::contains(argv[2], ":") || argv[2][0] == '/' )
         {
             filename = argv[2];
         }

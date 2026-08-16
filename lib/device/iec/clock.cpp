@@ -15,15 +15,20 @@ iecClock::~iecClock()
 {
 }
 
+// Both of these are reached from unlisten(), which the bus handler calls with
+// interrupts disabled and which must return within 1 millisecond (see
+// IECDevice.h, and the comment in talk() below). They must NOT print: with
+// ENABLE_CONSOLE, Debug_printf/Debug_printv both go to console.printf, and its
+// fwrite takes a newlib lock - lock_acquire_generic() calls abort() outright
+// when it cannot yield, which rebooted the ESP32 whenever the C64 addressed
+// the clock device.
 void iecClock::set_timestamp(std::string s)
 {
-    Debug_printf("set_timestamp(%s)\r\n",s.c_str());
     ts = atoi(payload.c_str());
 }
 
 void iecClock::set_timestamp_format(std::string s)
 {
-    Debug_printf("set_timestamp_format(%s)\r\n",s.c_str());
     s = mstr::toUTF8(s);
     tf = s;
 }

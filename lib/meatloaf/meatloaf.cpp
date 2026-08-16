@@ -591,6 +591,21 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
     if ( path.empty() )
         return nullptr;
 
+    // CBM DOS separates a filename from its path with a colon
+    // ("/settings/:components.t"). Normalise it away HERE, before the string is
+    // split into components: pathInStream is built by joining those raw
+    // components, so it never goes through PeoplesUrlParser and a colon left in
+    // place survives into the in-image path, where it matches no entry.
+    // Only the path portion is touched, so a query or fragment keeps its own.
+    {
+        size_t tail = path.find_first_of("?#");
+        std::string head = (tail == std::string::npos) ? path : path.substr(0, tail);
+        size_t sep;
+        while ((sep = head.find("/:")) != std::string::npos)
+            head.erase(sep + 1, 1);
+        path = (tail == std::string::npos) ? head : head + path.substr(tail);
+    }
+
     if ( !default_fs )
     {
         // If this is a ML Short Code, resolve it!
@@ -1138,7 +1153,11 @@ MFile* MFile::cd(std::string newDir)
 {
     Debug_printv("url[%s] cd[%s] hex[%s]", url.c_str(), newDir.c_str(), mstr::toHex(newDir).c_str());
 
-    if(newDir.find(':') != std::string::npos) 
+    // A colon is only a scheme separator when what precedes it actually looks
+    // like a scheme. CBM DOS uses a colon to separate a filename from its path
+    // ("/settings/:components.t"), and treating that as "cd into another url
+    // scheme" threw away the current directory - the image - entirely.
+    if(PeoplesUrlParser::hasScheme(newDir))
     {
         // // Check if this is a wrapper scheme with a relative path
         // size_t firstColon = newDir.find(':');
@@ -1366,6 +1385,35 @@ MFile* MFile::cdRoot(std::string plus)
 MFile* MFile::cdLocalRoot(std::string plus)
 {
     Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
+
+    // "The root of the stream" for a file hosted by a container image is the
+    // IMAGE, not the directory the image sits in. `path` already excludes
+    // pathInStream, so it names the image itself, and appending to it puts the
+    // new component in pathInStream where it belongs.
+    //
+    // sourceFile->pathInStream is non-empty EXACTLY when this file is hosted by
+    // a container: MFSOwner::File() names the image within its own filesystem
+    // there (source url /sd/games + pathInStream game.d64), while for a plain
+    // VFS path it takes the isRootFS branch and never sets pathInStream at all.
+    // That is what separates /sd/games/game.d64 from the directory /sd/games.
+    //
+    // Without this, CD//OS inside an image resolved against the image's PARENT
+    // directory - /sd/.../ide64CF1GB.hdd became /sd/.../os - so C64 OS's boot
+    // sequence (CP1 then CD//OS) failed with 62,FILE NOT FOUND.
+    // `plus` is a component RELATIVE to that root. A leading '/' means an
+    // absolute host path reached here through the "//" form - the console's
+    // `mount` builds exactly that ("/" + "/sd/x.hdd" -> "///sd/x.hdd") - so
+    // resolve it as-is instead of appending it to anything.
+    if (!plus.empty() && plus[0] == '/')
+        return MFSOwner::File( plus );
+
+    if (sourceFile != nullptr && !sourceFile->pathInStream.empty())
+    {
+        std::string destUrl = path;
+        if (!plus.empty()) { destUrl += '/'; destUrl += plus; }
+        Debug_printv("in container, url[%s]", destUrl.c_str());
+        return MFSOwner::File( destUrl );
+    }
 
     // cd() must not mutate `this`. Callers do getCurrentPath()->cd(...) and only
     // adopt the result if it turns out to be a directory - so mutating here moved
