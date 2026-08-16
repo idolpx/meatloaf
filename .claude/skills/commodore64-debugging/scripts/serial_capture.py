@@ -71,7 +71,14 @@ def check_health(pid_path: str) -> bool:
     try:
         with open(pid_path) as f:
             pid = int(f.read().strip())
-        os.kill(pid, 0)  # check if alive
+        # NOTE: os.kill(pid, 0) is a liveness probe on POSIX only. On Windows
+        # CPython implements os.kill via TerminateProcess for any signal that
+        # is not CTRL_C/CTRL_BREAK_EVENT, so signal 0 would KILL the daemon
+        # this function is merely asking about. Use the heartbeat alone there —
+        # it is the stronger signal anyway (a hung daemon stops updating it
+        # while its PID stays perfectly alive).
+        if os.name != "nt":
+            os.kill(pid, 0)
         # Check heartbeat is fresh (< 30s old)
         hb_age = time.time() - os.path.getmtime(HEARTBEAT_DEFAULT)
         if hb_age > 30:
@@ -193,20 +200,30 @@ def main():
     # (prevents serial port contention)
     cmd_fifo_path = os.environ.get("SERIAL_CAPTURE_CMD_FIFO", CMD_FIFO_DEFAULT)
     cmd_fifo_fd = None
+    # Windows has no os.mkfifo. Fall back to a plain file that the loop polls
+    # and truncates after reading — send_command() writes it with mode "w",
+    # so a regular file behaves the same way from the sender's side.
+    cmd_is_fifo = hasattr(os, "mkfifo")
     try:
         if os.path.exists(cmd_fifo_path):
             os.unlink(cmd_fifo_path)
-        os.mkfifo(cmd_fifo_path, 0o600)
-        # Open non-blocking so we don't block waiting for a writer
-        cmd_fifo_fd = os.open(cmd_fifo_path, os.O_RDONLY | os.O_NONBLOCK)
+        if cmd_is_fifo:
+            os.mkfifo(cmd_fifo_path, 0o600)
+            # Open non-blocking so we don't block waiting for a writer
+            cmd_fifo_fd = os.open(cmd_fifo_path, os.O_RDONLY | os.O_NONBLOCK)
+        else:
+            os.makedirs(os.path.dirname(cmd_fifo_path) or ".", exist_ok=True)
+            with open(cmd_fifo_path, "w"):
+                pass
         ts2 = time.strftime("%H:%M:%S")
         write_to_log(out_fd,
-            f"[{ts2}] serial: Command FIFO at {cmd_fifo_path}\n")
+            f"[{ts2}] serial: Command {'FIFO' if cmd_is_fifo else 'file'} at {cmd_fifo_path}\n")
     except OSError as e:
         ts2 = time.strftime("%H:%M:%S")
         write_to_log(out_fd,
-            f"[{ts2}] serial: Could not create FIFO {cmd_fifo_path}: {e}\n")
+            f"[{ts2}] serial: Could not create command channel {cmd_fifo_path}: {e}\n")
         cmd_fifo_fd = None
+        cmd_is_fifo = True   # disable the file path too
 
     while _running:
         # Periodic heartbeat (every 5s, even without data — Meatloaf
@@ -230,15 +247,21 @@ def main():
                     status = "connecting"
 
                 # Open with a timeout so we can check _running periodically
-                ser = pyser.Serial(
+                # exclusive=False lets monitoring tools coexist on POSIX, but
+                # pyserial's win32 backend rejects anything but exclusive
+                # access ("win32 only supports exclusive access"), so omit the
+                # kwarg there and take the default.
+                open_kwargs = dict(
                     port=args.port,
                     baudrate=args.baud,
                     timeout=0.1,
                     write_timeout=0.1,
-                    exclusive=False,
                     rtscts=False,
                     dsrdtr=False,
                 )
+                if os.name != "nt":
+                    open_kwargs["exclusive"] = False
+                ser = pyser.Serial(**open_kwargs)
                 consecutive_failures = 0
 
                 ts2 = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -287,7 +310,25 @@ def main():
                     sys.stdout.write(cleaned)
                     sys.stdout.flush()
 
-            # --- Check for commands from FIFO ---
+            # --- Check for commands from FIFO (or, on Windows, the poll file) ---
+            if cmd_fifo_fd is None and not cmd_is_fifo:
+                try:
+                    if os.path.getsize(cmd_fifo_path) > 0:
+                        with open(cmd_fifo_path, "r+") as cf:
+                            cmd_data = cf.read().encode("utf-8")
+                            cf.seek(0)
+                            cf.truncate()
+                    else:
+                        cmd_data = b""
+                    if cmd_data:
+                        cmd_text = cmd_data.decode("utf-8", errors="replace").strip()
+                        if cmd_text and ser and ser.is_open:
+                            ts2 = time.strftime("%H:%M:%S")
+                            write_to_log(out_fd, f"[{ts2}] > {cmd_text}\n")
+                            ser.write((cmd_text + "\n").encode("utf-8"))
+                except OSError:
+                    pass
+
             if cmd_fifo_fd is not None:
                 try:
                     cmd_data = os.read(cmd_fifo_fd, 4096)

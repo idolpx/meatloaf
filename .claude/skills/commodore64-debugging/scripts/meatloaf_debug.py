@@ -741,7 +741,14 @@ def is_capture_running() -> bool:
 
     try:
         pid = int(SERIAL_PID.read_text().strip())
-        os.kill(pid, 0)  # Process alive check (signal 0)
+        # POSIX only: signal 0 is a liveness probe there, but Windows CPython
+        # routes os.kill through TerminateProcess for any signal other than
+        # CTRL_C/CTRL_BREAK_EVENT — at best it raises (a false "not running",
+        # which is what happens in practice since PROCESS_ALL_ACCESS is
+        # refused), at worst it kills the daemon being asked about. The
+        # heartbeat check below is the real test and works everywhere.
+        if os.name != "nt":
+            os.kill(pid, 0)
     except (ProcessLookupError, ValueError, OSError):
         return False
 
