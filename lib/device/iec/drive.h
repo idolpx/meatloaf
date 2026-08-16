@@ -144,6 +144,11 @@ public:
   std::string getCWD() { return m_cwd->url; }
   uint8_t getStatusCode() { return m_statusCode; }
   void    setStatusCode(uint8_t code, uint8_t trk = 0, uint8_t sec = 0);
+  // Overrides the canned getStatus() text.  For failures whose reason the
+  // numeric CBM code cannot carry -- a network drive is "NOT READY" whether
+  // the host is down or its certificate was rejected, and only the message
+  // field can tell the two apart on the command channel.
+  void    setStatusCode(uint8_t code, const std::string &msg);
   bool    hasError();
   bool    hasMemExeError();
 
@@ -199,6 +204,7 @@ protected:
   std::unique_ptr<MFile> m_cwd;   // current working directory
   iecChannelHandler *m_channels[16];
   uint8_t m_statusCode, m_statusTrk, m_statusSec, m_numOpenChannels;
+  std::string m_statusMessage;   // when non-empty, replaces getStatus()'s canned text
 //#ifdef USE_VDRIVE
   VDrive   *m_vdrive;
 //#endif

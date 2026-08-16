@@ -33,6 +33,7 @@
 
 #include "meatloaf.h"
 #include "meat_session.h"
+#include "network/http.h"
 #include "mlConfig.h"
 #include "fuji.h"
 #include "fnFsSD.h"
@@ -1087,12 +1088,18 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                             return m_vdrive->openFile(channel, "$");
                         }
 
+                        // Clear first so a reason left by an earlier request
+                        // can't be attached to this failure.
+                        http_clear_tls_error();
                         std::shared_ptr<MStream> new_stream = f->getSourceStream(mode);
-                        
+
                         if( new_stream==nullptr )
                         {
                             Debug_printv("Error: could not get stream for file [%s]", f->url.c_str());
-                            setStatusCode(ST_DRIVE_NOT_READY);
+                            if( http_had_tls_error() )
+                                setStatusCode(ST_DRIVE_NOT_READY, http_last_tls_status());
+                            else
+                                setStatusCode(ST_DRIVE_NOT_READY);
                         }
                         // else if( (mode == std::ios_base::in) && new_stream->size()==0 && !is_dir )
                         // {
@@ -1104,7 +1111,10 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                         {
                             Debug_printv("Error: could not open file stream [%s]", f->url.c_str());
                             //delete new_stream;
-                            setStatusCode(ST_DRIVE_NOT_READY);
+                            if( http_had_tls_error() )
+                                setStatusCode(ST_DRIVE_NOT_READY, http_last_tls_status());
+                            else
+                                setStatusCode(ST_DRIVE_NOT_READY);
                         }
                         else
                         {
@@ -2236,12 +2246,20 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
 }
 
 
+void iecDrive::setStatusCode(uint8_t code, const std::string &msg)
+{
+    setStatusCode(code);
+    m_statusMessage = msg;   // set after: the call above clears it
+}
+
+
 void iecDrive::setStatusCode(uint8_t code, uint8_t trk, uint8_t sec)
 {
     //Debug_printv("code[%d]", code);
     m_statusCode = code;
     m_statusTrk  = trk;
     m_statusSec  = sec;
+    m_statusMessage.clear();
 
     // clear current status buffer to force a call to getStatus()
     clearStatus();
@@ -2314,6 +2332,15 @@ uint8_t iecDrive::getStatusData(char *buffer, uint8_t bufferSize, bool *eoi)
 
 void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
 {
+    // A caller-supplied message wins - it carries detail the numeric code
+    // cannot.  See setStatusCode(code, msg).
+    if( !m_statusMessage.empty() )
+    {
+        snprintf(buffer, bufferSize, "%02d,%s,%02d,%02d\r",
+                 m_statusCode, m_statusMessage.c_str(), m_statusTrk, m_statusSec);
+        return;
+    }
+
     const char *msg = NULL;
     std::string dosVersionMsg;  // must outlive the switch below - msg points into it
     switch( m_statusCode )

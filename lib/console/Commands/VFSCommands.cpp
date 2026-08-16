@@ -817,6 +817,10 @@ int wget(int argc, char **argv)
     if (insecure)
         http_set_insecure(true);
 
+    // Discard any reason left over from an earlier command so a failure here
+    // that never reaches the network can't inherit it.
+    http_clear_tls_error();
+
     std::unique_ptr<MFile>f(MFSOwner::File(url_arg));
     if (f != nullptr)
     {
@@ -828,6 +832,18 @@ int wget(int argc, char **argv)
         // plain wget saves the container's actual bytes instead of failing.
         if ((!s || !s->isOpen()) && f->sourceFile != nullptr)
             s = f->sourceFile->getSourceStream();
+        // A rejected certificate means there is nothing to download.  Report it
+        // BEFORE deriving an output name or touching the filesystem: a bare
+        // host URL yields an empty name, and the resulting "can't open file"
+        // masked the real reason.  Cannot leak the insecure flag - with -k
+        // there is no verification and so no TLS error to trip this.
+        if (http_had_tls_error())
+        {
+            Serial.printf("wget: cannot open '%s'\r\n", url_arg);
+            Serial.printf("TLS: %s\r\n     Retry with 'wget -k' to skip verification.\r\n",
+                          http_last_tls_error().c_str());
+            return 1;
+        }
         if (!s)
         {
             Serial.printf("wget: cannot open '%s'\r\n", url_arg);
@@ -884,6 +900,9 @@ int wget(int argc, char **argv)
         {
             Serial.printf("\nError: Download failed, removing empty file '%s'\r\n", outfile.c_str());
             remove(outfile.c_str());
+            if (http_had_tls_error())
+                Serial.printf("TLS: %s\r\n     Retry with 'wget -k' to skip verification.\r\n",
+                              http_last_tls_error().c_str());
         }
         else
         {

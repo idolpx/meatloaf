@@ -19,6 +19,8 @@
 
 #include <esp_idf_version.h>
 #include <esp_crt_bundle.h>
+#include <esp_tls.h>
+#include <mbedtls/x509.h>
 #include <algorithm>
 #include <cctype>
 #include <cstring>
@@ -1148,6 +1150,10 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     // returns a NULL handle on an unencoded URL, crashing later client calls.
     mstr::replaceAll(url, " ", "%20");
     _error = 0;
+    // Cleared per REQUEST, not per handle: processRedirectsAndOpen() calls
+    // init() between its 3 retries, and the reason must survive that to still
+    // be readable by the caller after the last one fails.
+    http_clear_tls_error();
     // Reset state for new file operation — MeatHttpClient is shared across files on the same host:port
     isFriendlySkipper = false;
     _size = 0;
@@ -1844,6 +1850,9 @@ static std::string parse_content_disposition_filename(const char *value)
     return fname;
 }
 
+// Defined further down, beside the rest of the TLS-failure state.
+static void http_record_tls_error(esp_tls_error_handle_t h);
+
 esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
 {
     MeatHttpClient* meatClient = (MeatHttpClient*)evt->user_data;
@@ -1852,6 +1861,11 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
         case HTTP_EVENT_ERROR: // This event occurs when there are any errors during execution
             Debug_printv("HTTP_EVENT_ERROR");
             meatClient->_error = 1;
+            // evt->data is esp_transport_get_error_handle() -- the only place
+            // the TLS handshake failure reason is exposed.  Do NOT print here:
+            // this handler runs on whichever task drove the request, including
+            // the IEC task, where console output over TCP corrupts the heap.
+            http_record_tls_error((esp_tls_error_handle_t)evt->data);
             break;
 
         case HTTP_EVENT_ON_CONNECTED: // Once the HTTP has been connected to the server, no data exchange has been performed
@@ -2068,6 +2082,111 @@ static size_t g_ca_cert_len = 0;
 static bool g_ca_cert_loaded = false;
 
 void http_set_insecure(bool v) { g_http_insecure = v; }
+
+// --- TLS failure detail -----------------------------------------------------
+// Set from _http_event_handler(), read by wget and iecDrive.  See http.h.
+static bool g_tls_failed = false;
+static int  g_tls_code = 0;    // esp_tls_error_code -- mbedTLS code, e.g. -0x3000
+static int  g_tls_flags = 0;   // MBEDTLS_X509_BADCERT_* bits; 0 when unavailable
+
+void http_clear_tls_error()
+{
+    g_tls_failed = false;
+    g_tls_code = 0;
+    g_tls_flags = 0;
+}
+
+bool http_had_tls_error() { return g_tls_failed; }
+
+// Pull the reason out of the esp-tls error record attached to HTTP_EVENT_ERROR.
+// Note esp_tls_get_and_clear_last_error() CLEARS the record, so this must run
+// exactly once per failure -- which it does, from the event handler.
+static void http_record_tls_error(esp_tls_error_handle_t h)
+{
+    if (h == nullptr) return;   // plain-HTTP errors reach the same event
+
+    int code = 0, flags = 0;
+    esp_err_t last = esp_tls_get_and_clear_last_error(h, &code, &flags);
+    if (last == ESP_OK && code == 0 && flags == 0) return;  // nothing recorded
+
+    // Only a handshake failure means "the certificate was rejected".  A read
+    // timeout or a socket error also lands here and must not be reported as a
+    // certificate problem.
+    if (last != ESP_ERR_MBEDTLS_SSL_HANDSHAKE_FAILED && flags == 0) return;
+
+    // Raw values before any interpretation -- the only way to tell which arm
+    // of the mapping below a given server actually takes.
+    Debug_printv("TLS failure: esp_err=0x%X mbedtls=-0x%04X verify_flags=0x%08X",
+                 (unsigned)last, (unsigned)code, (unsigned)flags);
+
+    g_tls_failed = true;
+    g_tls_code = code;
+    g_tls_flags = flags;
+}
+
+// Why the flag arms below are effectively dead with esp_crt_bundle, and why
+// the error CODE is the usable signal instead:
+//
+// esp_tls_flags was 0x00000000 for every failure measured on hardware
+// (www.c64.com, expired.badssl.com, wrong.host.badssl.com) -- a failed
+// handshake never commits verify_result, so esp_mbedtls_verify_certificate()
+// captures nothing.  The flag arms are kept because a build using cacert_buf
+// or the global CA store can still populate them; they cost two compares.
+//
+// The code IS meaningful.  esp_crt_bundle hands mbedTLS an EMPTY CA chain and
+// does all anchoring inside esp_crt_verify_callback(), so every chain reaches
+// that callback with NOT_TRUSTED set at its top:
+//   -0x3000  the callback itself failed -> no matching root in the bundle
+//            (incomplete chain, or a CA the bundle does not carry)
+//   -0x2700  the callback found the root and cleared NOT_TRUSTED, then
+//            mbedTLS's own checks rejected the cert.  WHICH check is not
+//            recoverable without flags, so the message must not guess.
+static bool tls_untrusted() { return g_tls_code == -MBEDTLS_ERR_X509_FATAL_ERROR; }
+static bool tls_bad_cert()  { return g_tls_code == -MBEDTLS_ERR_X509_CERT_VERIFY_FAILED; }
+
+std::string http_last_tls_error()
+{
+    if (!g_tls_failed) return {};
+
+    if (g_tls_flags & MBEDTLS_X509_BADCERT_EXPIRED)
+        return "the server's certificate has expired";
+    if (g_tls_flags & MBEDTLS_X509_BADCERT_FUTURE)
+        return "the server's certificate is not valid yet - check this device's clock";
+    if (g_tls_flags & MBEDTLS_X509_BADCERT_CN_MISMATCH)
+        return "the server's certificate is for a different hostname";
+    if (g_tls_flags & MBEDTLS_X509_BADCERT_REVOKED)
+        return "the server's certificate has been revoked";
+    if (g_tls_flags & MBEDTLS_X509_BADCERT_MISSING)
+        return "the server presented no certificate";
+    if (g_tls_flags & MBEDTLS_X509_BADCERT_NOT_TRUSTED)
+        return "the server's certificate is not trusted - it sent an incomplete "
+               "chain, or its CA is not in this device's bundle";
+
+    if (tls_untrusted())
+        return "the server's certificate could not be traced to a trusted CA - "
+               "it sent an incomplete chain, or its CA is not in this device's bundle";
+    if (tls_bad_cert())
+        return "the server's certificate was rejected - it may be expired, not "
+               "yet valid, or issued for a different hostname";
+
+    return "the server's certificate could not be verified";
+}
+
+std::string http_last_tls_status()
+{
+    if (!g_tls_failed) return {};
+
+    if (g_tls_flags & MBEDTLS_X509_BADCERT_EXPIRED)     return "CERT EXPIRED";
+    if (g_tls_flags & MBEDTLS_X509_BADCERT_FUTURE)      return "CERT NOT YET VALID";
+    if (g_tls_flags & MBEDTLS_X509_BADCERT_CN_MISMATCH) return "CERT NAME MISMATCH";
+    if (g_tls_flags & MBEDTLS_X509_BADCERT_REVOKED)     return "CERT REVOKED";
+    if (g_tls_flags & MBEDTLS_X509_BADCERT_MISSING)     return "NO CERT";
+    if (g_tls_flags & MBEDTLS_X509_BADCERT_NOT_TRUSTED) return "CERT NOT TRUSTED";
+
+    if (tls_untrusted()) return "CERT NOT TRUSTED";
+    if (tls_bad_cert())  return "CERT REJECTED";
+    return "CERT NOT VERIFIED";
+}
 
 static void load_ca_cert_from_flash()
 {

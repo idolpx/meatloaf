@@ -228,8 +228,81 @@ bool TAPMStream::nextTapeEntry()
 
 void TAPMStream::serveCurrent()
 {
+    // MMediaStream::read() only routes through readFile() once a file has been
+    // selected; without this a browsable open would hand back container bytes.
+    seekCalled = true;
+
     _size = current.prg.size();
     _position = 0;
+
+    // Serving an entry moves the head past it, so the "already ready" shortcut
+    // must not fire for it again - otherwise a repeated LOAD"NAME" re-serves
+    // the same entry forever and a tape whose loader and payload share a name
+    // can never reach the payload. `current` stays valid: readFile() works
+    // from it and _position, and nothing here disturbs either.
+    have_current = false;
+}
+
+std::string TAPMStream::seekNextEntry()
+{
+    // With a .idx the tape is a directory and getSourceStream() takes the
+    // random-access branch instead; this is never driven then.
+    if (has_idx)
+        return "";
+
+    if (mode == std::ios_base::out)
+    {
+        Debug_printv("Writing to tape images is not supported");
+        return "";
+    }
+
+    if (!ensureDecoder() || scan_exhausted)
+        return "";
+
+    if (!scan_started)
+    {
+        scan_started = true;
+
+        if (tape_ended)
+        {
+            resetTape();
+            scan_wrapped = true;
+        }
+        scan_origin = tape_pos;
+
+        if (have_current)
+        {
+            // The program the last directory request left under the head.
+            // Serve it before moving on, so a LOAD"*" straight after a listing
+            // gets what was just listed rather than the one after it.
+            serveCurrent();
+            return entryDisplayName(current);
+        }
+    }
+
+    if (!nextTapeEntry())
+    {
+        // The end of the tape is not the end of the scan - the head runs back
+        // to the start rather than stopping there. Once only, and not at all
+        // if the scan began there anyway.
+        if (scan_wrapped || scan_origin == 0)
+            return "";
+
+        resetTape();
+        scan_wrapped = true;
+
+        if (!nextTapeEntry())
+            return "";
+    }
+
+    // Wrapped past where the search began: offer this one, then stop. The
+    // check is deliberately after the entry is taken, so the program sitting
+    // exactly at the origin is still considered.
+    if (scan_wrapped && current.tape_offset >= scan_origin)
+        scan_exhausted = true;
+
+    serveCurrent();
+    return entryDisplayName(current);
 }
 
 bool TAPMStream::seekPath(std::string path)
@@ -324,7 +397,10 @@ bool TAPMStream::seekPath(std::string path)
 
 uint32_t TAPMStream::readFile(uint8_t *buf, uint32_t size)
 {
-    if (!have_current || _position >= current.prg.size())
+    // Guards on the decoded bytes, NOT on have_current: serving an entry
+    // consumes that flag (see serveCurrent), so testing it here would make
+    // every read of a served file return 0.
+    if (current.prg.empty() || _position >= current.prg.size())
         return 0;
     uint32_t avail = current.prg.size() - _position;
     if (size > avail)

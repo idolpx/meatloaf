@@ -49,6 +49,19 @@ void http_set_insecure(bool v);
 
 #include "utils.h"
 
+// Last TLS certificate-verification failure.
+//
+// esp_http_client reports only "connection failed" for a rejected
+// certificate; the reason lives in the esp-tls error record handed to
+// HTTP_EVENT_ERROR and is otherwise discarded.  Recorded in a global
+// because a MeatHttpClient is shared per host:port while the callers that
+// need the reason (wget, iecDrive) hold only the failed MFile/MStream --
+// same rationale as http_set_insecure() above.
+bool        http_had_tls_error();
+std::string http_last_tls_error();   // long form, for the console
+std::string http_last_tls_status();  // short uppercase form, for the CBM command channel
+void        http_clear_tls_error();
+
 #define HTTP_BLOCK_SIZE 256
 
 class HTTPMSession;

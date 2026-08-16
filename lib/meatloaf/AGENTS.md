@@ -519,6 +519,93 @@ When implementing a new stream:
 - **Diagnostic that settled it, worth repeating**: temporary prints in `dataSectorForPos()` (pos, tree LBA, pointer index, raw pointer bytes, first 16 bytes of the node) and `readFile()` (pos, chunk, LBA, absolute image offset, bytes returned). They showed the pointers and offsets were already right, which is what localised the fault to a byte permutation instead of the tree.
 - **`MFile::cdLocalRoot()` ("the root of the stream", `CD//DIR`) must land on the CONTAINER, not its parent directory**: it used `sourceFile->path`, but for a container-hosted file the source file is the directory the image lives in (`/sd/games` + pathInStream `game.d64`), so `CD//OS` inside an image escaped it entirely. `path` excludes `pathInStream` and therefore already names the image; append to that. The test for "hosted by a container" is `sourceFile != nullptr && !sourceFile->pathInStream.empty()` — `MFSOwner::File()` sets the source's `pathInStream` only on the container branch, never on the `isRootFS` one — so plain VFS and network paths are untouched. Note `cdLocalParent()` (`CD:..DIR`) has the same container blindness and was NOT changed.
 - **A wildcard-only path component is not a partition reference** (`hddResolvePartitionIn()`, and the same fix in `media/hd/dhd.cpp`): `byName()` honours wildcards, so `LOAD"*"` matched the first partition by name and turned into a listing. `HDDMStream::seekEntry()` additionally skips directories and separators for an all-wildcard pattern, so `*` reaches the first loadable file past `%DELETED FILES%`.
+## Recent Changes (August 15, 2026)
+
+- **CSM cassette images** (`media/tape/csm.h/cpp`, new; registered as `csmFS`): a CSM holds
+  **already-decoded** CBM tape blocks — there are no pulses, so no TAPClean, no decoding and no
+  PSRAM requirement, which is the ONLY way it differs from TAP internally. Its BEHAVIOUR is a
+  datasette exactly as TAP's is, and the file layer is a direct copy of TAP's shape. Image layout is
+  `[192-byte header block][data block]` repeated, terminated by a type-`$05` header with **no data
+  block after it**; the header carries type at 0, start/end address LE at 1-4 and a 16-byte
+  space-padded PETSCII name at 5-20. **The data block is raw program bytes with NO load-address
+  prefix** — the two bytes a PRG begins with are synthesized from the header's start address, the
+  same thing `T64MStream::readFile()` does. The high byte is `(start >> 8) & 0xFF` — see the T64
+  entry below for why that spelling matters.
+- **A CSM has no directory — entry *n*'s offset is the sum of every preceding block**, so
+  `readHeader()` WALKS the container to build the entry list. It is idempotent via the shared
+  `walked` flag, which is set even when the walk yields nothing (a broken image would otherwise be
+  re-walked on every listing) — and each step of the walk is a seek plus a read, i.e. one HTTP range
+  request per entry over the network.
+- **Sequential media resolves a name through `seekNextEntry()`, NOT `seekPath()`** — the browsable
+  branch of `MFile::getSourceStream()`. Before 2026-08-15 that branch was unreachable dead code:
+  nothing overrode `seekNextEntry()` (`MMediaStream` hard-returned `""`) and nothing anywhere
+  returned `isBrowsable() == true`, because `MMediaStream::isRandomAccess()` is unconditionally
+  true, so every media format took the `seekPath()` branch — TAP included. `CSMMStream` and
+  `TAPMStream` now override `isBrowsable()`/`isRandomAccess()` and implement `seekNextEntry()`.
+  **TAP is idx-aware**: with a `.idx` sidecar it stays random-access and `seekPath()` still does the
+  work; without one it is a datasette and `seekNextEntry()` does. `drive.cpp` tests
+  `isRandomAccess() || isBrowsable()`, so the cwd-setting behaviour is unchanged either way.
+- **The `seekNextEntry()` contract**: advance the head by one, SERVE that entry (so the stream is
+  ready to read the instant the caller's name matches), return its display name. **At the end of the
+  media it WRAPS** — the end of the tape is not the end of a scan. It returns `""` only once it has
+  been all the way round, which is what lets a name behind the head still be found while a miss
+  still terminates. The generic loop only matches names; all tape semantics live in the stream.
+  Lap detection is per-STREAM (`scan_steps` on CSM, `scan_*` on TAP), deliberately not in the shared
+  state: a fresh decoded stream is built for every open, so it starts clean each search with no
+  reset to get wrong — which is also why the tape POSITION must be shared and this must not be.
+- **`serveCurrent()` clears `have_current` in both CSM and TAP, and that is load-bearing.** The
+  entry a listing left under the head is offered first so `LOAD"*"` after a listing gets what was
+  just listed; serving it moves the head past it, so the flag must be consumed or a repeated
+  `LOAD"NAME"` re-serves the same entry forever. That is precisely the case these have to get right:
+  `Abductor.csm` carries a BASIC loader and its payload BOTH named `ABDUCTOR`, which is the norm for
+  multi-part tapes, and the payload is unreachable without it. **`TAPMStream::readFile()` guarded on
+  `have_current` and had to change** — testing it there made every read of a served file return 0.
+  It now guards on `current.prg` being non-empty. `serveCurrent()` also sets `seekCalled`, which
+  `seekPath()` used to do and which `MMediaStream::read()` needs to route through `readFile()` at
+  all.
+- **The datasette position lives in `CSMState`, shared per container URL via a weak_ptr registry**,
+  copied from `TapeState` and for the same reason: `MFile::getSourceStream()` builds a FRESH stream
+  on every open while directory listings use the ImageBroker instance, so a per-instance position
+  would rewind to entry 0 on every `LOAD`. The aliasing reference members must stay declared after
+  `state` — they are bound in the constructor's init list, in declaration order.
+- **The `$05` end-of-tape block's address fields are not a length.** The jsvic20 reference decoder
+  (`.reference/jsvic20-csm/`, minified line 1303, class `Kbe`) has no case for it and reads them as
+  one, running off the end — four of the twelve corpus samples end this way. The walk also stops on
+  `end < start`, a short read, a header block that does not fit in what remains, and a 256-entry cap;
+  a final entry whose data runs past EOF is clamped to the bytes that exist.
+- **Names are padding-trimmed with `mstr::rtrimPad()`** ($A0 *and* trailing spaces — its own comment
+  cites CBM tape headers). An entry the tape leaves unnamed lists under the media file's name
+  (`entryDisplayName()`), as TAP does, and duplicates need no disambiguation because the sequential
+  model resolves them positionally. Real tapes carry both cases: `Wacky Waiters` has an unnamed
+  entry, `Abductor` has two `ABDUCTOR` entries.
+- **Every T64 entry loaded to the wrong address** (`media/tape/t64.cpp`, `seekPath()`): the load
+  address high byte was `entry.start_address & 0xFF00` assigned into `_load_address`, which is
+  `uint8_t[2]`. That mask clears exactly the eight bits the assignment keeps, so it stored **0 for
+  every possible address** — a PRG at `$0801` loaded to `$0001`. Now `(start_address >> 8) & 0xFF`.
+  The low byte was always correct, which is what made this survive: the file loaded, just into the
+  wrong page. Pinned by `test/native/test_t64_read/`.
+- **OPEN: T64 never trims the 16-byte filename field, so exact-name lookup fails on `$20`-padded
+  images.** `seekEntry(std::string)` compares the query against the raw field (the `rtrimA0()` call
+  is commented out), and `std::string entryFilename = entry.filename` on a `char[16]` with no
+  terminator also over-reads past the struct. For a `$00`-padded T64 the string constructor stops at
+  the NUL and the name comes out clean — which is why this goes unnoticed, most files in the wild
+  being `$00`-padded — but the T64 spec specifies `$20`, and on those images the entry compares as
+  `"himem           "` and only `LOAD"*"` or a wildcard can reach it. Not fixed because it is a
+  behaviour change with a real trade-off: a trailing space can be part of a CBM name, which is
+  exactly why `mstr::rtrimA0()` strips only `$A0` and `mstr::rtrimPad()` exists as the opt-in for
+  fixed-width fields (CSM uses the latter). `test_space_padded_name_lookup` is
+  `TEST_IGNORE_MESSAGE`'d with its body intact — lift the guard and re-run to verify a fix.
+- **Host tests**: `test/native/test_csm_read/` — 24 synthesized-image cases (the walk, the datasette
+  behaviour, reading, corrupt input) plus one that walks every sample in `.archive/csm` and asserts
+  each consumes to exactly EOF, which is the invariant pinning the layout. Three gotchas that cost
+  time: `compareFilename()` matches against `mstr::toUTF8()` of the entry name, so a test passing a
+  bare ASCII literal asks a question the drive never asks; `MMediaStream::write()` only reaches
+  `writeFile()` once `seekCalled` is set, so a read-only assertion needs a `seekPath()` first; and
+  **each test must use its own container path**, because Unity's `TEST_ASSERT` failure path is a
+  `longjmp` that does not unwind C++ destructors — a failing test therefore leaks its stream, the
+  `CSMState` never expires from the registry, and every later test on that URL inherits a stale
+  tape, turning one real failure into a dozen fictitious ones. `CSMMFile` itself is out of reach
+  natively: `MFSOwner::File()` aborts under the stubs, as for the M2I and HDD suites.
 
 ## Recent Changes (August 13, 2026)
 

@@ -171,6 +171,21 @@ public:
 
     bool seekPath(std::string path) override;
 
+    // Sequential media resolves a name by SCANNING, not by seeking: this is
+    // the primitive MFile::getSourceStream() drives for a browsable stream.
+    // Advances the head by one, serves that entry so the stream is ready to
+    // read the moment the caller's name matches, and returns its display name.
+    // At the end of the tape it WRAPS; it returns "" only once it has been all
+    // the way round, so a name behind the head is still reachable and a miss
+    // still terminates. With a .idx the tape is a directory instead, and
+    // seekPath() does the work - this returns "" and is never driven.
+    std::string seekNextEntry() override;
+
+    // With a .idx the tape is a random-access directory; without one it is a
+    // datasette, and getSourceStream() must take the browsable branch.
+    bool isBrowsable() override { return !has_idx; };
+    bool isRandomAccess() override { return has_idx; };
+
     // Tape counter: current read position as time from the start of the
     // tape (like a datasette counter). Interpolated within the file being
     // read; durationMs() is the length of the whole tape.
@@ -191,6 +206,16 @@ protected:
     std::vector<IdxEntry> idx_entries;
 
     std::string default_name = "tape file";
+
+    // Bookkeeping for the caller's current seekNextEntry() scan, used to spot
+    // a full lap. Deliberately NOT in TapeState: this is search state rather
+    // than tape position, and a fresh stream is built for every open (which is
+    // why the position has to be shared but this does not), so it starts clean
+    // on each search with no reset needed.
+    bool scan_started = false;
+    bool scan_wrapped = false;
+    bool scan_exhausted = false;
+    uint32_t scan_origin = 0;
 
 private:
     friend class TAPMFile;
