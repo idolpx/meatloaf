@@ -1,0 +1,35 @@
+{
+  "skill_name": "commodore64-vice-debugging",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "My cc65 C program for the C64 draws garbage on screen instead of my sprite table. I have sprites.c and it builds fine. Can you run it in VICE and figure out where the sprite data is getting corrupted?",
+      "expected_output": "Builds with cl65 -g -Ln to get a label file, launches VICE with the binary monitor, loads the labels, sets a store watchpoint on the sprite data range (brk <sym> <end> --store), autostarts the PRG, waits for the stop, then reads registers and PC (resolving the symbol) plus memory to identify the writer. All stop/inspect steps issued through a single `batch` invocation rather than separate CLI calls."
+    },
+    {
+      "id": 2,
+      "prompt": "Something in my assembly program is writing to $d020 and flickering the border and I can't find it. It's in raster.s.",
+      "expected_output": "Builds the .s (recognising that assembly needs -C c64-asm.cfg -u __LOADADDR__), sets a store watchpoint on $d020, autostarts, waits, and reports the PC of the writing instruction with its nearest symbol. Should not attempt to read $d019 or other I/O with side effects enabled."
+    },
+    {
+      "id": 3,
+      "prompt": "I typed a command with the type subcommand and nothing happened on the C64 screen, then it showed up later and looked like it ran twice. Is the tooling broken?",
+      "expected_output": "Explains that VICE holds keyboard-feed text for as long as a binary monitor client is connected and delivers it on disconnect; that this is why the command appeared an invocation late and looked duplicated; that `type --wait` handles it by dropping and reopening the connection; and that autostart should be preferred over typing RUN. Does not conclude the tool is broken or start rewriting the keyboard code."
+    },
+    {
+      "id": 4,
+      "prompt": "I set a breakpoint, waited for it to hit, then ran 'regs' and now I get connection refused even though the VICE window is still open and responding. What happened?",
+      "expected_output": "Identifies that disconnecting while the emulator is halted at a checkpoint permanently tears down VICE's monitor listener, that the emulator keeps running but is unreachable, and that VICE must be restarted. Explains the fix is to do the stop-and-inspect sequence in one `batch` invocation so the connection is never dropped while halted."
+    },
+    {
+      "id": 5,
+      "prompt": "Set up the whole loop from scratch for hello.bas and show me the screen output. I have no idea if VICE is even installed.",
+      "expected_output": "Runs config or diag first to report discovered tools and monitor reachability, launches VICE if needed, builds the .bas (petcat if bc64 is absent), autostarts it, and prints the decoded 40x25 screen. Handles a launch failure by recognising the monitor port may still be held and retrying or choosing another port."
+    },
+    {
+      "id": 6,
+      "prompt": "My breakpoint on _main never fires but the program clearly runs — I can see its output on screen.",
+      "expected_output": "Diagnoses a mismatch between the .prg and the .lbl rather than a tooling fault: most commonly a build to the default foo.prg name from a different source language overwriting the PRG while the label file describes another build. Recommends distinct -o names and rebuilding both artifacts together, and verifies by comparing the symbol address against the running code."
+    }
+  ]
+}
