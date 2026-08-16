@@ -334,7 +334,15 @@ const DHDPartition* DHDResolvePartition(const std::string &containerUrl,
         if (slash != std::string::npos)
             comp = comp.substr(0, slash);
 
-        if (!comp.empty())
+        // A component made only of wildcard characters is the CBM "first
+        // entry" pattern (LOAD"*"), never a deliberate partition reference.
+        // byName() honours wildcards, so a bare "*" would otherwise match the
+        // first partition and strip itself from the path, turning LOAD"*" into
+        // a listing of that partition's root directory.
+        bool wildcard_only = !comp.empty() &&
+                             comp.find_first_not_of("*?") == std::string::npos;
+
+        if (!comp.empty() && !wildcard_only)
         {
             bool numeric = comp.find_first_not_of("0123456789") == std::string::npos;
             if (numeric)

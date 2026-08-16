@@ -218,6 +218,12 @@ protected:
     uint8_t tree_buf[512];
     uint32_t tree_cache_lba = 0xFFFFFFFF;
 
+    // The last data sector read, still interleaved as stored (see
+    // loadDataSector()). Cached because a sector must be read whole even
+    // when the caller wants a few bytes of it.
+    uint8_t data_buf[512];
+    uint32_t data_cache_lba = 0xFFFFFFFF;
+
     Header header;
     Entry entry;
 
@@ -242,6 +248,7 @@ protected:
     bool seekPath(std::string path) override;
 
     // Data tree traversal
+    bool loadDataSector(uint32_t lba);
     bool loadTreeSector(uint32_t lba);
     Pointer assembleNextTree(uint8_t k);            // from cached tree sector
     bool dataSectorForPos(uint32_t pos, uint32_t *lba, bool *hole);

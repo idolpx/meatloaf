@@ -391,9 +391,25 @@ bool HDDMStream::seekEntry(std::string filename)
     filename = mstr::toPETSCII2(filename); // CFS uses ASCII, but the stream is PETSCII
     bool wildcard = (mstr::contains(filename, "*") || mstr::contains(filename, "?"));
 
+    // "*" (or any all-wildcard pattern) is the CBM "first entry" idiom and it
+    // means the first loadable FILE: a CFS partition root typically opens with
+    // the %DELETED FILES% directory, so LOAD"*" must skip directories and
+    // separators to reach the first real file. Mirrors D64MStream::seekEntry(),
+    // which skips DEL entries for the same reason. A pattern that carries real
+    // name characters ("GAM*") is left alone so it can still match a
+    // subdirectory for cd.
+    bool files_only = wildcard &&
+                      filename.find_first_not_of("*?") == std::string::npos;
+
     uint16_t index = 1;
     while (seekEntry(index))
     {
+        if (files_only && (entry.is_directory || (entry.attributes & 0x07) == 0))
+        {
+            index++;
+            continue;
+        }
+
         if (mstr::compareFilename(entry.filename, filename, wildcard))
             return true;
 
@@ -520,6 +536,28 @@ uint64_t HDDMStream::treeCoverage(uint8_t depth)
     return cov;
 }
 
+// CFS stores the 512 bytes of file data in a data sector as FOUR interleaved
+// 128-byte columns: file byte n of that sector lives at sector offset
+// (n % 128) * 4 + (n / 128). Only FILE DATA is stored this way - boot,
+// partition, directory and tree sectors are all linear, which is why listings
+// and the tree walk work when reads do not.
+//
+// Verified on two independently authored images (a C64 OS 1 GB CF image and
+// Soci/Singular's own IDE64 image): de-interleaving turns a PRG into a valid
+// BASIC program whose line-link chain walks correctly across sector
+// boundaries, and turns the file-association tables into ordered text. The
+// published CFS 0.11 spec documents the tree geometry this code already
+// implements but says nothing about the byte order inside a data sector.
+bool HDDMStream::loadDataSector(uint32_t lba)
+{
+    if (data_cache_lba == lba)
+        return true;
+    if (!readSector(lba, data_buf))
+        return false;
+    data_cache_lba = lba;
+    return true;
+}
+
 bool HDDMStream::loadTreeSector(uint32_t lba)
 {
     if (tree_cache_lba == lba)
@@ -626,10 +664,18 @@ uint32_t HDDMStream::readFile(uint8_t* buf, uint32_t size)
         }
         else
         {
-            if (!containerStream->seek((lba * block_size) + (pos % block_size)))
+            // A data sector must be read WHOLE and de-interleaved - the
+            // requested range cannot be read directly out of the image.
+            if (!loadDataSector(lba))
                 break;
-            if (readContainer(buf + total, chunk) != chunk)
-                break;
+
+            const uint32_t col = block_size / 4;
+            uint32_t off = pos % block_size;
+            for (uint32_t i = 0; i < chunk; i++)
+            {
+                uint32_t n = off + i;
+                buf[total + i] = data_buf[((n % col) * 4) + (n / col)];
+            }
         }
 
         total += chunk;
@@ -905,7 +951,15 @@ const HDDPartition* hddResolvePartitionIn(const HDDImageRegistry::Image &img,
         if (slash != std::string::npos)
             comp = comp.substr(0, slash);
 
-        if (!comp.empty())
+        // A component made only of wildcard characters is the CBM "first
+        // entry" pattern (LOAD"*"), never a deliberate partition reference.
+        // byName() honours wildcards, so a bare "*" would otherwise match the
+        // first partition and strip itself from the path, turning LOAD"*" into
+        // a listing of that partition's root directory.
+        bool wildcard_only = !comp.empty() &&
+                             comp.find_first_not_of("*?") == std::string::npos;
+
+        if (!comp.empty() && !wildcard_only)
         {
             bool numeric = comp.find_first_not_of("0123456789") == std::string::npos;
             if (numeric)

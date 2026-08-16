@@ -513,6 +513,12 @@ When implementing a new stream:
 6. Verify ImageBroker caching works correctly
 7. Check memory leaks with stream chains
 
+## Recent Changes (August 16, 2026)
+
+- **A CFS data sector is FOUR interleaved 128-byte columns, not 512 linear bytes** (`media/hd/hdd.h/.cpp`): file byte `n` of a sector lives at sector offset `(n % 128) * 4 + (n / 128)`. `readFile()` now reads the sector whole via the new `loadDataSector()` (cached, since a caller asking for a few bytes still needs all 512) and de-interleaves out of it. Only FILE DATA is interleaved — boot, partition, directory and tree sectors are linear, which is why every listing and the whole tree walk were correct while every file came back scrambled. The CFS 0.11 spec pins the tree geometry but is silent on byte order inside a data sector. Two independently authored images agree, and a de-interleaved PRG's BASIC line-link chain walks correctly across sector boundaries. Full reasoning is in the comment above `loadDataSector()` and in the root `AGENTS.md`.
+- **Diagnostic that settled it, worth repeating**: temporary prints in `dataSectorForPos()` (pos, tree LBA, pointer index, raw pointer bytes, first 16 bytes of the node) and `readFile()` (pos, chunk, LBA, absolute image offset, bytes returned). They showed the pointers and offsets were already right, which is what localised the fault to a byte permutation instead of the tree.
+- **A wildcard-only path component is not a partition reference** (`hddResolvePartitionIn()`, and the same fix in `media/hd/dhd.cpp`): `byName()` honours wildcards, so `LOAD"*"` matched the first partition by name and turned into a listing. `HDDMStream::seekEntry()` additionally skips directories and separators for an all-wildcard pattern, so `*` reaches the first loadable file past `%DELETED FILES%`.
+
 ## Recent Changes (August 13, 2026)
 
 - **IDE64 CFS gained the CMD partition model** (`media/hd/hdd.h/.cpp`, new `media/hd/partition_select.h/.cpp`): `HDDImageRegistry` mirrors `DHDImageRegistry` — per-image table and selection keyed on the container URL, `HDDResolvePartition()` binding a partition to a path without calling `select()`, `$=P` listing on `HDDMFile`, and entry URLs that name the partition BY NUMBER. The image root is now the SELECTED partition's directory rather than the partition list; that is the one visible regression, and `partition` / `$=P` are how the list is reached. See the three divergences from DHD in `AGENTS.md` before touching any of it.
