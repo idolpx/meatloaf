@@ -427,6 +427,10 @@ iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecCha
     std::string path = m_dir->path;
     std::string archive = m_dir->media_archive;
     std::string image = m_dir->media_image;
+    // Where we are INSIDE the image. `path` above is the container's path and
+    // never shows it, so a listing of os/temporary looked identical to one of
+    // the image root.
+    std::string inImage = m_dir->pathInStream;
     if (archive.size() > 0) {
         mstr::replaceAll(path, archive, "");
         mstr::drop(path, 1);
@@ -442,12 +446,14 @@ iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecCha
     path = mstr::toPETSCII2(path);
     archive = mstr::toPETSCII2(archive);
     image = mstr::toPETSCII2(image);
-    
+    inImage = mstr::toPETSCII2(inImage);
+
     m_headers.clear();
     if( url.size()>0 )     addExtraInfo(scheme, url);
     if( path.size()>1 )    addExtraInfo("PATH", path);
     if( archive.size()>1 ) addExtraInfo("ARCHIVE", archive);
     if( image.size()>0 )   addExtraInfo("IMAGE", image);
+    if( inImage.size()>0 ) addExtraInfo("DIR", inImage);
     if( m_headers.size()>0 ) m_headers.push_back("NFO ----------------");
 
     // If SD Card is available and we are at the root path show it as a directory at the top

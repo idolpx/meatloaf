@@ -178,6 +178,11 @@ public:
     bool seekDirectory(std::string path);
     PathResult resolvePath(std::string path);
 
+    // Free data sectors in the SELECTED partition, from its usage bitmaps.
+    // Cached: it costs one sector read per 2 MB of partition and CFS is
+    // read-only here, so the count cannot change under us.
+    uint32_t countFreeBlocks();
+
 protected:
     struct Header {
         std::string disk_label;
@@ -203,6 +208,12 @@ protected:
     bool partition_list = false;    // at image root: list partitions
     uint32_t dir_start_lba = 0;     // first sector of the current directory
     std::string dir_label;
+
+    // Extent of the selected partition, for the usage-bitmap walk
+    uint32_t part_start_lba = 0;
+    uint32_t part_end_lba = 0;
+    uint32_t blocks_free = 0;
+    bool blocks_free_valid = false;
 
     // Directory walk state (sequential entry iteration)
     DirectorySector dir_buf;
@@ -230,6 +241,7 @@ protected:
     bool readHeader() override;
     bool readSector(uint32_t lba, uint8_t *buf);
 
+    void setPartitionExtent(uint32_t start, uint32_t end);
     bool selectPartitionByName(std::string name);   // "" = default partition
     bool selectPartitionByNumber(uint8_t number);   // 1-based, valid entries only
     bool selectCurrentPartition();

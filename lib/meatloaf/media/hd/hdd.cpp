@@ -151,6 +151,65 @@ bool HDDMStream::readHeader()
     return true;
 }
 
+void HDDMStream::setPartitionExtent(uint32_t start, uint32_t end)
+{
+    if (start == part_start_lba && end == part_end_lba)
+        return;     // same partition, keep the cached free count
+
+    part_start_lba = start;
+    part_end_lba = end;
+    blocks_free_valid = false;
+}
+
+// CFS lays a partition out in repeating groups of 4096 sectors: a usage
+// bitmap sector, a backup copy of it, then 4094 data sectors. One bitmap
+// sector describes all 4094 of its own group - byte 0 carries 6 bits, bytes
+// 1-511 carry 8 each (6 + 511*8 = 4094) - and a SET bit means FREE.
+//
+// The two spare bits of byte 0 are unused and, like every sector outside the
+// partition, must be recorded as USED (0), which is what lets this simply
+// count set bits across the whole sector: the spec does not state the bit
+// order within a byte, and a plain popcount does not depend on it.
+uint32_t HDDMStream::countFreeBlocks()
+{
+    if (blocks_free_valid)
+        return blocks_free;
+
+    blocks_free = 0;
+    blocks_free_valid = true;   // don't retry a failed walk on every listing
+
+    if (part_start_lba == 0 || part_end_lba < part_start_lba)
+        return 0;
+
+    uint8_t buf[512];
+    uint32_t groups = 0;
+    for (uint32_t base = part_start_lba; base <= part_end_lba; base += 4096)
+    {
+        if (!readSector(base, buf))
+        {
+            Debug_printv("usage bitmap read failed at LBA %lu", base);
+            break;
+        }
+
+        for (int i = 0; i < 512; i++)
+            blocks_free += __builtin_popcount(buf[i]);
+        groups++;
+
+        // The count is only ever DISPLAYED through a 16-bit "BLOCKS FREE"
+        // line, so once it is past that there is nothing more to learn -
+        // and a bitmap sector every 4096 sectors means a 1 GB partition
+        // otherwise costs ~500 seek+read round trips on SD (~25 s on the
+        // first listing). A mostly empty partition passes the limit within
+        // ~16 groups; a small one is walked in full anyway.
+        if (blocks_free > 65535)
+            break;
+    }
+
+    Debug_printv("free blocks[%lu] from [%lu] bitmap group(s)",
+                 (unsigned long)blocks_free, (unsigned long)groups);
+    return blocks_free;
+}
+
 bool HDDMStream::selectPartitionByName(std::string name)
 {
     const PartitionEntry *sel = nullptr;
@@ -197,6 +256,7 @@ bool HDDMStream::selectPartitionByName(std::string name)
     partition_list = false;
     dir_start_lba = sel->root_dir.getLBA();
     dir_label = trimEntryName(sel->name, 16, '\0');
+    setPartitionExtent(sel->start.getLBA(), sel->end.getLBA());
     restartDirWalk();
     entry_index = 0;
 
@@ -230,6 +290,7 @@ bool HDDMStream::selectPartitionByNumber(uint8_t number)
         partition_list = false;
         dir_start_lba = pe.root_dir.getLBA();
         dir_label = trimEntryName(pe.name, 16, '\0');
+        setPartitionExtent(pe.start.getLBA(), pe.end.getLBA());
         restartDirWalk();
         entry_index = 0;
         return true;
@@ -430,6 +491,13 @@ bool HDDMStream::enterDirectory(std::string name)
     dir_start_lba = entry.pointer.getLBA();
     if (dir_start_lba == 0)
         return false;
+
+    // Name the directory we just entered. dir_label is otherwise only written
+    // when the WALK finds a label entry, so a subdirectory that has none - an
+    // empty one always does - kept whatever the parent or partition set, and a
+    // listing of it announced the wrong directory. A real label entry found
+    // during the walk still overrides this.
+    dir_label = entry.filename;
 
     restartDirWalk();
     entry_index = 0;
@@ -1117,7 +1185,10 @@ bool HDDMFile::rewindDirectory()
     // Set Media Info Fields
     media_header = image->dir_label.empty() ? image->header.disk_label : image->dir_label;
     media_id = "IDE64";
-    media_blocks_free = 0;  // TODO: count usage bitmap bits
+    // Free data sectors from the partition's usage bitmaps. Capped because the
+    // CBM "BLOCKS FREE" line carries a 16-bit count, and a CFS partition can
+    // hold far more than that.
+    media_blocks_free = std::min(image->countFreeBlocks(), (uint32_t)65535);
     media_block_size = image->block_size;
     media_image = name;
     media_partition = image->selected_partition;
