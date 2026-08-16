@@ -26,18 +26,29 @@ try:
 except ImportError:
     requests = None  # type: ignore
 
-# ── Paths (overridable via env vars) ──────────────────────────────────
+# ── Build settings (platformio.ini is the source of truth) ────────────
 
-MEATLOAF_DIR = Path(os.environ.get("MEATLOAF_DIR", "/home/qus/dev/_c/meatloaf"))
-U64_IP_ADDRESS = os.environ.get("U64_IP_ADDRESS", "192.168.1.176")
-U64_PASSWORD = os.environ.get("U64_PASSWORD", "")
-UPLOAD_PORT = os.environ.get("MEATLOAF_UPLOAD_PORT", "/dev/ttyUSB0")
-MONITOR_SPEED = os.environ.get("MEATLOAF_MONITOR_SPEED", "2000000")
-BUILD_ENV = os.environ.get("MEATLOAF_BUILD_ENV", "")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pio_config  # noqa: E402
+
 SKILL_DIR = Path(os.environ.get(
     "MEATLOAF_DEBUG_SKILL_DIR",
-    "/home/qus/dev/_claude/commodore64debugging"
+    Path(__file__).resolve().parents[1],
 ))
+
+# Everything below comes from platformio.ini; MEATLOAF_* env vars override
+# it for one-off runs (e.g. a second board on a different port).
+PIO = pio_config.load()
+
+MEATLOAF_DIR = Path(os.environ.get("MEATLOAF_DIR") or PIO["project_root"] or ".")
+U64_IP_ADDRESS = (os.environ.get("U64_IP_ADDRESS")
+                  or PIO["u64_ip_address"] or "192.168.1.176")
+U64_PASSWORD = os.environ.get("U64_PASSWORD", "")
+UPLOAD_PORT = os.environ.get("MEATLOAF_UPLOAD_PORT") or PIO["upload_port"]
+SERIAL_PORT = (os.environ.get("MEATLOAF_UPLOAD_PORT")
+               or PIO["monitor_port"] or PIO["upload_port"])
+MONITOR_SPEED = os.environ.get("MEATLOAF_MONITOR_SPEED") or PIO["monitor_speed"]
+BUILD_ENV = os.environ.get("MEATLOAF_BUILD_ENV") or PIO["environment"]
 
 # ── C64 memory locations ─────────────────────────────────────────────
 
@@ -656,7 +667,11 @@ def start_capture(port: str = "") -> bool:
     if not ensure_capture_script():
         return False
 
-    port = port or UPLOAD_PORT
+    port = port or SERIAL_PORT
+    if not port:
+        print("[serial] ERROR: no serial port. Set monitor_port in "
+              f"{MEATLOAF_DIR / 'platformio.ini'} or MEATLOAF_UPLOAD_PORT.")
+        return False
     stop_capture()  # kill stale one first
     time.sleep(0.5)
 
@@ -828,19 +843,37 @@ def wait_for_serial_data(timeout: float = 15.0, poll: float = 0.5) -> bool:
 # Meatloaf Build / Flash
 # ═══════════════════════════════════════════════════════════════════════
 
+def build_config() -> dict:
+    """Effective build settings: platformio.ini values plus any env-var
+    overrides actually in force."""
+    return {
+        "project_root": str(MEATLOAF_DIR),
+        "ini_path": PIO["ini_path"],
+        "environment": BUILD_ENV,
+        "board": PIO["board"],
+        "mcu": PIO["mcu"],
+        "flash_size": PIO["flash_size"],
+        "build_platform": PIO["build_platform"],
+        "u64_ip_address": U64_IP_ADDRESS,
+        "upload_port": UPLOAD_PORT,
+        "serial_port": SERIAL_PORT,
+        "monitor_speed": MONITOR_SPEED,
+        "verbose_flags": PIO["verbose_flags"],
+        "defines": sorted(PIO["defines"]),
+        # U64_PASSWORD is deliberately not reported.
+        "overrides": {k: v for k, v in os.environ.items()
+                      if k.startswith("MEATLOAF_") or k == "U64_IP_ADDRESS"},
+    }
+
+
 def get_build_env() -> str:
-    """Read active build environment from platformio.ini."""
-    if BUILD_ENV:
-        return BUILD_ENV
-    ini_path = MEATLOAF_DIR / "platformio.ini"
-    if not ini_path.exists():
-        return "fujiloaf-rev0"
-    import configparser
-    config = configparser.ConfigParser()
-    config.read(str(ini_path))
-    env = config.get("meatloaf", "environment", fallback="fujiloaf-rev0")
-    env = env.split(";")[0].strip()
-    return env
+    """Active build environment ([meatloaf] environment in platformio.ini)."""
+    if not BUILD_ENV:
+        raise RuntimeError(
+            "No build environment resolved. Uncomment one 'environment =' line "
+            f"in {MEATLOAF_DIR / 'platformio.ini'}, or set MEATLOAF_BUILD_ENV."
+        )
+    return BUILD_ENV
 
 
 def build_and_flash(*, port: str = "") -> None:
@@ -852,8 +885,10 @@ def build_and_flash(*, port: str = "") -> None:
     """
     env = get_build_env()
     upload_port = port or UPLOAD_PORT
-    cmd = ["pio", "run", "-e", env, "-t", "upload",
-           "--upload-port", upload_port]
+    cmd = ["pio", "run", "-e", env, "-t", "upload"]
+    if upload_port:
+        # Otherwise let PlatformIO use platformio.ini's own upload_port.
+        cmd += ["--upload-port", upload_port]
     print(f"[build] Building and flashing ({env})...")
     print(f"[build] {' '.join(cmd)}")
     subprocess.run(cmd, cwd=str(MEATLOAF_DIR), check=True)
@@ -923,7 +958,7 @@ class MeatloafDebugCycle:
 
     def full_diagnostic(self) -> dict:
         """Check connectivity of all components."""
-        result = {}
+        result = {"build_config": build_config()}
 
         # U64 reachability
         try:
@@ -1049,6 +1084,8 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
 
     # ── C64 control ──────────────────────────────────────────────────
+    p = sub.add_parser("config",
+                       help="Show build settings resolved from platformio.ini")
     p = sub.add_parser("diag", help="Full setup diagnostic")
     p = sub.add_parser("screen", help="Read C64 screen")
     p.add_argument("--url", default="")
@@ -1132,6 +1169,12 @@ def main():
     p.add_argument("--url", default="")
 
     args = parser.parse_args()
+
+    # Needs no U64 connection — answer before building the cycle.
+    if args.command == "config":
+        print(json.dumps(build_config(), indent=2))
+        return
+
     cycle = MeatloafDebugCycle(
         args.url if hasattr(args, 'url') and args.url else "",
         os.environ.get("U64_PASSWORD", ""),
@@ -1277,7 +1320,9 @@ def main():
 
 
 if __name__ == "__main__":
-    if not requests:
+    # 'config' only reads platformio.ini — usable before requests is installed,
+    # which is exactly when you want to check your setup.
+    if not requests and sys.argv[1:2] != ["config"]:
         print("Error: 'requests' library required. pip install requests")
         sys.exit(1)
     main()

@@ -79,6 +79,11 @@ flash_filesystem = FLASH_LITTLEFS
 wifi_ssid = "meatloaf"
 wifi_pass = "meatloaf"
 
+; Address of the Ultimate 64 / Ultimate II+ REST API, used by the C64 debug
+; tooling in .claude/skills/commodore64-debugging. Not compiled into the
+; firmware. The U64_IP_ADDRESS environment variable overrides it.
+u64_ip_address = 192.168.1.64
+
 ; Required flags, leave as is
 build_platform = BUILD_IEC
 ;build_platform = BUILD_GPIB

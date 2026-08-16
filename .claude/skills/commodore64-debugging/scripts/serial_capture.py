@@ -35,8 +35,20 @@ import errno
 
 # ── Config ──────────────────────────────────────────────────────────────────
 
-PORT_DEFAULT = os.environ.get("MEATLOAF_UPLOAD_PORT", "/dev/ttyUSB0")
-BAUD_DEFAULT = int(os.environ.get("MEATLOAF_MONITOR_SPEED", "2000000"))
+# Defaults come from the project's platformio.ini (monitor_port /
+# monitor_speed). pio_config is stdlib-only and optional, so this script
+# still runs standalone if it is missing — pass --port/--baud then.
+try:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import pio_config
+    _PIO = pio_config.load()
+except Exception:
+    _PIO = {"monitor_port": "", "upload_port": "", "monitor_speed": ""}
+
+PORT_DEFAULT = (os.environ.get("MEATLOAF_UPLOAD_PORT")
+                or _PIO["monitor_port"] or _PIO["upload_port"])
+BAUD_DEFAULT = int(os.environ.get("MEATLOAF_MONITOR_SPEED")
+                   or _PIO["monitor_speed"] or "2000000")
 OUT_DEFAULT = "/tmp/meatloaf_serial.log"
 PID_DEFAULT = "/tmp/serial_capture.pid"
 HEARTBEAT_DEFAULT = "/tmp/serial_capture_heartbeat"
@@ -133,6 +145,11 @@ def main():
     # Health check mode
     if args.check is not None:
         sys.exit(0 if check_health(args.check) else 1)
+
+    if not args.port:
+        print("Error: no serial port. Set monitor_port in platformio.ini, "
+              "or pass --port.")
+        sys.exit(1)
 
     # Ensure pyserial is available
     try:

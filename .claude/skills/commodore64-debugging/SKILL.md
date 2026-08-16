@@ -25,22 +25,23 @@ This skill guides the full iterative loop for debugging C64 BASIC programs
 that use Meatloaf's Full-Mode HTTP Client:
 
 ```
-┌──────────────────┐   IEC serial   ┌──────────────┐   HTTP   ┌─────────────┐
+┌──────────────────┐    IEC serial   ┌──────────────┐   HTTP   ┌─────────────┐
 │  Ultimate 64     │ ◄──────────────►│  Meatloaf    │◄────────►│  API /      │
-│  (BASIC program) │                │  (ESP32)     │          │  Test Svr   │
-└──────────────────┘                └──────┬───────┘          └─────────────┘
-                                           │ USB serial (2M baud)
-                                           ▼
-                                    ┌──────────────┐
-                                    │  Serial       │
-                                    │  capture      │
-                                    │  (this PC)    │
-                                    └──────────────┘
+│  (BASIC program) │                 │  (ESP32)     │          │  Test Svr   │
+└──────────────────┘                 └──────┬───────┘          └─────────────┘
+                                            │ USB serial (monitor_speed)
+                                            ▼
+                                     ┌──────────────┐
+                                     │  Serial      │
+                                     │  capture     │
+                                     │  (this PC)   │
+                                     └──────────────┘
 ```
 
 **Two codebases are debugged in the same loop:**
 - **BASIC** — runs on the C64, talks to Meatloaf via IEC bus
-- **Meatloaf C++** — the ESP32 firmware at `/home/qus/dev/_c/meatloaf/`
+- **Meatloaf C++** — the ESP32 firmware in this repo (the directory holding
+  `platformio.ini`; `MEATLOAF_DIR` overrides it)
 
 **Which one to fix?** Claude decides based on evidence from the screen and
 serial log. The skill provides tools to gather evidence and deploy fixes to
@@ -91,12 +92,58 @@ Memory locations used:
 
 ### Build Configuration
 
-| Setting | Value |
-|---------|-------|
-| Active env | `fujiloaf-rev0` (ESP32-WROVER, 8MB PSRAM, 16MB Flash) |
-| Upload port | `/dev/ttyUSB0` |
-| Serial debug | 2,000,000 baud |
-| Verbose flags | `VERBOSE_HTTP` enabled |
+**All build settings are read from the project's `platformio.ini`** — never
+hardcode them, and never assume the values below. The board, serial port and
+baud rate change per machine and per user; `platformio.ini` is where the
+project documents them, so it is the single source of truth.
+
+Ask for the resolved settings before doing anything that touches the device:
+
+```bash
+python3 scripts/meatloaf_debug.py config
+```
+
+```json
+{
+  "project_root": "/Users/you/src/meatloaf",
+  "ini_path": "/Users/you/src/meatloaf/platformio.ini",
+  "environment": "fujiloaf-rev0",
+  "board": "esp32-wrover-16m",
+  "mcu": "esp32",
+  "flash_size": "16m",
+  "u64_ip_address": "192.168.1.176",
+  "upload_port": "/dev/cu.usbserial-14520",
+  "serial_port": "/dev/cu.usbserial-14520",
+  "monitor_speed": "2000000",
+  "verbose_flags": [],
+  "defines": ["BUILD_IEC", "ENABLE_CONSOLE", "SD_CARD", "..."],
+  "overrides": {}
+}
+```
+
+| Setting | Where it comes from |
+|---------|--------------------|
+| Active env | `[meatloaf] environment` (falls back to `[platformio] default_envs`) |
+| Board / MCU / flash size | `[env:<environment>] board`, then `boards/<board>.json` |
+| Upload port | `[env:<environment>] upload_port`, else `[env] upload_port` |
+| Serial capture port | `monitor_port` if set, else `upload_port` |
+| Serial debug baud | `monitor_speed` |
+| Verbose flags | active `-D` flags in the env's `build_flags` (commented-out flags are correctly ignored) |
+| Ultimate 64 address | `[meatloaf] u64_ip_address` (debug tooling only — not compiled into firmware) |
+
+`scripts/pio_config.py` does the parsing (`${section.key}` interpolation and
+`;` comments included) and is imported by both `meatloaf_debug.py` and
+`serial_capture.py`. The project root is found by walking up from the script,
+so the skill works from any working directory.
+
+**Checking `verbose_flags` matters.** If the serial log is missing the HTTP
+diagnostics this skill's tables refer to, `VERBOSE_HTTP` is probably not
+enabled — it ships commented out. Uncomment it in `platformio.ini` under
+`[env] build_flags` and reflash, rather than concluding the code path was
+never reached.
+
+To target a different board or port for one run without editing
+`platformio.ini`, set the `MEATLOAF_*` env vars (see "Environment Variables").
 
 ---
 
@@ -107,6 +154,7 @@ commodore64debugging/
 ├── SKILL.md                            ← This file: workflow + reference
 ├── scripts/
 │   ├── meatloaf_debug.py               ← Python automation + CLI
+│   ├── pio_config.py                   ← Reads build settings from platformio.ini
 │   └── serial_capture.py               ← Robust serial capture daemon
 └── evals/
     └── evals.json                      ← Test cases
@@ -157,7 +205,9 @@ to run — it's a standalone script.
 ## Robust Serial Capture
 
 The serial capture is the most important diagnostic tool. It reads the
-ESP32's `Debug_printv()` output over USB UART at 2M baud.
+ESP32's `Debug_printv()` output over USB UART, on the port and baud rate
+resolved from `platformio.ini` (`monitor_port` / `monitor_speed` — run
+`meatloaf_debug.py config` to see them).
 
 ### Why It's Robust
 
@@ -174,7 +224,7 @@ ESP32's `Debug_printv()` output over USB UART at 2M baud.
 
 ### What survives
 
-- **Flashing firmware** — esptool takes over /dev/ttyUSB0 during flash.
+- **Flashing firmware** — esptool takes over the serial port during flash.
   The capture detects the port error, enters backoff mode, and reconnects
   automatically when the ESP32 reboots and the port reappears. No action needed.
 - **ESP32 crash/reboot** — same auto-reconnect behavior.
@@ -592,6 +642,9 @@ in Meatloaf's HTTP client or network layer.
 ### Build & Flash
 
 ```bash
+# Show build settings resolved from platformio.ini (no hardware needed)
+python3 scripts/meatloaf_debug.py config
+
 # Build only
 python3 scripts/meatloaf_debug.py build
 
@@ -654,7 +707,10 @@ Example output:
 
 Run once at the start of a session:
 
-1. **`diag`** — check U64 is reachable, serial capture status
+0. **`config`** — confirm the environment, port and baud resolved from
+   `platformio.ini` match the hardware actually plugged in
+1. **`diag`** — check U64 is reachable, serial capture status (its output
+   includes `config` under `build_config`)
 2. **`capture start`** — ensure serial capture is running
 3. **Start echo server** if you'll do body verification: `echo start`
 4. **`reset`** or **`stop` + clear** — ensure the C64 is at READY
@@ -961,14 +1017,19 @@ This is transparent to BASIC code.
 
 ## Environment Variables
 
+Every build setting defaults to what `platformio.ini` says. These variables
+exist to override it for a single run (a second board, a different port);
+`config` reports which ones are in force under `overrides`.
+
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `U64_IP_ADDRESS` | `192.168.1.176` | IP of the Ultimate 64 |
-| `U64_PASSWORD` | (empty) | X-Password header if configured |
-| `MEATLOAF_DIR` | `/home/qus/dev/_c/meatloaf` | Path to meatloaf firmware source |
-| `MEATLOAF_BUILD_ENV` | (from platformio.ini) | Build environment (e.g. fujiloaf-rev0) |
-| `MEATLOAF_UPLOAD_PORT` | `/dev/ttyUSB0` | Upload and serial port |
-| `MEATLOAF_MONITOR_SPEED` | `2000000` | UART baud rate |
+| `U64_IP_ADDRESS` | `[meatloaf] u64_ip_address`, else `192.168.1.176` | IP of the Ultimate 64 |
+| `U64_PASSWORD` | (empty) | X-Password header if configured. Env var only — never put it in `platformio.ini`, which is shared with the sample file |
+| `MEATLOAF_DIR` | auto-detected (nearest ancestor with a `platformio.ini`) | Path to meatloaf firmware source |
+| `MEATLOAF_BUILD_ENV` | `[meatloaf] environment` | Build environment (e.g. fujiloaf-rev0); also selects which `[env:…]` section board/flags are read from |
+| `MEATLOAF_UPLOAD_PORT` | `monitor_port` / `upload_port` | Upload and serial port |
+| `MEATLOAF_MONITOR_SPEED` | `monitor_speed` | UART baud rate |
+| `MEATLOAF_DEBUG_SKILL_DIR` | this skill's directory | Location of `scripts/` |
 
 ---
 
