@@ -102,6 +102,7 @@
 #include "media/disk/g64.h"
 #include "media/disk/m2i.h"
 #include "media/disk/nib.h"
+#include "media/disk/p64.h"
 
 // Hard Disk
 #include "media/hd/d90.h"
@@ -368,6 +369,7 @@ DXMMFileSystem dxmFS;
 G64MFileSystem g64FS;
 M2IMFileSystem m2iFS;
 NIBMFileSystem nibFS;
+P64MFileSystem p64FS;
 
 // Hard Disk
 DNPMFileSystem dnpFS;
@@ -427,7 +429,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     // Disk
     &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d90FS,
     &dxmFS,
-    &g64FS, &m2iFS, &nibFS,
+    &g64FS, &m2iFS, &nibFS, &p64FS,
 
     // Hard Disk
     &dnpFS, &dhdFS, &hddFS,

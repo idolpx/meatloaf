@@ -151,7 +151,7 @@ lib/meatloaf/
 ├── meat_session.h/cpp      # SessionBroker, MSession, CachedFile (HIMEM-aware)
 ├── iec_pipe.h              # IEC device communication pipes
 ├── media/                  # Container format implementations
-│   ├── disk/              # Disk images: d64, d71, d80, d81, d82, d90, g64, m2i, nib
+│   ├── disk/              # Disk images: d64, d71, d80, d81, d82, d90, g64, m2i, nib, p64
 │   ├── archive/           # Archives: zip, rar, tar, lbr, ark
 │   ├── tape/              # Tapes: tap/dmp/htap (TAPClean-based, see tape_decoder), t64, tcrt
 │   ├── cartridge/         # Cartridge: crt
@@ -514,6 +514,100 @@ When implementing a new stream:
 7. Check memory leaks with stream chains
 
 ## Recent Changes (August 16, 2026)
+
+### P64 flux-level disk images (`media/disk/p64.h/.cpp`, new; registered as `p64FS`)
+
+- **A P64 stores flux transitions, not sectors** — so reading one CBM block is three
+  decodes stacked: range-coded chunk → pulses → GCR bitstream → sector. `P64MStream`
+  derives `D64MStream` and overrides exactly the three things that touch the container:
+  `readHeader()` (walk the chunk stream first, THEN delegate — `D64MStream::readHeader()`
+  immediately seeks 18/0 and needs the half-track table to already exist; g64.h does this
+  in the opposite order, do not copy that), `seekSector()` and `readContainer()`.
+- **The pulse list is never materialized.** The reference decodes every pulse into a
+  linked list and then walks it in `P64PulseStreamConvertToGCRWithLogic`; a single track
+  is ~34k pulses × 16 bytes ≈ 0.5 MB, and a whole image would be ~22 MB. The decoder emits
+  positions in increasing order and the GCR logic consumes them in that same order, so the
+  two passes are folded into one and each pulse is converted as it decodes. **Do not
+  "simplify" this back into two passes.**
+- **Only strong pulses (`strength >= 0x80000000`) trigger, and a weak one must NOT update
+  `last_position`** — that is what makes it a non-event rather than a shifted one. Weak-bit
+  protection tracks therefore decode partially or not at all, which is the reference
+  algorithm behaving as specified, not a defect. `zetawingii.p64` reads 18/0 fine and its
+  18/1 data block carries id `$4F` instead of `$07`; a release is free to do that.
+- **A P64 holds ONE rotation, and its position 0 is not a gap — so the rotation must be
+  decoded with an OVERLAP.** Position 0 is wherever the imaging hardware started, and a
+  sector straddling it is split across the two ends of the bitstream: ends that do not
+  join, because the bit cell phase at 0 has nothing to do with the phase where the rotation
+  ran out, and the last cell is truncated. Wrapping the sync scan is NOT enough. After the
+  rotation, `decodeTrack()` REPLAYS the pulse stream with every position shifted one
+  rotation later, continuing the same read-logic state — what the head sees on the next
+  revolution — so the straddling sector is contiguous in the overlap
+  (`P64_OVERLAP_BYTES`, 512, comfortably more than a header + gap + data block). The replay
+  must restart the range decoder from the start of the chunk with FRESH models: they adapt
+  as they decode and cannot be seeked into. It stops after the overlap, so it costs a small
+  fraction of the first pass. `last_position` deliberately carries ACROSS the two passes,
+  which is what makes the join seamless; the gap it spans is small in practice (measured
+  393 samples at most, about six bit cells, over all 46 replays in the corpus) because a
+  formatted track has flux transitions all the way round, so the replay cannot start with a
+  long spin through the read logic. **Symptom if this is ever undone**: a handful of sectors, each
+  with its data block starting past ~95% of the rotation, come back with bad data checksums,
+  and a sector whose HEADER is on the seam is not found at all — measured on
+  wheels64_4.4a as one bad sector on each of tracks 18, 19, 20 and 23 plus a lost sector on
+  17 and 24, with the other 670-odd blocks of the disk perfectly fine. Hardware-confirmed:
+  the same file extracted before and after differs in exactly three 254-byte blocks.
+- **The GCR bitstream is NOT byte-aligned** — this is the one substantial difference from
+  g64, where the container already holds aligned GCR bytes. `findSync()`/`decodeBlock()`
+  are bit-resolution ports of VICE's `gcr.c` (`lib/vdrive/gcr.c`), wrapping at the end of
+  the track because a track is a loop. **`gcr_read_sector_header()`'s `static int p` in
+  VICE is a rotational-position simulation, not state you want** — it is a local here,
+  with the loop terminating on returning to the first sync found plus an iteration cap.
+- **The track buffer must be cleared before every decode.** Bits are OR-ed in, and with a
+  one-track cache the previous track's tail would otherwise survive in the wrap-around
+  region a sync scan reads.
+- **`readContainer()` needs its own cursor into the decoded sector, NOT `_position`.**
+  `_position` is the position in the FILE being read; `D64MStream::readFile()` calls
+  `readContainer()` repeatedly between `seekSector()` calls, so indexing a 256-byte sector
+  buffer by `_position` walks off the end on any multi-block file. `G64MStream::readContainer()`
+  does exactly that and is wrong for files larger than one block.
+- **Memory: ~1 MB of probability table per track decode**, transient, plus the compressed
+  chunk. The table is `uint16_t` rather than the reference's `uint32_t` (a probability
+  lives in 15..4080, so 12 bits is the whole range) which halves it. Allocated with
+  `malloc` and NULL-checked, never `std::vector`, because ESP-IDF compiles `-fno-exceptions`
+  and a throwing allocation is an `abort()`. Effectively requires PSRAM, same trade the
+  tape decoder makes.
+- **A SAVE into a `.p64` fails messily rather than answering `26,WRITE PROTECT ON`.**
+  `drive.cpp`'s guard is `!f->isWritable || f->pathInStream.empty()`, and `MFSOwner::File()`
+  copies `isWritable` from the container - so a `.p64` on an SD card inherits true and the
+  guard does not fire. `P64MStream::writeContainer()` returning 0 is what actually keeps
+  the image intact; the drive then reports whatever the D64 write path makes of writes that
+  never land. `g64` and `nib` have the same exposure and no equivalent guard at all.
+- **The track range stays at 35 even though the chunk table knows better.** A 1541 BAM holds
+  35 four-byte records, so widening it makes `getBAMRecord()` read the disk name as free
+  counts - and an image with tracks past 35 is usually a protected release that put
+  protection data there, exactly when a listing must not start reporting nonsense. Reaching
+  those tracks needs an extended-BAM layout, which is the same open problem the D64
+  constructor has for a 40-track `.d64` (its DOLPHIN/SPEED/PrologicDOS records are
+  commented out).
+- **Scope**: read-only, side 0, `.p64` only. `.p81` (P64-1581) is a different geometry and
+  `MFileSystem::byContent()` already maps it separately. `vdrive_compatible` is left unset:
+  the vdrive layer wants a whole `TP64Image` in RAM, which is the thing ruled out above.
+- **A GEOS VLIR file reads back as its 254-byte index block, on P64 and D64 alike.** There
+  is no VLIR support anywhere in the codebase (`meat_media.cpp` only names the type in a
+  listing), so `readFile()` walks the entry's block chain — which for a VLIR file is the
+  single index block, not the records it points at. Wheels' `SYSTEM2` is 69 blocks in the
+  directory and copies out as 254 bytes of record pointers. Pre-existing and
+  format-agnostic; do not chase it as a P64 defect.
+- **Host tests**: `test/native/test_p64_read/` — 13 cases over the real images in
+  `.archive/p64` (gitignored, so they skip cleanly without it). They assert on CBM
+  structures rather than intermediate shapes, because each decode stage is silent about
+  the next being wrong: a blank disk's BAM free count and bitmap for all 35 tracks across
+  all four speed zones, and Wheels 4.4a's exact disk name, id and eight directory entries
+  with their block counts. Note the block count a GEOS entry carries includes its
+  single-block info record, so a data chain walks one block shorter than the directory says.
+  **`test_every_sector_of_every_track_decodes` is the load-bearing one** — all 683 sectors
+  of a full disk, header found and data checksum valid. It is what found the seam bug, and
+  nothing smaller would have: the directory, the disk header and every file read tested
+  before it all passed while four sectors were quietly wrong.
 
 - **A CFS data sector is FOUR interleaved 128-byte columns, not 512 linear bytes** (`media/hd/hdd.h/.cpp`): file byte `n` of a sector lives at sector offset `(n % 128) * 4 + (n / 128)`. `readFile()` now reads the sector whole via the new `loadDataSector()` (cached, since a caller asking for a few bytes still needs all 512) and de-interleaves out of it. Only FILE DATA is interleaved — boot, partition, directory and tree sectors are linear, which is why every listing and the whole tree walk were correct while every file came back scrambled. The CFS 0.11 spec pins the tree geometry but is silent on byte order inside a data sector. Two independently authored images agree, and a de-interleaved PRG's BASIC line-link chain walks correctly across sector boundaries. Full reasoning is in the comment above `loadDataSector()` and in the root `AGENTS.md`.
 - **Diagnostic that settled it, worth repeating**: temporary prints in `dataSectorForPos()` (pos, tree LBA, pointer index, raw pointer bytes, first 16 bytes of the node) and `readFile()` (pos, chunk, LBA, absolute image offset, bytes returned). They showed the pointers and offsets were already right, which is what localised the fault to a byte permutation instead of the tree.
