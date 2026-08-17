@@ -146,7 +146,9 @@ static bool loadByName(std::shared_ptr<TestCSMStream>& image, const char* want)
     std::string pointed = image->seekNextEntry();
     while (!pointed.empty())
     {
-        std::string entryName = mstr::toUTF8(pointed);
+        // No conversion: seekNextEntry() returns UTF-8, exactly as
+        // MFile::getSourceStream()'s browsable branch now treats it.
+        std::string entryName = pointed;
         if (mstr::compareFilename(entryName, wanted, wildcard))
             return true;
         pointed = image->seekNextEntry();
@@ -195,7 +197,7 @@ void test_walk_finds_every_entry(void)
     TEST_ASSERT_TRUE(image->readHeader());
     TEST_ASSERT_EQUAL_UINT32(2, (uint32_t)image->entries.size());
 
-    TEST_ASSERT_EQUAL_STRING("LOADER", image->entries[0].name.c_str());
+    TEST_ASSERT_EQUAL_STRING("loader", image->entries[0].name.c_str());
     TEST_ASSERT_EQUAL_UINT16(0x1001, image->entries[0].start_address);
     TEST_ASSERT_EQUAL_UINT32(HEADER_BLOCK, image->entries[0].data_offset);
     TEST_ASSERT_EQUAL_UINT32(256, image->entries[0].data_length);
@@ -234,7 +236,7 @@ void test_tape_without_end_block_is_fully_walked(void)
 
     TEST_ASSERT_TRUE(image->readHeader());
     TEST_ASSERT_EQUAL_UINT32(1, (uint32_t)image->entries.size());
-    TEST_ASSERT_EQUAL_STRING("ONLY", image->entries[0].name.c_str());
+    TEST_ASSERT_EQUAL_STRING("only", image->entries[0].name.c_str());
 }
 
 // Names are a fixed-width padded field. The padding is stripped, so a LOAD of
@@ -247,7 +249,7 @@ void test_names_are_padding_trimmed(void)
     TEST_ASSERT_NOT_NULL(image.get());
 
     TEST_ASSERT_TRUE(image->readHeader());
-    TEST_ASSERT_EQUAL_STRING("LOADER", image->entries[0].name.c_str());
+    TEST_ASSERT_EQUAL_STRING("loader", image->entries[0].name.c_str());
     TEST_ASSERT_EQUAL_STRING("", image->entries[1].name.c_str());
 }
 
@@ -266,7 +268,7 @@ void test_a0_padded_name_is_trimmed(void)
     TEST_ASSERT_NOT_NULL(image.get());
 
     TEST_ASSERT_TRUE(image->readHeader());
-    TEST_ASSERT_EQUAL_STRING("MOTOR MOUSE", image->entries[0].name.c_str());
+    TEST_ASSERT_EQUAL_STRING("motor mouse", image->entries[0].name.c_str());
 }
 
 // Types 1 and 3 are both programs; 2 and 4 are sequential.
@@ -308,7 +310,7 @@ void test_listing_is_sequential_then_ends(void)
     TEST_ASSERT_NOT_NULL(image.get());
 
     TEST_ASSERT_TRUE(image->nextTapeEntry());
-    TEST_ASSERT_EQUAL_STRING("LOADER", image->current.name.c_str());
+    TEST_ASSERT_EQUAL_STRING("loader", image->current.name.c_str());
 
     TEST_ASSERT_TRUE(image->nextTapeEntry());
     TEST_ASSERT_EQUAL_STRING("", image->current.name.c_str());
@@ -332,7 +334,7 @@ void test_tape_wraps_after_end(void)
     TEST_ASSERT_FALSE(image->tapeEnded());
 
     TEST_ASSERT_TRUE(image->nextTapeEntry());
-    TEST_ASSERT_EQUAL_STRING("LOADER", image->current.name.c_str());
+    TEST_ASSERT_EQUAL_STRING("loader", image->current.name.c_str());
 }
 
 // An entry the tape leaves unnamed is listed under the media file's name,
@@ -430,7 +432,7 @@ void test_scan_wraps_past_end_of_tape(void)
     // The entry left ready - the last one, which is unnamed.
     TEST_ASSERT_EQUAL_STRING("TAPEIMAGE", load->seekNextEntry().c_str());
     // Past the end: wraps to the start rather than reporting the end.
-    TEST_ASSERT_EQUAL_STRING("LOADER", load->seekNextEntry().c_str());
+    TEST_ASSERT_EQUAL_STRING("loader", load->seekNextEntry().c_str());
     // A full lap done - now the scan terminates.
     TEST_ASSERT_EQUAL_STRING("", load->seekNextEntry().c_str());
 }
@@ -590,7 +592,7 @@ void test_reversed_addresses_stop_the_walk(void)
 
     TEST_ASSERT_TRUE(image->readHeader());
     TEST_ASSERT_EQUAL_UINT32(1, (uint32_t)image->entries.size());
-    TEST_ASSERT_EQUAL_STRING("GOOD", image->entries[0].name.c_str());
+    TEST_ASSERT_EQUAL_STRING("good", image->entries[0].name.c_str());
 }
 
 // A tape cut off mid-file serves the bytes that are there instead of reading

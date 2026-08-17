@@ -91,11 +91,13 @@ bool TCRTMStream::seekEntry( std::string filename )
             uint8_t i = entryFilename.find_first_of(static_cast<char>(0x00)); // padded with NUL (0x00)
             entryFilename = entryFilename.substr(0, (i > 16 ? 16 : i));
             //mstr::rtrimA0(entryFilename);
-            //entryFilename = mstr::toUTF8(entryFilename);
-            
-            // TCRT uses PETSCII Uppercase in the lower range
-            // UTF8 won't translate correctly so we translate to ASCII here
-            util_petscii_to_ascii_str(entryFilename);
+            // toUTF8, not util_petscii_to_ascii_str: both render the same
+            // glyph, but only toUTF8's form survives the trip back through
+            // toPETSCII2 at the IEC boundary. PETSCII $41-$5A map to UTF-8
+            // LOWERCASE a-z, and toPETSCII2("a") is $41 while toPETSCII2("A")
+            // is $C1 - the shifted range, which the C64 draws as graphics.
+            // This also makes it match what getNextFileInDir() now produces.
+            entryFilename = mstr::toUTF8(entryFilename);
 
             //Debug_printv("index[%d] filename[%s] entry.filename[%s] entry.file_type[%d]", index, filename.c_str(), entryFilename.c_str(), entry.file_type);
 
@@ -250,6 +252,9 @@ MFile* TCRTMFile::getNextFileInDir()
         uint8_t i = filename.find_first_of(static_cast<char>(0x00)); // padded with NUL (0x00)
         filename = filename.substr(0, (i > 16 ? 16 : i));
         // mstr::rtrimA0(filename);
+        // PETSCII in the container, UTF-8 from here on - seekEntry() converts
+        // the stored name the same way, so a listed name can be typed back.
+        filename = mstr::toUTF8(filename);
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
 

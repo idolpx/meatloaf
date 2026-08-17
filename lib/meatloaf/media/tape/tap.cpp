@@ -71,11 +71,11 @@ bool TAPMStream::ensureDecoder()
 
 void TAPMStream::setDefaultName(std::string name)
 {
-    // Media file name without its extension, PETSCII-encoded so it lists
-    // like the tape's own (PETSCII) entry names
+    // Media file name without its extension. Left as UTF-8, like the tape's
+    // own entry names - the IEC boundary converts.
     size_t dot = name.find_last_of('.');
     if (dot != std::string::npos && dot > 0)
-        name = mstr::toPETSCII2(name.substr(0, dot));
+        name = name.substr(0, dot);
     if (!name.empty())
         default_name = name;
 }
@@ -135,9 +135,10 @@ void TAPMStream::loadIndex(const std::string &idx_text)
         if (name.empty())
             name = "entry " + std::to_string(idx_entries.size() + 1);
 
-        // .idx files hold ASCII/UTF8 text; entry names are PETSCII internally
-        name = mstr::toPETSCII2(name);
-
+        // .idx files hold UTF-8 text, which is what entry names are - no
+        // conversion here. Note a name written in CAPITALS reaches the C64 as
+        // the shifted PETSCII range and draws as graphics; lowercase is what
+        // the C64 renders as capitals.
         idx_entries.push_back({ (uint32_t)off, (uint32_t)size, name });
     }
 
@@ -325,7 +326,7 @@ bool TAPMStream::seekPath(std::string path)
         // Random access via the index: decode the program at the offset
         for (auto &ie : idx_entries)
         {
-            std::string entryName = mstr::toUTF8(ie.name);
+            std::string entryName = ie.name;  // already UTF-8
             if (mstr::compareFilename(entryName, path, wildcard))
             {
                 if (!ensureDecoder() || !decoder.nextProgram(ie.offset, current))
@@ -347,7 +348,7 @@ bool TAPMStream::seekPath(std::string path)
     // Sequential: the file found by the last directory request is ready
     if (have_current)
     {
-        std::string entryName = mstr::toUTF8(entryDisplayName(current));
+        std::string entryName = entryDisplayName(current);  // already UTF-8
         if (mstr::compareFilename(entryName, path, wildcard))
         {
             serveCurrent();
@@ -378,7 +379,7 @@ bool TAPMStream::seekPath(std::string path)
             continue;
         }
 
-        std::string entryName = mstr::toUTF8(entryDisplayName(current));
+        std::string entryName = entryDisplayName(current);  // already UTF-8
         if (mstr::compareFilename(entryName, path, wildcard))
         {
             serveCurrent();
@@ -673,7 +674,7 @@ MFile* TAPMFile::getNextFileInDir()
     }
 
     // End of the tape reached
-    std::string marker = "END OF TAPE";
+    std::string marker = "end of tape";  // lowercase: the IEC boundary converts, and lowercase UTF-8 is what the C64 draws as capitals
     auto file = MFSOwner::File(url + "/" + marker);
     file->name = marker;
     file->extension = " NFO";

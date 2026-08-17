@@ -1164,11 +1164,12 @@ std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {
 
         while (!pointedFile.empty())
         {
-            // Both sides go through toUTF8: what arrives from the drive is
-            // PETSCII that has already been converted, and compareFilename()
-            // is the same matcher the random-access formats use, so a wildcard
+            // seekNextEntry() returns UTF-8, as every name in Meatloaf is, and
+            // what arrives from the drive has already been converted from
+            // PETSCII - so both sides match directly. compareFilename() is the
+            // same matcher the random-access formats use, so a wildcard
             // behaves identically either side of this branch.
-            std::string entryName = mstr::toUTF8(pointedFile);
+            std::string entryName = pointedFile;
             if(mstr::compareFilename(entryName, wanted, wildcard))
             {
                 //Debug_printv("returning decodedStream 1 [%s]", decodedStream->url.c_str());

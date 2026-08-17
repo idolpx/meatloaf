@@ -351,8 +351,12 @@ void TapeDecoder::harvestEntries(int nprg)
         // stops at the first embedded low byte) looks fine - so both have to
         // go, which is rtrimPad() rather than rtrimA0().
         mstr::rtrimPad(name);
+        // TAPClean hands back the tape header's bytes as "ASCII", but they are
+        // the PETSCII the header actually holds - so this is a conversion, not
+        // a case fold, and it is what makes e.name UTF-8 like every other name
+        // in Meatloaf. The IEC boundary converts it back.
         if (!name.empty())
-            e.name = name;
+            e.name = mstr::toUTF8(name);
         e.loader = p.type_name ? p.type_name : "";
         e.start_addr = (uint16_t)p.start_addr;
         e.end_addr = (uint16_t)p.end_addr;

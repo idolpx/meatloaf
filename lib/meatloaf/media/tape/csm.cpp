@@ -130,6 +130,11 @@ bool CSMMStream::readHeader()
         // such an entry is listed under the media file's name.
         e.name.assign((const char *)hdr + 5, 16);
         mstr::rtrimPad(e.name);
+        // The header field is PETSCII. Converting HERE rather than at the two
+        // consumers makes both the listing and the name lookup UTF-8 at once -
+        // they compared raw PETSCII against a UTF-8 path before, and only
+        // agreed because compareFilename() is case-insensitive.
+        e.name = mstr::toUTF8(e.name);
 
         e.data_offset = offset + header_block_size;
         e.data_length = e.end_address - e.start_address;
@@ -366,7 +371,7 @@ MFile* CSMMFile::getNextFileInDir()
     }
 
     // End of the tape reached
-    std::string marker = "END OF TAPE";
+    std::string marker = "end of tape";  // lowercase: the IEC boundary converts, and lowercase UTF-8 is what the C64 draws as capitals
     auto file = MFSOwner::File(url + "/" + marker);
     file->name = marker;
     file->extension = " NFO";

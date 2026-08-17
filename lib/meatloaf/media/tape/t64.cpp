@@ -212,6 +212,9 @@ MFile* T64MFile::getNextFileInDir() {
         //uint8_t i = filename.find_first_of(0x20); // (in PETASCII, padded with $20, not $A0)
         //filename = filename.substr(0, (i > 16 ? 16 : i));
         // mstr::rtrimA0(filename);
+        // PETSCII in the container, UTF-8 from here on - seekEntry() converts
+        // the stored name the same way, so a listed name can be typed back.
+        filename = mstr::toUTF8(filename);
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
 
