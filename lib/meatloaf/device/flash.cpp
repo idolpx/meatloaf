@@ -397,6 +397,29 @@ uint32_t FlashMStream::read(uint8_t* buf, uint32_t size) {
         if ( size > available() )
             size = available();
 
+        // DIAGNOSTIC (2026-08-17) - remove once the WARGAMES.ARC crash is
+        // root-caused. A LoadProhibited was reported inside newlib's memcpy in
+        // _fread_r with src == NULL and the full requested length: the FILE
+        // claimed >= size bytes buffered (_r) while its buffer pointer (_p) was
+        // NULL. That combination is unreachable through newlib's own code -
+        // on a __smakebuf allocation failure _p points at fp->_nbuf with
+        // _bf._size 1, so _r could never reach the request - which means a real
+        // buffer was filled and the struct clobbered afterwards. Catch it here,
+        // where the FILE fields and the internal-heap state can still be read,
+        // rather than at the faulting dereference.
+        FILE *fh = handle->file_h;
+        if ( fh->_p == nullptr || fh->_r < 0 || (uint32_t)fh->_r > (uint32_t)fh->_bf._size )
+        {
+            Debug_printv("CORRUPT FILE [%s] _p[%p] _r[%d] _base[%p] _bf_size[%d] _flags[%04X] "
+                         "want[%lu] pos[%lu] size[%lu] internal_free[%u] internal_largest[%u]",
+                         url.c_str(), (void *)fh->_p, (int)fh->_r,
+                         (void *)fh->_bf._base, (int)fh->_bf._size, (unsigned)fh->_flags,
+                         (unsigned long)size, (unsigned long)_position, (unsigned long)_size,
+                         (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                         (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+            return 0;
+        }
+
         count = fread((void*) buf, 1, size, handle->file_h );
         // Debug_printv("count[%d]", count);
         // auto hex = mstr::toHex(buf, count);
