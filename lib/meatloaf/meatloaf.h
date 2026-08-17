@@ -299,7 +299,18 @@ public:
 
     mfile_type_t type = MFILE_VFS;
 
-    bool isPETSCII = false;
+    // Entries under this file come from CBM DOS media. Names, media_header and
+    // media_id are UTF-8 here as everywhere else in Meatloaf - the conversion
+    // to PETSCII happens once, at the IEC boundary in iecChannelHandlerDir -
+    // but two things about the C64 listing still depend on the origin:
+    //   - `extension` is already a CBM type field (from decodeType()), so the
+    //     DIR/PRG synthesis must not run;
+    //   - a CBM name may hold graphics characters, which are U+E0xx in UTF-8
+    //     and round-trip exactly through toPETSCII2(). Running them through
+    //     U8Char::encodeACE() first would punycode them to "xn--..." instead.
+    // This was called isPETSCII when the names really were PETSCII in memory,
+    // and got read off the wrong object twice while it was.
+    bool isCBM = false;
     bool isWritable = false;
     std::string media_header;
     std::string media_id;

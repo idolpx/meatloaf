@@ -123,7 +123,7 @@ public:
 
     ARCMFile(std::string path, bool is_dir = true): MFile(path) {
         isDir = is_dir;
-        isPETSCII = true;
+        isCBM = true;
         media_archive = name;
     };
 

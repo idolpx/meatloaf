@@ -261,8 +261,8 @@ public:
                 return false;
             part_index = 0;
             this->dirIsOpen = true;
-            this->media_header = "CMD HD"; //img->disk_label;
-            this->media_id = "HD 1H";
+            this->media_header = "cmd hd"; //img->disk_label;
+            this->media_id = "hd 1h";
             this->media_blocks_free = 0;
             this->media_image = this->name;
             this->media_partition = 255; // system partition
@@ -287,7 +287,9 @@ public:
             }
 
             const DHDPartition &p = img->parts[part_index++];
-            std::string fname = p.name;
+            // PETSCII in the table, UTF-8 from here on - byName() converts the
+            // same way, so a listed name resolves back to its partition.
+            std::string fname = mstr::toUTF8(p.name);
             mstr::replaceAll(fname, "/", "\\");
 
             auto file = MFSOwner::File(this->url + "/" + fname);

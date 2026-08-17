@@ -277,8 +277,10 @@ bool M2IMFile::rewindDirectory()
     image->resetEntryCounter();
 
     // Set Media Info Fields
-    media_header = image->title;
-    media_id = "M2I";
+    // The title line is PETSCII, like the entries' cbmname fields - sd2iec
+    // sends both to the C64 verbatim.
+    media_header = mstr::toUTF8(image->title);
+    media_id = "m2i";
     media_blocks_free = 0;
     media_block_size = image->block_size;
     media_image = name;

@@ -305,11 +305,13 @@ bool CSMMFile::rewindDirectory()
     auto dot = media_header.find_last_of('.');
     if ( dot != std::string::npos )
         media_header = media_header.substr(0, dot);
-    mstr::toUpper(media_header);
+    // Lowercase, not upper: this is UTF-8 until the IEC boundary converts it,
+    // and lowercase UTF-8 is what maps to the PETSCII the C64 draws as caps.
+    mstr::toLower(media_header);
     if ( media_header.size() > 16 )
         media_header = media_header.substr(0, 16);
 
-    media_id = " CSM ";
+    media_id = " csm ";
     media_blocks_free = 0;
     media_block_size = image->block_size;
     media_image = name;

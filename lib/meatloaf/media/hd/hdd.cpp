@@ -239,7 +239,7 @@ bool HDDMStream::selectPartitionByName(std::string name)
         {
             if (!partition_entries[i].isValid())
                 continue;
-            std::string pn = trimEntryName(partition_entries[i].name, 16, '\0');
+            std::string pn = mstr::toUTF8(trimEntryName(partition_entries[i].name, 16, '\0'));
             if (mstr::compareFilename(pn, name, wildcard))
             {
                 if (!partition_entries[i].isCFS())
@@ -815,7 +815,7 @@ const HDDPartition* HDDImageRegistry::Image::byName(std::string name) const
     bool wildcard = (mstr::contains(name, "*") || mstr::contains(name, "?"));
     for (auto &p : parts)
     {
-        std::string p_name = p.name;
+        std::string p_name = mstr::toUTF8(p.name);
         if (mstr::compareFilename(p_name, name, wildcard))
             return &p;
     }
@@ -1149,8 +1149,8 @@ bool HDDMFile::rewindDirectory()
             return false;
         }
         part_index = 0;
-        media_header = img->disk_label;
-        media_id = "IDE64";
+        media_header = mstr::toUTF8(img->disk_label);
+        media_id = "ide64";
         media_blocks_free = 0;
         media_block_size = 512;
         media_image = name;
@@ -1183,8 +1183,9 @@ bool HDDMFile::rewindDirectory()
     }
 
     // Set Media Info Fields
-    media_header = image->dir_label.empty() ? image->header.disk_label : image->dir_label;
-    media_id = "IDE64";
+    media_header = mstr::toUTF8(image->dir_label.empty() ? image->header.disk_label
+                                                         : image->dir_label);
+    media_id = "ide64";
     // Free data sectors from the partition's usage bitmaps. Capped because the
     // CBM "BLOCKS FREE" line carries a 16-bit count, and a CFS partition can
     // hold far more than that.
@@ -1216,13 +1217,15 @@ MFile* HDDMFile::getNextFileInDir()
         }
 
         const HDDPartition &p = img->parts[part_index++];
-        std::string fname = p.name;
+        // PETSCII on the media, UTF-8 from here on - byName() converts the
+        // same way, so a listed partition name resolves back to its partition.
+        std::string fname = mstr::toUTF8(p.name);
         mstr::replaceAll(fname, "/", "\\");
 
         // By NUMBER, not name: CFS names are 16 bytes that may contain '/'
         // and spaces, which do not survive a URL path component.
         //auto file = MFSOwner::File(url + "/" + std::to_string((unsigned)p.number));
-        auto file = MFSOwner::File(url + "/" + p.name);
+        auto file = MFSOwner::File(url + "/" + mstr::toUTF8(p.name));
         file->name = fname;
         file->extension = (p.type == 1) ? "*CFS"
                         : (p.type == 2) ? " GEOS"
@@ -1241,7 +1244,10 @@ MFile* HDDMFile::getNextFileInDir()
 
     if (image->getNextImageEntry())
     {
-        std::string filename = image->entry.filename;
+        // PETSCII on the media; converted before the entry URL is built from
+        // it, so the listed name is the one seekEntry() matches (it converts
+        // the incoming name the other way, in toPETSCII2).
+        std::string filename = mstr::toUTF8(image->entry.filename);
         mstr::replaceAll(filename, "/", "\\");
 
         // Entry URLs name the partition BY NUMBER, so an entry listed from a

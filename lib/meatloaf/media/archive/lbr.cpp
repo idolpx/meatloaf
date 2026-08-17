@@ -196,8 +196,8 @@ bool LBRMFile::rewindDirectory()
     image->resetEntryCounter();
 
     // Set Media Info Fields
-    media_header = mstr::format("%.16s", image->header.name.c_str());
-    media_id = image->header.id_dos;
+    media_header = mstr::toUTF8(mstr::format("%.16s", image->header.name.c_str()));
+    media_id = mstr::toUTF8(image->header.id_dos);
     media_blocks_free = 0;
     media_block_size = image->block_size;
     media_archive = name;

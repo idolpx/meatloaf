@@ -173,8 +173,8 @@ bool ARKMFile::rewindDirectory()
     image->resetEntryCounter();
 
     // Set Media Info Fields
-    media_header = mstr::format("%.16s", image->header.name.c_str());
-    media_id = image->header.id_dos;
+    media_header = mstr::toUTF8(mstr::format("%.16s", image->header.name.c_str()));
+    media_id = mstr::toUTF8(image->header.id_dos);
     media_blocks_free = 0;
     media_block_size = image->block_size;
     media_archive = name;
@@ -208,7 +208,7 @@ MFile *ARKMFile::getNextFileInDir()
 
         // sourceFile->url is the archive's PARENT DIRECTORY, so this used to
         // name a file next to the archive rather than one inside it. The
-        // entry then resolved to a plain flash file with isPETSCII false, and
+        // entry then resolved to a plain flash file with isCBM false, and
         // `ls` printed the raw PETSCII bytes instead of the UTF-8 form that
         // seekEntry() matches against - so the listed name could not be typed
         // back. fullUrl() rejoins any pathInStream, per the rule on joining a

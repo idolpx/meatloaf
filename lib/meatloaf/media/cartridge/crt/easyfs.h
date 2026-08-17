@@ -87,7 +87,7 @@ public:
         isDir = is_dir;
 
         media_image = name;
-        isPETSCII = true;
+        isCBM = true;
     };
     
     ~EFCRTMFile() {

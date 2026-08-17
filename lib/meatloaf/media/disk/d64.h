@@ -805,7 +805,7 @@ public:
     D64MFile(std::string path): MFile(path)
     {
         media_image = name;
-        isPETSCII = true;
+        isCBM = true;
         size = 174848; // Default - 35 tracks no errors
     };
     

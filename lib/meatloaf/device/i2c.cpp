@@ -240,8 +240,8 @@ I2CMFile::I2CMFile(std::string path) : MFile(path) {
 
     if (!_has_address) {
         // Root node — represents the entire I2C bus.
-        media_header = "I2C BUS";
-        media_id     = "00 2A";
+        media_header = "i2c bus";
+        media_id     = "00 2a";
     }
 }
 

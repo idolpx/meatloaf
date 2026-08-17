@@ -303,7 +303,7 @@ CSIPMFile::CSIPMFile(std::string path, size_t filesize): MFile(path) {
         }
     }
 
-    isPETSCII = true;
+    isCBM = true;
     m_isNull = false;
 }
 
@@ -543,9 +543,10 @@ bool CSIPMFile::rewindDirectory() {
             line = _session->readLn(); // dir header
             auto last_quote = line.find_last_of("\"");
             if (last_quote != std::string::npos && last_quote >= 2) {
-                media_header = line.substr(2, last_quote - 1);
+                // The server speaks PETSCII; Meatloaf carries UTF-8.
+                media_header = mstr::toUTF8(line.substr(2, last_quote - 1));
                 if (last_quote + 2 <= line.size()) {
-                    media_id = line.substr(last_quote + 2);
+                    media_id = mstr::toUTF8(line.substr(last_quote + 2));
                 } else {
                     media_id.clear();
                 }
@@ -569,11 +570,11 @@ bool CSIPMFile::rewindDirectory() {
         if(_session->isConnected() && line.size()) {
             auto last_bracket = line.find_last_of("]");
             if (last_bracket != std::string::npos && last_bracket >= 2) {
-                media_header = line.substr(2, last_bracket - 1);
+                media_header = mstr::toUTF8(line.substr(2, last_bracket - 1));
             } else {
                 media_header.clear();
             }
-            media_id = "C=SVR";
+            media_id = "c=svr";
             dirIsOpen = true;
             if (!dirHoldsIo) {
                 _session->acquireIO();

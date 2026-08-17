@@ -594,8 +594,11 @@ bool TAPMFile::rewindDirectory()
     // Set Media Info Fields (the tape position is NOT reset - listings
     // advance through the tape sequentially)
 
+    // Lowercased because media_header is UTF-8 until the IEC boundary; the
+    // decoder's own names stay uppercase for the log and the console.
     media_header = image->decoder.platformName() + " (" + image->decoder.videoName() + ")";
-    media_id = "TAPE";
+    mstr::toLower(media_header);
+    media_id = "tape";
     media_blocks_free = 0;
     media_block_size = image->block_size;
     media_image = name;

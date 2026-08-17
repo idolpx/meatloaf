@@ -521,28 +521,38 @@ uint8_t iecChannelHandlerDir::readBufferData()
         m_data[6] = 18;     // REVERSE ON
         m_data[7] = '"';
         Debug_printv("header[%s] id[%s]", m_dir->media_header.c_str(), m_dir->media_id.c_str());
-        std::string name = m_dir->media_header.size() ? m_dir->media_header : PRODUCT_ID;
+        // media_header/media_id are UTF-8, like every other name in Meatloaf,
+        // and are converted here for the same reasons the entry names below
+        // are. Literals assigned to them are therefore written LOWERCASE, so
+        // toPETSCII2 lands in the unshifted range the C64 draws as capitals.
+        // Not PRODUCT_ID: that is uppercase because the status channel and the
+        // serial banner take it raw, and this path converts.
+        std::string name = m_dir->media_header.size() ? m_dir->media_header : "meatloaf cbm";
+        if ( !m_dir->isCBM )
+            name = U8Char::encodeACE(name);
+        name = mstr::toPETSCII2( name );
         size_t n = std::min(16, (int) name.size());
         memcpy(m_data+8, name.data(), n);
         while( n<16 ) { m_data[8+n] = ' '; n++; }
         m_data[24] = '"';
         m_data[25] = ' ';
+        std::string id;
         if ( m_dir->media_id.size() )
         {
             mstr::replaceAll(m_dir->media_id, "{{id}}", mstr::format("%02i", m_drive->id()));
-            // Make sure media_id is at most 5 chars to fit in the browser line
-            if (m_dir->media_id.size() > 5) {
-                m_dir->media_id = m_dir->media_id.substr(0, 5);
-            } else if ( m_dir->media_id.size() < 5 ) {
-                // pad with spaces if media_id is less than 5 chars to keep the browser line aligned
-                m_dir->media_id += std::string(5 - m_dir->media_id.size(), ' ');
-            }
-            memcpy(m_data+26, m_dir->media_id.c_str(), 5); // Use ID and DOS version from media file
+            id = mstr::toPETSCII2( m_dir->media_id );
         }
         else
         {
-            sprintf((char *) m_data+26, "%02i 2A", m_drive->id()); // Use drive # as ID in browser mode
+            // Drive # as ID in browser mode. Lowercase for the same reason.
+            id = mstr::toPETSCII2( mstr::format("%02i 2a", m_drive->id()) );
         }
+        // Exactly 5 chars ("ID" + DOS version) to keep the browser line aligned
+        if ( id.size() > 5 )
+            id = id.substr(0, 5);
+        else if ( id.size() < 5 )
+            id += std::string(5 - id.size(), ' ');
+        memcpy(m_data+26, id.data(), 5);
         m_data[31] = 0;
         m_len = 32;
         m_headerLine++;
@@ -618,12 +628,16 @@ uint8_t iecChannelHandlerDir::readBufferData()
             if ( ext[0] == '_' )
                 ext.clear();
 
-            // Convert to PETSCII and set extension
-            if ( !m_dir->isPETSCII )
+            // Set the extension, then convert to PETSCII. Only the EXTENSION
+            // handling depends on where the entry came from - the name is
+            // UTF-8 either way and is converted unconditionally, below.
+            if ( !m_dir->isCBM )
             {
                 Debug_printv("original name[%s] ext[%s]", name.c_str(), ext.c_str());
+                // A host filename can hold characters PETSCII has no code for;
+                // ACE keeps them typable. Never do this to a CBM name - see
+                // the isCBM comment in meatloaf.h.
                 name = U8Char::encodeACE(name);
-                name = mstr::toPETSCII2( name );
 
                 ext  = U8Char::encodeACE(ext);
                 ext  = mstr::toPETSCII2( ext );
@@ -643,7 +657,6 @@ uint8_t iecChannelHandlerDir::readBufferData()
                     ext = "PRG";
                 }
                 ext = " " + ext + " "; // Clear closed and locked status display
-                Debug_printv("converted name[%s] ext[%s]", name.c_str(), ext.c_str());
             }
             else
             {
@@ -661,6 +674,14 @@ uint8_t iecChannelHandlerDir::readBufferData()
                     ext = ext.substr(0, 5);
             }
 
+            // The IEC boundary: everything upstream of here is UTF-8. A CBM
+            // name round-trips exactly (toUTF8 at the producer, toPETSCII2
+            // here); a host name has been ACE-encoded above so it is plain
+            // ASCII by now. Note UTF-8 LOWERCASE maps to the unshifted PETSCII
+            // range the C64 renders as capitals - which is why literal strings
+            // destined for a listing are written in lowercase.
+            name = mstr::toPETSCII2( name );
+            Debug_printv("converted name[%s] ext[%s]", name.c_str(), ext.c_str());
 
 #if 0
             // C64 compatibale filename (16+3 chars)

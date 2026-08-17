@@ -90,7 +90,7 @@ public:
         //isDir = false;
 
         // media_image = name;
-        // isPETSCII = true;
+        // isCBM = true;
     };
     
     ~CRTMFile() {

@@ -1552,10 +1552,14 @@ bool D64MFile::rewindDirectory()
     // Set Media Info Fields
     //Debug_printv("name[%s]", image->header.name);
     //Debug_printv("id_dos[%s]", image->header.id_dos);
+    // On-disk bytes are PETSCII; Meatloaf carries names as UTF-8 and converts
+    // back once at the IEC boundary. A02Space runs first, on the raw bytes.
     media_header = mstr::format("%.16s", image->header.name);
     mstr::A02Space(media_header);
+    media_header = mstr::toUTF8(media_header);
     media_id = mstr::format("%.5s", image->header.id_dos);
     mstr::A02Space(media_id);
+    media_id = mstr::toUTF8(media_id);
     media_blocks_free = image->blocksFree();
     media_block_size = image->block_size;
     media_image = name;
@@ -1601,6 +1605,11 @@ MFile* D64MFile::getNextFileInDir()
         if (i == std::string::npos || i > 16) i = 16;
         filename = filename.substr(0, i);
         // mstr::rtrimA0(filename);
+        // The directory holds PETSCII. Convert HERE, before the entry URL is
+        // built from it, so the name a listing shows is the name seekEntry()
+        // matches (it converts the on-disk name the same way) and the name
+        // that can be typed back.
+        filename = mstr::toUTF8(filename);
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (url + "/" + filename).c_str() );
 

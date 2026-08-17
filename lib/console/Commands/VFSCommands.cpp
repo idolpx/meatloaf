@@ -280,9 +280,10 @@ int ls(int argc, char **argv)
              (show_hidden || !entry->is_hidden) &&
              ( !filtered || mstr::compare(entry->name, pattern, false) ) )
         {
-            if ( entry->isPETSCII )
-                entry->name = mstr::toUTF8(entry->name);
-
+            // No conversion here: entry->name is UTF-8 whatever produced it.
+            // Media filesystems convert their PETSCII on-disk names once, in
+            // getNextFileInDir(), so the name printed is the name seekPath()
+            // matches and the name that can be typed back.
             mstr::replaceAll(entry->name, "\"", "\\\""); // Escape double quotes
 
             // 'd' directory, 'h' hidden (only reachable with -a), '-' regular.

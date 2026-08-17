@@ -857,7 +857,7 @@ bool ARCMFile::rewindDirectory()
     image->resetEntryCounter();
 
     media_header = name;
-    media_id = "ARC";
+    media_id = "arc";
     media_blocks_free = 0;
     media_block_size = image->block_size;
     media_archive = name;

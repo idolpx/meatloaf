@@ -409,7 +409,7 @@ class ArchiveMFile : public MFile {
     MFile* getInnerFile() {
         if (!m_innerFile) {
             m_innerFile = MFSOwner::File(url + "/" + getInnerFilename());
-            isPETSCII = m_innerFile->isPETSCII;
+            isCBM = m_innerFile->isCBM;
         }
         return m_innerFile;
     }

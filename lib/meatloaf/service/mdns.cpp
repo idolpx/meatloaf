@@ -565,7 +565,7 @@ bool MDNSMFile::rewindDirectory() {
     refreshServiceList();
 
     // Set Media Info Fields
-    media_header = "NETWORK EXPLORER";
+    media_header = "network explorer";
     media_id = "{{id}} ";
     if (path.size() == 1) {
         media_partition = _session->discovered_service_types.size();

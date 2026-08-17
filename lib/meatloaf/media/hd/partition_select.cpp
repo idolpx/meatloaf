@@ -82,13 +82,17 @@ bool list(const Target& t, std::vector<View>& out, std::string& disk_label)
         auto img = HDDImageRegistry::obtain(t.container);
         if (img == nullptr || !img->valid)
             return false;
-        disk_label = img->disk_label;
+        // A View is user-facing, so it carries UTF-8 like every other name.
+        // The CMD branch above gets this for free (DHDImageRegistry converts
+        // at parse); HDDImageRegistry keeps the raw media bytes, because its
+        // disk_label/dir_label are stream internals, so convert here.
+        disk_label = mstr::toUTF8(img->disk_label);
         for (const auto& p : img->parts)
         {
             View v;
             v.number = p.number;
             v.type_label = cfs_type_label(p.type);
-            v.name = p.name;           // CFS names are ASCII
+            v.name = mstr::toUTF8(p.name);
             v.selected = (p.number == img->selected);
             v.selectable = (p.type == 1);
             out.push_back(v);

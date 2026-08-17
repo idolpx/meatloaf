@@ -295,10 +295,10 @@ bool LNXMFile::rewindDirectory()
     image->resetEntryCounter();
 
     // Set Media Info Fields
+    // The host filename, which is already UTF-8 - the IEC boundary converts.
     media_header = name;
     std::string ext = "." + extension;
     mstr::replaceAll(media_header, ext, "");
-    media_header = mstr::toPETSCII2(media_header);
 
     //media_id = "";
     media_blocks_free = 0;

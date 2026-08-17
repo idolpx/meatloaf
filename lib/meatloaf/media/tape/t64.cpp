@@ -182,8 +182,8 @@ bool T64MFile::rewindDirectory() {
     image->resetEntryCounter();
 
     // Set Media Info Fields
-    media_header = mstr::format("%.16s", image->header.name);
-    media_id = " T64 ";
+    media_header = mstr::toUTF8(mstr::format("%.16s", image->header.name));
+    media_id = " t64 ";
     media_blocks_free = 0;
     media_block_size = image->block_size;
     media_image = name;
