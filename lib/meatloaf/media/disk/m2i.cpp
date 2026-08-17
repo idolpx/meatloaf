@@ -304,7 +304,9 @@ MFile* M2IMFile::getNextFileInDir()
 
     if ( image->getNextImageEntry() )
     {
-        std::string filename = image->entry.cbmname;
+        // PETSCII in the index file, UTF-8 from here on - seekEntry() converts
+        // the stored name the same way, so a listed name can be typed back.
+        std::string filename = mstr::toUTF8(image->entry.cbmname);
         mstr::replaceAll(filename, "/", "\\");
 
         auto file = MFSOwner::File(url + "/" + filename);

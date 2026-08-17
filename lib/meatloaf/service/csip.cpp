@@ -649,6 +649,9 @@ MFile* CSIPMFile::getNextFileInDir() {
             size = atoi(line.substr(0, line.find_first_of(" ")).c_str());
             size = size * 256; // convert blocks to bytes
             mstr::rtrim(name);
+            // The server speaks PETSCII, Meatloaf carries UTF-8; converted
+            // before the entry URL is built from it.
+            name = mstr::toUTF8(name);
             mstr::replaceAll(name, "/", "\\");
             //Debug_printv("xx: %s -- %s %d", line.c_str(), name.c_str(), size);
             //return new CSIPMFile(path() +"/"+ name);
@@ -693,6 +696,7 @@ MFile* CSIPMFile::getNextFileInDir() {
                 size = (683 * 256);
             }
             mstr::rtrim(name);
+            name = mstr::toUTF8(name);  // PETSCII from the server, UTF-8 here
             //Debug_printv("url[%s] name[%s] size[%d]", url.c_str(), name.c_str(), size);
             if(name.size() > 0)
             {

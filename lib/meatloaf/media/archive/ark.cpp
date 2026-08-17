@@ -210,12 +210,9 @@ MFile *ARKMFile::getNextFileInDir()
         //Debug_printv( "entry[%s]", (sourceFile->url + "/" + fileName).c_str() );
 
         // sourceFile->url is the archive's PARENT DIRECTORY, so this used to
-        // name a file next to the archive rather than one inside it. The
-        // entry then resolved to a plain flash file with isCBM false, and
-        // `ls` printed the raw PETSCII bytes instead of the UTF-8 form that
-        // seekEntry() matches against - so the listed name could not be typed
-        // back. fullUrl() rejoins any pathInStream, per the rule on joining a
-        // child name onto an MFile.
+        // name a file next to the archive rather than one inside it, and the
+        // entry resolved to a plain flash file. fullUrl() rejoins any
+        // pathInStream, per the rule on joining a child name onto an MFile.
         auto file = MFSOwner::File(fullUrl() + "/" + filename);
         file->name = filename;  // Use actual entry name, not container image name
         file->extension = image->decodeType(image->entry.file_type);
