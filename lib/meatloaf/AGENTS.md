@@ -152,7 +152,7 @@ lib/meatloaf/
 ├── iec_pipe.h              # IEC device communication pipes
 ├── media/                  # Container format implementations
 │   ├── disk/              # Disk images: d64, d71, d80, d81, d82, d90, g64, g71, g81, m2i, nib/nb2/nbz, p64, p81 (mfm.h shared by g81+p81)
-│   ├── archive/           # Archives: zip, rar, tar, lbr, ark
+│   ├── archive/           # Archives: zip, rar, tar, lbr, ark, arc/sda
 │   ├── tape/              # Tapes: tap/dmp/htap (TAPClean-based, see tape_decoder), t64, tcrt
 │   ├── cartridge/         # Cartridge: crt
 │   ├── file/              # File wrappers: p00
@@ -515,6 +515,62 @@ When implementing a new stream:
 
 ## Recent Changes (August 17, 2026)
 
+### ARC/SDA archives, and a flash-text ceiling that now gates the newer formats
+
+New read-only filesystem `arcFS` (`media/archive/arc.h/.cpp`) for `.arc` and `.sda`, ported
+from cbmconvert 2.1.2's `unarc.c` — the reference implementation, and the one the format's
+own documentation points at.
+
+- **ARC is not one format but six.** An entry is stored, run-length packed, Huffman
+  squeezed, LZW crunched, squeezed AND packed, or crunched in a single pass with its size
+  and checksum written at the END of the stream rather than in the header. All six are
+  implemented; the corpus exercises five (0-4).
+- **Run-length decoding sits ON TOP of the byte producer** for every mode except stored and
+  squeezed, so it is applied to whatever Huffman or LZW hands back rather than to the
+  container bytes. Getting that layering backwards yields plausible-looking garbage.
+- **The directory walk never touches compressed data.** The next entry's header sits exactly
+  `blocks * 254` bytes past this one, so listing an archive costs one small read per entry
+  and never builds a Huffman table. Only `seekPath()` decompresses, and it does the whole
+  entry at once into RAM — streaming it would mean carrying Huffman and LZW state across
+  `readFile()` calls for no gain, since the drive reads a file start to end anyway.
+- **The decompressors read from a RAM buffer, not the container.** The reference walks the
+  file a BIT at a time through stdio; doing that against an MStream is a read call per bit,
+  which over a network is hopeless. The entry's compressed bytes are fetched once - plus
+  512 bytes of slack, because the reference reads the container as one continuous stream and
+  a decoder can legitimately need a few bits past its own block count.
+- **`readFile()` must READ `_position` and never write it.** `MMediaStream::read()` advances
+  it by whatever `readFile()` returns, so advancing it inside as well moves it twice per call
+  and the entry ends at half its length. This is the mirror image of the g64/nib defect,
+  where a sector buffer was indexed BY `_position`; the two mistakes look alike and are
+  opposite.
+- **An `.sda` is the same archive behind a BASIC loader.** `skipBasicLoader()` steps over it:
+  the loader's BASIC line number doubles as the count of 254-byte blocks the preamble
+  occupies, so the archive starts at `(line - 6) * 254`, less one byte for the SDA232.128
+  special case the reference documents.
+- **Two entries in the corpus are damaged, and the test names them.** `pcpfonts.arc`'s
+  `PRINCETON24 P.24` and `RUTGERS24 PD .24` each declare 3757 bytes while their LZW stream
+  reaches its own end marker after 3756. What rules out an off-by-one in the port is the
+  same archive: 43 of its other 43 mode-3 entries decode with correct checksums, and both a
+  decoder that dropped a final byte and an archiver with a bad size field would have got all
+  of them wrong. cbmconvert stops on end-of-stream and reports a checksum error too.
+- **Host tests**: `test/native/test_arc_read/` — 6 cases over the real corpus in
+  `.archive/archive/arc` and `.archive/archive/sda`: 84 entries across 9 archives plus an
+  SDA. The checksum is what makes this worth anything - it is computed over the
+  DECOMPRESSED bytes, so an entry that comes out the right length but subtly wrong fails it,
+  which nothing else here could detect.
+
+**`EXTRA_DISK_FORMATS` now gates the newer formats.** Registering `.arc`, `.g71`, `.g81` and
+`.p81` alongside everything else puts a plain ESP32 board about 5 KB over its ~3.3 MB
+`iram0_2_seg` flash-text window — the constraint the board survey in the 2026-08-12 entry
+describes. They are compiled but only registered in `meatloaf.cpp` when the flag is defined,
+which `platformio.ini.sample` sets for `esp32-s3-devkitc-1` and not for `lolin-d32-pro`.
+`.p64`, `.nib`/`.nb2`/`.nbz` and `.g64` are always registered. **`#pragma GCC optimize("Os")`
+was tried first and is NOT the answer here** — on `d64.cpp` and `archive.cpp` it made the
+segment 1.8 KB LARGER, because the pragma replaces the build's optimization options rather
+than adding to them. That is the opposite of its effect on the C components in
+`components/`, where it is applied to a whole library that the PlatformIO builder was
+otherwise compiling at the project's global level.
+
 ### NIB read path rewritten; NB2 and NBZ actually supported
 
 `nib.cpp` was a near-copy of the old `g64.cpp` and carried every defect that one did, plus
@@ -547,13 +603,20 @@ told them apart, so they were read as plain `.nib` and came out wrong.
   windows and refuses anything that does not divide evenly. One reader handles both, and
   only the first pass is used. Verified with a 4-pass fixture that reads byte-identically to
   the 1-pass one.
-- **`.nbz` is identified by CONTENT, and both readings of it are handled.** A gzip magic
-  number means inflate the whole thing (gzip has no random access) into a buffer capped at
-  what a `.nib` can legitimately be — `0x100 + 84 * 0x2000` — so a compressed `.nb2` is
-  refused rather than exhausting the heap. Failing that, the `MNIB-1541-RAW` signature is
-  accepted at offset 0 **or offset 1**, the latter being what `MFileSystem::byContent()` has
-  always claimed for `.nbz`. Anything else is refused. Which reading is right is not
-  something this repo can settle, so it does not have to: each is detected, not assumed.
+- **`.nbz` is a compressed NIB, and it is NOT gzip.** This was first guessed at and then
+  settled by measuring the corpus in `.archive/disk/nbz`: a real `.nbz` begins with a
+  leading `$05`, then `MNIB-1541-RAW` **one byte in** - which is exactly what
+  `MFileSystem::byContent()` has always claimed - then a version byte of 3, then a perfectly
+  ordinary track table. What follows the table is compressed to variable lengths:
+  `ghostbusters[...].nbz` holds 40 tracks in 70660 bytes, about 1766 each against a plain
+  track's 8192. The per-track compression is not implemented, so the container is RECOGNISED
+  AND REFUSED with a message saying so, rather than half-read - its table parses fine and
+  every track behind it would be garbage.
+- **A gzip-compressed `.nib` is still handled**, since that is a thing people make and it
+  costs almost nothing: a gzip magic number means inflate the whole thing (gzip has no random
+  access) into a buffer capped at what a `.nib` can legitimately be, `0x100 + 84 * 0x2000`,
+  so a compressed `.nb2` is refused rather than exhausting the heap. That branch is NOT what
+  a real `.nbz` is.
 - **zlib needed an include path for the native tests.** `build_libarchive.py` already folds
   zlib into the single archive lib it prepends for every native suite, so the objects link —
   only the headers were missing. `-I components/zlib/zlib` added to `[env:native]` in both
@@ -563,6 +626,11 @@ told them apart, so they were read as plain `.nib` and came out wrong.
   Every block is compared against that `.d64`. As with g64, **most of the suite would pass
   with the old `readContainer()`** — only `test_reading_a_file_through_the_stream` drives the
   path where `_position` advances. Verified by reverting the fix: 6 of the 12 fail.
+  Two further cases run against the REAL corpus that now sits in `.archive/disk/nib` (41
+  nibbler dumps of commercial disks) and `.archive/disk/nbz`: all 41 real images produce an
+  exact whole-track stride, four of five sampled protected originals still give up a CBM
+  disk header on track 18 (the fifth is the media, not the reader), and a real `.nbz` is
+  refused cleanly.
 
 ### G71 and G81, and an MFM layer shared with P81
 

@@ -40,7 +40,6 @@
 static const char* NIB_IMAGE = ".archive/disk/nib/wolf64.nib";
 static const char* NB2_IMAGE = ".archive/disk/nib/wolf64.nb2";
 static const char* NBZ_IMAGE = ".archive/disk/nib/wolf64.nbz";
-static const char* NBZ_OFFSET_IMAGE = ".archive/disk/nib/wolf64_offset.nbz";
 static const char* SOURCE = ".archive/disk/d64/wolf64.d64";
 
 static const uint8_t SECTORS_PER_TRACK[36] = {
@@ -385,35 +384,86 @@ void test_nbz_gzip_reads_identically(void)
     }
 }
 
-// The OTHER thing a .nbz might be. MFileSystem::byContent() has always
-// described the format as having its MNIB signature one byte in, which is not
-// gzip - so both readings are accepted, each detected by content. If that
-// description is wrong the branch is simply never taken; if it is right, this
-// is the only thing that reads such a file.
-void test_nbz_offset_signature_reads_identically(void)
+// A real .nbz is refused, clearly, rather than half-read.
+//
+// This is what the corpus actually contains, and it is not what was first
+// guessed at: the signature really does sit one byte in, as
+// MFileSystem::byContent() always claimed, but behind a leading $05 and with a
+// version byte of 3 - and the tracks behind the table are COMPRESSED to
+// variable lengths (about 1766 bytes each against a plain track's 8192). The
+// per-track compression is not implemented, so the container is recognised and
+// rejected; the track table alone would be no use.
+void test_real_nbz_is_recognised_and_refused(void)
 {
-    std::shared_ptr<FileContainerStream> src;
-    auto image = openImage(src, NBZ_OFFSET_IMAGE);
-    if (image == nullptr)
-        TEST_IGNORE_MESSAGE("fixture missing");
+    static const char* NBZ_CORPUS[] = {
+        ".archive/disk/nbz/ghostbusters[activision_1984](aa)(ntsc)(!).nbz",
+        ".archive/disk/nbz/altered_beast[sega_1987](ntsc)(!).nbz",
+    };
 
-    TEST_ASSERT_TRUE(image->parseHeader());
-    TEST_ASSERT_FALSE(image->inflated);
-    TEST_ASSERT_EQUAL_UINT32(1, image->base_offset);
-
-    // Spot-check rather than sweep: the addressing is what the offset changes,
-    // and it is the same decode underneath.
-    for (uint8_t track = 1; track <= 35; track += 7)
+    int checked = 0;
+    for (size_t i = 0; i < sizeof(NBZ_CORPUS) / sizeof(NBZ_CORPUS[0]); i++)
     {
-        uint8_t block[256], expected[256];
-        char message[48];
-        snprintf(message, sizeof(message), "track %u sector 0", (unsigned)track);
+        std::shared_ptr<FileContainerStream> src;
+        auto image = openImage(src, NBZ_CORPUS[i]);
+        if (image == nullptr)
+            continue;
 
-        TEST_ASSERT_TRUE_MESSAGE(image->seekSector(track, 0, 0), message);
-        TEST_ASSERT_EQUAL_UINT32(sizeof(block), image->readContainer(block, sizeof(block)));
-        TEST_ASSERT_TRUE(referenceBlock(track, 0, expected));
-        TEST_ASSERT_EQUAL_UINT8_ARRAY_MESSAGE(expected, block, sizeof(block), message);
+        TEST_ASSERT_FALSE_MESSAGE(image->parseHeader(), NBZ_CORPUS[i]);
+        TEST_ASSERT_FALSE_MESSAGE(image->readHeader(), NBZ_CORPUS[i]);
+        checked++;
     }
+
+    if (checked == 0)
+        TEST_IGNORE_MESSAGE("no .nbz in .archive/disk/nbz");
+}
+
+// The real corpus: 41 nibbler dumps of commercial disks, none of them made by
+// this project. There is no reference image to compare content against, so
+// what is asserted is what a CBM disk cannot fake - the container parses, its
+// stride comes out an exact number of track windows, and track 18 sector 0
+// decodes as a disk header with the DOS version byte 'A'.
+//
+// These are protected originals, so tracks OUTSIDE the directory are expected
+// to fail in all sorts of ways; that is the media, not the reader.
+void test_real_nib_corpus_parses_and_reads_its_directory(void)
+{
+    static const char* REAL[] = {
+        ".archive/disk/nib/bubble_bobble[firebird_1987]-1fb126.nib",
+        ".archive/disk/nib/california_games_s1[epyx_1987]-2e35fe.nib",
+        ".archive/disk/nib/impossible_mission[epyx_1984]-c00eb9.nib",
+        ".archive/disk/nib/maniac_mansion_s1[lucasfilm_1989](ntsc)-fca0c7.nib",
+        ".archive/disk/nib/vipterm.nib",
+    };
+
+    int checked = 0;
+    int with_directory = 0;
+
+    for (size_t i = 0; i < sizeof(REAL) / sizeof(REAL[0]); i++)
+    {
+        std::shared_ptr<FileContainerStream> src;
+        auto image = openImage(src, REAL[i]);
+        if (image == nullptr)
+            continue;
+
+        TEST_ASSERT_TRUE_MESSAGE(image->parseHeader(), REAL[i]);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(NIB_TRACK_LENGTH, image->track_stride, REAL[i]);
+        checked++;
+
+        // A protected disk can do anything it likes with its directory track,
+        // so this counts rather than requires - but if NONE of them read, the
+        // reader is broken rather than the media.
+        if (image->seekSector(18, 0, 0) && image->sector_buffer[2] == 0x41)
+            with_directory++;
+    }
+
+    if (checked == 0)
+        TEST_IGNORE_MESSAGE("no real .nib images in .archive/disk/nib");
+
+    printf("real nib corpus: %d parsed, %d with a readable CBM directory track\n",
+           checked, with_directory);
+
+    TEST_ASSERT_TRUE_MESSAGE(with_directory > 0,
+        "no real image produced a CBM disk header - the reader, not the media");
 }
 
 // Something that is neither gzip nor a NIB has to be refused rather than
@@ -455,7 +505,8 @@ int main(int argc, char** argv)
     RUN_TEST(test_reading_a_file_through_the_stream);
     RUN_TEST(test_nb2_multi_pass_reads_identically);
     RUN_TEST(test_nbz_gzip_reads_identically);
-    RUN_TEST(test_nbz_offset_signature_reads_identically);
+    RUN_TEST(test_real_nbz_is_recognised_and_refused);
+    RUN_TEST(test_real_nib_corpus_parses_and_reads_its_directory);
     RUN_TEST(test_unrecognised_container_is_refused);
     RUN_TEST(test_every_sector_matches_the_source_image);
 

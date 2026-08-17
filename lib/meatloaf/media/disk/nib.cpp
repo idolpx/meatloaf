@@ -17,6 +17,7 @@
 
 #include "nib.h"
 
+
 #include <cstring>
 
 #include <zlib.h>
@@ -224,9 +225,20 @@ bool NIBMStream::parseHeader()
     }
     else if (std::memcmp(probe + 1, "MNIB-1541-RAW", 13) == 0)
     {
-        // MFileSystem::byContent() has always described .nbz this way: the
-        // signature a byte in. Honour it rather than argue with it.
-        base_offset = 1;
+        // A real .nbz, and this is what one is - established by measuring the
+        // corpus rather than guessing. The signature sits one byte in behind a
+        // leading $05, the version byte that follows it is 3 rather than 0, the
+        // track table is a normal one, and the tracks after it are COMPRESSED
+        // to variable lengths: ghostbusters[...].nbz carries 40 tracks in 70660
+        // bytes, about 1766 each against a plain NIB track's 8192.
+        //
+        // So the container is recognised and refused rather than half-read. The
+        // per-track compression is not implemented; without it the track table
+        // is readable but every track behind it is not, and serving those bytes
+        // would be worse than saying so.
+        Debug_printv("compressed .nbz images are not supported - "
+                     "the per-track compression is not implemented");
+        return false;
     }
 
     const uint32_t size = imageSize();

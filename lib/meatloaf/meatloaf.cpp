@@ -64,6 +64,7 @@
 
 // Archive
 #include "media/archive/archive.h"
+#include "media/archive/arc.h"
 #include "media/archive/ark.h"
 #include "media/archive/lbr.h"
 #include "media/archive/lnx.h"
@@ -100,12 +101,16 @@
 #include "media/disk/d82.h"
 #include "media/disk/dxm.h"
 #include "media/disk/g64.h"
+#ifdef EXTRA_DISK_FORMATS
 #include "media/disk/g71.h"
 #include "media/disk/g81.h"
+#endif
 #include "media/disk/m2i.h"
 #include "media/disk/nib.h"
 #include "media/disk/p64.h"
+#ifdef EXTRA_DISK_FORMATS
 #include "media/disk/p81.h"
+#endif
 
 // Hard Disk
 #include "media/hd/d90.h"
@@ -331,6 +336,7 @@ I2CMFileSystem i2cFS;
 
 // Archive
 ArchiveMFileSystem archiveFS;
+ARCMFileSystem arcFS;
 ARKMFileSystem arkFS;
 LBRMFileSystem lbrFS;
 LNXMFileSystem lnxFS;
@@ -370,12 +376,16 @@ D82MFileSystem d82FS;
 D90MFileSystem d90FS;
 DXMMFileSystem dxmFS;
 G64MFileSystem g64FS;
+#ifdef EXTRA_DISK_FORMATS
 G71MFileSystem g71FS;
 G81MFileSystem g81FS;
+#endif
 M2IMFileSystem m2iFS;
 NIBMFileSystem nibFS;
 P64MFileSystem p64FS;
+#ifdef EXTRA_DISK_FORMATS
 P81MFileSystem p81FS;
+#endif
 
 // Hard Disk
 DNPMFileSystem dnpFS;
@@ -423,6 +433,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
 
     // Archive
     &archiveFS,     // extension-based FS have to be on top to be picked first, otherwise the scheme will pick them!
+    &arcFS,
     &arkFS, &lbrFS, &lnxFS,
 #endif
 
@@ -435,7 +446,10 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     // Disk
     &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d90FS,
     &dxmFS,
-    &g64FS, &g71FS, &g81FS, &m2iFS, &nibFS, &p64FS, &p81FS,
+    &g64FS, &m2iFS, &nibFS, &p64FS,
+#ifdef EXTRA_DISK_FORMATS
+    &g71FS, &g81FS, &p81FS,
+#endif
 
     // Hard Disk
     &dnpFS, &dhdFS, &hddFS,

@@ -17,6 +17,7 @@
 
 #include "g81.h"
 
+
 #include <cstring>
 
 static uint32_t g81_le32(const uint8_t *p)

@@ -36,6 +36,8 @@
 #include "meatloaf.h"
 #include "meat_media.h"
 
+#include <vector>
+
 
 /********************************************************
  * Streams
@@ -52,25 +54,43 @@ public:
     };
 
 protected:
-    struct Header {
-        std::string signature;
-        uint16_t directory_blocks;
-        uint16_t entry_count;
-    };
-
+    // One entry's header, as it sits in the container. The fixed part is
+    // version..fnlen, then the name, then two more fields on version 2, then
+    // per-mode extras that only the decompressor needs.
     struct Entry {
         std::string filename;
-        uint16_t block_count;
-        std::string type;
-        uint8_t lsu;  // Last Sector Used
-        uint16_t rel_record_size;  // For REL files
-        uint32_t offset;
-        uint32_t size;
+        uint8_t version = 0;    // 1 or 2
+        uint8_t mode = 0;       // 0 store, 1 pack, 2 squeeze, 3 crunch,
+                                // 4 squeeze+pack, 5 crunch in one pass
+        uint16_t check = 0;     // checksum the entry claims
+        uint32_t size = 0;      // uncompressed size (three bytes stored)
+        uint16_t blocks = 0;    // compressed size in 254-byte CBM blocks
+        uint8_t type = 0;       // 'P', 'S', 'U' or 'R'
+        uint8_t rel_record_size = 0;
+        uint16_t date = 0;
+        uint32_t offset = 0;    // container offset of this entry's HEADER
     };
 
+    // Where the archive proper starts. Zero for a .arc; for a .sda it is past
+    // the BASIC loader and machine code that make it self-dissolving.
+    uint32_t archive_offset = 0;
+    bool header_parsed = false;
+    bool header_ok = false;
+
     std::vector<Entry> entries;
-    int8_t loadEntries();
-    void skipBasicLoader();
+
+    // Walks every entry header once. Cheap: the next header sits exactly
+    // blocks * 254 bytes past this one, so the walk never has to look at
+    // compressed data or build a Huffman table.
+    bool loadEntries();
+
+    // Finds the first byte of the archive, skipping a .sda's BASIC loader.
+    bool skipBasicLoader();
+
+    // Decompresses one whole entry into `data`. Streaming it would mean
+    // carrying Huffman and LZW state across readFile() calls for no gain: a
+    // CBM file is small, and the drive reads it start to end anyway.
+    bool extractEntry( const Entry &e );
 
     bool readHeader() override;
     bool seekEntry( std::string filename ) override;
@@ -80,8 +100,14 @@ protected:
     uint32_t writeFile(uint8_t* buf, uint32_t size) override { return 0; };
     bool seekPath(std::string path) override;
 
-    Header header;
+    std::string decodeType(uint8_t file_type, bool show_hidden = false) override;
+
     Entry entry;
+
+    // The entry seekPath() last extracted, and which one it is.
+    std::vector<uint8_t> data;
+    int cached_entry = -1;
+    bool checksum_ok = true;
 
 private:
     friend class ARCMFile;

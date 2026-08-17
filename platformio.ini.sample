@@ -366,6 +366,13 @@ build_flags =
     -D ENABLE_DISPLAY
     -D ENABLE_CONSOLE
     -D ENABLE_CONSOLE_TCP
+    ; The newer disk and archive formats - .arc/.sda, .g71, .g81, .p81 - are
+    ; opt-in because they do not fit alongside everything else in the ESP32's
+    ; ~3.3 MB iram0_2_seg flash-text window. The S3 has room; a plain ESP32
+    ; board is roughly 5 KB short with them all registered, so it leaves them
+    ; out rather than failing to link. .p64, .nib/.nb2/.nbz and .g64 are always
+    ; built.
+    -D EXTRA_DISK_FORMATS
 
 [env:esp32-s3-makemagazin]
 extends = esp32_base

@@ -565,6 +565,25 @@ gitignored.
 
 ## Recent Changes (August 17, 2026)
 
+### ARC/SDA archives, NIB/NB2/NBZ, G71, G81, P81 and G64 read fixes
+
+New read-only filesystem `arcFS` (`lib/meatloaf/media/archive/arc.h/.cpp`) for `.arc` and `.sda`,
+ported from cbmconvert 2.1.2's `unarc.c`. ARC is six formats in one — stored, run-length packed,
+Huffman squeezed, LZW crunched, squeezed+packed, and crunched-in-one-pass with its size and
+checksum at the END of the stream — and run-length decoding layers on top of the byte producer for
+all but two of them. The directory walk never touches compressed data (the next header is exactly
+`blocks * 254` bytes on), and only `seekPath()` decompresses, doing the whole entry at once into
+RAM. `test/native/test_arc_read/` verifies 84 entries across 9 real archives plus an SDA against
+the checksum each entry carries over its DECOMPRESSED bytes; two entries in one archive are
+genuinely damaged and are named in the test rather than waved through.
+
+**`EXTRA_DISK_FORMATS` gates the newer formats.** `.arc`, `.g71`, `.g81` and `.p81` together put a
+plain ESP32 about 5 KB over its ~3.3 MB `iram0_2_seg` flash-text window, so they are compiled but
+only registered when that flag is defined — set for `esp32-s3-devkitc-1`, not for `lolin-d32-pro`.
+`.p64`, `.nib`/`.nb2`/`.nbz` and `.g64` are always registered. Note `#pragma GCC optimize("Os")`
+made the segment BIGGER here and is not the lever it is for the C components; see
+`lib/meatloaf/AGENTS.md`.
+
 ### NIB/NB2/NBZ, G71, G81, P81 and G64 read fixes
 
 `nib.cpp` was a near-copy of the old `g64.cpp` and had every defect that one did — including
@@ -574,8 +593,9 @@ removed, and the sync scan moved off the container (it read ONE BYTE AT A TIME, 
 is thousands of range requests per sector) into a cached track buffer. `.nb2` and `.nbz` were
 already routed to it by `handles()` but read as plain `.nib`; both are now supported, identified by
 CONTENT rather than extension — a `.nb2`'s per-track stride is derived from the file length so no
-format knowledge is needed, and a `.nbz` is either gzip (inflated, size-capped) or a NIB whose
-signature starts one byte in. `test/native/test_nib_read/` covers it in 11 cases; reverting the
+format knowledge is needed, and a real `.nbz` (signature one byte in, behind a leading `$05`, with variable-length
+compressed tracks) is recognised and refused, since its per-track compression is not
+implemented; a gzip-compressed `.nib` is inflated and read. `test/native/test_nib_read/` covers it in 11 cases; reverting the
 `readContainer()` fix fails 6 of the 12.
 
 ### G71, G81, P81 (1581 flux images) and G64 read fixes
