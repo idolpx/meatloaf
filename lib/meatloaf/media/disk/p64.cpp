@@ -248,9 +248,9 @@ bool P64MStream::parseChunks()
         return false;
     }
 
-    if (std::memcmp(header, "P64-1541", 8) != 0)
+    if (std::memcmp(header, imageSignature(), 8) != 0)
     {
-        Debug_printv("not a P64-1541 image");
+        Debug_printv("not a %s image", imageSignature());
         return false;
     }
 
@@ -290,11 +290,11 @@ bool P64MStream::parseChunks()
             break;
         }
 
-        // Half track index is the low 7 bits; bit 7 selects the side. Only side
-        // 0 is read, and the mask matters - an unmasked side-1 signature byte
-        // would land in the table as a half track well past 85.
-        if (chunk[0] == 'H' && chunk[1] == 'T' && chunk[2] == 'P' &&
-            (chunk[3] & 0x80) == 0 && chunk_size >= 8)
+        // Half track index is the low 7 bits; bit 7 selects the side. The table
+        // is keyed on the RAW byte so both sides can live in it - a 1541 image
+        // only ever has side 0, a 1581 image has both - and chunkKeyFor() is
+        // what decides which key a track reads from.
+        if (chunk[0] == 'H' && chunk[1] == 'T' && chunk[2] == 'P' && chunk_size >= 8)
         {
             uint8_t half_track = chunk[3] & 0x7f;
             if (half_track >= P64_FIRST_HALF_TRACK && half_track <= P64_LAST_HALF_TRACK)
@@ -309,7 +309,7 @@ bool P64MStream::parseChunks()
 
                     if (entry.pulses > 0 && entry.size > 0 && entry.size == chunk_size - 8)
                     {
-                        half_tracks[half_track] = entry;
+                        half_tracks[chunk[3]] = entry;
                     }
                     else if (entry.size != chunk_size - 8)
                     {
@@ -348,10 +348,20 @@ bool P64MStream::decodeTrack(uint8_t track)
     if (cached_track == (int)track)
         return true;
 
-    auto it = half_tracks.find((uint8_t)(track * 2));
+    // resetEmitState() is handed the track because the 1541 read logic needs
+    // its speed zone; the cache id is the track, since that is what the caller
+    // asks for again.
+    return decodeChunk(chunkKeyFor(track), (int)track);
+}
+
+bool P64MStream::decodeChunk(uint8_t key, int cache_id)
+{
+    const uint8_t track = (uint8_t)(cache_id < 0 ? 0 : cache_id);
+
+    auto it = half_tracks.find(key);
     if (it == half_tracks.end())
     {
-        Debug_printv("no pulse data for track[%d]", track);
+        Debug_printv("no pulse data for track[%d] (chunk key %02X)", track, key);
         return false;
     }
     const HalfTrack entry = it->second;
@@ -359,7 +369,7 @@ bool P64MStream::decodeTrack(uint8_t track)
     // Bits are OR-ed into the buffer, so it has to start clear - and it holds
     // the previous track until this succeeds, which would otherwise survive in
     // the wrap-around region a sync scan reads.
-    gcr_track.assign(P64_MAX_TRACK_BYTES, 0);
+    gcr_track.assign(trackBufferBytes(), 0);
     gcr_track_bytes = 0;
     cached_track = -1;
     logged_track_mismatch = false;
@@ -392,7 +402,6 @@ bool P64MStream::decodeTrack(uint8_t track)
     // megabyte, and every pulse is consumed in exactly the order it decodes
     // (positions only ever move forward), so the two passes are folded into
     // one and the list never exists.
-    const uint32_t zone = speedZone(track);
     const uint32_t buffer_bits = (uint32_t)gcr_track.size() * 8;
 
     RangeDecoder rc;
@@ -402,14 +411,8 @@ bool P64MStream::decodeTrack(uint8_t track)
     uint32_t strength = 0;
     uint32_t count = 0;
 
-    uint32_t last_position = 0;
-    uint32_t flip_flop = 0;
-    uint32_t last_flip_flop = 0;
-    uint32_t clock = zone;
-    uint32_t counter = 0;
-    uint32_t bit_pos = 0;
-
-    uint32_t target_bits = buffer_bits;
+    resetEmitState(track);
+    emit_target_bits = buffer_bits;
 
     // A P64 holds ONE rotation, and its position 0 is wherever the imaging
     // hardware happened to start - not a gap. A sector that straddles that
@@ -433,12 +436,12 @@ bool P64MStream::decodeTrack(uint8_t track)
     {
         if (pass == 1)
         {
-            if (bit_pos >= buffer_bits)
+            if (emit_bit_pos >= buffer_bits)
                 break;  // buffer filled by the rotation alone, no room to overlap
 
-            target_bits = bit_pos + (P64_OVERLAP_BYTES * 8);
-            if (target_bits > buffer_bits)
-                target_bits = buffer_bits;
+            emit_target_bits = emit_bit_pos + (overlapBytes() * 8);
+            if (emit_target_bits > buffer_bits)
+                emit_target_bits = buffer_bits;
 
             position = P64_SAMPLES_PER_ROTATION;
             delta_position = 0;
@@ -450,7 +453,7 @@ bool P64MStream::decodeTrack(uint8_t track)
             probabilities[i] = 2048;
         rc.start(compressed, entry.size, probabilities);
 
-        while (count < entry.pulses && bit_pos < target_bits)
+        while (count < entry.pulses && emit_bit_pos < emit_target_bits)
         {
             if (rc.readFlag(MODEL_POSITION_FLAG))
             {
@@ -478,51 +481,70 @@ bool P64MStream::decodeTrack(uint8_t track)
             if (strength < 0x80000000UL)
                 continue;
 
-            uint32_t delta = position - last_position;
-            last_position = position;
+            uint32_t delta = position - emit_last_position;
+            emit_last_position = position;
 
-            uint32_t delay = 0;
-            flip_flop ^= 1;
-            do
-            {
-                if ((delay == 40) && (last_flip_flop != flip_flop))
-                {
-                    last_flip_flop = flip_flop;
-                    clock = zone;
-                    counter = 0;
-                }
-                if (clock == 16)
-                {
-                    clock = zone;
-                    counter = (counter + 1) & 0x0f;
-                    if ((counter & 3) == 2)
-                    {
-                        gcr_track[bit_pos >> 3] |=
-                            (uint8_t)((((counter + 0x1c) >> 4) & 1) << ((~bit_pos) & 7));
-                        if (++bit_pos >= target_bits)
-                            break;
-                    }
-                }
-                clock++;
-            } while (++delay < delta);
+            emitDelta(delta);
         }
     }
 
     free(probabilities);
     free(compressed);
 
-    if (bit_pos == 0)
+    if (emit_bit_pos == 0)
     {
         Debug_printv("track[%d] decoded to an empty bitstream", track);
         return false;
     }
 
-    gcr_track_bytes = (bit_pos + 7) >> 3;
-    cached_track = track;
+    gcr_track_bytes = (emit_bit_pos + 7) >> 3;
+    cached_track = cache_id;
 
-
-    //Debug_printv("track[%d] pulses[%lu] bits[%lu]", track, (unsigned long)count, (unsigned long)bit_pos);
+    //Debug_printv("track[%d] pulses[%lu] bits[%lu]", track, (unsigned long)count, (unsigned long)emit_bit_pos);
     return true;
+}
+
+// The 1541's read logic: a clock divided by the track's speed zone, advancing a
+// counter that emits one bit every four counts. Turning flux timing into bits
+// this way is what produces a GCR bitstream, and it is the half of the decoder
+// that a 1581 replaces wholesale - see P81MStream::emitDelta().
+void P64MStream::resetEmitState(uint8_t track)
+{
+    emit_last_position = 0;
+    emit_flip_flop = 0;
+    emit_last_flip_flop = 0;
+    emit_zone = speedZone(track);
+    emit_clock = emit_zone;
+    emit_counter = 0;
+    emit_bit_pos = 0;
+}
+
+void P64MStream::emitDelta(uint32_t delta)
+{
+    uint32_t delay = 0;
+    emit_flip_flop ^= 1;
+    do
+    {
+        if ((delay == 40) && (emit_last_flip_flop != emit_flip_flop))
+        {
+            emit_last_flip_flop = emit_flip_flop;
+            emit_clock = emit_zone;
+            emit_counter = 0;
+        }
+        if (emit_clock == 16)
+        {
+            emit_clock = emit_zone;
+            emit_counter = (emit_counter + 1) & 0x0f;
+            if ((emit_counter & 3) == 2)
+            {
+                gcr_track[emit_bit_pos >> 3] |=
+                    (uint8_t)((((emit_counter + 0x1c) >> 4) & 1) << ((~emit_bit_pos) & 7));
+                if (++emit_bit_pos >= emit_target_bits)
+                    break;
+            }
+        }
+        emit_clock++;
+    } while (++delay < delta);
 }
 
 int P64MStream::findSync(int p, int limit) const

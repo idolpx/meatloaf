@@ -19,8 +19,6 @@
 
 #include <cstring>
 
-#include "utils.h"
-
 /* G64-to-Nibble conversion tables */
 static uint8_t gcr_decode_high[32] = {
 	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -80,27 +78,55 @@ bool G64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
 
     sectorOffset = gcr_track_offset + (sector * 360);
     containerStream->seek( sectorOffset );
-    do
+
+    // This loop used to be a do/while that ignored findSync()'s result and
+    // spun until the header matched. When the sector is not on the track that
+    // never happens: findSync() seeks BACK to gcr_track_end and returns false,
+    // so the stream position stops advancing, the same bytes are re-read, and
+    // the comparison never changes - a hang, on the IEC task. The bound is a
+    // track's 21 sectors plus slack for false syncs in the gaps.
+    bool found = false;
+    for ( uint8_t guard = 0; guard < 64; guard++ )
     {
         //Debug_printv("track[%d] gcr_track[%d] gcr_track_offset[%04X] gcr_track_size[%d]", track, (gcr_track + 2), gcr_track_offset, gcr_track_size);
         //Debug_printv("gcr_track_end[%04X] sector_offset[%04X]", gcr_track_end, sectorOffset);
 
-        findSync( gcr_track_end );
+        if ( !findSync( gcr_track_end ) )
+            break;
+
         //Debug_printv( "Read Sector Header [%04X]", containerStream->position() );
-        readSectorHeader();
-        findSync( gcr_track_end );
+        bool header_ok = readSectorHeader();
+
+        // The next sync is this sector's data block whether or not the header
+        // was usable, and stepping over it is what leaves the stream on the
+        // FOLLOWING header when this is not the sector being looked for.
+        if ( !findSync( gcr_track_end ) )
+            break;
+
         //Debug_printv( "Read Sector Data [%04X]", containerStream->position() );
-    } 
-    while ( sector != gcr_sector_header.sector );
+        if ( header_ok && sector == gcr_sector_header.sector )
+        {
+            found = true;
+            break;
+        }
+    }
+
+    if ( !found )
+    {
+        Debug_printv("track[%d] sector[%d] not found", track, sector);
+        return false;
+    }
+
     //Debug_printv( "Start Sector Data [%04lX]", containerStream->position() );
-    readSector();
+    if ( !readSector() )
+        return false;
 
     sectorOffset += sector;
 
     this->block = sectorOffset;
     this->track = track;
     this->sector = sector;
-    _position = offset;
+    sector_pos = offset;
 
     //Debug_printv("track[%d] sector[%d] speedZone[%d] sectorOffset[%d]", track, sector, speedZone(track), sectorOffset);
 
@@ -110,9 +136,21 @@ bool G64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
 
  uint32_t G64MStream::readContainer(uint8_t *buf, uint32_t size)
 {
-    uint8_t *s = sector_buffer + _position;
-    std::memcpy(buf, s, size);
-    _position += size;
+    // The sector is already decoded in RAM, so reads walk it the way the D64
+    // layer walks the container after a seek - which means the cursor is
+    // sector_pos, NOT _position. _position is the position in the FILE being
+    // read: it keeps growing across blocks, so using it here read past the end
+    // of sector_buffer for anything longer than one block, and returned
+    // whatever followed the buffer in memory as file content.
+    if (sector_pos >= block_size)
+        return 0;
+
+    uint32_t remaining = (uint32_t)block_size - sector_pos;
+    if (size > remaining)
+        size = remaining;
+
+    std::memcpy(buf, sector_buffer + sector_pos, size);
+    sector_pos += size;
     return size;
 }
 
@@ -127,18 +165,28 @@ bool G64MStream::readSectorHeader()
     gcr_sector_header.checksum = data[1];
     gcr_sector_header.sector = data[2];
     gcr_sector_header.track = data[3];
-    printf("H[%02X] C[%02X] S[%d] T[%d] ", data[0], data[1], data[2], data[3]);
 
     containerStream->read(buf, sizeof(buf));
     convert4BytesFromGCR(buf, data);
     gcr_sector_header.id1 = data[0];
     gcr_sector_header.id0 = data[1];
-    printf("ID1[%02X] ID0[%02X]", data[0], data[1]);
 
-    uint8_t checksum = gcr_sector_header.sector ^ gcr_sector_header.track ^ gcr_sector_header.id1 ^ gcr_sector_header.id0;
+    // These three lines used to be unconditional printf()s - one per header, so
+    // a single directory listing printed a screenful and every file read printed
+    // more. They are gone rather than converted to Debug_printv: seekSector()
+    // runs from the IEC task, where printing at all is the hazard.
 
-    printf(" VERIFY[%02X]\r\n", checksum);
-    return true;
+    // The header block id, and the checksum the drive verifies it against. Both
+    // were computed and thrown away before; checking them is what lets the
+    // caller tell a real header from a false sync in a gap.
+    if ( gcr_sector_header.code != 0x08 )
+        return false;
+
+    uint8_t checksum = gcr_sector_header.checksum ^ gcr_sector_header.sector
+                     ^ gcr_sector_header.track ^ gcr_sector_header.id1
+                     ^ gcr_sector_header.id0;
+
+    return ( checksum == 0 );
 }
 
 bool G64MStream::readSector()
@@ -150,22 +198,29 @@ bool G64MStream::readSector()
     containerStream->read(buf, sizeof(buf));
     convert4BytesFromGCR(buf, data);
 
-    // Data Header 0x07
-    if ( data[0] == 0x07 )
+    // Data Header 0x07. Anything else means the sync led somewhere that is not
+    // a data block, and returning true there left sector_buffer holding the
+    // PREVIOUS sector's bytes for the caller to serve as this one's.
+    if ( data[0] != 0x07 )
     {
-        uint8_t *h = data + 1;
-        std::memcpy(d, h, 3);  // skip the header byte
-        d += 3;
-
-        for ( int i = 0; i< 64; i++ )
-        {
-            containerStream->read(buf, sizeof(buf));
-            convert4BytesFromGCR(buf, data);
-            std::memcpy(d, &data, 4);
-            d += 4;
-        }
-        util_dump_bytes(sector_buffer, sizeof(sector_buffer));
+        Debug_printv("track[%d] sector[%d] data block id [%02X]", track, sector, data[0]);
+        return false;
     }
+
+    uint8_t *h = data + 1;
+    std::memcpy(d, h, 3);  // skip the header byte
+    d += 3;
+
+    for ( int i = 0; i< 64; i++ )
+    {
+        containerStream->read(buf, sizeof(buf));
+        convert4BytesFromGCR(buf, data);
+        std::memcpy(d, &data, 4);
+        d += 4;
+    }
+
+    // A util_dump_bytes() of all 260 bytes used to run here, on every single
+    // sector read.
 
     return true;
 }

@@ -139,19 +139,47 @@ protected:
         uint32_t pulses = 0;    // pulse count the chunk header claims
     };
 
-    // Walks the chunk stream once, recording every side-0 HTPx chunk. Repeated
-    // calls are free - a directory listing calls readHeader() on every rewind
-    // and each walk is a seek plus a read per chunk, which over the network is
-    // a request per chunk.
+    // The 8-byte signature this stream will accept. A P64-1581 is the same
+    // container carrying MFM flux instead of GCR - see p81.h.
+    virtual const char *imageSignature() const { return "P64-1541"; }
+
+    // Which chunk holds a track. The key is the RAW signature byte of the HTPx
+    // chunk, so it carries the side in bit 7 and the half track index in the
+    // low seven - a 1541 has one side and half-steps, so half track = track * 2.
+    virtual uint8_t chunkKeyFor( uint8_t track ) const { return (uint8_t)(track * 2); }
+
+    // Size of the decoded bitstream buffer, and how much of the next rotation is
+    // decoded past the end of the first. MFM packs a rotation into far more
+    // cells than GCR packs into bits, and its sectors are larger, so a 1581
+    // needs both of these bigger.
+    virtual uint32_t trackBufferBytes() const { return P64_MAX_TRACK_BYTES; }
+    virtual uint32_t overlapBytes() const { return P64_OVERLAP_BYTES; }
+
+    // Walks the chunk stream once, recording every HTPx chunk under its raw
+    // signature byte. Repeated calls are free - a directory listing calls
+    // readHeader() on every rewind and each walk is a seek plus a read per
+    // chunk, which over the network is a request per chunk.
     bool parseChunks();
 
     // Decodes one track's pulses into gcr_track. Caches the last track, since
     // reading a file walks its block chain within a track before leaving it.
     bool decodeTrack( uint8_t track );
 
+    // Decodes one chunk into gcr_track. decodeTrack() is the caller that knows
+    // how a track maps to a chunk; a format with two sides addresses chunks
+    // itself and calls this directly.
+    bool decodeChunk( uint8_t key, int cache_id );
+
+    // Turns one flux gap into bits. The default is the 1541's read logic: a
+    // clock divided by the speed zone, emitting a bit every four counts, which
+    // is what turns pulse timing into a GCR bitstream. MFM needs only the gap
+    // length, so it overrides this rather than reimplementing the decoder.
+    virtual void resetEmitState( uint8_t track );
+    virtual void emitDelta( uint32_t delta );
+
     // Finds sector on the decoded track and fills sector_buffer with its 256
     // bytes (link bytes included, as the D64 layer expects).
-    bool loadSector( uint8_t track, uint8_t sector );
+    virtual bool loadSector( uint8_t track, uint8_t sector );
 
     // Bit-resolution scan for a sync mark, starting at bit p and giving up
     // after limit bits. Returns the bit position of the first non-sync bit, or
@@ -169,6 +197,17 @@ protected:
     std::vector<uint8_t> gcr_track;
     uint32_t gcr_track_bytes = 0;
     int cached_track = -1;
+
+    // Emit state, shared by both read logics so the overlap replay can carry it
+    // across the seam. The 1541 logic uses all of it; MFM uses only bit_pos.
+    uint32_t emit_last_position = 0;
+    uint32_t emit_flip_flop = 0;
+    uint32_t emit_last_flip_flop = 0;
+    uint32_t emit_clock = 0;
+    uint32_t emit_zone = 0;
+    uint32_t emit_counter = 0;
+    uint32_t emit_bit_pos = 0;
+    uint32_t emit_target_bits = 0;
 
     // Whether the sector loadSector() last served had a valid data checksum.
     // The bytes are handed over either way - an original disk can carry

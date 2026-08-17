@@ -151,7 +151,7 @@ lib/meatloaf/
 ├── meat_session.h/cpp      # SessionBroker, MSession, CachedFile (HIMEM-aware)
 ├── iec_pipe.h              # IEC device communication pipes
 ├── media/                  # Container format implementations
-│   ├── disk/              # Disk images: d64, d71, d80, d81, d82, d90, g64, m2i, nib, p64
+│   ├── disk/              # Disk images: d64, d71, d80, d81, d82, d90, g64, m2i, nib, p64, p81
 │   ├── archive/           # Archives: zip, rar, tar, lbr, ark
 │   ├── tape/              # Tapes: tap/dmp/htap (TAPClean-based, see tape_decoder), t64, tcrt
 │   ├── cartridge/         # Cartridge: crt
@@ -513,7 +513,106 @@ When implementing a new stream:
 6. Verify ImageBroker caching works correctly
 7. Check memory leaks with stream chains
 
+## Recent Changes (August 17, 2026)
+
+### P81 — the same container, a completely different physical format
+
+New read-only filesystem `p81FS` (`media/disk/p81.h/.cpp`) for `.p81`, deriving from
+`P64MStream`. The container half really is shared and really is inherited — header, chunk
+stream, range decoder, rotation-seam overlap replay, track cache. **Everything downstream
+of the pulses is different**, and calling this a geometry override would be wrong:
+
+| | .p64 (1541) | .p81 (1581) |
+|---|---|---|
+| encoding | GCR | MFM |
+| read logic | 1541 clock/counter, per speed zone | fixed 2 µs cell |
+| sync | ten or more 1 bits | `$4489` (an `$A1` with a missing clock bit) ×3 |
+| integrity | XOR checksum | CRC-16/CCITT |
+| sides | one | two |
+| stepping | half tracks, `ht = track * 2` | whole cylinders, `cylinder = ht - 2` |
+| speed zones | four | one |
+| sector | 256 bytes | 512 bytes, split into two CBM blocks |
+
+- **MFM was established by measurement, not by assumption.** The pulse spacings on
+  `td1581.p81` are exactly 4.00, 6.00 and 8.00 µs — the 2T/3T/4T of double-density MFM at a
+  2 µs cell (32 samples at the P64 16 MHz clock) — and nothing like the 1541's GCR timing.
+  Neither the P64 reference implementation nor VICE decodes a P64-1581 at all (both check
+  for the literal `P64-1541` signature), so there is no upstream to copy from.
+- **The P64 side bit is INVERTED relative to the head the address marks report.** Side 0 of
+  the image carries head 1 and side 1 carries head 0, on every chunk of every cylinder.
+  This is the one thing here that will silently produce plausible-but-wrong data if it is
+  "corrected": both surfaces decode cleanly, so only a block chain or a directory notices.
+- **Mapping**: CBM track 1-80 → cylinder `track - 1`; block 0-39 → head `block / 20`,
+  physical sector `((block % 20) / 2) + 1`, and the low or high 256-byte half by `block % 2`.
+  The chunk key is `(side << 7) | (cylinder + 2)` and the cache id is `cylinder * 2 + head`
+  — the two heads of a cylinder are different chunks and must not share a decoded buffer.
+- **The MFM buffer is much bigger than the GCR one**: a rotation is 3200000 / 32 = 100000
+  cells = 12500 bytes, against a 1541's ~7100. `trackBufferBytes()`/`overlapBytes()` are
+  virtual for this reason, and the overlap is 2048 bytes because it has to exceed a whole
+  512-byte MFM sector (~1150 bytes of cells), where 512 sufficed for GCR.
+- **What P64MStream had to expose to make this work**: `imageSignature()`, `chunkKeyFor()`,
+  `trackBufferBytes()`, `overlapBytes()`, `resetEmitState()`, `emitDelta()` and
+  `loadSector()` are now virtual, and the chunk table is keyed on the **raw** HTPx signature
+  byte (side in bit 7) instead of the masked half track, so both sides can live in it.
+  `decodeChunk(key, cache_id)` is the entry point a two-sided format calls directly.
+  `emitDelta()` is the seam: one flux gap in, bits out — the 1541 read logic and "round the
+  gap to a cell count" are the two implementations of exactly that.
+- **Host tests**: `test/native/test_p81_read/` — 10 cases against the real
+  `.archive/disk/p81/td1581.p81`. Two are load-bearing and neither can be dropped:
+  `test_every_block_of_every_track_reads` sweeps all 80 cylinders × 40 blocks across both
+  heads with the CRC checked on every one, and **`test_file_chains_match_their_directory_block_counts`
+  is the only thing that constrains the sector ORDER** — the sweep would pass just as
+  happily if the logical-to-physical mapping shuffled blocks within a head, since all 3200
+  would still decode and pass CRC, just in the wrong order. A chain walk cannot be fooled
+  that way: every link names the next block, so it runs long, runs short or dies.
+- **A 1581 directory can hold CBM sub-partition entries (type `$85`)**, and their "blocks"
+  field is the SIZE of a partition area, not the length of a chain — `td1581.p81` has one,
+  `PIC.DIR`, 400 blocks. Anything walking chains out of a 1581 directory must filter to
+  SEQ/PRG/USR; that filter is what the first run of the chain test was missing.
+
 ## Recent Changes (August 16, 2026)
+
+### G64 read path: three defects, and a test suite that can reach them
+
+- **`readContainer()` returned memory past its sector buffer for any multi-block file.** It
+  indexed `sector_buffer` by `_position`, which is the position in the FILE being read, not
+  the offset within the decoded sector. `D64MStream::readFile()` calls `readContainer()`
+  repeatedly between `seekSector()` calls, so from the second block on it read past the end
+  of a 260-byte buffer and handed back adjacent memory as file content. Fixed the way p64
+  does it: a `sector_pos` cursor set by `seekSector()` and bounds-checked against
+  `block_size`.
+- **`seekSector()` hung on a sector that is not on the track.** Its `do { findSync;
+  readSectorHeader; findSync; } while (sector != gcr_sector_header.sector);` ignored
+  `findSync()`'s result, and when the sector is absent that loop never terminates:
+  `findSync()` seeks BACK to the track end and returns false, so the stream position stops
+  advancing, the same bytes are re-read forever. On the IEC task. Now a bounded scan that
+  checks every `findSync()` and returns false when the sector is not found.
+- **`readSector()` returned true when the data block id was not `$07`**, leaving the
+  PREVIOUS sector's bytes in `sector_buffer` for the caller to serve as this one's. It now
+  fails, and `seekSector()` propagates that.
+- **`readSectorHeader()` computed the header checksum and threw it away** — it existed only
+  to be `printf`'d. It now validates the block id and the checksum and returns false on
+  either, which is what lets the scan tell a real header from a false sync in a gap.
+- **The `printf()`s are gone, not converted to `Debug_printv`.** `readSectorHeader()`
+  printed three lines per header and `readSector()` called
+  `util_dump_bytes(sector_buffer, 260)` on EVERY sector read. These run from the IEC task,
+  where printing at all is the hazard — the same rule the `iecClock` entry documents.
+  Removing the dump orphaned `#include "utils.h"`, which went with it.
+- **Host tests**: `test/native/test_g64_read/` — 6 cases. There is no `.g64` anywhere in
+  `.archive` and the firmware has a GCR decoder but no encoder, so the fixture is generated
+  from a real `.d64` by `host/make_g64.py` (checked in; the tests skip cleanly when it has
+  not been run). Every decoded block is compared byte for byte against the source `.d64`,
+  which is an independent reference for the CONTENT even though the encoding is this
+  project's own round trip.
+- **`test_reading_a_file_through_the_stream_matches_the_source` is the only one of the six
+  that actually reproduces the first defect, and that is worth knowing before trusting the
+  others.** The rest call `readContainer()` straight after a `seekSector()`, so `_position`
+  never advances and the OLD code passes them. The bug needs the real path —
+  `MMediaStream::read()` → `readFile()` → `readContainer()` — where `_position` grows with
+  every byte returned. Verified by reverting the fix and re-running: 4 of the 6 fail,
+  including this one and the full-disk sweep. Note also that `seekPath()` matches against
+  `mstr::toUTF8()` of the entry name, so a test passing the raw directory bytes as a name
+  matches nothing — PETSCII `$41-$5A` map to lowercase.
 
 ### P64 flux-level disk images (`media/disk/p64.h/.cpp`, new; registered as `p64FS`)
 

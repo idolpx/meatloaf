@@ -134,6 +134,13 @@ public:
 protected:
     uint8_t sector_buffer[260];
 
+    // Read cursor WITHIN sector_buffer. It cannot be _position: that is the
+    // position in the FILE being read, and D64MStream::readFile() calls
+    // readContainer() repeatedly between seekSector() calls, so indexing a
+    // 260-byte sector buffer by it walks off the end on the second block of
+    // any file.
+    uint16_t sector_pos = 0;
+
 private:
     friend class G64MFile;
 };
