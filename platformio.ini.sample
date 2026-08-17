@@ -213,6 +213,10 @@ build_flags =
     ; (mingw gaps, freertos/esp stubs, and the libarchive config override -
     ; see test/native/test_archive_extract/host/config.h).
     -I components/libarchive/lib
+    ; test_nib_read: zlib's headers, for the gzip-compressed .nbz container.
+    ; The library objects themselves are already linked - build_libarchive.py
+    ; folds zlib into the single archive lib it prepends for every native suite.
+    -I components/zlib/zlib
     -I test/native/test_archive_extract/host
     -include test/native/test_archive_extract/host/host_posix_compat.h
     ;-lgcov

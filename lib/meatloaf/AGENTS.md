@@ -151,7 +151,7 @@ lib/meatloaf/
 ├── meat_session.h/cpp      # SessionBroker, MSession, CachedFile (HIMEM-aware)
 ├── iec_pipe.h              # IEC device communication pipes
 ├── media/                  # Container format implementations
-│   ├── disk/              # Disk images: d64, d71, d80, d81, d82, d90, g64, g71, g81, m2i, nib, p64, p81 (mfm.h shared by g81+p81)
+│   ├── disk/              # Disk images: d64, d71, d80, d81, d82, d90, g64, g71, g81, m2i, nib/nb2/nbz, p64, p81 (mfm.h shared by g81+p81)
 │   ├── archive/           # Archives: zip, rar, tar, lbr, ark
 │   ├── tape/              # Tapes: tap/dmp/htap (TAPClean-based, see tape_decoder), t64, tcrt
 │   ├── cartridge/         # Cartridge: crt
@@ -514,6 +514,55 @@ When implementing a new stream:
 7. Check memory leaks with stream chains
 
 ## Recent Changes (August 17, 2026)
+
+### NIB read path rewritten; NB2 and NBZ actually supported
+
+`nib.cpp` was a near-copy of the old `g64.cpp` and carried every defect that one did, plus
+two of its own. `.nb2` and `.nbz` were already listed in `handles()` but nothing in the code
+told them apart, so they were read as plain `.nib` and came out wrong.
+
+- **`readContainer()` indexed `sector_buffer` by `_position`** — the same defect g64 had, with
+  the same consequence: from the second block of any file onward it read past the buffer and
+  returned adjacent memory as file content. Fixed with a bounds-checked `sector_pos` cursor.
+- **The track-table search was unbounded**: `do { read 2 bytes; index++ } while (wanted !=
+  found && found != 0)`. A track the table does not list walked off the end of the header and
+  on through the track data with nothing to stop it. It is now a bounded loop over at most 84
+  entries, parsed once in `parseHeader()` into an offset table.
+- **The sector search called `readSectorHeader()` before finding any sync at all**, and
+  looped on a flag that a failing `findSync()` could leave set. Rewritten as the bounded
+  sync → header → validate → data scan g64 now uses.
+- **`readSector()` returned true when the data block id was not `$07`**, leaving the previous
+  sector's bytes to be served as this one's; and the header checksum was computed and thrown
+  away, existing only to be `printf`'d. Both fixed, and the `printf`s and the per-sector
+  `util_dump_bytes()` are gone — they ran on the IEC task.
+- **`findSync()` read ONE BYTE AT A TIME straight from the container.** Over a network that
+  is thousands of range requests per sector. The track window is now pulled into RAM once
+  (`loadTrack()`, cached) and scanned there, which is the same shape g81/p81 use.
+- **A NIB track has NO length field**, unlike a `.g64` which stores one per track. The window
+  is a fixed 8192 bytes and whatever the nibbler did not fill is padding, so the whole window
+  is searchable and the header checksum is what rejects the junk. Do not invent a length.
+- **`.nb2` needs no format knowledge — the stride is DERIVED.** A `.nb2` holds several passes
+  of each track one after another and nothing in the header says how many, so
+  `parseHeader()` computes `(size - 0x100) / entries`, rounds it to a whole number of track
+  windows and refuses anything that does not divide evenly. One reader handles both, and
+  only the first pass is used. Verified with a 4-pass fixture that reads byte-identically to
+  the 1-pass one.
+- **`.nbz` is identified by CONTENT, and both readings of it are handled.** A gzip magic
+  number means inflate the whole thing (gzip has no random access) into a buffer capped at
+  what a `.nib` can legitimately be — `0x100 + 84 * 0x2000` — so a compressed `.nb2` is
+  refused rather than exhausting the heap. Failing that, the `MNIB-1541-RAW` signature is
+  accepted at offset 0 **or offset 1**, the latter being what `MFileSystem::byContent()` has
+  always claimed for `.nbz`. Anything else is refused. Which reading is right is not
+  something this repo can settle, so it does not have to: each is detected, not assumed.
+- **zlib needed an include path for the native tests.** `build_libarchive.py` already folds
+  zlib into the single archive lib it prepends for every native suite, so the objects link —
+  only the headers were missing. `-I components/zlib/zlib` added to `[env:native]` in both
+  `platformio.ini` and `platformio.ini.sample`.
+- **Host tests**: `test/native/test_nib_read/` — 11 cases over fixtures generated from a real
+  `.d64` by `host/make_nib.py` (which writes `.nib` and, with `-p N`, a multi-pass `.nb2`).
+  Every block is compared against that `.d64`. As with g64, **most of the suite would pass
+  with the old `readContainer()`** — only `test_reading_a_file_through_the_stream` drives the
+  path where `_position` advances. Verified by reverting the fix: 6 of the 12 fail.
 
 ### G71 and G81, and an MFM layer shared with P81
 

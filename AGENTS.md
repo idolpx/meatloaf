@@ -565,6 +565,19 @@ gitignored.
 
 ## Recent Changes (August 17, 2026)
 
+### NIB/NB2/NBZ, G71, G81, P81 and G64 read fixes
+
+`nib.cpp` was a near-copy of the old `g64.cpp` and had every defect that one did — including
+`readContainer()` indexing its sector buffer by `_position` — plus an unbounded track-table search
+and a sector scan that read a header before finding any sync. All fixed, the per-sector `printf`s
+removed, and the sync scan moved off the container (it read ONE BYTE AT A TIME, which over a network
+is thousands of range requests per sector) into a cached track buffer. `.nb2` and `.nbz` were
+already routed to it by `handles()` but read as plain `.nib`; both are now supported, identified by
+CONTENT rather than extension — a `.nb2`'s per-track stride is derived from the file length so no
+format knowledge is needed, and a `.nbz` is either gzip (inflated, size-capped) or a NIB whose
+signature starts one byte in. `test/native/test_nib_read/` covers it in 11 cases; reverting the
+`readContainer()` fix fails 6 of the 12.
+
 ### G71, G81, P81 (1581 flux images) and G64 read fixes
 
 Three new read-only filesystems. `g71FS` (`lib/meatloaf/media/disk/g71.h`) is a `.g64` with a
