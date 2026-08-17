@@ -384,7 +384,7 @@ namespace ESP32Console
             vTaskDelete(exec_task_);
             exec_task_ = nullptr;
             xSemaphoreGive(exec_mutex_);
-            Debug_printv("console exec task freed after idle timeout");
+            //Debug_printv("console exec task freed after idle timeout");
         }
         xSemaphoreGive(exec_users_mutex_);
     }

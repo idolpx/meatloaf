@@ -20,4 +20,5 @@
 // https://ist.uwaterloo.ca/~schepers/formats/ZIP_DISK.TXT
 // https://ist.uwaterloo.ca/~schepers/formats/ZIP_FILE.TXT
 // https://ist.uwaterloo.ca/~schepers/formats/ZIP_SIX.TXT
+// https://www.infinite-loop.at/Power64/Documentation/Power64-ReadMe/AE-File_Formats.html#Section%20E.5
 //

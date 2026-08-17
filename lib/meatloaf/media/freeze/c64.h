@@ -16,7 +16,7 @@
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
 
-// .C64 - Power64 Snapshot File
+// .C64 - CCS64 Freeze File
 //
-// https://www.infinite-loop.at/Power64/Documentation/Power64-ReadMe/AE-File_Formats.html#Section%20E.2
+// https://www.computerbrains.com/ccs64.html
 // 

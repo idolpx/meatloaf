@@ -182,11 +182,11 @@ public:
           last_activity(std::chrono::steady_clock::now()),
           keep_alive_interval(30000) // Default 30 seconds
     {
-        Debug_printv("MSession created: %s", key.c_str());
+        //Debug_printv("MSession created: %s", key.c_str());
     }
 
     virtual ~MSession() {
-        Debug_printv("MSession destroyed: %s", key.c_str());
+        //Debug_printv("MSession destroyed: %s", key.c_str());
         // Don't call disconnect() here - it's pure virtual
         // Derived classes should call disconnect() in their destructors
     }
@@ -424,7 +424,7 @@ private:
     static void disposeByKey(const std::string& key) {
         auto it = session_repo.find(key);
         if (it != session_repo.end()) {
-            Debug_printv("Disposing session: %s", key.c_str());
+            //Debug_printv("Disposing session: %s", key.c_str());
             // Disconnect explicitly: a stale shared_ptr held elsewhere would
             // otherwise keep the destructor (and the socket close) from
             // running when the repo entry is erased
@@ -563,7 +563,7 @@ public:
                 if (session->isBusy() || session->getIdleTime() < session->getIdleGracePeriod()) {
                     continue;
                 }
-                Debug_printv("Session not in use, removing: %s", key.c_str());
+                //Debug_printv("Session not in use, removing: %s", key.c_str());
                 to_remove.push_back(key);
                 continue;
             }

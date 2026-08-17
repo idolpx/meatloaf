@@ -18,4 +18,5 @@
 // .X64 - Disk Image Format
 //
 // https://vice-emu.sourceforge.io/vice_17.html#SEC423
+// https://www.infinite-loop.at/Power64/Documentation/Power64-ReadMe/AE-File_Formats.html#Section%20E.3
 //
