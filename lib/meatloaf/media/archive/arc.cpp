@@ -24,6 +24,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <new>          // placement new for the heap-allocated ArcDecoder
 
 #include "utils.h"
 
@@ -705,7 +706,28 @@ bool ARCMStream::extractEntry( const Entry &e )
         return false;
     }
 
-    ArcDecoder d;
+    // HEAP, never the stack. ArcDecoder carries the LZW string table
+    // (lz_prefix 4096*2 + lz_ext 4096) and the Huffman tables (hc 256*4 +
+    // hl + hv), about 14.4 KB - more than a task stack here can spare. As a
+    // local it overflowed `console_exec` (16 KB) the moment extractEntry was
+    // entered, because the frame is reserved on entry: the fault landed
+    // wherever the next deep call touched, which is why it first showed up as
+    // a LoadProhibited inside fread rather than as anything to do with ARC.
+    // `bus_iec` (20 KB) would have been just as exposed on a C64 LOAD.
+    // Not a std::unique_ptr with plain new: ESP-IDF compiles -fno-exceptions,
+    // so a throwing allocation is an abort() - malloc and a NULL check, the
+    // same pattern p64.cpp uses for its probability table.
+    ArcDecoder *decoder = (ArcDecoder *)malloc(sizeof(ArcDecoder));
+    if (decoder == nullptr)
+    {
+        Debug_printv("no memory for the decoder (%u bytes)", (unsigned)sizeof(ArcDecoder));
+        free(compressed);
+        return false;
+    }
+    // Placement-new so the member initialisers run; ArcDecoder is trivially
+    // destructible, so free() alone is the correct teardown.
+    ArcDecoder &d = *new (decoder) ArcDecoder();
+
     d.input = compressed;
     d.input_size = available_bytes;
     d.version = e.version;
@@ -727,6 +749,7 @@ bool ARCMStream::extractEntry( const Entry &e )
         {
             Debug_printv("[%s] has an unreadable Huffman table", e.filename.c_str());
             free(compressed);
+            free(decoder);
             return false;
         }
     }
@@ -787,6 +810,7 @@ bool ARCMStream::extractEntry( const Entry &e )
     }
 
     free(compressed);
+    free(decoder);
 
     cached_entry = (int)e.offset;
     return true;
