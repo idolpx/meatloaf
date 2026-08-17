@@ -660,7 +660,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
 
     if ( r != ARCHIVE_OK ) {
         if (r == ARCHIVE_EOF) {
-            Debug_printv("End of archive reached");
+            //Debug_printv("End of archive reached");
         } else {
             // Suppress expected end-of-archive errors from compressed streams
             const char* err_str = archive_error_string(a);
