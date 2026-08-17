@@ -602,6 +602,16 @@ touched and what it is worth.
 - **Not converted, deliberately**: the status channel, `exec`, fuji and network paths, which convert
   at their own edges; and `EFCRTMFile::getNextFileInDir()`, which is declared in `easyfs.h` with no
   definition anywhere, so EasyFS has no working listing to convert.
+- **The `[DIR]` extra-INFO line is FIXED as a side effect, and a hardware comparison will show it
+  changing.** `iecChannelHandlerDir`'s constructor already ran `toPETSCII2` over all six values it
+  composes those lines from (`drive.cpp:446-451`), `inImage = m_dir->pathInStream` among them. That
+  was a DOUBLE conversion while `pathInStream` held raw PETSCII — raw PETSCII read as UTF-8 maps
+  into the shifted `$C1-$DA` range, i.e. graphics characters — so a subdirectory listing inside a
+  container announced itself in garbage. Now `pathInStream` is UTF-8 and the conversion is the only
+  one. The line's TITLES (`"NFO ["`, `"PATH"`, `"IMAGE"`, `"DIR"`) are raw uppercase ASCII and stay
+  that way: they are never converted, and raw uppercase ASCII already IS unshifted PETSCII capitals.
+  Every one of those six values is UTF-8 by construction — `media_archive`/`media_image` are only
+  ever assigned from an MFile `name` or propagated from `sourceFile`, never from raw media bytes.
 
 Builds on `lolin-d32-pro` (Flash 42.5%) and `esp32-s3-devkitc-1` (Flash 82.0%). Full native suite
 17 pass; `test_EdUrlParser`, `test_strings` and `test_hdd_read` error identically at baseline

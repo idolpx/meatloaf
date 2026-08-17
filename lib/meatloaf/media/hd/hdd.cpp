@@ -1223,7 +1223,8 @@ MFile* HDDMFile::getNextFileInDir()
         mstr::replaceAll(fname, "/", "\\");
 
         // By NUMBER, not name: CFS names are 16 bytes that may contain '/'
-        // and spaces, which do not survive a URL path component.
+        // and spaces, which do not survive a URL path component. (fname is the
+        // same string with '/' escaped, which is why the URL does not use it.)
         //auto file = MFSOwner::File(url + "/" + std::to_string((unsigned)p.number));
         auto file = MFSOwner::File(url + "/" + mstr::toUTF8(p.name));
         file->name = fname;
