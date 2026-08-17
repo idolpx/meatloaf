@@ -226,6 +226,9 @@ MFile *LBRMFile::getNextFileInDir()
         if (i == std::string::npos || i > 16) i = 16;
         filename = filename.substr(0, i);
         // mstr::rtrimA0(filename);
+        // PETSCII in the archive, UTF-8 from here on - seekEntry() converts
+        // the stored name the same way, so a listed name can be typed back.
+        filename = mstr::toUTF8(filename);
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (sourceFile->url + "/" + fileName).c_str() );
 

@@ -328,6 +328,9 @@ MFile *LNXMFile::getNextFileInDir()
         size_t i = filename.find_first_of(0xA0);
         if (i == std::string::npos || i > 16) i = 16;
         filename = filename.substr(0, i);
+        // PETSCII in the archive, UTF-8 from here on - seekEntry() converts
+        // the stored name the same way, so a listed name can be typed back.
+        filename = mstr::toUTF8(filename);
         mstr::replaceAll(filename, "/", "\\");
 
         // sourceFile->url is the archive's PARENT DIRECTORY - see the note in

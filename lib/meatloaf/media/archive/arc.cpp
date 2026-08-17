@@ -882,7 +882,9 @@ MFile *ARCMFile::getNextFileInDir()
 
     if (image->getNextImageEntry())
     {
-        std::string filename = image->entry.filename;
+        // PETSCII in the archive, UTF-8 from here on - seekEntry() converts
+        // the stored name the same way, so a listed name can be typed back.
+        std::string filename = mstr::toUTF8(image->entry.filename);
         mstr::replaceAll(filename, "/", "\\");
 
         // fullUrl() rejoins any pathInStream: `url` alone is the CONTAINER's
