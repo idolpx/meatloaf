@@ -565,21 +565,37 @@ gitignored.
 
 ## Recent Changes (August 17, 2026)
 
-### P81 (1581 flux images) and a G64 read fix
+### G71, G81, P81 (1581 flux images) and G64 read fixes
 
-New read-only filesystem `p81FS` (`lib/meatloaf/media/disk/p81.h/.cpp`) for `.p81`, deriving from
-`P64MStream`. A `.p81` is the SAME container as a `.p64` — header, chunk stream and range-coded
-pulses, all inherited — carrying a completely different physical format: the 1581 is an MFM drive,
-so the read logic, the sync mark, the integrity check, the sector size and the number of sides all
-differ. See the Important Notes entry below and, in full, `lib/meatloaf/AGENTS.md`.
+Three new read-only filesystems. `g71FS` (`lib/meatloaf/media/disk/g71.h`) is a `.g64` with a
+different signature and a 1571's geometry — nothing else differs, because a 1571 in double-sided
+mode is two 1541 surfaces written by the same logic, and track numbering is flat (track N at half
+track N*2 for all 70 tracks, confirmed from VICE's own reader rather than assumed).
 
-Verified by `test/native/test_p81_read/` (10 cases, all passing) against the real
-`.archive/disk/p81/td1581.p81`: the exact D81 disk header and name, both heads of the directory
-track, a sweep of all 80 cylinders × 40 blocks with the CRC checked on every one, and every real
-file's block chain walked to exactly the block count its directory entry claims. Builds clean on
-`lolin-d32-pro` (Flash 42.4%) and `esp32-s3-devkitc-1` (Flash 81.7%). **Not hardware-tested.**
+`g81FS` (`media/disk/g81.h/.cpp`) and `p81FS` (`media/disk/p81.h/.cpp`) are both 1581 images and
+both MFM, arriving at the same cell bitstream by different routes — `.g81` reads it out of the
+container, `.p81` decodes it from flux pulses inherited from `P64MStream`. The shared half is
+`media/disk/mfm.h/.cpp` (sync search, clock/data de-interleave, address marks, CRC-16); the 1581
+logical-to-physical mapping is deliberately kept out of it, since each container has its own head
+order.
 
-Separately, three defects fixed in `g64.cpp`: `readContainer()` returned memory past the end of its
+**Verification differs sharply between them, and the difference matters.** `test_p81_read` (10
+cases) runs against a REAL 1581 flux image, `.archive/disk/p81/td1581.p81` — exact disk header and
+name, both heads of the directory track, a sweep of all 80 cylinders x 40 blocks with the CRC
+checked on every one, and every file's block chain walked to exactly the block count its directory
+entry claims. `test_g71_read` (6) and `test_g81_read` (8) run against generated fixtures, since no
+`.g71` or `.g81` exists anywhere. **G81's container layout is therefore unverified**: no real image,
+no VICE support, no reference implementation - only a four-line note in the header comment, which
+the fixture generator and the decoder both encode the same reading of. See `lib/meatloaf/AGENTS.md`
+for exactly which claims that does and does not cover. The MFM layer underneath is not in that
+caveat, being validated by the P81 suite against real media.
+
+All five suites pass — `test_g64_read` 6, `test_g71_read` 6, `test_g81_read` 8, `test_p64_read` 13,
+`test_p81_read` 10 — and the firmware builds on `lolin-d32-pro` (Flash 42.5%) and
+`esp32-s3-devkitc-1`. **None of the three new filesystems has been hardware-tested.**
+
+Also fixed in `g64.cpp`/`g64.h`, which `.g71` inherits: `readContainer()` returned memory past the
+end of its
 sector buffer for any file longer than one block (it indexed by `_position`, the position in the
 FILE, instead of an offset within the decoded sector); `seekSector()` spun forever on a sector that
 is not on the track, on the IEC task; and `readSector()` returned success when the data block id was
@@ -588,7 +604,10 @@ sector read are gone, and the header checksum — computed and discarded before 
 New `test/native/test_g64_read/` (6 cases) covers all of it against a fixture generated from a real
 `.d64` by its `host/make_g64.py`, since no `.g64` exists in `.archive`; reverting the first fix
 fails 4 of the 6. See `lib/meatloaf/AGENTS.md` for which test reaches which defect — most of them
-cannot reach the first one.
+cannot reach the first one. `readHeader()` also read the container header from wherever the stream
+was left AFTER delegating to `D64MStream::readHeader()` rather than from offset 0, so the values it
+logged were never the header's; it now reads and validates the signature first, which is what lets
+`.g71` be told from `.g64`.
 
 ## Recent Changes (August 16, 2026)
 

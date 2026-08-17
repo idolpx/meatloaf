@@ -33,6 +33,8 @@
 
 #include "endianness.h"
 
+#include <cstring>
+
 // Format codes:
 // ID	Description
 // 0	Unknown format
@@ -114,17 +116,59 @@ public:
     MediaHeader gcr_header;
     SectorHeader gcr_sector_header;
 
+    // The 8-byte signature this stream accepts. A .g71 is the same container
+    // with a different signature and a 1571's geometry - see g71.h.
+    virtual const char *imageSignature() const { return "GCR-1541"; }
+
     bool readHeader() override
     {
-        D64MStream::readHeader();
-        containerStream->read((uint8_t*)&gcr_header, sizeof(gcr_header));
-        Debug_printv("signature[%s] version[%d] track_count[%d] track_size[%d]", gcr_header.signature, gcr_header.version, gcr_header.track_count, gcr_header.track_size);
-        return true;
+        // Read and validate the container header BEFORE delegating.
+        // D64MStream::readHeader() immediately seeks 18/0, which goes through
+        // seekSector() and the track table, so a file that is not a G64 at all
+        // would otherwise attempt a sector decode before anything rejected it.
+        //
+        // This also used to read gcr_header from wherever the stream happened
+        // to be left AFTER that delegation rather than from offset 0, so the
+        // values it logged were never the header's.
+        uint8_t buf[12];
+        if (!containerStream->seek(0) || containerStream->read(buf, sizeof(buf)) != sizeof(buf))
+        {
+            Debug_printv("cannot read the container header");
+            return false;
+        }
+
+        if (std::memcmp(buf, imageSignature(), 8) != 0)
+        {
+            Debug_printv("not a %s image", imageSignature());
+            return false;
+        }
+
+        std::memcpy(gcr_header.signature, buf, 8);
+        gcr_header.version = buf[8];
+        gcr_header.track_count = buf[9];
+        gcr_header.track_size = (uint16_t)(buf[10] | (buf[11] << 8));
+
+        //Debug_printv("signature[%.8s] version[%d] track_count[%d] track_size[%d]", gcr_header.signature, gcr_header.version, gcr_header.track_count, gcr_header.track_size);
+
+        return D64MStream::readHeader();
     }
 
     bool seekSector( uint8_t track, uint8_t sector, uint8_t offset = 0 ) override;
 
     uint32_t readContainer(uint8_t *buf, uint32_t size) override;
+
+    // Read-only, enforced here rather than assumed. D64MStream's whole write
+    // path reaches the container through writeContainer() and addresses it as a
+    // linear .d64; a G64 is a GCR bitstream with a track table, so any such
+    // write lands at an arbitrary offset in the encoded data. MFile::isWritable
+    // is no defence - MFSOwner::File() copies it from the container, so a .g64
+    // on an SD card inherits true. Covers .g71 too.
+    uint32_t writeContainer(uint8_t *buf, uint32_t size) override
+    {
+        (void)buf; (void)size;
+        Debug_printv("G64/G71 images are read-only");
+        return 0;
+    }
 
     bool readSectorHeader();
     bool readSector();

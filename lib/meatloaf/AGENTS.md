@@ -151,7 +151,7 @@ lib/meatloaf/
 ├── meat_session.h/cpp      # SessionBroker, MSession, CachedFile (HIMEM-aware)
 ├── iec_pipe.h              # IEC device communication pipes
 ├── media/                  # Container format implementations
-│   ├── disk/              # Disk images: d64, d71, d80, d81, d82, d90, g64, m2i, nib, p64, p81
+│   ├── disk/              # Disk images: d64, d71, d80, d81, d82, d90, g64, g71, g81, m2i, nib, p64, p81 (mfm.h shared by g81+p81)
 │   ├── archive/           # Archives: zip, rar, tar, lbr, ark
 │   ├── tape/              # Tapes: tap/dmp/htap (TAPClean-based, see tape_decoder), t64, tcrt
 │   ├── cartridge/         # Cartridge: crt
@@ -514,6 +514,57 @@ When implementing a new stream:
 7. Check memory leaks with stream chains
 
 ## Recent Changes (August 17, 2026)
+
+### G71 and G81, and an MFM layer shared with P81
+
+Two new read-only filesystems, `g71FS` (`media/disk/g71.h`) and `g81FS`
+(`media/disk/g81.h/.cpp`). They are much less alike than their names suggest.
+
+- **`.g71` is a `.g64` with a different signature and a 1571's geometry, and nothing else.**
+  A 1571 in double-sided mode is two 1541 surfaces written by the same logic at the same
+  four speed zones, so `G71MStream` is `G64MStream` plus the `D71MStream` geometry block, a
+  `speedZone()` that repeats the progression for tracks 36-70, and `imageSignature()`.
+- **Track numbering is FLAT, and this is the one thing that could have been otherwise.**
+  Track N is at half track `N * 2` for all 70 tracks, so side 2 (tracks 36-70) needs no
+  per-side base and `G64MStream::seekSector()` reads it unchanged. Confirmed from VICE
+  rather than assumed: `fsimage-gcr.c` indexes the offset table with `half_track - 2` and
+  derives the track back as `half_track / 2` for every image type, with the table sized
+  `MAX_GCR_TRACKS = 168 = 84 * 2`.
+- **`.g81` is a different format wearing a similar name**: MFM, not GCR. Its container is a
+  G64 with three changes — the `MFM-1581` signature, no speed zone table, and a four-byte
+  per-track length counting **bits** rather than a two-byte byte count. The bitstream it
+  holds is exactly what a `.p81` produces from flux, so everything downstream is shared.
+- **`mfm.h/.cpp` is that shared half** — `findSync`, `readBytes`, `crc16`, `readSector`,
+  pure functions over `(const uint8_t *bits, uint32_t bytes, …)`. `P81MStream` was
+  refactored onto it (`p81.cpp` went from ~360 lines to 204) and its 10 tests re-run
+  unchanged before any G81 code was written. **The 1581 logical-to-physical mapping is
+  deliberately NOT in there**: `head = block / 20`, `sector = ((block % 20) / 2) + 1` is
+  drive geometry, and each container's own head order is its own affair — the `.p81` side
+  bit is inverted, which is a P64 quirk and not a 1581 property. Keeping the mapping at each
+  call site keeps those assumptions visible where they are made.
+- **G81's container layout is UNVERIFIED and must be described that way.** There is no
+  `.g81` in `.archive`, VICE has no MFM-1581 support at all, and the P64 reference
+  implementation does not know the format; the four-line note at the top of `g81.h` is the
+  entire specification. Two of its claims cannot be checked — where the track data starts
+  (which follows from "no speed zone table" but is not stated) and the four-byte prefix —
+  because `host/make_g81.py` encodes the same reading that `g81.cpp` decodes, so a green
+  test proves only that the two agree. The bit-vs-byte claim IS weakly self-checking: the
+  generator emits ~101000 cells per track, the right order of magnitude for a 100000-cell
+  1581 rotation, where a byte reading would give ~12500 and find no sectors. If a real
+  `.g81` ever appears and the base offset is wrong, every track fails at once, which is the
+  right failure mode. **The MFM layer underneath is NOT in this caveat** — it is validated
+  against a real 1581 flux image by the P81 suite, and G81 reuses it rather than copying it.
+- **Fixtures**: `test/native/test_g64_read/host/make_g64.py` now emits a `.g71` too (it
+  switches on the output extension), and `test/native/test_g81_read/host/make_g81.py` is a
+  full MFM encoder. Both source images are synthesized with every block carrying a pattern
+  derived from its own track and sector, so a block served from the wrong place is caught by
+  its CONTENT — a CRC would pass either way.
+- **Also fixed while in `g64.h`**: `readHeader()` read `gcr_header` from wherever the stream
+  happened to be left AFTER delegating to `D64MStream::readHeader()`, rather than from
+  offset 0, so the values it logged were never the header's. It now reads and validates the
+  signature FIRST — the same ordering trap p64 had — and `writeContainer()` refuses writes,
+  which a GCR container needs for the same reason p64 does: `D64MStream`'s write path
+  addresses it as a linear `.d64` and `MFile::isWritable` inherits true from the SD card.
 
 ### P81 — the same container, a completely different physical format
 

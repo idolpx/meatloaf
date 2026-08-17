@@ -60,14 +60,6 @@
 #define P81_OVERLAP_BYTES       2048
 #define P81_MAX_TRACK_BYTES     (12800 + P81_OVERLAP_BYTES)
 
-// The raw MFM cell pattern of an $A1 sync byte with its missing clock bit.
-#define P81_SYNC_PATTERN        0x4489
-
-// IBM System 34 address marks.
-#define P81_MARK_ID             0xFE
-#define P81_MARK_DATA           0xFB
-#define P81_MARK_DELETED_DATA   0xF8
-
 // A 1581 formats ten 512-byte sectors per side of a cylinder, numbered from 1.
 #define P81_SECTOR_BYTES        512
 
@@ -107,16 +99,10 @@ protected:
     // physical sector and copies the requested half of it into sector_buffer.
     bool loadSector( uint8_t track, uint8_t sector ) override;
 
-    // Finds the next $4489 sync at or after cell p, returning the cell index
-    // just past it, or -1. Wraps like the GCR scan does.
-    int findMfmSync( int p, int limit ) const;
-
     // Finds the physical 512-byte sector and leaves it in physical_sector.
+    // The MFM reading itself lives in mfm.h, shared with g81.h - a .p81 and a
+    // .g81 differ only in how the cell bitstream is obtained.
     bool readPhysicalSector( uint8_t cylinder, uint8_t head, uint8_t physical );
-
-    // Reads `count` MFM data bytes starting at cell p. The data bit is the
-    // second cell of each pair; the first is the clock.
-    bool readMfmBytes( int p, uint8_t *buf, int count ) const;
 
     // The 512-byte physical sector currently decoded, and which one it is.
     uint8_t physical_sector[P81_SECTOR_BYTES] = { 0 };

@@ -1,4 +1,4 @@
-// Pulls in the exact translation units the P81 read tests need. See
+// Pulls in the exact translation units the G71 read tests need. See
 // test/native/test_disk_write/engine_sources.cpp for why PlatformIO's library
 // dependency finder can't be used here.
 #include "../../../lib/utils/punycode.cpp"
@@ -9,8 +9,6 @@
 #include "../../../lib/utils/string_utils.cpp"
 #include "../../../lib/meatloaf/meat_media.cpp"
 #include "../../../lib/meatloaf/media/disk/d64.cpp"
-#include "../../../lib/meatloaf/media/disk/p64.cpp"
-#include "../../../lib/meatloaf/media/disk/mfm.cpp"
-#include "../../../lib/meatloaf/media/disk/p81.cpp"
+#include "../../../lib/meatloaf/media/disk/g64.cpp"
 
 #include "../test_disk_write/native_stubs.cpp"
