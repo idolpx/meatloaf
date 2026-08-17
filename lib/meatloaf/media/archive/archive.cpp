@@ -335,11 +335,34 @@ bool Archive::open(std::ios_base::openmode mode, bool rawOnly, bool randomAccess
         } else if (mstr::endsWith(u, ".cpio") || mstr::endsWith(u, ".cpgz")) {
             archive_read_support_format_cpio(m_archive);
         } else {
-            // Unknown/ambiguous extension — let libarchive bid across all
-            // formats, and fall back to raw for single compressed files like
+            // Unknown/ambiguous extension — bid across the formats named
+            // above, and fall back to raw for single compressed files like
             // .gz/.bz2, whose decompressed content is just bytes that no
             // archive format recognizes.
-            archive_read_support_format_all(m_archive);
+            //
+            // This is deliberately NOT archive_read_support_format_all():
+            // that reference is the only thing linking the cab, mtree, warc
+            // and ar readers, ~31 KB of flash text for formats a Commodore
+            // device does not meet. A plain ESP32's flash-text window
+            // (iram0_2_seg, ~3.3 MB) is what this project links against, and
+            // it had under 1.1 KB spare — adding the -lh1- decoder to the lha
+            // reader overflowed it by 985 bytes. Every format Meatloaf can
+            // name by extension is registered here, so the fallback still
+            // recognizes any of them from content alone.
+            archive_read_support_format_zip(m_archive);
+            archive_read_support_format_tar(m_archive);
+            archive_read_support_format_7zip(m_archive);
+            archive_read_support_format_rar(m_archive);
+            archive_read_support_format_rar5(m_archive);
+            archive_read_support_format_lha(m_archive);
+            archive_read_support_format_xar(m_archive);
+            archive_read_support_format_iso9660(m_archive);
+            archive_read_support_format_cpio(m_archive);
+            // Keep `empty` as well: it is what gives a zero-byte file a clean
+            // empty listing. Without it that file falls to raw, which bids 1
+            // on anything and synthesizes one entry named "data" — the exact
+            // failure the note below is about.
+            archive_read_support_format_empty(m_archive);
             archive_read_support_format_raw(m_archive);
         }
 

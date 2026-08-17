@@ -21,6 +21,11 @@ real `ArchiveMStream::nextEntrySimple()` walk.
 | `misaligned_zip_is_not_extracted_as_raw_data` | A source whose bytes are not the archive's first bytes must not come back as one entry named `data`. |
 | `unreadable_zip_fails_rather_than_succeeding_with_junk` | Same defect from the caller's side: failure, not fabricated content. |
 | `gz_still_reaches_its_content_through_raw` | The raw reader is still registered where it is correct — a single compressed file has no directory. |
+| `lh1_entries_decode_and_pass_their_crc` | Every entry of three real `-lh1-` archives decodes to its declared size and passes the CRC-16 the compressor stored — a bit-exactness test for the adaptive-Huffman decoder. |
+| `lh1_reading_an_entry_leaves_the_walk_aligned` | A decoding walk finds the same entries in the same order as a listing walk. |
+| `lh1_short_origsize_still_leaves_the_walk_aligned` | Leftover compressed bytes are skipped when the declared uncompressed size ends the entry early. Without that, a 25-entry archive walks as 1. |
+| `unimplemented_lzh_method_is_still_refused` | A method with no decoder (`-lh2-`, forged from a real header) reports an error rather than succeeding empty. |
+| `lh5_entries_still_decode_and_pass_their_crc` | `-lh5-`/`-lh0-` still decode — the `-lh1-` work touched the window pre-fill and the state a finished match returns to, which every method runs through. Also the Amiga case: `mce.lha`'s 997 level-1 entries, which the bidder used to reject outright. |
 
 ### The bug these exist for
 
@@ -47,6 +52,14 @@ The zip case uses `.archive/zip/Donnie_Russell_II_d64.zip`. Everything under
 `.archive/` is gitignored, so those tests `TEST_IGNORE` themselves when the
 sample is absent — a green run without it has not tested the zip path. Any
 multi-entry zip works if you adjust the expected first entry name.
+
+The `-lh1-` cases use `.archive/archive/lzh/games.lzh`, `Taboo.lzh` and
+`Tomb.lzh` and skip the same way; their expected entry counts (25, 4, 71) are
+in the test. They need no known-good output of their own — each entry's CRC-16
+is in the archive, written by the original compressor, so a single wrong byte
+anywhere fails. Two of the cases forge a header field (the method digit, the
+uncompressed size) from `games.lzh` in memory, patching the header checksum so
+the header still parses.
 
 ## How the host build works
 

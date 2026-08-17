@@ -490,6 +490,7 @@ public:
                 ".arj",
                 ".lha",     // Have to find a way to distinquish between PC/C64 LHA/LXH/SFX file
                 ".lzh",
+                ".sfx",
                 ".lzx",
 
                 // Archives (no central directory, no table of contents)

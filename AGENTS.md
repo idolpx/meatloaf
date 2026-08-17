@@ -568,8 +568,105 @@ gitignored.
 - **`exec` PETSCII-encodes and does nothing else — so DOS commands must be TYPED IN LOWERCASE.** `mstr::toPETSCII2()` reverse-maps through `U8Char::utf8map`, where PETSCII `$41-$5A` map to UTF-8 *lowercase* `a-z`; lowercase input therefore yields `$41-$5A`, exactly what an unshifted C64 sends and what `executeData()` dispatches on ("CD", "N0", "T-Z"). **Uppercase input is not equivalent** — it maps to the SHIFTED range, valid PETSCII that matches no command; not a silent trap, since `executeData()` falls through to `ST_SYNTAX_INVALID` and `exec M-R` answers `31,INVALID COMMAND`. Measured on the real map: `m-r` → `4D 2D 52` ✅, `M-R` → `CD 2D D2` ✗, `i0:` → `49 30 3A` ✅, `I0:` → `C9 30 3A` ✗, `cd:games` → `43 44 3A 47 41 4D 45 53` ✅. **Nothing is case-folded, deliberately**: a `toLower()` was tried and removed, because commands and their parameters can be mixed case and lowercasing the line to make the VERB match corrupts every filename and path in it. Binary bytes (`M-R`/`M-W`/`B-P` carry addresses and data that are not text) are written `0xNN` and pass through unconverted. Spacing is sent exactly as typed, because `B-P 2 0` needs its separators while `M-R` needs its address bytes butted against the verb (`exec m-r0x000x030x01`).
 - **`IECFileDevice::peekStatus()` / `GPIBFileDevice::peekStatus()`** return the UNREAD part of the status buffer — what the bus master would receive if it read the status channel now — without consuming it; `clearStatus()` consumes. Returning 0 means empty, which is the same test `read()` uses to decide whether to call `getStatusData()`. `iecDrive::consoleExecDos()` follows that exact order, so a reply pushed by `setStatus()` (how `iecMeatloaf` answers FujiNet commands) wins over the canned DOS status instead of being left queued for the C64. Both bus classes must keep this in step — `drive.cpp` compiles against either.
 - **A CBM status can carry raw binary** (`M-R` answers with drive memory), so anything rendering one to a human must hex-dump it when a byte falls outside `0x20-0x7E` rather than printing it as text. `printStatus()` in `IECCommands.cpp` is the reference.
+- **A decoder whose end of entry is an OUTPUT byte count must reconcile `entry_bytes_remaining`** (`archive_read_support_format_lha.c`). `-lh5-`/`-lh6-`/`-lh7-` end when their input runs out, so libarchive's bookkeeping balances by construction. `-lh1-` ends when it has emitted `origsize` bytes and can leave compressed bytes behind — and nothing else ever takes them, because `archive_read_format_lha_read_data_skip()` consumes `entry_unconsumed` and then returns early once the entry is finished. The leftovers must be folded into `entry_unconsumed` on EOF or **every later header is read from the wrong offset**: with the fold disabled, a 25-entry `.lzh` walks as 1 entry. Normally there is nothing to fold, since the bit reader fills a 64-bit cache greedily and has already taken the encoder's few trailing flush bytes — it bites when the two sizes genuinely disagree (an entry whose `origsize` is 0, or a header that under-reports it), which is why the regression test forges a short `origsize` rather than trusting a real archive to reach it.
+- **The 128 KiB window all the lzh decoders share must be pre-filled one byte BELOW the real window size.** A match may reach a full window back, and at `w_pos == 0` a distance of `w_size` selects `ds->w_size - w_size - 1` — one byte below what `memset(w_buff + w_size - real, 0x20, real)` filled. The original decoders answer `0x20` there (a circular buffer of exactly `real` bytes, pre-filled with spaces); the old code returned whatever the PREVIOUS entry left at that byte, so the defect was nondeterministic across entries rather than reproducible. Upstream had this edge for `-lh5-`/`-lh6-`/`-lh7-` too; it is now `real + 1`. A wrong byte here is a CRC failure that looks like a Huffman bug. Note the arithmetic assumes `ds->w_size > real` — true for every method (12-16 bits against a 17-bit buffer), but it underflows the buffer if the expanded window is ever set equal to the real one.
+- **`archive_read_support_format_all()` is deliberately NOT called in `Archive::open()`'s unknown-extension fallback** (`lib/meatloaf/media/archive/archive.cpp`). That one reference is the only thing linking the cab, mtree, warc and ar readers — **~31 KB of flash text** for formats a Commodore device does not meet, and a plain ESP32 links within ~1 KB of its `iram0_2_seg` window. The fallback registers every format Meatloaf can name by extension, so any of them is still recognized from content alone; adding a format to the extension list means adding it here too. **`empty` is in that list on purpose** — it is what gives a zero-byte file a clean empty listing, and without it that file falls to `raw`, which bids 1 on anything and synthesizes one entry named `data`.
 
 ## Recent Changes (August 17, 2026)
+
+### -lh1- (LHarc 1.x) support in libarchive's lha reader
+
+`hex menu` inside `/sd/content/archive/lzh/games.lzh` answered
+`Unsupported lzh compression method -lh1-` while the listing was perfect — sizes and names come
+out of the entry headers, so only reading was affected. libarchive supports `-lh0-` (stored),
+`-lh5-`, `-lh6-` and `-lh7-`; `-lh1-` is LHarc 1.x's method and shares nothing with them above the
+LZSS layer. All three `.lzh` samples in `.archive/archive/lzh/` are `-lh1-`; the six `.lha` ones are
+`-lh5-`/`-lh0-`.
+
+What `-lh1-` is, and what that cost: a 4 KiB LZSS window whose literal/length alphabet (314 symbols:
+256 literals plus lengths 3-60) is coded with an **adaptive** Huffman tree that both sides mutate
+after every symbol, and whose match positions come from a **fixed** table rather than one sent in
+the stream. So there are no blocks, no transmitted code lengths and no end marker. Ported from
+`dhuf.c`/`shuf.c` of *LHa for UNIX* (`start_c_dyn`, `swap_inc`, `reconst`, `update_c`, `ready_made`)
+as a resumable state machine — the existing decoder is fed input in chunks, and an adaptive code has
+no length bound the way a table-driven one does, so the tree walk consumes **one bit at a time** and
+suspends on the node it reached (`ST_LH1_TREE`, `dyn->walk`) instead of asking for a fixed number of
+bits up front. Everything from the match copy onward is the shared `ST_COPY_DATA` path, reached by
+making the state a finished match returns to a variable (`ds->literal_state`).
+
+- **`ready_made(0)`'s code lengths are 3-8 with a Kraft sum of exactly 1**, so one 8-bit lookahead
+  always resolves a position symbol and no tree walk is needed for positions. It is expanded into
+  the 256-entry lookahead table it is only ever used through.
+- **The tree state is ~8 KB and is allocated only for `-lh1-`** (`struct lzh_dyn`, heap, so PSRAM on
+  a PSRAM board). `struct lzh_dec` is allocated per stream and every other method leaves `dyn` NULL.
+  The position-tree arrays are deliberately absent: only `-lh2-` (still unsupported) codes positions
+  adaptively.
+- **Verified by the archives' own CRCs.** Every entry carries a CRC-16 of its *decompressed* bytes,
+  written by the original compressor, and the reader checks it at end of entry — so decoding a real
+  archive is a bit-exactness test. `test_archive_extract` gained 5 cases: 100 entries across
+  `games.lzh` (25), `Taboo.lzh` (4) and `Tomb.lzh` (71) all decode to exactly their declared size
+  with no CRC error, a listing walk and a decoding walk agree entry for entry, a forged short
+  `origsize` still leaves the walk aligned, and a forged `-lh2-` is still refused. Full native suite
+  262 cases, 243 pass, 16 skip; `test_EdUrlParser`, `test_strings` and `test_hdd_read` error
+  identically at baseline.
+- **`-lh5-` decode coverage was added at the same time, and is not optional.** The edits above touch
+  code every method runs through — the window pre-fill, `ds->literal_state`, the EOF accounting —
+  and nothing in the suite decoded through the lha reader at all (the zip cases skip without their
+  sample; the gz cases go through gzip). `test_lh5_entries_still_decode_and_pass_their_crc` walks
+  the `.lha` samples twice, listing then decoding, and checks every entry against its CRC.
+  `rasm.lha` is the one that matters: 135 entries including one of 851804 bytes, which flushes the
+  128 KiB window six times.
+- **`reconst()` is NOT exercised by the corpus** — verified with a temporary probe: it never fires.
+  It runs when the tree root's frequency reaches `0x8000`, i.e. after ~32450 symbols in ONE entry,
+  and the largest `-lh1-` entry available is 41343 bytes (the tree resets per entry, so many small
+  entries never accumulate). A mis-port there would surface as a CRC failure, not a crash — every
+  index in it is structurally bounded. Finding a large `-lh1-` entry, or diffing the port against
+  `dhuf.c` step by step over a synthetic symbol stream, is what would close it.
+- **The window flush/suspend paths were covered by shrinking the window, not by a big sample.**
+  `ds->w_size` is expanded to 128 KiB purely for decode speed, so setting it to twice the real
+  window (8 KiB for `-lh1-`) makes every entry over 8 KiB cross the boundary repeatedly. The whole
+  corpus still decodes CRC-clean that way, which is what exercises `-lh1-`'s literal flush, the
+  mid-copy suspension returning through `ds->literal_state`, and an EOF with a partial window. Worth
+  repeating as a one-off after any change to that path.
+- **`mce.lha` exposed a second, older defect — see the Amiga bidder entry below.** It could not be
+  read at all, and that predated `-lh1-` support.
+- **NOT hardware-tested.** The console path (`hex`, `unzipx`) and the C64 LOAD path both need a
+  device. `unzipx games.lzh` is the run worth doing, not just `hex menu`: a multi-entry sequential
+  walk is what the alignment rule above protects.
+
+**The feature cost 2071 bytes of flash text and `lolin-d32-pro` had 1086 bytes of `iram0_2_seg`
+headroom**, so it overflowed by 985. Two levers made it *worse*, both worth not retrying:
+`#pragma GCC optimize("Oz")` on the file (985 → 1013, the same inversion the ARC work saw with
+`-Os`) and `__attribute__((noinline))` on the tree helpers (985 → 1001; everything in the decode
+path is inlined into `archive_read_format_lha_read_data`, 5472 bytes at baseline). The space came
+from narrowing the `format_all` fallback instead — see the Important Notes entry. Both boards build
+*smaller* than before: `lolin-d32-pro` Flash 42.5% → 42.2%, `esp32-s3-devkitc-1` 82.0% → 81.5%.
+Note PlatformIO's `build_flags` do **not** reach `components/` compiles (checked in `build.ninja`:
+no `EXTRA_DISK_FORMATS`, no `PINMAP_*`), so a per-board gate inside libarchive would need CMake or
+sdkconfig plumbing — which is why the budget was solved rather than the feature gated.
+
+### Amiga level-1 headers are no longer rejected by the lha bidder
+
+Found while adding the `-lh5-` coverage above: `mce.lha` could not be read at all — libarchive
+declined it outright, "Unrecognized archive format", zero entries listed, and this predated `-lh1-`
+support. `lha_check_header_format()` required `H_ATTR_OFFSET == 0x20` for header levels 1-3. That
+byte is the **MS-DOS** attribute; Amiga LhA writes AmigaOS protection bits there (`0x02` in this
+archive), so every Amiga level-1 archive failed the bid before a single entry was read. Level 0 was
+already accepted with no such check at all.
+
+The test is now `0x20` **or** a self-consistent level-1 header
+(`lha_level1_header_is_plausible()`): the header must be long enough for its own fixed part plus its
+name, with a name length `lha_read_file_header_1()` would accept. Only the first `H_SIZE` (22) bytes
+may be read there — that is all the bidder and the SFX scan guarantee — which is why the check is
+structural rather than a checksum over the whole header. Two things make relaxing it safe: nothing
+downstream reads the attribute byte (`lha->dos_attr` comes from extended headers only), and
+`lha_read_file_header_1()` verifies the header checksum, so a false positive fails the read instead
+of fabricating entries. **Levels 2 and 3 keep the `0x20` requirement** — their first 22 bytes carry
+no name length to check against, and no failing sample exists.
+
+Verified: `mce.lha` now lists and decodes all **997** entries, each to its declared size with its
+CRC-16 accepted — 3.4 MB, level-1 headers with extended headers, `-lh5-`. The entry count is
+asserted in the test, so it cannot pass by finding the first few and stopping.
 
 ### ArcDecoder overflowed the console_exec stack
 

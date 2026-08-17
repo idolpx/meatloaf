@@ -478,6 +478,291 @@ void test_image_broker_survives_a_null_source_file(void)
         "obtain() must return null for a file with no source, not crash");
 }
 
+// ---------------------------------------------------------------------------
+// -lh1- (LHarc 1.x: 4KiB LZSS + adaptive Huffman)
+//
+// libarchive's lha reader only ever supported -lh0-/-lh5-/-lh6-/-lh7-; every
+// -lh1- entry failed to read with "Unsupported lzh compression method -lh1-"
+// while LISTING perfectly, since the sizes come from the entry headers.
+// Reported from a real archive:
+//
+//     meatloaf[/sd/content/archive/lzh/games.lzh]# hex menu
+//       archive read error 79: Unsupported lzh compression method -lh1-
+//
+// Every entry carries a CRC-16 of its DECOMPRESSED bytes, written by the
+// original compressor, and the reader checks it at end of entry. So decoding
+// all of a real archive is a bit-exactness test, not just a smoke test: a
+// single wrong byte anywhere fails.
+//
+// The samples under .archive/ are gitignored, so these skip when absent.
+struct Lh1Sample {
+    const char* path;
+    size_t      entries;
+};
+static const Lh1Sample LH1_SAMPLES[] = {
+    { ".archive/archive/lzh/games.lzh", 25 },
+    { ".archive/archive/lzh/Taboo.lzh", 4 },
+    { ".archive/archive/lzh/Tomb.lzh", 71 },
+};
+
+static std::vector<unsigned char> readWholeFile(const char* path)
+{
+    std::vector<unsigned char> bytes;
+    FILE* fp = fopen(path, "rb");
+    if (fp == nullptr)
+        return bytes;
+    fseek(fp, 0, SEEK_END);
+    long len = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    if (len > 0) {
+        bytes.resize((size_t)len);
+        if (fread(bytes.data(), 1, bytes.size(), fp) != bytes.size())
+            bytes.clear();
+    }
+    fclose(fp);
+    return bytes;
+}
+
+// One entry's worth of what a caller sees. `read_result` is the return of the
+// read that hit end of entry: that is where "LHa data CRC error" surfaces.
+struct Lh1Entry {
+    std::string name;
+    int64_t     declared_size;
+    int64_t     decoded_size;
+    int         read_result;
+};
+
+// Walks an in-memory .lzh. `read_data` false skips every entry's body, which
+// is the listing path; true decodes each entry to its end, which is the path
+// a LOAD or an unzipx takes.
+static std::string g_lzh_error;
+
+static std::vector<Lh1Entry> walkLzh(const std::vector<unsigned char>& bytes,
+                                     bool read_data, int* walk_result)
+{
+    std::vector<Lh1Entry> out;
+    g_lzh_error.clear();
+    struct archive* a = archive_read_new();
+    archive_read_support_format_lha(a);
+    *walk_result = archive_read_open_memory(a, bytes.data(), bytes.size());
+    if (*walk_result == ARCHIVE_OK) {
+        struct archive_entry* ae;
+        for (;;) {
+            int r = archive_read_next_header(a, &ae);
+            if (r == ARCHIVE_EOF)
+                break;
+            if (r < ARCHIVE_OK) {
+                *walk_result = r;
+                break;
+            }
+            Lh1Entry e;
+            e.name = archive_entry_pathname(ae) ? archive_entry_pathname(ae) : "";
+            e.declared_size = archive_entry_size(ae);
+            e.decoded_size = 0;
+            e.read_result = ARCHIVE_OK;
+            if (read_data) {
+                unsigned char buf[4096];
+                for (;;) {
+                    ssize_t n = archive_read_data(a, buf, sizeof(buf));
+                    if (n <= 0) {
+                        e.read_result = (int)n;
+                        break;
+                    }
+                    e.decoded_size += n;
+                }
+            }
+            out.push_back(e);
+        }
+    }
+    if (archive_error_string(a) != nullptr)
+        g_lzh_error = archive_error_string(a);
+    archive_read_free(a);
+    return out;
+}
+
+// Decode every entry of every -lh1- sample and let the archive's own CRCs
+// judge the result.
+void test_lh1_entries_decode_and_pass_their_crc(void)
+{
+    for (const auto& sample : LH1_SAMPLES) {
+        auto bytes = readWholeFile(sample.path);
+        if (bytes.empty())
+            TEST_IGNORE_MESSAGE("sample missing under .archive/archive/lzh/");
+
+        int walk = ARCHIVE_OK;
+        auto entries = walkLzh(bytes, true, &walk);
+
+        TEST_ASSERT_EQUAL_INT_MESSAGE(ARCHIVE_OK, walk, sample.path);
+        TEST_ASSERT_EQUAL_size_t_MESSAGE(sample.entries, entries.size(),
+            sample.path);
+        for (const auto& e : entries) {
+            // 0 is the clean end of an entry's data; anything negative is an
+            // error, and a CRC mismatch is reported that way.
+            TEST_ASSERT_EQUAL_INT_MESSAGE(0, e.read_result,
+                (sample.path + std::string(": ") + e.name +
+                 ": decode or CRC failed").c_str());
+            TEST_ASSERT_EQUAL_INT64_MESSAGE(e.declared_size, e.decoded_size,
+                (sample.path + std::string(": ") + e.name).c_str());
+        }
+    }
+}
+
+// -lh1- ends an entry on its uncompressed byte count, not on running out of
+// input, so the encoder's final bit flush can be left unread. Nothing else
+// consumes it - read_data_skip() returns early once the entry is finished -
+// so the next header would be read from the wrong offset. Symptom: a listing
+// works but reading entry 1 and then continuing finds garbage or stops short.
+void test_lh1_reading_an_entry_leaves_the_walk_aligned(void)
+{
+    auto bytes = readWholeFile(LH1_SAMPLES[0].path);
+    if (bytes.empty())
+        TEST_IGNORE_MESSAGE("sample missing: .archive/archive/lzh/games.lzh");
+
+    int listed_walk = ARCHIVE_OK, read_walk = ARCHIVE_OK;
+    auto listed = walkLzh(bytes, false, &listed_walk);
+    auto read = walkLzh(bytes, true, &read_walk);
+
+    TEST_ASSERT_EQUAL_INT(ARCHIVE_OK, listed_walk);
+    TEST_ASSERT_EQUAL_INT(ARCHIVE_OK, read_walk);
+    TEST_ASSERT_EQUAL_size_t_MESSAGE(listed.size(), read.size(),
+        "decoding the entries must not lose the walk");
+    for (size_t i = 0; i < listed.size() && i < read.size(); i++)
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(listed[i].name.c_str(),
+            read[i].name.c_str(),
+            "entry names differ between a listing walk and a decoding walk");
+}
+
+// -lh5- must keep working: adding -lh1- touched code every method runs through
+// - the window pre-fill, the state a finished match returns to, and the
+// end-of-entry accounting. Nothing else in this suite decodes through the lha
+// reader at all (the zip cases skip without their sample, and the gz cases go
+// through gzip), so this is the only cover for that shared path.
+//
+// No entry counts here: the point is that a decoding walk sees exactly what a
+// listing walk sees, and that every entry's own CRC-16 accepts the bytes.
+// rasm.lha is the valuable one - 135 entries and one of 851804 bytes, which
+// flushes the 128KiB window six times, and that flush is where the
+// shared-state edit shows up. BountyHunter and rasm mix -lh5- with stored
+// -lh0- entries, so lha_read_data_none is covered alongside.
+//
+// mce.lha is the Amiga case: a 997-entry level-1 archive libarchive used to
+// decline outright ("Unrecognized archive format", zero entries listed),
+// because lha_check_header_format() demanded H_ATTR_OFFSET == 0x20 for header
+// levels 1-3 and Amiga LhA writes AmigaOS protection bits (0x02) in that byte.
+// It is also 3.4MB, so it is the sample that exercises the level-1 header path
+// and the extended headers that come with it.
+void test_lh5_entries_still_decode_and_pass_their_crc(void)
+{
+    static const Lh1Sample samples[] = {
+        { ".archive/archive/lha/Bonanza.lha", 6 },
+        { ".archive/archive/lha/BountyHunter.lha", 5 },
+        { ".archive/archive/lha/LoveThisNow.lha", 9 },
+        { ".archive/archive/lha/MorbidArt3fx.lha", 4 },
+        { ".archive/archive/lha/rasm.lha", 135 },
+        { ".archive/archive/lha/mce.lha", 997 },
+    };
+    size_t tested = 0;
+    for (const auto& sample : samples) {
+        const char* path = sample.path;
+        auto bytes = readWholeFile(path);
+        if (bytes.empty())
+            continue;
+        tested++;
+
+        int listed_walk = ARCHIVE_OK, read_walk = ARCHIVE_OK;
+        auto listed = walkLzh(bytes, false, &listed_walk);
+        auto read = walkLzh(bytes, true, &read_walk);
+
+        std::string ctx = std::string(path) + ": " + g_lzh_error +
+            " (listed " + std::to_string(listed.size()) + ", read " +
+            std::to_string(read.size()) + ")";
+        TEST_ASSERT_EQUAL_INT_MESSAGE(ARCHIVE_OK, listed_walk, ctx.c_str());
+        TEST_ASSERT_EQUAL_INT_MESSAGE(ARCHIVE_OK, read_walk, ctx.c_str());
+        TEST_ASSERT_EQUAL_size_t_MESSAGE(sample.entries, read.size(), path);
+        TEST_ASSERT_EQUAL_size_t_MESSAGE(listed.size(), read.size(), path);
+        for (size_t i = 0; i < read.size(); i++) {
+            std::string where = std::string(path) + ": " + read[i].name;
+            TEST_ASSERT_EQUAL_STRING_MESSAGE(listed[i].name.c_str(),
+                read[i].name.c_str(), where.c_str());
+            TEST_ASSERT_EQUAL_INT_MESSAGE(0, read[i].read_result,
+                (where + ": decode or CRC failed").c_str());
+            TEST_ASSERT_EQUAL_INT64_MESSAGE(read[i].declared_size,
+                read[i].decoded_size, where.c_str());
+        }
+    }
+    if (tested == 0)
+        TEST_IGNORE_MESSAGE("no samples under .archive/archive/lha/");
+}
+
+// Same alignment property, forced. The samples above cannot reach the case
+// they guard: the bit reader fills a 64-bit cache greedily, so it has already
+// taken the encoder's trailing flush and there is nothing left over. Make the
+// two sizes disagree - shrink entry 1's declared uncompressed size - and the
+// leftover compressed bytes have to be skipped anyway, or every later header
+// is read from the wrong offset.
+void test_lh1_short_origsize_still_leaves_the_walk_aligned(void)
+{
+    auto bytes = readWholeFile(LH1_SAMPLES[0].path);
+    if (bytes.empty())
+        TEST_IGNORE_MESSAGE("sample missing: .archive/archive/lzh/games.lzh");
+
+    int listed_walk = ARCHIVE_OK;
+    auto listed = walkLzh(bytes, false, &listed_walk);
+    TEST_ASSERT_EQUAL_INT(ARCHIVE_OK, listed_walk);
+
+    // Level-0 header: [0] header size (of everything from byte 2 on),
+    // [1] checksum over that same range, [11..14] uncompressed size.
+    size_t hdrsize = bytes[0];
+    bytes[11] = 64;
+    bytes[12] = bytes[13] = bytes[14] = 0;
+    unsigned char sum = 0;
+    for (size_t i = 2; i < 2 + hdrsize; i++)
+        sum = (unsigned char)(sum + bytes[i]);
+    bytes[1] = sum;
+
+    int read_walk = ARCHIVE_OK;
+    auto read = walkLzh(bytes, true, &read_walk);
+
+    // Entry 1 now fails its CRC - it was cut short on purpose. Every entry
+    // after it must still be found, in the same order.
+    TEST_ASSERT_TRUE_MESSAGE(read.size() > 0, "header should still parse");
+    TEST_ASSERT_TRUE_MESSAGE(read[0].read_result < 0,
+        "a truncated entry should report its CRC error");
+    TEST_ASSERT_EQUAL_size_t_MESSAGE(listed.size(), read.size(),
+        "leftover compressed bytes were not skipped: the walk lost alignment");
+    for (size_t i = 1; i < listed.size() && i < read.size(); i++) {
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(listed[i].name.c_str(),
+            read[i].name.c_str(), "walk lost alignment after the short entry");
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, read[i].read_result,
+            "entries after the short one must still decode cleanly");
+    }
+}
+
+// The reader must still refuse a method it has no decoder for, rather than
+// e.g. producing zero bytes and claiming success. -lh2- shares -lh1-'s
+// adaptive literal tree but codes positions adaptively too, which is not
+// implemented; forge one from a real archive by renaming the method.
+void test_unimplemented_lzh_method_is_still_refused(void)
+{
+    auto bytes = readWholeFile(LH1_SAMPLES[0].path);
+    if (bytes.empty())
+        TEST_IGNORE_MESSAGE("sample missing: .archive/archive/lzh/games.lzh");
+
+    // Level-0 header: [0] size, [1] checksum, [2..6] "-lhN-", so the method
+    // digit is byte 5. The checksum covers bytes 2.. so patch it too, to keep
+    // the header itself valid.
+    TEST_ASSERT_EQUAL_UINT8('1', bytes[5]);
+    bytes[5] = '2';
+    bytes[1] = (unsigned char)(bytes[1] + 1);
+
+    int walk = ARCHIVE_OK;
+    auto entries = walkLzh(bytes, true, &walk);
+
+    TEST_ASSERT_TRUE_MESSAGE(entries.size() > 0, "header should still parse");
+    TEST_ASSERT_TRUE_MESSAGE(entries[0].read_result < 0,
+        "an unsupported method must report an error, not succeed empty");
+}
+
 int main(int, char**)
 {
     UNITY_BEGIN();
@@ -494,5 +779,10 @@ int main(int, char**)
     RUN_TEST(test_percent_in_local_path_is_left_alone);
     RUN_TEST(test_download_filename_is_the_resolved_entry);
     RUN_TEST(test_image_broker_survives_a_null_source_file);
+    RUN_TEST(test_lh1_entries_decode_and_pass_their_crc);
+    RUN_TEST(test_lh5_entries_still_decode_and_pass_their_crc);
+    RUN_TEST(test_lh1_reading_an_entry_leaves_the_walk_aligned);
+    RUN_TEST(test_lh1_short_origsize_still_leaves_the_walk_aligned);
+    RUN_TEST(test_unimplemented_lzh_method_is_still_refused);
     return UNITY_END();
 }
