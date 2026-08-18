@@ -244,6 +244,26 @@ python3 scripts/meatloaf_debug.py capture wait --timeout 20
 
 This polls until new data appears in the serial log (up to 20s timeout).
 
+### When to stop it
+
+**Stop the capture when the debug session ends** — it holds the serial port
+open, and on Windows that port is exclusive, so nothing else can attach until
+it lets go:
+
+```bash
+python3 scripts/meatloaf_debug.py capture stop
+```
+
+Leaving it running blocks the two things a person reaches for next: their own
+serial monitor (`pio device monitor`, PuTTY, the IDE terminal), and the next
+flash — `esptool` fails with `Could not open COM7, the port is busy` /
+`PermissionError(13, 'Access is denied.')`. The capture's auto-reconnect makes
+this survivable on Linux and macOS, where the port is shared, but on Windows
+it is a hard block.
+
+So the flash sequence on Windows is: **stop capture, flash, start capture.**
+And the last thing any session does is stop it.
+
 ### Health check
 
 ```bash
@@ -808,6 +828,20 @@ Common patterns from evidence:
 - **BASIC issue** → edit code, `inject`, `run`
 - **Firmware issue** → edit C++, `build --flash`, wait, `inject`, `run`
 - Loop until behavior matches expectations
+
+### Phase 7: Release the hardware
+
+When the session ends — fixed, or handing back for someone to look at —
+release what the tooling is holding:
+
+```bash
+python3 scripts/meatloaf_debug.py capture stop   # frees the serial port
+python3 scripts/meatloaf_debug.py echo stop      # if the echo server was started
+```
+
+Remove any temporary instrumentation (timing probes, checkpoint writes to
+`$D7FF`) and reflash, so the device is left running the code the repo
+describes rather than a debug build.
 
 ---
 
