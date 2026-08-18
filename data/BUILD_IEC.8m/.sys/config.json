@@ -1,11 +1,22 @@
 {
-  "version": "0.5.2",
+  "version": "20260724.13",
   "firmware": "",
   "hardware": "",
+  "update": {
+    "check": 1,
+    "auto_update": 1,
+    "last_check": 0,
+    "available": "",
+    "url": "https://flash.meatloaf.cc/update/?{{config.hardware}}"
+  },
+  "license": {
+    "key": ""
+  },
   "preferences": {
     "appearance": "auto",
     "language": "en",
     "timezone": "America/New_York",
+    "timezone_posix": "",
     "country": "US",
     "devicename": "Meatloaf",
     "rotationsounds": 0,
@@ -21,6 +32,7 @@
   "network": {
     "hostname": "meatloaf.local",
     "sntpserver": "pool.ntp.org",
+    "ipfs_gateway": "https://dweb.link/ipfs/",
     "services": {
       "httpd": {
         "enabled": 1,
@@ -37,49 +49,44 @@
     }
   },
   "wifi": {
-    "selected": "EEP_OPP_ORK_AH_AH",
-    "known":
-      [
-        {
-          "ssid": "EEP_OPP_ORK_AH_AH",
-          "passphrase": "meatloaf",
-          "enabled": 1
-        },
-        {
-          "enabled": 0,
-          "ssid": "meatloaf",
-          "passphrase": "meatloaf"
-        },
-        {
-          "ssid": "CODA-23B0",
-          "passphrase": "meatloaf",
-          "enabled": 0
-        }
-      ],
-    "scan_results": 
-      [
-        {
-          "ssid": "EEP_OPP_ORK_AH_AH",
-          "bssid": "00:11:22:33:44:55",
-          "channel": 6,
-          "rssi": -60,
-          "security": "WPA2-PSK"
-        },
-        {
-          "ssid": "meatloaf",
-          "bssid": "66:77:88:99:AA:BB",
-          "channel": 11,
-          "rssi": -70,
-          "security": "WPA2-PSK"
-        },
-        {
-          "ssid": "CODA-23B0",
-          "bssid": "CC:DD:EE:FF:GG:HH",
-          "channel": 1,
-          "rssi": -80,
-          "security": "WPA2-PSK"
-        }
-      ]
+    "active": "EEP_OPP_ORK_AH_AH",
+    "known": [
+      {
+        "ssid": "EEP_OPP_ORK_AH_AH",
+        "passphrase": "meatloaf"
+      },
+      {
+        "ssid": "meatloaf",
+        "passphrase": "meatloaf"
+      },
+      {
+        "ssid": "CODA-23B0",
+        "passphrase": "meatloaf"
+      }
+    ],
+    "scan_results": [
+      {
+        "ssid": "EEP_OPP_ORK_AH_AH",
+        "bssid": "00:11:22:33:44:55",
+        "channel": 6,
+        "rssi": -60,
+        "security": "WPA2-PSK"
+      },
+      {
+        "ssid": "meatloaf",
+        "bssid": "66:77:88:99:AA:BB",
+        "channel": 11,
+        "rssi": -70,
+        "security": "WPA2-PSK"
+      },
+      {
+        "ssid": "CODA-23B0",
+        "bssid": "CC:DD:EE:FF:GG:HH",
+        "channel": 1,
+        "rssi": -80,
+        "security": "WPA2-PSK"
+      }
+    ]
   },
   "settings": {
     "enabled": 1,
@@ -88,10 +95,11 @@
     "autoboot": "",
     "drive_roms": {
       "enabled": 0,
-      "default": "",
       "d64": "",
       "d71": "",
-      "d81": ""
+      "d81": "",
+      "DHD_DNP": "",
+      "HDD": ""
     },
     "directory": {
       "force_0801": 1,
@@ -107,7 +115,9 @@
       "load_address": 1,
       "sys_address": 1,
       "entry_counts": 1,
-      "footer_bytes": 1
+      "blocks_used": 1,
+      "footer_bytes": 1,
+      "update_nfo": 1
     },
     "fastloaders": {
       "hardware": {
