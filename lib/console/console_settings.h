@@ -27,14 +27,12 @@ extern "C" {
 void initialize_console_peripheral(int baud);
 
 /**
- * @brief Initialize linenoise and esp console
+ * @brief Initialize the esp_console component
  *
- * This function initialize linenoise library and esp_console component,
- * also checks if the terminal supports escape sequences
- *
- * @param history_path Path to store command history
+ * linenoise is not configured: the REPL reads its own lines (Console::readLine)
+ * and never calls linenoise().
  */
-void initialize_console_library(const char *history_path);
+void initialize_console_library(void);
 
 /**
  * @brief Initialize console prompt

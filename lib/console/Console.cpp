@@ -23,7 +23,6 @@
 #include "driver/usb_serial_jtag.h"
 #include "driver/usb_serial_jtag_vfs.h"
 #endif
-#include "linenoise/linenoise.h"
 #include "Helpers/PWDHelpers.h"
 #include "Helpers/InputParser.h"
 
@@ -168,9 +167,7 @@ namespace ESP32Console
     void Console::registerCoreCommands()
     {
         registerCommand(getClearCommand());
-        registerCommand(getHistoryCommand());
         registerCommand(getEchoCommand());
-        registerCommand(getSetMultilineCommand());
         registerCommand(getEnvCommand());
         registerCommand(getDeclareCommand());
         registerCommand(getRunCommand());
@@ -263,31 +260,9 @@ namespace ESP32Console
 
     void Console::beginCommon()
     {
-        // The console runs in dumb mode (see initialize_console_library), so
-        // neither refresh path is reached. Single-line is still the safer of
-        // the two if dumb mode is ever turned off.
-        linenoiseSetMultiLine(0);
-        // Allow empty lines so linenoise returns "" instead of re-printing the
-        // prompt internally. The REPL loop's own empty-line guard handles them,
-        // preventing a double-prompt when the terminal sends \r\n (which produces
-        // two newlines after ESP_LINE_ENDINGS_CR RX mapping).
-        linenoiseAllowEmpty(true);
-
-        /* Tell linenoise where to get command completions and hints */
-        linenoiseSetCompletionCallback(&esp_console_get_completion);
-        linenoiseSetHintsCallback((linenoiseHintsCallback *)&esp_console_get_hint);
-
-        /* Set command history size */
-        linenoiseHistorySetMaxLen(max_history_len_);
-
-        /* Set command maximum length */
-        linenoiseSetMaxLineLen(max_cmdline_len_);
-
-        // Load history if defined
-        if (history_save_path_)
-        {
-            linenoiseHistoryLoad(history_save_path_);
-        }
+        // Nothing configures linenoise here: the REPL reads its own lines
+        // (Console::readLine) and never calls linenoise(), so its line editor,
+        // history, completion and hints are all unreachable.
 
         // Register core commands like echo
         esp_console_register_help_command();
@@ -386,9 +361,12 @@ namespace ESP32Console
         mstr::replaceAll(p, "%dev%", dev ? std::to_string(dev) + ":" : std::string());
 
         std::time_t current_time = std::time(nullptr);
-        char time_buffer[9] = {};
-        std::strftime(time_buffer, sizeof(time_buffer), "%H:%M:%S", std::localtime(&current_time));
-        mstr::replaceAll(p, "%time%", time_buffer);
+        char time_buffer[11] = {};
+        std::strftime(time_buffer, sizeof(time_buffer), "%I:%M:%S%p", std::localtime(&current_time));
+        std::string time_str(time_buffer);
+        time_str = time_str.substr(0, 9);
+        mstr::toLower(time_str);
+        mstr::replaceAll(p, "%time%", time_str);
 
         return p;
     }
@@ -406,8 +384,8 @@ namespace ESP32Console
         // CONFIG_ESP_CONSOLE_UART_BAUDRATE.
         initialize_console_peripheral(baud);
 
-        // Initialize linenoise + esp_console using the shared settings module.
-        initialize_console_library(history_save_path_);
+        // Initialize esp_console using the shared settings module.
+        initialize_console_library();
 
         beginCommon();
 
@@ -728,7 +706,6 @@ namespace ESP32Console
             fcntl(fileno(stdin), F_SETFL, stdin_flags & ~O_NONBLOCK);
         }
 
-        linenoiseSetMaxLineLen(console.max_cmdline_len_);
         while (true)
         {
         // Dormant: wait for a byte on the console (usually ENTER; it is
@@ -798,17 +775,6 @@ namespace ESP32Console
                 console._exit_requested = true;
                 break;
             }
-
-            //Debug_printv("Line received from linenoise: [%s]", line);
-
-            // /* Add the command to the history */
-            // linenoiseHistoryAdd(line);
-            
-            // /* Save command history to filesystem */
-            // if (console.history_save_path_)
-            // {
-            //     linenoiseHistorySave(console.history_save_path_);
-            // }
 
             //Interpolate the input line
             std::string interpolated_line = interpolateLine(raw_line.c_str());
@@ -948,7 +914,7 @@ namespace ESP32Console
         }
 
 #ifdef ENABLE_CONSOLE_TCP
-        // Prompt goes to TCP only — the REPL loop owns the UART prompt via linenoise.
+        // Prompt goes to TCP only — the REPL loop owns the UART prompt.
         tcp_server.send(buildPrompt());
 #endif
     }

@@ -98,7 +98,7 @@ void initialize_console_peripheral(int baud)
     setvbuf(stdin, NULL, _IONBF, 0);
 }
 
-void initialize_console_library(const char *history_path)
+void initialize_console_library(void)
 {
     /* Initialize the console */
     esp_console_config_t console_config = {
@@ -110,54 +110,9 @@ void initialize_console_library(const char *history_path)
     };
     ESP_ERROR_CHECK( esp_console_init(&console_config) );
 
-    /* Configure linenoise line completion library */
-    /* Single-line editing: long commands scroll within the line. Multiline
-     * editing misrenders on a narrow terminal (see Console::beginCommon).
-     */
-    linenoiseSetMultiLine(0);
-
-    /* Tell linenoise where to get command completions and hints */
-    linenoiseSetCompletionCallback(&esp_console_get_completion);
-    linenoiseSetHintsCallback((linenoiseHintsCallback*) &esp_console_get_hint);
-
-    /* Set command history size */
-    linenoiseHistorySetMaxLen(100);
-
-    /* Set command maximum length */
-    linenoiseSetMaxLineLen(console_config.max_cmdline_length);
-
-    /* Don't return empty lines */
-    linenoiseAllowEmpty(false);
-
-#if CONFIG_CONSOLE_STORE_HISTORY
-    /* Load command history from filesystem */
-    linenoiseHistoryLoad(history_path);
-#endif // CONFIG_CONSOLE_STORE_HISTORY
-
-    /* Dumb mode, for the benefit of anything that asks: the REPL reads its own
-     * lines (Console::readLine) and never calls linenoise(). The terminal is
-     * deliberately not probed for escape-sequence support — the answer would
-     * change nothing, and the probe stalls boot for 500 ms when nothing
-     * answers it. */
-    linenoiseSetDumbMode(1);
-}
-
-char *setup_prompt(const char *prompt_str)
-{
-    /* set command line prompt */
-    const char *prompt_temp = "esp>";
-    if (prompt_str) {
-        prompt_temp = prompt_str;
-    }
-    snprintf(prompt, CONSOLE_PROMPT_MAX_LEN - 1, LOG_COLOR_I "%s " LOG_RESET_COLOR, prompt_temp);
-
-    if (linenoiseIsDumbMode()) {
-#if CONFIG_LOG_COLORS
-        /* Since the terminal doesn't support escape sequences,
-         * don't use color codes in the s_prompt.
-         */
-        snprintf(prompt, CONSOLE_PROMPT_MAX_LEN - 1, "%s ", prompt_temp);
-#endif //CONFIG_LOG_COLORS
-    }
-    return prompt;
+    /* linenoise is deliberately left unconfigured. The REPL reads its own lines
+     * (Console::readLine) and never calls linenoise(), so its line editor,
+     * history, completion and hints are all unreachable — and the terminal is
+     * not probed for escape-sequence support, which stalls boot for 500 ms when
+     * nothing answers. */
 }

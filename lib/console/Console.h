@@ -8,7 +8,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
-#include "linenoise/linenoise.h"
 
 #include "../../include/debug.h"
 
@@ -30,9 +29,6 @@ namespace ESP32Console
         const uint32_t task_priority_;
         const BaseType_t task_stack_size_;
         bool _initialized = false;
-
-        uint16_t max_history_len_ = 40;
-        const char* history_save_path_ = nullptr;
 
         const size_t max_cmdline_len_;
         const size_t max_cmdline_args_;
@@ -82,8 +78,8 @@ namespace ESP32Console
     public:
         /**
          * @brief Create a new ESP32Console with the default parameters.
-         * The REPL task only does linenoise I/O — commands run on the
-         * executor task's 16 KB stack — so 6 KB is enough here.
+         * The REPL task only reads lines — commands run on the executor
+         * task's 16 KB stack — so 6 KB is enough here.
          */
         Console(const uint32_t task_stack_size = 6144, const BaseType_t task_priority = 4, int max_cmdline_len = 256, int max_cmdline_args = 8) : task_priority_(task_priority), task_stack_size_(task_stack_size), max_cmdline_len_(max_cmdline_len), max_cmdline_args_(max_cmdline_args)
         {
@@ -148,24 +144,6 @@ namespace ESP32Console
          * @param prompt
          */
         void setPrompt(const char *prompt) { prompt_ = prompt; };
-
-        /**
-         * @brief Set the History Max Length object
-         * 
-         * @param max_length 
-         */
-        void setHistoryMaxLength(uint16_t max_length)
-        {
-            max_history_len_ = max_length;
-            linenoiseHistorySetMaxLen(max_length);
-        }
-
-        /**
-         * @brief Enable saving of command history, which makes history persistent over resets. SPIFF need to be enabled, or you need to pass the filename to use.
-         *
-         * @param history_save_path The file which will be used to save command history. Set to nullptr to disable persistent saving
-         */
-        void enablePersistentHistory(const char *history_save_path = "/spiffs/.history.txt") { history_save_path_ = history_save_path; };
 
         /**
          * @brief Starts the console. Similar to the Serial.begin() function
