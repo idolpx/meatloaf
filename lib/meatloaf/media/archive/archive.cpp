@@ -723,7 +723,17 @@ bool ArchiveMStream::seekEntry( uint16_t index )
         // For raw compressed entries (standalone .gz, .bz2, etc.) archive_entry_size()
         // returns the COMPRESSED file size, not the decompressed size.  Determine
         // the true decompressed size and reset the archive for data extraction.
-        if (entry.size == 0 || isRawCompressedEntry) {
+        //
+        // Only ask when the archive is decoding a compressed STREAM, where that
+        // size field is meaningless and there is exactly one entry. Inside a real
+        // container a size of 0 means the file IS empty, and probing it there is
+        // actively harmful: the probe below re-opens the archive and re-reads
+        // from the FIRST entry, which resets a name walk already in progress.
+        // Found on hardware — entry 66 of the 997 in mce.lha is an empty file,
+        // and `hex mce.lha/MCE.info` re-opened the archive about once a second
+        // forever, never reaching a name that sits past it.
+        if (isRawCompressedEntry ||
+            (entry.size == 0 && m_archive->hasCompressionFilter())) {
             bool sizeKnown = false;
 
             // Whether the archive is decoding a COMPRESSED stream right now,

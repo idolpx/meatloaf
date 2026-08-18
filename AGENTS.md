@@ -570,6 +570,7 @@ gitignored.
 - **A CBM status can carry raw binary** (`M-R` answers with drive memory), so anything rendering one to a human must hex-dump it when a byte falls outside `0x20-0x7E` rather than printing it as text. `printStatus()` in `IECCommands.cpp` is the reference.
 - **A decoder whose end of entry is an OUTPUT byte count must reconcile `entry_bytes_remaining`** (`archive_read_support_format_lha.c`). `-lh5-`/`-lh6-`/`-lh7-` end when their input runs out, so libarchive's bookkeeping balances by construction. `-lh1-` ends when it has emitted `origsize` bytes and can leave compressed bytes behind — and nothing else ever takes them, because `archive_read_format_lha_read_data_skip()` consumes `entry_unconsumed` and then returns early once the entry is finished. The leftovers must be folded into `entry_unconsumed` on EOF or **every later header is read from the wrong offset**: with the fold disabled, a 25-entry `.lzh` walks as 1 entry. Normally there is nothing to fold, since the bit reader fills a 64-bit cache greedily and has already taken the encoder's few trailing flush bytes — it bites when the two sizes genuinely disagree (an entry whose `origsize` is 0, or a header that under-reports it), which is why the regression test forges a short `origsize` rather than trusting a real archive to reach it.
 - **The 128 KiB window all the lzh decoders share must be pre-filled one byte BELOW the real window size.** A match may reach a full window back, and at `w_pos == 0` a distance of `w_size` selects `ds->w_size - w_size - 1` — one byte below what `memset(w_buff + w_size - real, 0x20, real)` filled. The original decoders answer `0x20` there (a circular buffer of exactly `real` bytes, pre-filled with spaces); the old code returned whatever the PREVIOUS entry left at that byte, so the defect was nondeterministic across entries rather than reproducible. Upstream had this edge for `-lh5-`/`-lh6-`/`-lh7-` too; it is now `real + 1`. A wrong byte here is a CRC failure that looks like a Huffman bug. Note the arithmetic assumes `ds->w_size > real` — true for every method (12-16 bits against a 17-bit buffer), but it underflows the buffer if the expanded window is ever set equal to the real one.
+- **`seekEntry()`'s size probe must only run for a compressed STREAM, never for an entry inside a container** (`lib/meatloaf/media/archive/archive.cpp`). When `archive_entry_size()` is 0 the probe re-opens the archive and counts decompressed bytes — and that re-open re-reads from the FIRST entry, which **resets a name walk already in progress**. Inside a real container a size of 0 means the file IS empty, so the probe is both unnecessary and fatal: any name sitting past an empty entry can never be reached, and the lookup re-opens the archive about once a second forever. Found on hardware — entry 66 of the 997 in `mce.lha` is an empty file, and `hex mce.lha/MCE.info` never returned. The gate is `isRawCompressedEntry || (entry.size == 0 && hasCompressionFilter())`: a `.gz`/`.bz2` has one entry and a meaningless size field, which is exactly when re-reading from the first entry is correct. Note a regression here presents as a HANG, not an error — the native test that pins it hangs the suite rather than failing it.
 - **`archive_read_support_format_all()` is deliberately NOT called in `Archive::open()`'s unknown-extension fallback** (`lib/meatloaf/media/archive/archive.cpp`). That one reference is the only thing linking the cab, mtree, warc and ar readers — **~31 KB of flash text** for formats a Commodore device does not meet, and a plain ESP32 links within ~1 KB of its `iram0_2_seg` window. The fallback registers every format Meatloaf can name by extension, so any of them is still recognized from content alone; adding a format to the extension list means adding it here too. **`empty` is in that list on purpose** — it is what gives a zero-byte file a clean empty listing, and without it that file falls to `raw`, which bids 1 on anything and synthesizes one entry named `data`.
 
 ## Recent Changes (August 17, 2026)
@@ -630,9 +631,17 @@ making the state a finished match returns to a variable (`ds->literal_state`).
   repeating as a one-off after any change to that path.
 - **`mce.lha` exposed a second, older defect — see the Amiga bidder entry below.** It could not be
   read at all, and that predated `-lh1-` support.
-- **NOT hardware-tested.** The console path (`hex`, `unzipx`) and the C64 LOAD path both need a
-  device. `unzipx games.lzh` is the run worth doing, not just `hex menu`: a multi-entry sequential
-  walk is what the alignment rule above protects.
+- **Hardware-verified on lolin-d32-pro** (console over serial; the C64 LOAD path is still untested).
+  The method: dump an entry with `hex`, parse the dump back out of the serial log, CRC-16 it and
+  compare against the CRC the compressor stored in that entry's header — the same oracle the native
+  suite uses, run end to end through the device.
+  - `games.lzh/menu` 895 bytes CRC `0xc193`, `Taboo.lzh/readme` 377 bytes CRC `0x573d`,
+    `Tomb.lzh/tiamat's tomb` 17214 bytes CRC `0x2120` — all three `-lh1-` archives, all exact.
+  - `unzipx /sd/content/archive/lzh/games.lzh` walked all 25 entries and wrote 24 (163312 bytes)
+    with no decode or CRC error. The one that did not write is a **filename** failure, not a decode
+    one: its name holds PETSCII graphics characters the filesystem cannot represent.
+  - This is the run the alignment rule above protects, and it is why it is worth doing over
+    `hex menu`: it reads each entry to its end and then continues to the next header.
 
 **The feature cost 2071 bytes of flash text and `lolin-d32-pro` had 1086 bytes of `iram0_2_seg`
 headroom**, so it overflowed by 985. Two levers made it *worse*, both worth not retrying:
@@ -667,6 +676,15 @@ no name length to check against, and no failing sample exists.
 Verified: `mce.lha` now lists and decodes all **997** entries, each to its declared size with its
 CRC-16 accepted — 3.4 MB, level-1 headers with extended headers, `-lh5-`. The entry count is
 asserted in the test, so it cannot pass by finding the first few and stopping.
+
+**Hardware-verified too, and doing so found a second defect this fix exposed.** On the device,
+`hex mce.lha/MCE.info` re-opened the archive about once a second and never returned. Cause: entry 66
+of the 997 is an empty file, and `seekEntry()`'s size probe re-reads from the first entry, which
+restarts the name walk — see the Important Notes entry on the probe. That bug is older than any of
+this work; it was simply unreachable while no Amiga archive could be opened, and every `.lzh`
+sample happens to have no empty entry. With the probe gated, `MCE.info` decodes in ONE archive open
+(4886 bytes, CRC `0xb122`) and `game1` — entry 67, immediately past the empty one — decodes too
+(1564 bytes, CRC `0x9e25`).
 
 ### ArcDecoder overflowed the console_exec stack
 

@@ -738,6 +738,43 @@ void test_lh1_short_origsize_still_leaves_the_walk_aligned(void)
     }
 }
 
+// An empty entry inside a multi-entry archive must not restart the walk.
+//
+// seekEntry() probes for a real size when archive_entry_size() is 0, by
+// re-opening the archive and counting bytes - and that re-open re-reads from
+// the FIRST entry. Inside a container that resets a name walk in progress, so
+// any name sitting past an empty entry can never be reached. Found on hardware
+// with mce.lha, whose entry 66 of 997 is an empty file: `hex mce.lha/MCE.info`
+// re-opened the archive about once a second, indefinitely.
+//
+// Reaching an entry past the empty one is the whole test. It has to go through
+// ArchiveMStream::seekPath(), not libarchive directly, because the probe lives
+// in this layer.
+void test_empty_entry_does_not_restart_the_walk(void)
+{
+    const char* path = ".archive/archive/lha/mce.lha";
+    if (!haveFile(path))
+        TEST_IGNORE_MESSAGE("sample missing: .archive/archive/lha/mce.lha");
+
+    // A regression here does not fail this test, it HANGS it: the probe loop is
+    // unbounded. A hung suite is the signal.
+    auto src = std::make_shared<FileContainerStream>(path);
+    TEST_ASSERT_TRUE(src->isOpen());
+
+    WalkableArchiveStream stream(src);
+    TEST_ASSERT_TRUE_MESSAGE(stream.open(std::ios_base::in), "archive failed to open");
+
+    // "game1" is entry 67; the empty "scores" is 66, so the walk has to pass it.
+    TEST_ASSERT_TRUE_MESSAGE(stream.seekPath("game1"),
+        "an entry past the empty one must be reachable");
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(1564, stream.entry.size,
+        "entry 67 of mce.lha is 1564 bytes");
+
+    // Note the empty entry itself does NOT resolve through seekPath: ensureData()
+    // has nothing to cache for a 0-byte entry. That is pre-existing and separate
+    // from the walk-restart defect this test is about.
+}
+
 // The reader must still refuse a method it has no decoder for, rather than
 // e.g. producing zero bytes and claiming success. -lh2- shares -lh1-'s
 // adaptive literal tree but codes positions adaptively too, which is not
@@ -783,6 +820,7 @@ int main(int, char**)
     RUN_TEST(test_lh5_entries_still_decode_and_pass_their_crc);
     RUN_TEST(test_lh1_reading_an_entry_leaves_the_walk_aligned);
     RUN_TEST(test_lh1_short_origsize_still_leaves_the_walk_aligned);
+    RUN_TEST(test_empty_entry_does_not_restart_the_walk);
     RUN_TEST(test_unimplemented_lzh_method_is_still_refused);
     return UNITY_END();
 }
