@@ -93,6 +93,12 @@ size_t FileHandlerFTP::read(void *ptr, size_t size, size_t n)
     if (ptr == nullptr || size == 0 || n == 0)
         return 0;
 
+    // Already at the end: answer without touching the network. Without this,
+    // the caller's final read - the one that gets 0 and ends its loop - would
+    // restart the transfer at EOF via REST.
+    if (_size >= 0 && _pos >= _size)
+        return 0;
+
     if (!start_transfer())
         return 0;
 
@@ -128,6 +134,13 @@ size_t FileHandlerFTP::read(void *ptr, size_t size, size_t n)
         if (_size >= 0 && _pos >= _size)
             break; // whole file delivered
     }
+
+    // End the transfer as soon as the file is complete, rather than leaving it
+    // for close(). The server waits for OUR FIN before sending its closing
+    // response and gives up only after its own ~10 s timeout - so holding the
+    // socket open here stalls the command by that long after the last byte.
+    if ((_size >= 0 && _pos >= _size) || (_started && !_ftp->data_connected() && _ftp->data_available() == 0))
+        stop_transfer();
 
     // Whole-elements semantics, as fread has.
     return (size > 1) ? (total / size) : total;
