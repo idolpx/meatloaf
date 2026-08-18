@@ -141,13 +141,23 @@ int FileHandlerMem::grow(long filesize)
             return -1;
         }
 #ifdef ESP_PLATFORM
+        // PSRAM first, then the ordinary heap. MALLOC_CAP_SPIRAM on its own can
+        // NEVER be satisfied on a board without PSRAM, so asking for it with no
+        // fallback made every memory-cached file fail outright there - which is
+        // every file read over FTP or HTTP, since FileCache keeps them in
+        // memory until they pass its threshold and only spills to SD.
         void *new_buf = heap_caps_realloc(_buffer, bufsize, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (new_buf == nullptr)
+            new_buf = heap_caps_realloc(_buffer, bufsize, MALLOC_CAP_8BIT);
 #else
         void *new_buf = realloc(_buffer, bufsize);
 #endif
         if (new_buf == nullptr) 
         {
-            Debug_println("FileHandlerMem::grow - failed to reallocate buffer");
+            Debug_printf("FileHandlerMem::grow - failed to reallocate buffer: want %ld, had %ld, free8 %u largest8 %u\n",
+                         bufsize, _size,
+                         (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT),
+                         (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
             return -1;
         } 
         _buffer = (uint8_t *)new_buf;

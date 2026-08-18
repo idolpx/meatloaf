@@ -649,6 +649,10 @@ namespace ESP32Console
             // ...and the device id selected with "use" (empty when none)
             int dev = iecSelectedDeviceId();
             mstr::replaceAll(prompt, "%dev%", dev ? std::to_string(dev) + ":" : std::string());
+            std::time_t current_time = std::time(nullptr);
+            char time_buffer[9] = {};
+            std::strftime(time_buffer, sizeof(time_buffer), "%H:%M:%S", std::localtime(&current_time));
+            mstr::replaceAll(prompt, "%time%", time_buffer);
             char *line = linenoise(prompt.c_str());
             if (line == NULL)
             {

@@ -813,7 +813,7 @@ int32_t fnFTP::get_file_size(string path)
     }
 }
 
-bool fnFTP::open_file(string path, bool stor)
+bool fnFTP::open_file(string path, bool stor, unsigned long offset)
 {
     if (!control->connected())
     {
@@ -833,6 +833,22 @@ bool fnFTP::open_file(string path, bool stor)
         }
         Debug_printf("fnFTP::open_file(%s, %s) could not get data port. Aborting.\n", path.c_str(), stor ? "STOR" : "RETR");
         return true;
+    }
+
+    // Restart marker, if resuming. REST must come after the data connection is
+    // set up and immediately before the transfer command; the server answers
+    // 350 and applies it to the next RETR/STOR only.
+    if (offset > 0)
+    {
+        REST(offset);
+        if (parse_response() || _statusCode != 350)
+        {
+            Debug_printf("fnFTP::open_file(%s) - REST %lu refused: %s\r\n",
+                         path.c_str(), offset, controlResponse.c_str());
+            if (_active_mode)
+                _active_server.stop();
+            return true;
+        }
     }
 
     // Do command
@@ -947,8 +963,13 @@ void fnFTP::close_directory()
     _dir_streaming = false;
     dirRemainder.clear();
 
-    if (data->connected())
-        data->stop();
+    // Unconditionally, NOT guarded by connected(): by the time a listing ends,
+    // connected() has already returned false (it peeked and saw the server's
+    // FIN), so a guard here leaves our half of the socket open. The server
+    // waits for our FIN before sending its closing response and only gives up
+    // after its own ~10 s timeout - which is exactly what a guard here cost,
+    // measured at 10396 ms on every listing.
+    data->stop();
 
     if (!_dir_got_response)
     {
@@ -1124,6 +1145,21 @@ int fnFTP::status()
 int fnFTP::data_available()
 {
     return data->available();
+}
+
+void fnFTP::end_transfer()
+{
+    data->stop();
+
+    if (_expect_control_response)
+    {
+        _expect_control_response = false;
+        if (parse_response())
+            Debug_printf("fnFTP::end_transfer() - timed out waiting for 226.\r\n");
+    }
+
+    _stor = false;
+    control->flush();
 }
 
 bool fnFTP::data_connected()
@@ -1466,6 +1502,12 @@ void fnFTP::CWD(string path)
 {
     Debug_printf("fnFTP::CWD(%s)\r\n",path.c_str());
     control->write("CWD " + path + "\r\n");
+}
+
+void fnFTP::REST(unsigned long offset)
+{
+    Debug_printf("fnFTP::REST(%lu)\r\n", offset);
+    control->write("REST " + std::to_string(offset) + "\r\n");
 }
 
 void fnFTP::LIST(string path, string pattern)

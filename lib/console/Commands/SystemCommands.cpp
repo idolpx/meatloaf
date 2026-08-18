@@ -159,7 +159,14 @@ static int meminfo(int argc, char **argv)
 
     Serial.printf("Internal Heap: %lu KB free, %lu KB used, (%lu KB total)\r\n", free, used, total);
     Serial.printf("Minimum free heap size during uptime was: %lu KB\r\n", min);
-    Serial.printf("Overall Free Memory: %lu KB\r\n\r\n", total_free);
+    Serial.printf("Overall Free Memory: %lu KB\r\n", total_free);
+
+    // Largest CONTIGUOUS block, which is what an allocation actually needs.
+    // Free-vs-largest is the difference between "out of memory" and
+    // "fragmented", and only the second number tells you which one you have.
+    Serial.printf("Largest free block: %lu bytes 8-bit, %lu bytes internal\r\n\r\n",
+                  (unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT),
+                  (unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
 
 #if defined(CONFIG_SPIRAM)
     total = ESP.getPsramSize() / 1024;

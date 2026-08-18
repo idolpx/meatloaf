@@ -56,7 +56,18 @@ public:
      * @param stor TRUE means STOR, otherwise RETR
      * @return TRUE if error, FALSE if successful.
      */
-    bool open_file(string path, bool stor);
+    /**
+     * @brief Begin a RETR/STOR transfer, optionally resuming at an offset.
+     * @param offset byte offset to restart at (REST), 0 for the whole file.
+     */
+    bool open_file(string path, bool stor, unsigned long offset = 0);
+
+    /**
+     * @brief End a transfer that is not being read to completion: drop the
+     * data connection and consume the closing response, so the control
+     * channel stays in step.
+     */
+    void end_transfer();
 
     /**
      * Open directory on FTP server, grab it, and return back.
@@ -392,6 +403,12 @@ private:
      * @param path path to retrieve.
      */
     void RETR(string path);
+
+    /**
+     * @brief set the restart marker for the next transfer.
+     * @param offset byte offset to restart at.
+     */
+    void REST(unsigned long offset);
 
     /**
      * @brief change current directory to path.

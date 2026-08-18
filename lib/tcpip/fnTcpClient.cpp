@@ -37,6 +37,14 @@
 #define FNTCP_SELECT_TIMEOUT_US (1000000)
 #define FNTCP_FLUSH_BUFFER_SIZE (1024)
 
+// Most bytes updateFIFO() will pull out of the socket in one call. FIONREAD
+// reports everything the stack has buffered, which during a fast transfer is
+// several KB - and _rxBuffer is a std::string, so resizing to that on a board
+// without PSRAM aborts inside operator new (ESP-IDF builds -fno-exceptions).
+// Every caller loops on available(), so the remainder simply stays in the
+// socket until the next call.
+#define FNTCP_RX_CHUNK_SIZE (2048)
+
 class fnTcpClientSocketHandle
 {
 private:
@@ -434,19 +442,19 @@ void fnTcpClient::updateFIFO()
 
     if (res > 0)
     {
-        ssize_t result;
-        unsigned count;
+        // Bounded: see FNTCP_RX_CHUNK_SIZE. One recv per call, rather than
+        // looping until FIONREAD's count is consumed - the old loop also spun
+        // forever if recv() returned 0 (peer closed), since `count` never
+        // decreased.
+        if (res > FNTCP_RX_CHUNK_SIZE)
+            res = FNTCP_RX_CHUNK_SIZE;
 
-        for (count = res; count; count -= result)
-        {
-            size_t old_len = _rxBuffer.size();
-            _rxBuffer.resize(old_len + count);
-            result = recv(fd(), &_rxBuffer[old_len], count, 0);
-            if (result < 0)
-                result = 0;
-            _rxBuffer.resize(old_len + result);
-        }
-
+        size_t old_len = _rxBuffer.size();
+        _rxBuffer.resize(old_len + res);
+        ssize_t result = recv(fd(), &_rxBuffer[old_len], res, 0);
+        if (result < 0)
+            result = 0;
+        _rxBuffer.resize(old_len + result);
     }
 
     return;

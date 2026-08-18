@@ -11,6 +11,7 @@
 #include "fnSystem.h"
 #include "fnFileCache.h"
 #include "utils.h"
+#include "fnFileFTP.h"
 
 #define COPY_BLK_SIZE 4096
 
@@ -174,8 +175,36 @@ FILE  *FileSystemFTP::file_open(const char *path, const char *mode)
 #ifndef FNIO_IS_STDIO
 FileHandler *FileSystemFTP::filehandler_open(const char *path, const char *mode)
 {
-    FileHandler *fh = cache_file(path, mode);
-    return fh;
+    if (!ensure_connected() || path == nullptr)
+        return nullptr;
+
+    // An existing cache file wins - that is the point of #cache=sd.
+    FileHandler *fh = FileCache::open(_url->mRawUrl.c_str(), path, mode);
+    if (fh != nullptr)
+        return fh;
+
+    // Read: stream straight off the data connection. Caching the file first
+    // needs as much internal heap as the file is long, which a board without
+    // PSRAM does not have during a transfer (measured: 5960 bytes free,
+    // largest block 1972). Writes still go the old way.
+    if (mode != nullptr && mode[0] == 'r')
+    {
+        FileHandlerFTP *sh = new FileHandlerFTP(_ftp, path);
+        if (sh == nullptr)
+            return nullptr;
+
+        if (sh->size() < 0)
+        {
+            // No SIZE from the server, so nothing can answer a size probe.
+            Debug_println("FileSystemFTP::filehandler_open - no size, falling back to cache");
+            sh->close();
+            return cache_file(path, mode);
+        }
+
+        return sh;
+    }
+
+    return cache_file(path, mode);
 }
 
 // Read file from FTP path and write it to cache file
@@ -203,6 +232,7 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
     if (_ftp->open_file(path, false))
     {
         Debug_println("FileSystemFTP::cache_file - RETR failed");
+        FileCache::remove(fc);
         return nullptr;
     }
 
@@ -210,14 +240,28 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
     bool cancel = false;
     int available;
 
-    // Allocate copy buffer
-    // uint8_t *buf = (uint8_t *)heap_caps_malloc(COPY_BLK_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    uint8_t *buf = (uint8_t *)malloc(COPY_BLK_SIZE);
+    // Allocate copy buffer. It only stages bytes between the socket and the
+    // cache file, so a smaller one costs throughput and nothing else - and on a
+    // board without PSRAM, by this point the SIZE and RETR round trips have
+    // already taken their lwIP buffers out of a small internal heap, so a
+    // single 4 KB contiguous request can fail on fragmentation alone (observed:
+    // 28 KB free, 4096 refused). Halve until something fits rather than giving
+    // up on a file of a few KB.
+    size_t blk_size = COPY_BLK_SIZE;
+    uint8_t *buf = nullptr;
+    while (blk_size >= 512 && (buf = (uint8_t *)malloc(blk_size)) == nullptr)
+        blk_size /= 2;
+
     if (buf == nullptr)
     {
         Debug_println("FileSystemFTP::cache_file - failed to allocate buffer");
+        _ftp->close();          // consume the 226 and drop the data socket
+        FileCache::remove(fc);  // release the in-memory cache file
         return nullptr;
     }
+
+    if (blk_size != COPY_BLK_SIZE)
+        Debug_printf("FileSystemFTP::cache_file - copy buffer reduced to %u bytes\n", (unsigned)blk_size);
 
     Debug_println("Retrieving file data");
     while ( !cancel )
@@ -244,7 +288,7 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
                     break;
 
                 // Read FTP data
-                int to_read = available > COPY_BLK_SIZE ? COPY_BLK_SIZE : available;
+                int to_read = available > (int)blk_size ? (int)blk_size : available;
                 if (_ftp->read_file(buf, to_read))
                 {
                     //Debug_println("FileSystemFTP::cache_file - FTP read failed");
