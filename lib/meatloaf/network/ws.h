@@ -180,10 +180,10 @@ public:
  * FS
  ********************************************************/
 
-class WSFileSystem: public MFileSystem 
+class WSMFileSystem: public MFileSystem 
 {
 public:
-    WSFileSystem(): MFileSystem("ws") {};
+    WSMFileSystem(): MFileSystem("ws") {};
 
     bool handles(std::string name) {
         std::string pattern = "ws:";

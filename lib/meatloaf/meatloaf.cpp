@@ -58,37 +58,30 @@
 #include "device/flash.h"
 #include "device/sd.h"
 
-#ifndef MIN_CONFIG
 // Device
+#ifndef MIN_CONFIG
 #include "device/i2c.h"
+#endif
 
 // Archive
+#ifndef MIN_CONFIG
 #include "media/archive/archive.h"
 #include "media/archive/arc.h"
 #include "media/archive/ark.h"
 #include "media/archive/lbr.h"
 #include "media/archive/lnx.h"
-
-// Service
-#include "service/csip.h"
-
-// Network
-#include "network/ftp.h"
-#include "network/sftp.h"
-#include "network/tnfs.h"
-#include "network/smb.h"
-#include "network/nfs.h"
-#include "network/afp.h"
-#include "network/fsp.h"
-#include "network/iscsi.h"
 #endif
 
 // Cartridge
+#ifndef MIN_CONFIG
 #include "media/cartridge/crt.h"
+#endif
 
 // Container
+#ifndef MIN_CONFIG
 #include "media/container/d8b.h"
 #include "media/container/dfi.h"
+#endif
 
 // File
 #include "media/file/p00.h"
@@ -99,6 +92,7 @@
 #include "media/disk/d80.h"
 #include "media/disk/d81.h"
 #include "media/disk/d82.h"
+#ifndef MIN_CONFIG
 #include "media/disk/dxm.h"
 #include "media/disk/g64.h"
 #ifdef EXTRA_DISK_FORMATS
@@ -111,25 +105,45 @@
 #ifdef EXTRA_DISK_FORMATS
 #include "media/disk/p81.h"
 #endif
+#endif
 
 // Hard Disk
 #include "media/hd/d90.h"
 #include "media/hd/dnp.h"
+#ifndef MIN_CONFIG
 #include "media/hd/dhd.h"
 #include "media/hd/hdd.h"
+#endif
 
 // Tape
+#ifndef MIN_CONFIG
 #include "media/tape/csm.h"
 #include "media/tape/tap.h"
 #include "media/tape/t64.h"
 #include "media/tape/tcrt.h"
+#endif
 
 // Network
 #include "network/http.h"
+#ifndef MIN_CONFIG
+#include "network/ftp.h"
+#include "network/sftp.h"
+#include "network/tnfs.h"
+#include "network/smb.h"
+#include "network/nfs.h"
+#include "network/afp.h"
+#include "network/fsp.h"
+#include "network/iscsi.h"
 // #include "network/ipfs.h"
 // #include "network/ws.h"
+// #include "network/tcp.h"
+#endif
+
 
 // Service
+#ifndef MIN_CONFIG
+#include "service/csip.h"
+#endif
 #include "service/ml.h"
 #include "service/mqtt.h"
 #include "service/mdns.h"
@@ -330,39 +344,31 @@ FlashMFileSystem defaultFS;
 SDFileSystem sdFS;
 #endif
 
-#ifndef MIN_CONFIG
 // Device
+#ifndef MIN_CONFIG
 I2CMFileSystem i2cFS;
+#endif
 
 // Archive
+#ifndef MIN_CONFIG
 ArchiveMFileSystem archiveFS;
 ARCMFileSystem arcFS;
 ARKMFileSystem arkFS;
 LBRMFileSystem lbrFS;
 LNXMFileSystem lnxFS;
-
-// Service
-CSIPMFileSystem csipFS;
-MQTTMFileSystem mqttFS;
-MDNSMFileSystem mdnsFS;
-
-// Network
-FTPMFileSystem ftpFS;
-SFTPMFileSystem sftpFS;
-TNFSMFileSystem tnfsFS;
-SMBMFileSystem smbFS;
-NFSMFileSystem nfsFS;
-AFPMFileSystem afpFS;
-FSPMFileSystem fspFS;
-ISCSIMFileSystem iscsiFS;
 #endif
 
+
 // Cartridge
+#ifndef MIN_CONFIG
 //CRTMFileSystem crtFS;
+#endif
 
 // Container
+#ifndef MIN_CONFIG
 D8BMFileSystem d8bFS;
 DFIMFileSystem dfiFS;
+#endif
 
 // File
 P00MFileSystem p00FS;
@@ -373,7 +379,7 @@ D71MFileSystem d71FS;
 D80MFileSystem d80FS;
 D81MFileSystem d81FS;
 D82MFileSystem d82FS;
-D90MFileSystem d90FS;
+#ifndef MIN_CONFIG
 DXMMFileSystem dxmFS;
 G64MFileSystem g64FS;
 #ifdef EXTRA_DISK_FORMATS
@@ -386,25 +392,49 @@ P64MFileSystem p64FS;
 #ifdef EXTRA_DISK_FORMATS
 P81MFileSystem p81FS;
 #endif
+#endif
 
 // Hard Disk
+D90MFileSystem d90FS;
 DNPMFileSystem dnpFS;
+#ifndef MIN_CONFIG
 DHDMFileSystem dhdFS;
 HDDMFileSystem hddFS;
+#endif
 
 // Tape
+#ifndef MIN_CONFIG
 CSMMFileSystem csmFS;
 TAPMFileSystem tapFS;
 T64MFileSystem t64FS;
 TCRTMFileSystem tcrtFS;
+#endif
+
 
 // Network
 HTTPMFileSystem httpFS;
-// IPFSFileSystem ipfsFS;
-// TcpFileSystem tcpFS;
-//WSFileSystem wsFS;
+#ifndef MIN_CONFIG
+FTPMFileSystem ftpFS;
+SFTPMFileSystem sftpFS;
+TNFSMFileSystem tnfsFS;
+SMBMFileSystem smbFS;
+NFSMFileSystem nfsFS;
+AFPMFileSystem afpFS;
+FSPMFileSystem fspFS;
+ISCSIMFileSystem iscsiFS;
+// IPFSMFileSystem ipfsFS;
+// WSMFileSystem wsFS;
+// TCPMFileSystem tcpFS;
+#endif
+
+
 
 // Service
+#ifndef MIN_CONFIG
+CSIPMFileSystem csipFS;
+#endif
+MQTTMFileSystem mqttFS;
+MDNSMFileSystem mdnsFS;
 MLMFileSystem mlFS;
 
 #ifndef MIN_CONFIG
@@ -427,35 +457,48 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &sdFS,
 #endif
 
-#ifndef MIN_CONFIG
     // Device
+#ifndef MIN_CONFIG
     &i2cFS,
+#endif
 
     // Archive
+#ifndef MIN_CONFIG
     &archiveFS,     // extension-based FS have to be on top to be picked first, otherwise the scheme will pick them!
     &arcFS,
     &arkFS, &lbrFS, &lnxFS,
 #endif
 
     // Cartridge
+#ifndef MIN_CONFIG
     //&crtFS,
+#endif
 
     // Container
+#ifndef MIN_CONFIG
     &d8bFS, &dfiFS,
+#endif
 
     // Disk
-    &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d90FS,
+    &d64FS, &d71FS, &d80FS, &d81FS, &d82FS,
+#ifndef MIN_CONFIG
     &dxmFS,
     &g64FS, &m2iFS, &nibFS, &p64FS,
 #ifdef EXTRA_DISK_FORMATS
     &g71FS, &g81FS, &p81FS,
 #endif
+#endif
 
     // Hard Disk
-    &dnpFS, &dhdFS, &hddFS,
+    &d90FS, &dnpFS, 
+#ifndef MIN_CONFIG
+    &dhdFS, &hddFS,
+#endif
 
     // Tape
+#ifndef MIN_CONFIG
     &csmFS, &tapFS, &t64FS, &tcrtFS,
+#endif
 
     // File
 //    &prgFS,         // needs to be on top to be picked first
@@ -465,11 +508,11 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &httpFS,
 #ifndef MIN_CONFIG
     &ftpFS, &sftpFS, &tnfsFS, &smbFS, &nfsFS, &afpFS, &fspFS, &iscsiFS,
-    //&ipfsFS, &tcpFS,
+    //&ipfsFS, &wsFS, &tcpFS,
 #endif
 
-#ifndef MIN_CONFIG
     // Service
+#ifndef MIN_CONFIG
     &mdnsFS, &mqttFS,
 #endif
 

@@ -121,10 +121,10 @@ public:
  * FS
  ********************************************************/
 
-class IPFSFileSystem: public MFileSystem
+class IPFSMFileSystem: public MFileSystem
 {
 public:
-    IPFSFileSystem(): MFileSystem("ipfs") {};
+    IPFSMFileSystem(): MFileSystem("ipfs") {};
 
     bool handles(std::string name) {
         std::string pattern = "ipfs:";
@@ -132,7 +132,7 @@ public:
     }
 
     MFile* getFile(std::string path) override {
-        // Debug_printv("IPFSFileSystem::getFile(%s)", path.c_str());
+        // Debug_printv("IPFSMFileSystem::getFile(%s)", path.c_str());
         return new IPFSMFile(path);
     }
 };

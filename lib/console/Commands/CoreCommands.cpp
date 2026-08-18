@@ -235,7 +235,9 @@ static int exit_console(int argc, char **argv)
 #endif
     // Serial REPL: stop the REPL task and return to on-demand mode so
     // its stack is freed until the next byte of console input.
+#ifdef ENABLE_CONSOLE
     console.requestExit();
+#endif
     Debug_memory();
     return EXIT_SUCCESS;
 }
