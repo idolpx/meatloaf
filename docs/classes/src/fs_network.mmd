@@ -22,7 +22,7 @@ classDiagram
     %%include HTTPMSession
     %%include HTTPMStream
     %%include HTTPRequestContext
-    %%include IPFSFileSystem
+    %%include IPFSMFileSystem
     %%include IPFSMFile
     %%include IPFSMStream
     %%include IRCMFile
@@ -59,7 +59,7 @@ classDiagram
     %%include TNFSMFileSystem
     %%include TNFSMSession
     %%include TNFSMStream
-    %%include WSFileSystem
+    %%include WSMFileSystem
     %%include WSMFile
     %%include WSMStream
 
@@ -92,7 +92,7 @@ classDiagram
     MFileSystem <|-- HTTPMFileSystem
     MSession <|-- HTTPMSession
     MStream <|-- HTTPMStream
-    MFileSystem <|-- IPFSFileSystem
+    MFileSystem <|-- IPFSMFileSystem
     HTTPMFile <|-- IPFSMFile
     HTTPMStream <|-- IPFSMStream
     MFile <|-- IRCMFile
@@ -123,7 +123,7 @@ classDiagram
     MFileSystem <|-- TNFSMFileSystem
     MSession <|-- TNFSMSession
     MStream <|-- TNFSMStream
-    MFileSystem <|-- WSFileSystem
+    MFileSystem <|-- WSMFileSystem
     MFile <|-- WSMFile
     MStream <|-- WSMStream
 

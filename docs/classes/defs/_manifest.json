@@ -1552,7 +1552,7 @@
   ],
   "area": "fs_network"
  },
- "IPFSFileSystem": {
+ "IPFSMFileSystem": {
   "header": "lib/meatloaf/network/ipfs.h",
   "bases": [
    "MFileSystem"
@@ -1794,7 +1794,7 @@
   ],
   "area": "fs_network"
  },
- "WSFileSystem": {
+ "WSMFileSystem": {
   "header": "lib/meatloaf/network/ws.h",
   "bases": [
    "MFileSystem"

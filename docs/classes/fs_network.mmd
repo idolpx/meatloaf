@@ -292,8 +292,8 @@ classDiagram
         +isHttpError() bool
     }
 %%gen
-    class IPFSFileSystem {
-        +IPFSFileSystem()
+    class IPFSMFileSystem {
+        +IPFSMFileSystem()
         +handles(std.string name) bool
         +getFile(std.string path) MFile*
     }
@@ -803,8 +803,8 @@ classDiagram
         +seekPath(std.string path) bool
     }
 %%gen
-    class WSFileSystem {
-        +WSFileSystem()
+    class WSMFileSystem {
+        +WSMFileSystem()
         +handles(std.string name) bool
         +getFile(std.string path) MFile*
     }
@@ -875,7 +875,7 @@ classDiagram
     MFileSystem <|-- HTTPMFileSystem
     MSession <|-- HTTPMSession
     MStream <|-- HTTPMStream
-    MFileSystem <|-- IPFSFileSystem
+    MFileSystem <|-- IPFSMFileSystem
     HTTPMFile <|-- IPFSMFile
     HTTPMStream <|-- IPFSMStream
     MFile <|-- IRCMFile
@@ -906,7 +906,7 @@ classDiagram
     MFileSystem <|-- TNFSMFileSystem
     MSession <|-- TNFSMSession
     MStream <|-- TNFSMStream
-    MFileSystem <|-- WSFileSystem
+    MFileSystem <|-- WSMFileSystem
     MFile <|-- WSMFile
     MStream <|-- WSMStream
 
