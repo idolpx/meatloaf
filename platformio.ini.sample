@@ -163,6 +163,13 @@ build_flags =
     ;-D ENABLE_DISPLAY      ; enable display service
     ;-D ENABLE_AUDIO        ; enable audio service
 
+    ; Memory Options
+    ;-D MIN_CONFIG
+    ;-D DISABLE_DIRCACHE    ; stream FTP listings instead of caching them
+                            ; (saves 272 bytes per entry of internal RAM on
+                            ;  boards without PSRAM; loses sorting, listing
+                            ;  re-use, and makes dir_seek() re-list)
+
     ; GPIO Expander Selection (select only one if available)
     ;-D GPIOX_PCF8575
     ;-D GPIOX_MCP23017
@@ -303,6 +310,7 @@ build_flags =
     -D PINMAP_WROOM32
     -D ENABLE_CONSOLE
     -D MIN_CONFIG
+    -D DISABLE_DIRCACHE    ; no PSRAM: a cached listing exhausts internal RAM
 
 [env:esp32-wroom32-pi1541]
 extends = esp32_base
@@ -315,6 +323,7 @@ build_flags =
     -D IEC_INVERTED_LINES
     -D ENABLE_CONSOLE
     -D MIN_CONFIG
+    -D DISABLE_DIRCACHE
 
 [env:ttgo-t1]
 extends = esp32_base
@@ -325,6 +334,7 @@ build_flags =
     -D SD_CARD
     -D ENABLE_CONSOLE
     -D MIN_CONFIG
+    -D DISABLE_DIRCACHE
 
 [env:petdiskmaxv2]
 extends = esp32_base
@@ -336,6 +346,7 @@ build_flags =
     -D SD_CARD
     -D ENABLE_CONSOLE
     -D MIN_CONFIG
+    -D DISABLE_DIRCACHE
 
 [env:wic64]
 extends = esp32_base
@@ -345,6 +356,7 @@ build_flags =
     -D PINMAP_WIC64
     -D ENABLE_CONSOLE
     -D MIN_CONFIG
+    -D DISABLE_DIRCACHE
     -D PARALLEL_BUS
 
 ; ESP32-S2

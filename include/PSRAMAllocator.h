@@ -20,7 +20,10 @@
 #pragma once
 
 #include <esp_heap_caps.h>
+#include <stdlib.h>
 #include "sdkconfig.h"
+
+#include "../include/debug.h"
 
 template <class T>
 class PSRAMAllocator
@@ -55,7 +58,17 @@ public:
             return p2;
         }
 
-        return NULL;
+        // Returning NULL here is not an option: ESP-IDF builds -fno-exceptions,
+        // so the caller is a container that will use the pointer regardless and
+        // write through it. That turns an out-of-memory into a StoreProhibited
+        // at a wild address, which reads as memory corruption rather than as
+        // exhaustion. Fail loudly instead, naming the size that could not be
+        // met and what was left.
+        Debug_printv("PSRAMAllocator: %u bytes failed. internal free[%u] largest[%u]",
+                     (unsigned)(n * sizeof(value_type)),
+                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                     (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+        abort();
     }
 
     void deallocate(value_type* p, std::size_t) noexcept

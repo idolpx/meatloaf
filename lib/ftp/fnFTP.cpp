@@ -928,60 +928,113 @@ bool fnFTP::open_directory(string path, string pattern)
         return true;
     }
 
-    uint8_t buf[256];
-
-    // if (buf == nullptr)
-    // {
-    //     Debug_printf("fnFTP::open_directory() - Could not allocate 2048 bytes.\r\n");
-    //     return true;
-    // }
-
-    int tmout_counter = 1 + FTP_TIMEOUT / 50;
-    bool got_response = false;
-
-    // Reset buffer
-    dirBuffer.str("");
-    dirBuffer.clear();
-    // Retrieve listing into buffer.
-    do
-    {
-        if (data->available() == 0)
-        {
-            if (--tmout_counter == 0)
-            {
-                // no data & no control message
-                Debug_printf("fnFTP::open_directory - Timeout\r\n");
-                break;
-            }
-            fnSystem.delay(50); // wait for more data or control message
-        }
-        if (data->available() > 0)
-        {
-            Debug_printf("Retrieving directory list\r\n");
-            while (data->available())
-            {
-                int len = data->available();
-                memset(buf, 0, sizeof(buf));
-                int num_read = data->read(buf, len > sizeof(buf) ? sizeof(buf) : len);
-                dirBuffer << string((const char *)buf, num_read);
-            }
-            tmout_counter = 1 + FTP_TIMEOUT / 50; // reset timeout counter
-        }
-        if (got_response == false && control->available())
-        {
-            got_response = !parse_response();
-        }
-    } while (data->available() > 0 || data->connected());
-
-    data->stop();
-
-    if (tmout_counter == 0 || (got_response == false && parse_response()))
-    {
-        Debug_printf("fnFTP::open_directory(%s%s) Timed out waiting for 226 response.\r\n", path.c_str(), pattern.c_str());
-        return true;
-    }
+    // The listing is served line by line straight off the data socket by
+    // read_directory(). It used to be read here in full into a stringstream,
+    // which on a board without PSRAM exhausted the internal heap while the
+    // buffer doubled, and operator new aborts (ESP-IDF builds -fno-exceptions).
+    dirRemainder.clear();
+    _dir_streaming = true;
+    _dir_got_response = false;
 
     return false; // all good.
+}
+
+void fnFTP::close_directory()
+{
+    if (!_dir_streaming)
+        return;
+
+    _dir_streaming = false;
+    dirRemainder.clear();
+
+    if (data->connected())
+        data->stop();
+
+    if (!_dir_got_response)
+    {
+        _dir_got_response = true;
+        if (parse_response())
+            Debug_printf("fnFTP::close_directory() - timed out waiting for 226.\r\n");
+    }
+}
+
+bool fnFTP::next_directory_line(string &line)
+{
+    uint8_t buf[256];
+    int tmout_counter = 1 + FTP_TIMEOUT / 50;
+
+    while (_dir_streaming)
+    {
+        size_t nl = dirRemainder.find('\n');
+        if (nl != string::npos)
+        {
+            line = dirRemainder.substr(0, nl);
+            dirRemainder.erase(0, nl + 1);
+            if (!line.empty() && line.back() == '\r')
+                line.pop_back();
+            return true;
+        }
+
+        if (data->available() > 0)
+        {
+            int len = data->available();
+            int num_read = data->read(buf, len > (int)sizeof(buf) ? sizeof(buf) : len);
+            if (num_read < 0)
+            {
+                Debug_printf("fnFTP::next_directory_line() - read error\r\n");
+                break;
+            }
+            if (num_read > 0)
+            {
+                dirRemainder.append((const char *)buf, num_read);
+                tmout_counter = 1 + FTP_TIMEOUT / 50; // reset timeout counter
+                continue;
+            }
+        }
+
+        // Consume the closing response as soon as it turns up, so the control
+        // channel is clear whether or not the caller reads to the end.
+        if (!_dir_got_response && control->available())
+        {
+            _dir_got_response = true;
+            parse_response();
+        }
+
+        if (!data->connected() && data->available() == 0)
+            break; // server closed the data connection - listing complete
+
+        if (--tmout_counter == 0)
+        {
+            Debug_printf("fnFTP::next_directory_line() - Timeout\r\n");
+            break;
+        }
+        fnSystem.delay(50); // wait for more data
+    }
+
+    // Whatever is left without a terminator is still an entry.
+    if (!dirRemainder.empty())
+    {
+        line = dirRemainder;
+        dirRemainder.clear();
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+        close_directory();
+        return !line.empty();
+    }
+
+    close_directory();
+    return false;
+}
+
+bool fnFTP::change_directory(string path)
+{
+    CWD(path);
+
+    if (parse_response())  // returns true on error
+        return false;
+
+    // 250 is the usual answer, but some servers reply 200.
+    return _statusCode >= 200 && _statusCode < 300;
 }
 
 bool fnFTP::read_directory(string &name, long &filesize, bool &is_dir)
@@ -989,13 +1042,10 @@ bool fnFTP::read_directory(string &name, long &filesize, bool &is_dir)
     string line;
     struct ftpparse parse;
 
-    getline(dirBuffer, line);
-
-    if (line.empty())
+    if (!next_directory_line(line) || line.empty())
         return true; // no more entries
 
     //Debug_printf("fnFTP::read_directory - %s\r\n",line.c_str());
-    line = line.substr(0, line.size() - 1);
     ftpparse(&parse, (char *)line.c_str(), line.length());
     name = string(parse.name ? parse.name : "???");
 
@@ -1009,7 +1059,7 @@ bool fnFTP::read_directory(string &name, long &filesize, bool &is_dir)
     filesize = parse.size;
     is_dir = (parse.flagtrycwd == 1);
     //Debug_printf("Name: \"%s\" size: %lu is_dir: %d\r\n", name.c_str(), filesize, is_dir);
-    return dirBuffer.eof();
+    return false;
 }
 
 bool fnFTP::read_file(uint8_t *buf, unsigned short len, unsigned long range_begin, unsigned long range_end)

@@ -8,7 +8,9 @@
 #include "peoples_url_parser.h"
 #include "fnFTP.h"
 #include "fnFS.h"
+#ifndef DISABLE_DIRCACHE
 #include "fnDirCache.h"
+#endif
 
 
 class FileSystemFTP : public FileSystem
@@ -24,9 +26,25 @@ private:
     std::string _username;
     std::string _password;
 
-    // directory cache
+    // Path of the listing that is open, or was last opened.
     char _last_dir[MAX_PATHLEN];
+
+#ifndef DISABLE_DIRCACHE
+    // Default: the whole listing is read up front and cached, which is what
+    // gives sorting, a re-usable listing and O(1) dir_seek().
     DirCache _dircache;
+#else
+    // DISABLE_DIRCACHE: entries are streamed off the FTP data connection one at
+    // a time. A DirCache holds 272 bytes per entry, which on a board without
+    // PSRAM comes out of the internal heap and is the largest single cost of an
+    // `ls` over FTP; only one entry is held at a time here, so a listing costs
+    // the same whether it has 10 entries or 10000. The price is no sorting, no
+    // listing re-use, and a dir_seek() that re-lists.
+    fsdir_entry _direntry;         // the entry dir_read() hands back
+    std::string _dirpattern;       // filter for the open listing
+    uint16_t _dirpos = 0;          // entries served so far
+    bool _dir_open = false;
+#endif
 
 public:
     FileSystemFTP();
@@ -63,6 +81,9 @@ public:
 
 private:
     bool ensure_connected();  // Check connection and reconnect if needed
+#ifdef DISABLE_DIRCACHE
+    bool dir_start(const char *path);  // (re)issue LIST and reset the cursor
+#endif
 
 public:
 #ifndef FNIO_IS_STDIO

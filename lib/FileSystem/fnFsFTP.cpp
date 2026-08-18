@@ -10,6 +10,7 @@
 
 #include "fnSystem.h"
 #include "fnFileCache.h"
+#include "utils.h"
 
 #define COPY_BLK_SIZE 4096
 
@@ -27,7 +28,10 @@ FileSystemFTP::~FileSystemFTP()
     Debug_printf("FileSystemFTP::dtor\n");
     if (_started)
     {
+#ifndef DISABLE_DIRCACHE
         _dircache.clear();
+#endif
+        _ftp->close_directory();
         _ftp->logout();
     }
     if (_ftp != nullptr)
@@ -108,6 +112,10 @@ bool FileSystemFTP::exists(const char *path)
     
     res = _ftp->read_directory(filename, filesz, is_directory);
     bool exists = (res == false && !filename.empty());
+
+    // The listing is streamed off the data socket now, so a caller that stops
+    // early must close it or the control channel is left mid-transfer.
+    _ftp->close_directory();
     
     Debug_printf("Path %s\n", exists ? "exists" : "does not exist");
     return exists;
@@ -117,6 +125,8 @@ bool FileSystemFTP::remove(const char *path)
 {
     if (!_started || path == nullptr)
         return false;
+
+    _ftp->close_directory();
 
     Debug_printf("FileSystemFTP::remove(\"%s\")\n", path);
 
@@ -291,64 +301,26 @@ bool FileSystemFTP::is_dir(const char *path)
 
     Debug_printf("FileSystemFTP::is_dir(\"%s\")\n", path);
 
-    // Try to open the path as a directory
-    bool res = _ftp->open_directory(path, "");
-    
-    if (res != 0)  // open_directory returns 0 on success
-    {
-        Debug_printf("Failed to LIST path\n");
-        return false;
-    }
+    // CWD is the whole test: the server accepts it only for a directory, and
+    // answers 550 for a file or a path that is not there - both of which are
+    // "not a directory" here. This used to LIST the path and compare the first
+    // entry's name against it, which downloaded the ENTIRE listing into
+    // fnFTP::dirBuffer just to answer yes or no. On a board without PSRAM that
+    // exhausted the internal heap and operator new aborted (ESP-IDF builds
+    // -fno-exceptions). Every path fnFTP is given is absolute, so leaving the
+    // server's working directory where CWD put it changes nothing.
+    bool res = _ftp->change_directory(path);
 
-    // Read the first entry to check if it's a directory
-    // For a file, LIST returns a single entry with is_dir=false
-    // For a directory, LIST returns its contents
-    string filename;
-    long filesz;
-    bool is_directory;
-    
-    res = _ftp->read_directory(filename, filesz, is_directory);
-    if (res == false && !filename.empty())
-    {
-        // Successfully read an entry
-        // If the filename matches the path (or just the basename), it's listing the file itself
-        // Some servers return full path, others return just basename
-        
-        if (strcmp(path, filename.c_str()) == 0)
-        {
-            // Full path matches - it's listing the file itself
-            Debug_printf("Path is %s (is_dir=%d)\n", is_directory ? "a directory" : "a file", is_directory);
-            return is_directory;
-        }
-        
-        const char *last_slash = strrchr(path, '/');
-        const char *basename = last_slash ? last_slash + 1 : path;
-        
-        const char *file_last_slash = strrchr(filename.c_str(), '/');
-        const char *file_basename = file_last_slash ? file_last_slash + 1 : filename.c_str();
-        
-        if (strcmp(basename, file_basename) == 0)
-        {
-            // Basename matches - it's listing the file itself
-            Debug_printf("Path is %s (is_dir=%d)\n", is_directory ? "a directory" : "a file", is_directory);
-            return is_directory;
-        }
-        else
-        {
-            // Different name - it's listing directory contents
-            Debug_printf("Path is a directory (listing contents)\n");
-            return true;
-        }
-    }
-    
-    Debug_printf("Could not determine if path is directory\n");
-    return false;
+    Debug_printf("Path is %s\n", res ? "a directory" : "not a directory");
+    return res;
 }
 
 bool FileSystemFTP::mkdir(const char* path)
 {
     if (!_started || path == nullptr)
         return false;
+
+    _ftp->close_directory();
 
     Debug_printf("FileSystemFTP::mkdir(\"%s\")\n", path);
 
@@ -370,6 +342,8 @@ bool FileSystemFTP::rmdir(const char* path)
 {
     if (!_started || path == nullptr)
         return false;
+
+    _ftp->close_directory();
 
     Debug_printf("FileSystemFTP::rmdir(\"%s\")\n", path);
 
@@ -393,7 +367,9 @@ bool FileSystemFTP::dir_exists(const char* path)
     return is_dir(path);
 }
 
-bool FileSystemFTP::dir_open(const char  *path, const char *pattern, uint16_t diropts)
+#ifndef DISABLE_DIRCACHE
+
+bool FileSystemFTP::dir_open(const char *path, const char *pattern, uint16_t diropts)
 {
     if (!ensure_connected())
         return false;
@@ -438,9 +414,13 @@ bool FileSystemFTP::dir_open(const char  *path, const char *pattern, uint16_t di
         res = _ftp->read_directory(filename, filesz, is_dir);
         while(res == false)
         {
-            // skip hidden
+            // skip hidden - fetch the next entry first, since `continue`
+            // alone would re-test this same one forever.
             if (filename[0] == '.')
+            {
+                res = _ftp->read_directory(filename, filesz, is_dir);
                 continue;
+            }
 
             // new dir entry
             fs_de = &_dircache.new_entry();
@@ -482,6 +462,124 @@ bool FileSystemFTP::dir_seek(uint16_t pos)
     return _dircache.seek(pos);
 }
 
+#else // DISABLE_DIRCACHE
+
+bool FileSystemFTP::dir_start(const char *path)
+{
+    _ftp->close_directory();
+    _dirpos = 0;
+    _dir_open = false;
+
+    if (_ftp->open_directory(path, ""))
+    {
+        Debug_printf("Failed to open directory\n");
+        return false;
+    }
+
+    _dir_open = true;
+    return true;
+}
+
+bool FileSystemFTP::dir_open(const char *path, const char *pattern, uint16_t diropts)
+{
+    if (!ensure_connected())
+        return false;
+
+    Debug_printf("FileSystemFTP::dir_open(\"%s\", \"%s\", %u)\n", path ? path : "", pattern ? pattern : "", diropts);
+
+    if (path == nullptr)
+        return false;
+
+    // Sorting is not available without the cache: it would mean holding the
+    // whole listing, which is exactly the cost this avoids. Entries come back
+    // in server order. Nothing in Meatloaf asks for a sorted FTP listing -
+    // FTPMFile passes DIR_OPTION_UNSORTED - so this only affects a fuji host slot.
+    if (!(diropts & DIR_OPTION_UNSORTED))
+        Debug_printf("FTP listings are unsorted (server order)\n");
+
+    _dirpattern = (pattern != nullptr) ? pattern : "";
+
+    if (!dir_start(path))
+        return false;
+
+    strlcpy(_last_dir, path, MAX_PATHLEN);
+    return true;
+}
+
+fsdir_entry *FileSystemFTP::dir_read()
+{
+    if (!_dir_open)
+        return nullptr;
+
+    string filename;
+    long filesz;
+    bool is_dir;
+
+    while (_ftp->read_directory(filename, filesz, is_dir) == false)
+    {
+        if (filename.empty() || filename[0] == '.')
+            continue; // hidden
+
+        // The filter is applied per entry as it arrives, since there is no
+        // stored list to filter afterwards. Directories are matched only when
+        // the pattern asks for them, as DirCache::apply_filter() does.
+        if (!_dirpattern.empty())
+        {
+            bool filter_dirs = _dirpattern.back() == '/';
+            if ((!is_dir || filter_dirs) &&
+                util_wildcard_match(filename.c_str(), _dirpattern.c_str()) == false)
+                continue;
+        }
+
+        strlcpy(_direntry.filename, filename.c_str(), sizeof(_direntry.filename));
+        _direntry.isDir = is_dir;
+        _direntry.size = (uint32_t)filesz;
+        _direntry.modified_time = 0; // TODO
+        _dirpos++;
+        return &_direntry;
+    }
+
+    // End of listing - the data connection is already closed by read_directory().
+    _dir_open = false;
+    return nullptr;
+}
+
+void FileSystemFTP::dir_close()
+{
+    _ftp->close_directory();
+    _dir_open = false;
+    _dirpos = 0;
+}
+
+uint16_t FileSystemFTP::dir_tell()
+{
+    // Answers after the listing is exhausted too, as DirCache does - dir_seek()
+    // can still get back there by re-listing.
+    return (_last_dir[0] != '\0') ? _dirpos : FNFS_INVALID_DIRPOS;
+}
+
+bool FileSystemFTP::dir_seek(uint16_t pos)
+{
+    // Without a stored list the only way back is to LIST again and skip
+    // forward. One network round trip per seek, which is why nothing should
+    // seek in a loop - but it keeps fuji host-slot paging working.
+    if (_last_dir[0] == '\0')
+        return false;
+
+    if (!dir_start(_last_dir))
+        return false;
+
+    while (_dirpos < pos)
+    {
+        if (dir_read() == nullptr)
+            return false; // fewer entries than asked for
+    }
+
+    return true;
+}
+
+#endif // DISABLE_DIRCACHE
+
 bool FileSystemFTP::keep_alive()
 {
     if (!_started)
@@ -500,6 +598,12 @@ bool FileSystemFTP::keep_alive()
 
 bool FileSystemFTP::ensure_connected()
 {
+    // A listing holds the data connection open until it is read to the end, so
+    // close any that was abandoned before issuing something else. No-op when
+    // none is open. dir_open() calls this before starting its own listing.
+    if (_ftp != nullptr)
+        _ftp->close_directory();
+
     // Check if we're actually connected at the FTP protocol level
     if (_started && _ftp && _ftp->control_connected()) {
         return true;  // Already connected and verified

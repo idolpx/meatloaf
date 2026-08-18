@@ -5,7 +5,6 @@
 #ifndef FNFTP_H
 #define FNFTP_H
 
-#include <sstream>
 
 #include "fnTcpClient.h"
 #include "fnTcpServer.h"
@@ -74,6 +73,19 @@ public:
      * @return TRUE if error, FALSE if successful
      */
     bool read_directory(string& name, long& filesize, bool &is_dir);
+
+    /**
+     * @brief Ask the server to change to path, as a directory test.
+     * @param path absolute path to test.
+     * @return true if the server accepted it as a directory.
+     */
+    bool change_directory(string path);
+
+    /**
+     * @brief End a listing early: drop the data connection and consume the
+     * closing response, so the control channel stays in step.
+     */
+    void close_directory();
 
     /**
      * Read file from data socket into buffer.
@@ -184,7 +196,30 @@ private:
     /**
      * Directory buffer stream
      */
-    std::stringstream dirBuffer;
+    /**
+     * @brief Bytes pulled from the data connection that are not yet a whole
+     * line. A listing is parsed one line at a time straight off the socket,
+     * so only this remainder is ever held - buffering the whole listing
+     * exhausted the internal heap on a board without PSRAM.
+     */
+    std::string dirRemainder;
+
+    /**
+     * @brief true while a listing's data connection is open.
+     */
+    bool _dir_streaming = false;
+
+    /**
+     * @brief true once the listing's closing response has been consumed.
+     */
+    bool _dir_got_response = false;
+
+    /**
+     * @brief Pull the next complete line of the listing off the data socket.
+     * @param line receives the line, without its terminator.
+     * @return true if a line was produced, false at end of listing.
+     */
+    bool next_directory_line(string &line);
 
     /**
      * The data port returned by EPSV/PASV

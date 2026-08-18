@@ -135,16 +135,18 @@ bool FTPMFile::readEntry(std::string filename) {
     if (!fs) return false;
     std::string searchPath = pathToFile();
     if (searchPath.empty()) searchPath = "/";
-    if (!fs->dir_open(searchPath.c_str(), "", 0)) {
+    if (fs->dir_open(searchPath.c_str(), "", 0)) {
         fsdir_entry_t* de;
         while ((de = fs->dir_read()) != nullptr) {
             std::string en = de->filename;
             if (en == filename || filename == "*") {
                 name = en;
                 rebuildUrl();
+                fs->dir_close();
                 return true;
             }
         }
+        fs->dir_close();
     }
     return false;
 }
