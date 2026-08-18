@@ -10,8 +10,8 @@
 //#define PSRAM_SIZE              8
 
 /* SD Card */
-#define PIN_CARD_DETECT         GPIO_NUM_12 // fnSystem.h
-#define PIN_CARD_DETECT_FIX     GPIO_NUM_15 // fnSystem.h
+#define PIN_CARD_DETECT         GPIO_NUM_NC
+#define PIN_CARD_DETECT_FIX     GPIO_NUM_NC
 
 #define PIN_SD_HOST_CS          GPIO_NUM_4
 #define PIN_SD_HOST_MISO        GPIO_NUM_19
@@ -19,7 +19,7 @@
 #define PIN_SD_HOST_SCK         GPIO_NUM_18
 
 /* UART */
-#define PIN_UART0_RX            GPIO_NUM_3  // fnUART.cpp
+#define PIN_UART0_RX            GPIO_NUM_3
 #define PIN_UART0_TX            GPIO_NUM_1
 #define PIN_UART1_RX            GPIO_NUM_9
 #define PIN_UART1_TX            GPIO_NUM_10
@@ -27,12 +27,12 @@
 #define PIN_UART2_TX            GPIO_NUM_NC
 
 /* Buttons */
-#define PIN_BUTTON_A            GPIO_NUM_0  // keys.cpp
+#define PIN_BUTTON_A            GPIO_NUM_0
 #define PIN_BUTTON_B            GPIO_NUM_NC
 #define PIN_BUTTON_C            GPIO_NUM_14
 
 /* LEDs */
-#define PIN_LED_WIFI            GPIO_NUM_2 // led.cpp
+#define PIN_LED_WIFI            GPIO_NUM_2
 #define PIN_LED_BT              GPIO_NUM_NC
 #define PIN_LED_BUS             GPIO_NUM_5
 #define PIN_LED_RGB             GPIO_NUM_13
@@ -66,7 +66,7 @@
 
 
 /* Modem/Parallel Switch */
-#define PIN_MODEM_ENABLE        GPIO_NUM_2  // High = Modem enabled
+#define PIN_MODEM_ENABLE        GPIO_NUM_12  // High = Modem enabled
 #define PIN_MODEM_UP9600        GPIO_NUM_15 // High = UP9600 enabled
 
 

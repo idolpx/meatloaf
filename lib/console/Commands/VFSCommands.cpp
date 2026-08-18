@@ -262,8 +262,10 @@ int ls(int argc, char **argv)
         if ( fnSDFAT.running() && ( !filtered || mstr::compare("sd", pattern, false) ) )
             Serial.printf("d %8lu  \"sd\"\r\n", 0);
 
+#ifndef MIN_CONFIG
         if ( !filtered || mstr::compare("network", pattern, false) )
             Serial.printf("d %8lu  \"network\"\r\n", 0);
+#endif
     }
 
     while(entry.get() != nullptr) {

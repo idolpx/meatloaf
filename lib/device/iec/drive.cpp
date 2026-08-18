@@ -462,9 +462,11 @@ iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecCha
     if(m_dir->url.size() < 2 ) {
         if( fnSDFAT.running() )
             m_headers.push_back("DIR SD");
-    
+
+#ifndef MIN_CONFIG
         // This will be used to browse the network
         m_headers.push_back("DIR NETWORK");
+#endif
     }
 
 #ifdef ENABLE_DISPLAY

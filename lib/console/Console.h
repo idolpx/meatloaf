@@ -14,6 +14,7 @@
 
 #include <functional>
 #include <memory>
+#include <string>
 
 #define CONSOLE_UART        UART_NUM_0
 #define MAX_READ_WAIT_TICKS 200
@@ -47,6 +48,8 @@ namespace ESP32Console
         static void repl_task(void *args);
 
         void beginCommon();
+        std::string buildPrompt();
+        bool readLine(const std::string &prompt, std::string &out);
         size_t _print_number(unsigned long n, uint8_t base);
 
     public:

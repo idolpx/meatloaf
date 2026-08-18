@@ -1,6 +1,7 @@
 #include "Console.h"
 
 #include <fcntl.h>
+#include <unistd.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "soc/soc_caps.h"
@@ -262,8 +263,10 @@ namespace ESP32Console
 
     void Console::beginCommon()
     {
-        // Match ESP-IDF console example defaults for line editing behavior.
-        linenoiseSetMultiLine(1);
+        // The console runs in dumb mode (see initialize_console_library), so
+        // neither refresh path is reached. Single-line is still the safer of
+        // the two if dumb mode is ever turned off.
+        linenoiseSetMultiLine(0);
         // Allow empty lines so linenoise returns "" instead of re-printing the
         // prompt internally. The REPL loop's own empty-line guard handles them,
         // preventing a double-prompt when the terminal sends \r\n (which produces
@@ -289,6 +292,105 @@ namespace ESP32Console
         // Register core commands like echo
         esp_console_register_help_command();
         registerCoreCommands();
+    }
+
+    // Line input for the serial REPL: prompt, echo, backspace, enter. This is
+    // deliberately not linenoise. Its editor re-derives the cursor's row and
+    // column from the prompt and buffer widths after every keystroke, which
+    // misrenders once the prompt approaches the terminal width; its dumb-mode
+    // fallback does no cursor arithmetic but types the tail of any escape
+    // sequence into the buffer (an arrow key becomes a literal "[A") and, on a
+    // read that returns 0 rather than an error — what a disconnected USB CDC or
+    // USB-Serial-JTAG host produces — fills the line with a stale character and
+    // submits it as a command. Nothing here moves the cursor, so terminal width
+    // never enters into it, and a read that yields nothing ends the line.
+    //
+    // Given up against a full editor: history recall, tab completion, hints and
+    // cursor movement within the line.
+    //
+    // Returns false when no line could be read; the caller backs off and
+    // reprompts.
+    bool Console::readLine(const std::string &prompt, std::string &out)
+    {
+        out.clear();
+
+        fputs(prompt.c_str(), stdout);
+        fflush(stdout);
+
+        const int fd = fileno(stdin);
+        while (out.length() + 1 < max_cmdline_len_)
+        {
+            char c;
+            if (read(fd, &c, 1) != 1)
+                return false;
+
+            if (c == '\n')
+                break;
+
+            if (c == 0x7F || c == 0x08) // DEL / backspace
+            {
+                if (!out.empty())
+                {
+                    out.pop_back();
+                    fputs("\b \b", stdout);
+                    fflush(stdout);
+                }
+                continue;
+            }
+
+            if (c == 0x1B) // ESC: discard the escape sequence it introduces
+            {
+                char next;
+                if (read(fd, &next, 1) != 1)
+                    return false;
+                if (next == '[') // CSI: parameter bytes, then a final byte
+                {
+                    char seq;
+                    do
+                    {
+                        if (read(fd, &seq, 1) != 1)
+                            return false;
+                    } while (seq >= 0x30 && seq <= 0x3F);
+                }
+                else if (next == 'O') // SS3: one final byte
+                {
+                    char seq;
+                    if (read(fd, &seq, 1) != 1)
+                        return false;
+                }
+                continue;
+            }
+
+            if ((unsigned char)c < 0x20) // remaining control characters
+                continue;
+
+            out += c;
+            fputc(c, stdout);
+            fflush(stdout);
+        }
+
+        // One '\n': the console's TX line-ending translation expands it to CRLF.
+        fputc('\n', stdout);
+        fflush(stdout);
+        return true;
+    }
+
+    // Renders the prompt template for both the serial REPL and the TCP session.
+    std::string Console::buildPrompt()
+    {
+        std::string p = prompt_;
+
+        mstr::replaceAll(p, "%pwd%", getCurrentPathUrl());
+
+        int dev = iecSelectedDeviceId();
+        mstr::replaceAll(p, "%dev%", dev ? std::to_string(dev) + ":" : std::string());
+
+        std::time_t current_time = std::time(nullptr);
+        char time_buffer[9] = {};
+        std::strftime(time_buffer, sizeof(time_buffer), "%H:%M:%S", std::localtime(&current_time));
+        mstr::replaceAll(p, "%time%", time_buffer);
+
+        return p;
     }
 
     void Console::begin(int baud, int rxPin, int txPin, uart_port_t channel)
@@ -642,26 +744,16 @@ namespace ESP32Console
 
         while (true)
         {
-            std::string prompt = console.prompt_;
-
-            // Insert current PWD into prompt if needed
-            mstr::replaceAll(prompt, "%pwd%", getCurrentPathUrl());
-            // ...and the device id selected with "use" (empty when none)
-            int dev = iecSelectedDeviceId();
-            mstr::replaceAll(prompt, "%dev%", dev ? std::to_string(dev) + ":" : std::string());
-            std::time_t current_time = std::time(nullptr);
-            char time_buffer[9] = {};
-            std::strftime(time_buffer, sizeof(time_buffer), "%H:%M:%S", std::localtime(&current_time));
-            mstr::replaceAll(prompt, "%time%", time_buffer);
-            char *line = linenoise(prompt.c_str());
-            if (line == NULL)
+            std::string prompt = console.buildPrompt();
+            std::string raw_line;
+            if (!console.readLine(prompt, raw_line))
             {
                 // Avoid tight-looping when input is temporarily unavailable.
                 vTaskDelay(pdMS_TO_TICKS(50));
                 continue;
             }
             // ESP_LINE_ENDINGS_CR maps both \r and \n to \n, so a \r\n terminal
-            // leaves a second \n in the buffer after linenoise consumes the first.
+            // leaves a second \n in the buffer after readLine consumes the first.
             // Drain it non-blocking to prevent a double prompt on the next call.
             {
                 int fl = fcntl(fileno(stdin), F_GETFL, 0);
@@ -671,24 +763,16 @@ namespace ESP32Console
                 if (ch != '\n' && ch != EOF) ungetc(ch, stdin);
             }
 
-            // Truncate to buffer size in case paste overflow corrupted length.
-            line[console.max_cmdline_len_ - 1] = '\0';
-
             // Ignore empty/whitespace-only input lines.
-            std::string raw_line = line;
             mstr::trim(raw_line);
             if (raw_line.empty())
-            {
-                linenoiseFree(line);
                 continue;
-            }
 
             // "reboot" must work even when the executor can't be created
             // (memory pressure) or is busy — handle it directly rather than
             // submitting a command. Never returns.
             if (raw_line == "reboot")
             {
-                linenoiseFree(line);
                 do_reboot();
             }
 
@@ -699,7 +783,6 @@ namespace ESP32Console
             // sets a volatile flag the scan polls, so it is safe here.
             if (raw_line == "updatedb stop")
             {
-                linenoiseFree(line);
                 if (updatedb_request_stop())
                     ::printf("updatedb: stopping...\r\n");
                 else
@@ -712,7 +795,6 @@ namespace ESP32Console
             // (memory pressure) — handle it without submitting a command.
             if (raw_line == "exit")
             {
-                linenoiseFree(line);
                 console._exit_requested = true;
                 break;
             }
@@ -754,9 +836,6 @@ namespace ESP32Console
             {
                 fprintf(stdout, "Internal error: %s\n", esp_err_to_name(err));
             }
-            /* linenoise allocates line buffer on the heap, so need to free it */
-            linenoiseFree(line);
-
             if (console._exit_requested)
                 break;
         }
@@ -870,13 +949,7 @@ namespace ESP32Console
 
 #ifdef ENABLE_CONSOLE_TCP
         // Prompt goes to TCP only — the REPL loop owns the UART prompt via linenoise.
-        {
-            std::string p = prompt_;
-            mstr::replaceAll(p, "%pwd%", getCurrentPathUrl());
-            int dev = iecSelectedDeviceId();
-            mstr::replaceAll(p, "%dev%", dev ? std::to_string(dev) + ":" : std::string());
-            tcp_server.send(p);
-        }
+        tcp_server.send(buildPrompt());
 #endif
     }
 

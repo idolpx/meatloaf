@@ -588,8 +588,8 @@ public:
 
         // Run keep-alive checks outside the lock (network I/O)
         for (auto& pair : to_check) {
-            Debug_printv("Sending keep-alive to: %s (idle: %ums)",
-                       pair.first.c_str(), pair.second->getIdleTime());
+            // Debug_printv("Sending keep-alive to: %s (idle: %ums)",
+            //            pair.first.c_str(), pair.second->getIdleTime());
 
             if (!pair.second->keep_alive()) {
                 Debug_printv("Keep-alive failed for: %s, attempting reconnect", pair.first.c_str());

@@ -111,10 +111,10 @@ void initialize_console_library(const char *history_path)
     ESP_ERROR_CHECK( esp_console_init(&console_config) );
 
     /* Configure linenoise line completion library */
-    /* Enable multiline editing. If not set, long commands will scroll within
-     * single line.
+    /* Single-line editing: long commands scroll within the line. Multiline
+     * editing misrenders on a narrow terminal (see Console::beginCommon).
      */
-    linenoiseSetMultiLine(1);
+    linenoiseSetMultiLine(0);
 
     /* Tell linenoise where to get command completions and hints */
     linenoiseSetCompletionCallback(&esp_console_get_completion);
@@ -134,11 +134,12 @@ void initialize_console_library(const char *history_path)
     linenoiseHistoryLoad(history_path);
 #endif // CONFIG_CONSOLE_STORE_HISTORY
 
-    /* Figure out if the terminal supports escape sequences */
-    const int probe_status = linenoiseProbe();
-    if (probe_status) {         /* zero indicates success */
-        linenoiseSetDumbMode(1);
-    }
+    /* Dumb mode, for the benefit of anything that asks: the REPL reads its own
+     * lines (Console::readLine) and never calls linenoise(). The terminal is
+     * deliberately not probed for escape-sequence support — the answer would
+     * change nothing, and the probe stalls boot for 500 ms when nothing
+     * answers it. */
+    linenoiseSetDumbMode(1);
 }
 
 char *setup_prompt(const char *prompt_str)

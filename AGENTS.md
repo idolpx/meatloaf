@@ -573,6 +573,88 @@ gitignored.
 - **`seekEntry()`'s size probe must only run for a compressed STREAM, never for an entry inside a container** (`lib/meatloaf/media/archive/archive.cpp`). When `archive_entry_size()` is 0 the probe re-opens the archive and counts decompressed bytes — and that re-open re-reads from the FIRST entry, which **resets a name walk already in progress**. Inside a real container a size of 0 means the file IS empty, so the probe is both unnecessary and fatal: any name sitting past an empty entry can never be reached, and the lookup re-opens the archive about once a second forever. Found on hardware — entry 66 of the 997 in `mce.lha` is an empty file, and `hex mce.lha/MCE.info` never returned. The gate is `isRawCompressedEntry || (entry.size == 0 && hasCompressionFilter())`: a `.gz`/`.bz2` has one entry and a meaningless size field, which is exactly when re-reading from the first entry is correct. Note a regression here presents as a HANG, not an error — the native test that pins it hangs the suite rather than failing it.
 - **`archive_read_support_format_all()` is deliberately NOT called in `Archive::open()`'s unknown-extension fallback** (`lib/meatloaf/media/archive/archive.cpp`). That one reference is the only thing linking the cab, mtree, warc and ar readers — **~31 KB of flash text** for formats a Commodore device does not meet, and a plain ESP32 links within ~1 KB of its `iram0_2_seg` window. The fallback registers every format Meatloaf can name by extension, so any of them is still recognized from content alone; adding a format to the extension list means adding it here too. **`empty` is in that list on purpose** — it is what gives a zero-byte file a clean empty listing, and without it that file falls to `raw`, which bids 1 on anything and synthesizes one entry named `data`.
 
+- **An FTP transfer must have OUR end of the data socket closed, promptly and unconditionally.** The server half-closes when it has sent everything, then waits for our FIN before emitting its `226`; it gives up only after its own timeout, measured at a constant **10396 ms** on zimmers.net. So every operation stalls ~10 s AFTER the last byte, and it presents as a hang rather than an error. This bit three times in one session: `close_directory()` guarded `data->stop()` with `if (data->connected())` — which is never true by then, because `connected()` has already peeked and seen the FIN, which is what prints `fnTcpClient disconnected because no bytes to read`; `next_directory_line()` ended a listing without closing; and `FileHandlerFTP::read()` left the socket for `close()` instead of ending the transfer the moment the file was complete. **Never guard the close on `connected()`**, and end the transfer at end-of-data, not at handle destruction.
+- **`MALLOC_CAP_SPIRAM` on its own can NEVER be satisfied on a board without PSRAM** — `heap_caps_realloc(p, n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)` in `FileHandlerMem::grow()` therefore failed unconditionally there, whatever the heap looked like, so every memory-cached file (i.e. every file read over FTP or HTTP, since `FileCache` keeps them in RAM until its 200 KB threshold and only ever spills to SD) failed on those boards. Always follow a SPIRAM request with a `MALLOC_CAP_8BIT`/`MALLOC_CAP_DEFAULT` retry, the way `PSRAMAllocator` does. A capability request is a hard filter, not a preference.
+- **`PSRAMAllocator::allocate()` aborts on failure rather than returning NULL** (`include/PSRAMAllocator.h`). ESP-IDF builds `-fno-exceptions`, so a container that gets NULL from its allocator uses it anyway: `std::vector`'s `_M_realloc_append` wrote through it and produced `StoreProhibited` at `EXCVADDR 0x1100` — 16 `fsdir_entry`s past address zero — which reads as memory corruption rather than exhaustion. It now logs the size it could not satisfy plus free and largest-block, then aborts.
+- **`fnTcpClient::available()` PULLS data into a `std::string`; it is not a counter.** `updateFIFO()` used to resize that string to the whole `FIONREAD` count in one go, which during a fast transfer is several KB and aborts in `operator new` on a small heap. It is now capped at `FNTCP_RX_CHUNK_SIZE` (2048) per call — every caller loops on `available()`, so the remainder simply stays in the socket. The old `for (count = res; count; count -= result)` loop also spun forever if `recv()` returned 0 (peer closed), since `count` never decreased.
+- **Free heap and largest CONTIGUOUS block are different questions, and only the second one explains an allocation failure.** `meminfo` prints both. The numbers that settled this session, on an `esp32-wroom32` (no PSRAM): 27 KB free / 14324 largest at idle, and **5960 free / 1972 largest during an FTP transfer** — the data socket and in-flight data cost ~17 KB. Nothing on that board can allocate 8 KB while a transfer is running, which is why the whole-file cache had to go.
+- **`CONFIG_LWIP_TCP_WND_DEFAULT` must be small on a board without PSRAM.** It was 65534 on `esp32-wroom32` — a 64 KB receive window advertised by a device with ~23 KB of 8-bit heap, so lwIP accepted far more than the heap could hold and the abort landed in whatever allocated next. Now 5760 (4×MSS), with `SND_BUF` to match and `RECVMBOX` 64 → 16. This is the change that turned a board reset into a clean failure. PSRAM boards do not need it — an earlier experiment on `lolin-d32-pro` was reverted for that reason.
+- **FTP file reads STREAM; they are not cached first** (`lib/FileSystem/fnFileFTP.h/.cpp`). `FileHandlerFTP` reads straight off the live RETR connection through a 512-byte buffer, so the RAM cost is the same whatever the file's size. **The transfer starts LAZILY, on the first read** — that is what lets `FTPMStream::open()` keep its seek-to-end/tell/seek-to-start size probe with no network traffic, and is why that code needed no change. Backwards seeks (and forward seeks past 8 KB) restart the transfer at the new offset with `REST`; shorter forward seeks read and discard. `FileCache::open()` is still tried first, so `#cache=sd` is unaffected, and a server that will not answer `SIZE` falls back to the old caching path. **`REST` itself is not hardware-verified** — every read so far has been forward-only.
+- **`DISABLE_DIRCACHE` (undefined by default) makes `FileSystemFTP` stream its directory listing** instead of caching it. `DirCache` holds a `fsdir_entry` per entry — `char filename[256]` plus size and flags, **272 bytes** — from the internal heap on a board without PSRAM, which is the largest single cost of an `ls` over FTP. With the flag set, one entry is held at a time: no sorting (`FTPMFile` passes `DIR_OPTION_UNSORTED` anyway, so only a fuji host slot notices), no listing re-use, and `dir_seek()` re-lists and skips forward. Only `FileSystemFTP` honours the flag; SD, NFS, SMB, HTTP and TNFS still cache unconditionally.
+- **`FTPMFile::readEntry()`'s `dir_open` test was inverted** (`if (!fs->dir_open(...))`) — `dir_open` returns true on success, so the scan loop only ever ran on a listing that had FAILED to open, and an FTP wildcard could never match. Fixed; note the same call must `dir_close()` on both exits now that streaming leaves the data connection open.
+
+## Recent Changes (August 18, 2026)
+
+### FTP over a board with no PSRAM: listings, file reads, and four memory defects
+
+Reported as `cd` into an FTP directory rebooting the board, then `ls` taking 11-13 s, then a file
+read failing outright. All on `esp32-wroom32` — 4 MB flash, **no PSRAM**, `MIN_CONFIG` plus console,
+now also carrying FTP/FSP/TNFS. The durable rules are in the Important Notes above; what follows is
+what the work touched and how each conclusion was reached, because several of the obvious readings
+were wrong.
+
+- **`is_dir()` downloaded the whole directory to answer a yes/no.** It ran `LIST` and compared the
+  first entry's name against the path. Now one `CWD`: the server accepts it only for a directory and
+  answers 550 for a file or a missing path, which are both "not a directory" here. That also
+  replaced a fragile basename-matching heuristic. Every path `fnFTP` is given is absolute (checked
+  across `fnFsFTP.cpp` and `lib/meatloaf/network/ftp.cpp`), so leaving the server's working
+  directory where `CWD` put it changes nothing.
+- **The listing streams.** `open_directory()` now returns after the 150 and `next_directory_line()`
+  pulls bytes on demand, holding only a partial-line remainder; `close_directory()` ends a listing a
+  caller abandons. `exists()` reads one entry and stops, so it must call it, and `ensure_connected()`
+  closes any stray listing before anything else runs — without that a later `RETR` reads the wrong
+  response off the control channel.
+- **The 11-13 s `ls` was measured, not guessed, and the measurement is what found it.** Temporary
+  probes gave `data port 95 ms, LIST+150 51 ms, end of listing 1 ms, closing response 10396 ms` —
+  identical to the millisecond across runs, which is a timeout rather than server jitter, and
+  pointed straight at the unclosed socket. Every other phase was already fast, which ruled out DNS,
+  EPSV and the streaming loop in one line. After the fix: 95-101 ms typical, one run at 1945 ms
+  (genuine server variance now — it varies, where the bug was constant).
+- **The file-read failure took four attempts to reach, and the first three were the wrong layer.**
+  A 4 KB copy buffer in `cache_file()` failed to allocate, so it now halves until something fits;
+  that changed nothing. `updateFIFO()`'s unbounded slurp was aborting in `operator new`; bounding it
+  changed nothing on its own. Capping `TCP_WND` stopped the board resetting but the read still
+  failed. Only then did the diagnostic print the number that mattered —
+  `want 2048, had 0, free8 5960 largest8 1972` — and the fix that actually worked was removing the
+  whole-file cache from the path.
+- **Both the `heap_caps_realloc` fallback and the streaming handler were needed.** The PSRAM-only
+  allocation made `FileHandlerMem` fail on every non-PSRAM board unconditionally; fixing it let the
+  transfer start, at which point the 8 KB it wanted was simply not there. The cache had to go.
+- **Verified on hardware**: `hex Zauberland.prg` (7298 bytes) returns exactly 7298 bytes ending at
+  `0x1C82`, starting `01 08 10 08 C4 07 9E 32 30 36 36` — load address `$0801`, `SYS 2066`, a valid
+  PRG — with the `226` consumed cleanly and heap steady at 21 KB free / 8180 largest across repeated
+  reads. `hex Tomb.readme` (492 bytes) likewise, and its trailing ~10 s stall is what produced the
+  third instance of the close-our-end rule.
+- **Two defects found by reading code around the ones being fixed**: `dir_open`'s hidden-file skip
+  was `if (filename[0] == '.') continue;` with the `read_directory()` call at the BOTTOM of the
+  loop, so any dotfile re-tested the same entry forever — it hangs the board on any FTP directory
+  containing one, and zimmers has `.message` files. And `readEntry()`'s inverted `dir_open` test,
+  above. Neither was part of the reported problem.
+- **Not done, deliberately**: `FileCache` still spills only to SD, so a `#cache=sd` request on a
+  board without an SD card still has nowhere to go. Streaming made that moot for reads; a write path
+  would need it.
+
+### Debug-loop notes (`.claude/skills/commodore64-debugging`)
+
+- **Stop the serial capture when a session ends** — it holds the port, and on Windows that is
+  exclusive, so it blocks both the user's own monitor and the next `esptool` run
+  (`Could not open COM7, the port is busy`). The Windows flash sequence is therefore **stop capture,
+  flash, start capture**. Documented in `SKILL.md` as its own step.
+- **`pio` is not on PATH** — the skill's `build --flash` fails with `FileNotFoundError`; use
+  `~/.platformio/penv/Scripts/pio.exe` directly. Already noted for builds generally; it applies to
+  the skill's scripts too.
+- **The console REPL eats the first byte after boot** (it is dormant in `fgetc()` until then), so a
+  throwaway `send ""` is needed before the first real command or it arrives with its first character
+  missing — `cd ftp://...` becomes `d ftp://...`, "Unrecognized command".
+- **Decode a backtrace against the ELF that produced it, immediately.** Two crashes here were
+  decoded a build too late and pointed at the wrong line; the second had to be reproduced just to
+  read it. `xtensa-esp32-elf-addr2line -pfiaC -e .pio/build/<env>/firmware.elf <addrs>`.
+- **A build-flag or sdkconfig change invalidates the whole tree** — ~9.5 minutes for this board
+  against ~2 for a source-only change. Adding a new source file does the same, per the CMake source
+  glob. On Windows the invalidation can also leave the tree wedged with
+  `CMake Error: Permission denied` writing `CMakeCXXCompiler.cmake.tmp`; `rm -rf .pio/build/<env>`
+  and rebuild.
+
 ## Recent Changes (August 17, 2026)
 
 ### -lh1- (LHarc 1.x) support in libarchive's lha reader

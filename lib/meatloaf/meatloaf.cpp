@@ -78,9 +78,10 @@
 #endif
 
 // Container
-#ifndef MIN_CONFIG
 #include "media/container/d8b.h"
 #include "media/container/dfi.h"
+#ifndef MIN_CONFIG
+
 #endif
 
 // File
@@ -92,6 +93,7 @@
 #include "media/disk/d80.h"
 #include "media/disk/d81.h"
 #include "media/disk/d82.h"
+#include "media/disk/m2i.h"
 #ifndef MIN_CONFIG
 #include "media/disk/dxm.h"
 #include "media/disk/g64.h"
@@ -99,7 +101,6 @@
 #include "media/disk/g71.h"
 #include "media/disk/g81.h"
 #endif
-#include "media/disk/m2i.h"
 #include "media/disk/nib.h"
 #include "media/disk/p64.h"
 #ifdef EXTRA_DISK_FORMATS
@@ -141,12 +142,13 @@
 
 
 // Service
+#include "service/ml.h"
+#include "service/mdns.h"
+#include "service/mqtt.h"
 #ifndef MIN_CONFIG
 #include "service/csip.h"
 #endif
-#include "service/ml.h"
-#include "service/mqtt.h"
-#include "service/mdns.h"
+
 
 
 #ifndef MIN_CONFIG
@@ -365,9 +367,10 @@ LNXMFileSystem lnxFS;
 #endif
 
 // Container
-#ifndef MIN_CONFIG
 D8BMFileSystem d8bFS;
 DFIMFileSystem dfiFS;
+#ifndef MIN_CONFIG
+
 #endif
 
 // File
@@ -379,6 +382,7 @@ D71MFileSystem d71FS;
 D80MFileSystem d80FS;
 D81MFileSystem d81FS;
 D82MFileSystem d82FS;
+M2IMFileSystem m2iFS;
 #ifndef MIN_CONFIG
 DXMMFileSystem dxmFS;
 G64MFileSystem g64FS;
@@ -386,7 +390,6 @@ G64MFileSystem g64FS;
 G71MFileSystem g71FS;
 G81MFileSystem g81FS;
 #endif
-M2IMFileSystem m2iFS;
 NIBMFileSystem nibFS;
 P64MFileSystem p64FS;
 #ifdef EXTRA_DISK_FORMATS
@@ -428,14 +431,14 @@ ISCSIMFileSystem iscsiFS;
 #endif
 
 
-
 // Service
+MLMFileSystem mlFS;
+MDNSMFileSystem mdnsFS;
+MQTTMFileSystem mqttFS;
 #ifndef MIN_CONFIG
 CSIPMFileSystem csipFS;
 #endif
-MQTTMFileSystem mqttFS;
-MDNSMFileSystem mdnsFS;
-MLMFileSystem mlFS;
+
 
 #ifndef MIN_CONFIG
 // Codec
@@ -475,15 +478,16 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
 #endif
 
     // Container
-#ifndef MIN_CONFIG
     &d8bFS, &dfiFS,
+#ifndef MIN_CONFIG
+
 #endif
 
     // Disk
-    &d64FS, &d71FS, &d80FS, &d81FS, &d82FS,
+    &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &m2iFS,
 #ifndef MIN_CONFIG
     &dxmFS,
-    &g64FS, &m2iFS, &nibFS, &p64FS,
+    &g64FS, &nibFS, &p64FS,
 #ifdef EXTRA_DISK_FORMATS
     &g71FS, &g81FS, &p81FS,
 #endif
@@ -508,13 +512,14 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     // Network
     &httpFS, &ftpFS, &fspFS, &tnfsFS,
 #ifndef MIN_CONFIG
-   &sftpFS, &smbFS, &nfsFS, &afpFS, &iscsiFS,
+    &sftpFS, &smbFS, &nfsFS, &afpFS, &iscsiFS,
     //&ipfsFS, &wsFS, &tcpFS,
 #endif
 
     // Service
-#ifndef MIN_CONFIG
     &mdnsFS, &mqttFS,
+#ifndef MIN_CONFIG
+
 #endif
 
 };
