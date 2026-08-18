@@ -301,7 +301,7 @@ board = esp32-wroom32
 build_flags =
     ${env.build_flags}
     -D PINMAP_WROOM32
-    ;-D ENABLE_CONSOLE
+    -D ENABLE_CONSOLE
     -D MIN_CONFIG
 
 [env:esp32-wroom32-pi1541]

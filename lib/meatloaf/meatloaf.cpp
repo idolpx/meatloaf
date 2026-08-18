@@ -116,23 +116,23 @@
 #endif
 
 // Tape
+#include "media/tape/t64.h"
+#include "media/tape/tcrt.h"
 #ifndef MIN_CONFIG
 #include "media/tape/csm.h"
 #include "media/tape/tap.h"
-#include "media/tape/t64.h"
-#include "media/tape/tcrt.h"
 #endif
 
 // Network
 #include "network/http.h"
-#ifndef MIN_CONFIG
 #include "network/ftp.h"
-#include "network/sftp.h"
+#include "network/fsp.h"
 #include "network/tnfs.h"
+#ifndef MIN_CONFIG
+#include "network/sftp.h"
 #include "network/smb.h"
 #include "network/nfs.h"
 #include "network/afp.h"
-#include "network/fsp.h"
 #include "network/iscsi.h"
 // #include "network/ipfs.h"
 // #include "network/ws.h"
@@ -403,24 +403,24 @@ HDDMFileSystem hddFS;
 #endif
 
 // Tape
+T64MFileSystem t64FS;
+TCRTMFileSystem tcrtFS;
 #ifndef MIN_CONFIG
 CSMMFileSystem csmFS;
 TAPMFileSystem tapFS;
-T64MFileSystem t64FS;
-TCRTMFileSystem tcrtFS;
 #endif
 
 
 // Network
 HTTPMFileSystem httpFS;
-#ifndef MIN_CONFIG
 FTPMFileSystem ftpFS;
-SFTPMFileSystem sftpFS;
+FSPMFileSystem fspFS;
 TNFSMFileSystem tnfsFS;
+#ifndef MIN_CONFIG
+SFTPMFileSystem sftpFS;
 SMBMFileSystem smbFS;
 NFSMFileSystem nfsFS;
 AFPMFileSystem afpFS;
-FSPMFileSystem fspFS;
 ISCSIMFileSystem iscsiFS;
 // IPFSMFileSystem ipfsFS;
 // WSMFileSystem wsFS;
@@ -496,8 +496,9 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
 #endif
 
     // Tape
+    &t64FS, &tcrtFS,
 #ifndef MIN_CONFIG
-    &csmFS, &tapFS, &t64FS, &tcrtFS,
+    &csmFS, &tapFS, 
 #endif
 
     // File
@@ -505,9 +506,9 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &p00FS,
 
     // Network
-    &httpFS,
+    &httpFS, &ftpFS, &fspFS, &tnfsFS,
 #ifndef MIN_CONFIG
-    &ftpFS, &sftpFS, &tnfsFS, &smbFS, &nfsFS, &afpFS, &fspFS, &iscsiFS,
+   &sftpFS, &smbFS, &nfsFS, &afpFS, &iscsiFS,
     //&ipfsFS, &wsFS, &tcpFS,
 #endif
 

@@ -234,8 +234,8 @@ namespace ESP32Console
         registerCommand(getUpdateCommand());
         registerCommand(getEnableCommand());
         registerCommand(getDisableCommand());
-        registerCommand(getGzipCommand());
 #ifndef MIN_CONFIG
+        registerCommand(getGzipCommand());
         registerCommand(getUnzipxCommand());
 #endif
 #ifdef SD_CARD

@@ -21,6 +21,7 @@
 
 #include "../../../include/debug.h"
 
+#include <algorithm>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -238,6 +239,14 @@ uint64_t FSPMFile::getAvailableSpace() {
     return 0;
 }
 
+// Re-read the entry at a saved dirpos. fsp_seekdir() only moves a cursor into
+// the listing fsp_opendir() already holds, so this costs no network I/O.
+static bool readEntryAt(FSP_DIR* dir, long pos, FSP_RDENTRY& out) {
+    fsp_seekdir(dir, pos);
+    FSP_RDENTRY* result = nullptr;
+    return fsp_readdir_native(dir, &out, &result) == 0 && result;
+}
+
 bool FSPMFile::rewindDirectory() {
     Debug_printv("rewindDirectory() called for path[%s]", path.c_str());
     openDir(path);
@@ -259,32 +268,62 @@ MFile* FSPMFile::getNextFileInDir() {
         return nullptr;
     }
 
-    // Read directory entries if not already cached
-    if (_dir_entries.empty()) {
+    // Index the directory once, then serve it in name order. fsp_opendir()
+    // already downloaded the whole listing into the FSP_DIR and
+    // fsp_readdir_native() walks it in place via dirpos, so an entry can be
+    // re-read from its dirpos alone - 4 bytes each, against the 272 a parsed
+    // FSP_RDENTRY costs. Caching the parsed entries instead exhausted the
+    // internal heap on a board without PSRAM, and operator new aborts
+    // (ESP-IDF builds -fno-exceptions).
+    if (_entry_offsets.empty()) {
         FSP_RDENTRY entry;
         FSP_RDENTRY* result;
 
+        // Count first so the vector is sized exactly once. Growing it would
+        // need 1.5x the final size at the moment it reallocates, which is the
+        // transient peak worth avoiding on a small internal heap.
+        size_t count = 0;
+        fsp_rewinddir(_dir_handle);
         while (fsp_readdir_native(_dir_handle, &entry, &result) == 0 && result) {
-            _dir_entries.push_back(entry);
+            count++;
+        }
+        _entry_offsets.reserve(count);
+
+        fsp_rewinddir(_dir_handle);
+        for (;;) {
+            long pos = fsp_telldir(_dir_handle);
+            if (fsp_readdir_native(_dir_handle, &entry, &result) != 0 || !result) {
+                break;
+            }
+            _entry_offsets.push_back(pos);
         }
 
-        // Sort entries by name
-        std::sort(_dir_entries.begin(), _dir_entries.end(), [](const FSP_RDENTRY& a, const FSP_RDENTRY& b) {
-            return strcmp(a.name, b.name) < 0;
+        // The comparator re-reads both names rather than holding them, which
+        // is what keeps the index at 4 bytes an entry. Both reads are against
+        // the buffer fsp_opendir() already filled - no network traffic.
+        FSP_DIR* dir = _dir_handle;
+        std::sort(_entry_offsets.begin(), _entry_offsets.end(),
+                  [dir](long a, long b) {
+            FSP_RDENTRY ea, eb;
+            if (!readEntryAt(dir, a, ea) || !readEntryAt(dir, b, eb)) {
+                return false;
+            }
+            return strcmp(ea.name, eb.name) < 0;
         });
     }
 
-    // Return next entry
-    if (_current_entry < _dir_entries.size()) {
-        const FSP_RDENTRY& entry = _dir_entries[_current_entry];
+    FSP_RDENTRY entry;
+
+    if (_current_entry < _entry_offsets.size() &&
+        readEntryAt(_dir_handle, _entry_offsets[_current_entry], entry)) {
+        _current_entry++;
+
         std::string entryName = entry.name;
         std::string fullPath = pathInStream;
         if (!fullPath.empty() && fullPath.back() != '/') {
             fullPath += "/";
         }
         fullPath += entryName;
-
-        _current_entry++;
 
         // Create new FSPMFile for this entry
         std::string url = "fsp://" + host;
@@ -432,7 +471,7 @@ void FSPMFile::openDir(std::string path) {
     _dir_handle = fsp_opendir(getSession(), path.c_str());
     if (_dir_handle) {
         dirOpened = true;
-        _dir_entries.clear();
+        _entry_offsets.clear();
         _current_entry = 0;
         Debug_printv("Opened FSP directory: %s", path.c_str());
     } else {
@@ -447,7 +486,7 @@ void FSPMFile::closeDir() {
         //Debug_printv("Closed FSP directory");
     }
     dirOpened = false;
-    _dir_entries.clear();
+    _entry_offsets.clear();
     _current_entry = 0;
 }
 

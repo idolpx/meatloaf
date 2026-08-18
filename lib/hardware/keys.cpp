@@ -315,6 +315,7 @@ void KeyManager::_keystate_task(void *param)
         case eKeyStatus::DOUBLE_TAP:
             Debug_println("BUTTON_A: DOUBLE-TAP");
             fnSystem.debug_print_tasks();
+            Debug_memory();
             break;
 
         default:

@@ -36,6 +36,7 @@ extern "C" {
 #include <dirent.h>
 #include <string.h>
 #include <mutex>
+#include <vector>
 
 
 
@@ -115,7 +116,7 @@ private:
     bool pathValid(std::string path);
 
     int entry_index = 0;
-    std::vector<FSP_RDENTRY> _dir_entries;
+    std::vector<long> _entry_offsets;  // dirpos of each entry, sorted by name
     size_t _current_entry = 0;
 };
 
