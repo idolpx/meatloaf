@@ -16,6 +16,7 @@ Wired in from [env] in platformio.ini as an extra_script.
 """
 
 import os
+import re
 
 Import("env")  # noqa: F821  (injected by SCons/PlatformIO)
 
@@ -45,6 +46,12 @@ def patch_esp_http_client(idf_dir):
 
     Drop this patch once the framework package includes the fix (check
     esp_http_client_prepare() for the cached-buffer cleanup).
+
+    Upstream went a different way in the end: rather than clearing inside
+    prepare(), ESP-IDF 5.5.5 / 6.1.3 expose esp_http_client_clear_response_buffer()
+    for the CALLER to invoke before reusing a handle -- which is what the
+    ESP_IDF_VERSION-guarded call in MeatHttpClient::openAndFetchHeaders() is
+    waiting for. Until that version is the floor, this patch is what fixes it.
     """
     path = os.path.join(idf_dir, "components", "esp_http_client", "esp_http_client.c")
     if not os.path.isfile(path):
@@ -56,21 +63,32 @@ def patch_esp_http_client(idf_dir):
     if marker in src:
         return
 
-    decl_anchor = "static esp_err_t esp_http_client_prepare(esp_http_client_handle_t client)\n{"
+    # esp_http_client_prepare() is file-static up to ESP-IDF 5.5.2 and public
+    # from 5.5.3 (declared in esp_http_client.h), so the "static " is optional.
+    # Anchored at line start so the non-static spelling cannot match INSIDE the
+    # static one and place the insertion seven characters into the signature.
+    decl_re = re.compile(
+        r"^(?:static )?esp_err_t esp_http_client_prepare"
+        r"\(esp_http_client_handle_t client\)\n\{",
+        re.MULTILINE,
+    )
+    # Exact indentation matters: this is prepare()'s own reset at function
+    # scope.  perform() has the same statement nested far deeper, and the
+    # leading four spaces are what keep the replace below off it.
     reset_anchor = "    client->first_line_prepared = false;"
 
-    if decl_anchor not in src or reset_anchor not in src:
+    decl_match = decl_re.search(src)
+    if decl_match is None or reset_anchor not in src:
         print("patch_framework: esp_http_client.c does not match the expected "
               "shape - NOT patched. Check whether the fix is already upstream.")
         return
 
     # esp_http_client_cached_buf_cleanup() is defined further down the file.
-    src = src.replace(
-        decl_anchor,
-        "/* " + marker + " */\n"
+    src = (
+        src[:decl_match.start()]
+        + "/* " + marker + " */\n"
         "static void esp_http_client_cached_buf_cleanup(esp_http_buffer_t *res_buffer);\n\n"
-        + decl_anchor,
-        1,
+        + src[decl_match.start():]
     )
 
     src = src.replace(

@@ -1220,6 +1220,10 @@ bool MeatHttpClient::reopen() {
     return open(url, lastMethod);
 }
 
+// Largest redirect body worth draining to keep a connection alive.  Above it,
+// reconnecting is cheaper than reading the bytes out of the socket.
+static constexpr int64_t REDIRECT_BODY_DRAIN_LIMIT = 4096;
+
 bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
     //Debug_printv("processRedirectsAndOpen: position=%u, size=%u", position, size);
     wasRedirected = false;
@@ -1243,6 +1247,15 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
             if (connectRetries++ < 3) {
                 Debug_printv("connection failed, retrying (%d/3)...", connectRetries);
                 vTaskDelay(pdMS_TO_TICKS(500));
+                // A reused connection can fail because the server closed it
+                // between requests without having said so.  Drop the handle so
+                // the retry starts from a fresh connection rather than looping
+                // on the same dead socket.
+                if (_reusedHandle && _http != nullptr) {
+                    esp_http_client_cleanup(_http);
+                    _http = nullptr;
+                    _httpOrigin.clear();
+                }
                 init(); // reinitialize the client handle before retrying
                 redirects--; // don't count this as a redirect
                 continue;
@@ -1253,19 +1266,51 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
         connectRetries = 0; // reset on success
 
         if (lastRC >= 300 && lastRC <= 399) {
-            // Redirect — the old connection is half-closed (server sent body +
-            // may have closed or will close).  Force full handle cleanup even
-            // if the redirect target is the same origin.  init() will create
-            // a fresh handle for the new URL.
+            // Redirect.  When the target is on the same origin the connection
+            // is still good and worth keeping — a fresh HTTPS handshake costs
+            // ~3 s here, and "add a trailing slash" is the single most common
+            // redirect a directory URL hits, so paying for a second handshake
+            // to learn what Location already said is the bulk of the latency.
+            //
+            // The redirect's body has to be drained first, or its bytes would
+            // be parsed as the next response.  A redirect body is a tiny stub
+            // by construction; the length check keeps a pathological one from
+            // stalling the drive, and falls back to reconnecting instead.
             postResponse.clear();
             postBuffer.clear();
             _size = 0;
             _position = 0;
-            if (_http != nullptr) {
-                esp_http_client_cleanup(_http);
-                _http = nullptr;
+
+            std::string target;
+            size_t tcolon = url.find(':');
+            if (tcolon != std::string::npos) {
+                size_t authEnd = url.find_first_of("/?#", tcolon + 3);
+                target = url.substr(0, authEnd == std::string::npos ? url.size() : authEnd);
             }
-            _httpOrigin.clear();
+            bool keepConnection = !target.empty() && target == _httpOrigin && !_connectionClose;
+
+            // A HEAD's redirect response has no body to drain.
+            if (keepConnection && lastMethod != HTTP_METHOD_HEAD) {
+                // Only drain a body whose length the server declared up front
+                // and which is small.  A chunked redirect body reports length 0
+                // here and would make flush_response() read until the final
+                // chunk — unbounded work on the IEC task to save a handshake.
+                int64_t bodyLen = esp_http_client_get_content_length(_http);
+                if (esp_http_client_is_chunked_response(_http) || bodyLen > REDIRECT_BODY_DRAIN_LIMIT) {
+                    keepConnection = false;
+                } else if (bodyLen > 0) {
+                    int flushed = 0;
+                    esp_http_client_flush_response(_http, &flushed);
+                }
+            }
+
+            if (!keepConnection) {
+                if (_http != nullptr) {
+                    esp_http_client_cleanup(_http);
+                    _http = nullptr;
+                }
+                _httpOrigin.clear();
+            }
             _is_open = false;
             init();
             connectRetries = 0;
@@ -1677,7 +1722,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     // Set URL and Method
     mstr::replaceAll(url, " ", "%20");
     //Debug_printv("method[%d] url[%s]", method, url.c_str());
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 1, 3)
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 5)
     // Clear the response buffer before each new request to ensure raw_data == orig_raw_data.
     esp_http_client_clear_response_buffer(_http);
 #endif
@@ -1763,6 +1808,9 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
         _is_open = true;
         return 200;
     }
+
+    // Belongs to the response about to be read, not the one before it.
+    _connectionClose = false;
 
     rc = esp_http_client_open(_http, 0);
     if (rc == ESP_OK)
@@ -1904,6 +1952,15 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             //         Debug_printv("Accept-Ranges: %s",evt->header_value);
             //     }
             // }
+            // A server that announces it is closing the connection makes the
+            // handle unreusable — reusing it would write the next request into
+            // a socket the peer has already torn down.
+            if ( mstr::equals("Connection", evt->header_key, false) )
+            {
+                if ( meatClient != nullptr && mstr::contains(evt->header_value, (char *)"close", false) )
+                    meatClient->_connectionClose = true;
+            }
+
             if ( mstr::equals("DAV", evt->header_key, false) )
             {
                 if ( mstr::contains(evt->header_value, (char *)"1") )
@@ -2242,18 +2299,77 @@ void MeatHttpClient::init() {
             size_t authEnd = url.find_first_of("/?#", colon + 3);
             newOrigin = url.substr(0, authEnd == std::string::npos ? url.size() : authEnd);
         }
+        // Reuse requires clearing the handle's first_line_prepared flag, or
+        // esp_http_client_open() skips regenerating the request line and the
+        // server hangs waiting for a request that never arrives.  perform()
+        // (POST/PUT) clears it internally; the GET/HEAD streaming path
+        // (open() + fetch_headers()) historically did not, which is why
+        // GET/HEAD used to rebuild the handle — and pay a fresh TLS
+        // handshake — for every single request.
+        //
+        // From ESP-IDF 5.5.3 esp_http_client_connect() calls
+        // esp_http_client_prepare() unconditionally, so the flag is cleared on
+        // every open() and GET/HEAD are reusable too.  That version is also
+        // where prepare() became public API, which is what lets the reuse path
+        // below assert the requirement itself rather than depend on connect()
+        // internals.  Older ESP-IDF keeps the rebuild-per-request behaviour.
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 3)
+        bool methodCanReuse = true;
+#else
+        bool methodCanReuse = (lastMethod == HTTP_METHOD_POST || lastMethod == HTTP_METHOD_PUT);
+#endif
+        // The connection is only reusable when the previous response was read
+        // to its end — otherwise the unread remainder is still queued on the
+        // socket and would be parsed as the next response.  A HEAD has to be
+        // special-cased: it never carries a body, but is_complete_data_received()
+        // compares data_process (0) against the Content-Length the headers
+        // advertised and so reports false forever.
+        //
+        // Only a NON-ERROR HEAD though.  A server that generates an error
+        // document sends it even in reply to a HEAD, and esp_http_client tells
+        // the parser to skip a HEAD's body (http_on_headers_complete returns 1
+        // for HTTP_METHOD_HEAD), so those bytes are never consumed by anything
+        // — they stay in the socket and the next response would be read out of
+        // them.  Nothing in the handle can drain them, so the only safe move is
+        // to drop the connection.  It costs nothing: a failed HEAD is a
+        // FILE NOT FOUND that ends the operation anyway.
+        bool bodyDrained = (lastMethod == HTTP_METHOD_HEAD && lastRC > 0 && lastRC < 400)
+                           || esp_http_client_is_complete_data_received(_http);
+
         if (!newOrigin.empty() && newOrigin == _httpOrigin &&
-            // Reuse is only safe when the previous request went through
-            // perform() (POST/PUT), which internally calls prepare() and
-            // resets first_line_prepared.  GET/HEAD leave
-            // first_line_prepared=true — the request line is never
-            // regenerated and the server hangs.  Recreate instead.
-            (lastMethod == HTTP_METHOD_POST || lastMethod == HTTP_METHOD_PUT)) {
-            // Same origin — flush stale state and reuse
-            int flushed = 0;
-            esp_http_client_flush_response(_http, &flushed);
+            methodCanReuse && bodyDrained && !_connectionClose) {
+            // Same origin — clear stale response state and reuse.
+            //
+            // The handle's CACHED buffer (body bytes that arrived in the same
+            // segment as the headers, held in orig_raw_data/raw_len) needs no
+            // draining here: esp_http_client_connect() calls
+            // esp_http_client_prepare() on every open(), and prepare() clears
+            // that buffer — natively from ESP-IDF 5.5.5 / 6.1.3, and via
+            // patch_framework.py's esp-idf#18359 backport before that.  Without
+            // one of those in place the next response is parsed on top of the
+            // previous one's leftovers, so REUSE DEPENDS ON THE PATCH BEING
+            // APPLIED — patch_framework.py has to be in extra_scripts.
+            //
+            // flush_response() must not run after a HEAD: is_complete_data_received()
+            // is false forever for one (see above) while get_data() returns 0
+            // for one, so the loop inside it would spin.
+            if (lastMethod != HTTP_METHOD_HEAD) {
+                int flushed = 0;
+                esp_http_client_flush_response(_http, &flushed);
+            }
+
             esp_http_client_set_url(_http, url.c_str());
             esp_http_client_set_method(_http, HTTP_METHOD_GET);
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 3)
+            // Clears first_line_prepared so the request line is regenerated,
+            // re-inits the response parser, and drops the previous response's
+            // Location and auth headers.  Redundant with the call inside
+            // esp_http_client_connect() on this version, and kept because it
+            // is what makes reuse correct here rather than incidentally so.
+            // Runs after set_url() so the auth header is rebuilt from the
+            // credentials of the NEW url.
+            esp_http_client_prepare(_http);
+#endif
             // Clear any POST body state that the prior request left on the handle.
             // Without this, the ESP-IDF handle retains a dangling post_data_ pointer
             // (set by esp_http_client_set_post_field during the previous POST) and
@@ -2268,13 +2384,19 @@ void MeatHttpClient::init() {
             _size = 0;
             _position = 0;
             lastRC = 0;
+            _reusedHandle = true;
             Debug_printv("init: reused handle for %s", newOrigin.c_str());
             return;
         }
-        // Different origin — full cleanup
+        // Not reusable (different origin, undrained body, or a server that
+        // asked to close) — full cleanup.
         esp_http_client_cleanup(_http);
         _http = nullptr;
     }
+    // Building a fresh handle: any close request belonged to the connection
+    // just dropped and must not suppress reuse of the new one.
+    _reusedHandle = false;
+    _connectionClose = false;
     // Clear stale response data from prior requests regardless of origin.
     // Without this, a HEAD to a different origin preserves old POST
     // response data that the next GET restores, serving stale bytes

@@ -96,7 +96,7 @@ class MeatHttpClient {
     esp_http_client_handle_t _http = nullptr;
     static esp_err_t _http_event_handler(esp_http_client_event_t *evt);
     int openAndFetchHeaders(esp_http_client_method_t method, uint32_t position, uint32_t size = HTTP_BLOCK_SIZE);
-    esp_http_client_method_t lastMethod;
+    esp_http_client_method_t lastMethod = HTTP_METHOD_GET;
 
     std::function<int(char*, char*)> onHeader = [] (char*, char*){ return 0; };
     std::map<std::string, std::string> headers;
@@ -188,6 +188,13 @@ public:
     std::string url;
     std::string contentDispositionFilename;
     std::string _httpOrigin; // origin (scheme://host:port) of current _http handle
+
+    // Connection-reuse bookkeeping.  Keeping the TCP+TLS session alive across
+    // requests is worth a lot here: a fresh HTTPS handshake costs ~3 s on this
+    // hardware (software ECC, no accelerator), against ~0.1 s for a request on
+    // an already-open connection.
+    bool _connectionClose = false; // server sent "Connection: close" on the last response
+    bool _reusedHandle = false;    // last init() reused the handle instead of rebuilding it
 
     bool _performPending = false;
     int lastRC = 0;
