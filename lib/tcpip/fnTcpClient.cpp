@@ -55,6 +55,12 @@ public:
     ~fnTcpClientSocketHandle() { close(); }
 
     int fd() { return _sockfd; }
+    int detach()
+    {
+        int res = _sockfd;
+        _sockfd = -1;
+        return res;
+    }
     int close()
     {
         int res = (_sockfd >= 0) ? closesocket(_sockfd) : -1;
@@ -79,6 +85,17 @@ void fnTcpClient::stop()
 {
     _clientSocketHandle = nullptr;
     _connected = false;
+}
+
+int fnTcpClient::detach()
+{
+    int sockfd = -1;
+    if (_clientSocketHandle != nullptr)
+        sockfd = _clientSocketHandle->detach();
+    _clientSocketHandle = nullptr;
+    _connected = false;
+    _rxBuffer.clear();
+    return sockfd;
 }
 
 int fnTcpClient::connect(in_addr_t ip, uint16_t port, int32_t timeout)

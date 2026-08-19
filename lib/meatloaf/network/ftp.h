@@ -40,12 +40,41 @@
  * MSession - FTP Session Management
  ********************************************************/
 
+// Build the host key a session is filed under. Credentials are embedded so
+// they reach the FTPMSession constructor before connect() runs, and so that
+// two users of the same server get two sessions rather than sharing one.
+// Same shape as SMBMFile's session_host.
+inline std::string ftpSessionHost(const std::string &user,
+                                  const std::string &password,
+                                  const std::string &host)
+{
+    if (user.empty()) return host;
+    std::string h = user;
+    if (!password.empty()) h += ":" + password;
+    return h + "@" + host;
+}
+
 class FTPMSession : public MSession {
    public:
     FTPMSession(std::string host, uint16_t port = 21)
         : MSession("ftp://" + host + ":" + std::to_string(port), host, port)
     {
-        Debug_printv("FTPMSession created for %s:%d", host.c_str(), port);
+        // Split user[:pass]@ back off the key, leaving `host` the bare host.
+        size_t at = host.rfind('@');
+        if (at != std::string::npos) {
+            std::string creds = host.substr(0, at);
+            this->host = host.substr(at + 1);
+            size_t colon = creds.find(':');
+            if (colon != std::string::npos) {
+                _user = creds.substr(0, colon);
+                _password = creds.substr(colon + 1);
+            } else {
+                _user = creds;
+            }
+        }
+        Debug_printv("FTPMSession created for %s:%d (user: %s)",
+                     this->host.c_str(), port,
+                     _user.empty() ? "anonymous" : _user.c_str());
     }
     ~FTPMSession() override {
         Debug_printv("FTPMSession destroyed for %s:%d", host.c_str(), port);
@@ -62,7 +91,12 @@ class FTPMSession : public MSession {
         std::string base = std::string("ftp://") + host;
         if (port != 21) base += ":" + std::to_string(port);
 
-        if (!_fs->start(base.c_str())) {
+        // nullptr, not "", when there are no credentials - start() picks its
+        // anonymous defaults on a null pointer and would otherwise send an
+        // empty USER.
+        if (!_fs->start(base.c_str(),
+                        _user.empty() ? nullptr : _user.c_str(),
+                        _password.empty() ? nullptr : _password.c_str())) {
             Debug_printv("Failed to start FTP filesystem for %s:%d",
                          host.c_str(), port);
             connected = false;
@@ -94,6 +128,8 @@ class FTPMSession : public MSession {
 
    private:
     std::unique_ptr<FileSystemFTP> _fs;
+    std::string _user;
+    std::string _password;
 };
 
 /********************************************************
@@ -107,7 +143,8 @@ class FTPMFile : public MFile {
     FTPMFile(std::string path) : MFile(path) {
         // Obtain or create FTP session via SessionBroker
         uint16_t ftp_port = port.empty() ? 21 : std::stoi(port);
-        _session = SessionBroker::obtain<FTPMSession>(host, ftp_port);
+        _session = SessionBroker::obtain<FTPMSession>(
+            ftpSessionHost(user, password, host), ftp_port);
 
         if (!_session || !_session->isConnected()) {
             Debug_printv("Failed to obtain FTP session for %s:%d", host.c_str(), ftp_port);

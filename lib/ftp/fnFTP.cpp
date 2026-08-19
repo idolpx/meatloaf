@@ -7,6 +7,14 @@
 #include <cstdio>
 #include <string.h>
 
+#ifdef ESP_PLATFORM
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/select.h>
+#include <esp_tls.h>
+#include <esp_crt_bundle.h>
+#endif
+
 #include "../../include/debug.h"
 
 #include "fnSystem.h"
@@ -637,12 +645,305 @@ int ftpparse(struct ftpparse *fp, char *buf, int len)
     return 0;
 }
 
+/** FTP CONTROL CONNECTION *********************************************************************/
+
+// Most decrypted bytes pulled out of the TLS session in one go. Control
+// responses are short; this only has to be big enough that a whole one
+// usually arrives in a single call.
+#define FTP_TLS_RX_CHUNK 256
+
+fnFtpControl::~fnFtpControl()
+{
+    stop();
+}
+
+int fnFtpControl::connect(const char *host, uint16_t port, int32_t timeout)
+{
+    stop();
+    return _plain.connect(host, port, timeout);
+}
+
+bool fnFtpControl::start_tls(const char *host, uint16_t port)
+{
+#ifdef ESP_PLATFORM
+    if (_tls != nullptr)
+        return false; // already protected
+
+    // Anything already waiting was sent before the handshake and so is
+    // unauthenticated. A server has nothing to say between its 234 and the
+    // handshake, so this is an injection attempt, not a race.
+    if (_plain.available() != 0)
+    {
+        Debug_printf("fnFtpControl::start_tls() - unexpected data before handshake, refusing.\r\n");
+        return true;
+    }
+
+    // Capture this while the socket still belongs to _plain - PORT (active
+    // mode) needs it and esp-tls does not offer it.
+    _local_ip = _plain.localIP();
+
+    int sockfd = _plain.detach();
+    if (sockfd < 0)
+    {
+        Debug_printf("fnFtpControl::start_tls() - no socket to upgrade.\r\n");
+        return true;
+    }
+
+    esp_tls_t *tls = esp_tls_init();
+    if (tls == nullptr)
+    {
+        Debug_printf("fnFtpControl::start_tls() - esp_tls_init() failed (out of memory).\r\n");
+        closesocket(sockfd);
+        return true;
+    }
+
+    // Telling esp-tls the connection is already in ESP_TLS_CONNECTING makes it
+    // skip its own TCP connect and go straight to the handshake on our socket.
+    if (esp_tls_set_conn_sockfd(tls, sockfd) != ESP_OK ||
+        esp_tls_set_conn_state(tls, ESP_TLS_CONNECTING) != ESP_OK)
+    {
+        Debug_printf("fnFtpControl::start_tls() - could not adopt socket.\r\n");
+        esp_tls_conn_destroy(tls); // closes sockfd
+        return true;
+    }
+
+    esp_tls_cfg_t cfg = {};
+    cfg.crt_bundle_attach = esp_crt_bundle_attach;
+    cfg.timeout_ms = FTP_TIMEOUT;
+
+    // The certificate chain IS verified against the CA bundle; the name in it
+    // is not. FTPS is routinely served under a certificate issued for the
+    // machine rather than for the name the client dialled - meatloaf.cc
+    // answers with one for vpsl.techknowpro.com - and refusing those would
+    // make the feature unusable against most real servers. The cost is that a
+    // holder of any CA-issued certificate could stand in the middle, so the
+    // credentials sent over this channel are protected from eavesdroppers but
+    // not from an active attacker.
+    cfg.skip_common_name = true;
+
+    int res = esp_tls_conn_new_sync(host, strlen(host), port, &cfg, tls);
+    if (res != 1)
+    {
+        Debug_printf("fnFtpControl::start_tls() - handshake failed (%d).\r\n", res);
+        esp_tls_conn_destroy(tls); // closes sockfd
+        return true;
+    }
+
+    // From here reads are polled, so the descriptor must not block when a
+    // record has only partly arrived.
+    int flags = fcntl(sockfd, F_GETFL, 0);
+    if (flags >= 0)
+        fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
+
+    _tls = tls;
+    _fd = sockfd;
+    _tls_connected = true;
+    _rx.clear();
+
+    Debug_printf("fnFtpControl::start_tls() - handshake complete (peer name not verified).\r\n");
+    return false;
+#else
+    (void)host;
+    (void)port;
+    Debug_printf("fnFtpControl::start_tls() - TLS not available on this platform.\r\n");
+    return true;
+#endif
+}
+
+void fnFtpControl::stop()
+{
+#ifdef ESP_PLATFORM
+    if (_tls != nullptr)
+    {
+        esp_tls_conn_destroy((esp_tls_t *)_tls); // closes _fd
+        _tls = nullptr;
+    }
+#endif
+    _fd = -1;
+    _tls_connected = false;
+    _rx.clear();
+    _plain.stop();
+}
+
+uint8_t fnFtpControl::connected()
+{
+    if (_tls == nullptr)
+        return _plain.connected();
+    return (_tls_connected || !_rx.empty()) ? 1 : 0;
+}
+
+bool fnFtpControl::tls_fill()
+{
+#ifdef ESP_PLATFORM
+    if (!_rx.empty())
+        return true;
+    if (_tls == nullptr || !_tls_connected)
+        return false;
+
+    esp_tls_t *tls = (esp_tls_t *)_tls;
+
+    // mbedTLS may already hold a decrypted record even when the socket is
+    // empty, so ask it before polling the descriptor.
+    if (esp_tls_get_bytes_avail(tls) <= 0)
+    {
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        FD_SET(_fd, &rfds);
+        struct timeval tv = {0, 0};
+        if (select(_fd + 1, &rfds, nullptr, nullptr, &tv) <= 0)
+            return false;
+    }
+
+    uint8_t buf[FTP_TLS_RX_CHUNK];
+    ssize_t num_read = esp_tls_conn_read(tls, buf, sizeof(buf));
+    if (num_read > 0)
+    {
+        _rx.append((const char *)buf, num_read);
+        return true;
+    }
+    if (num_read != ESP_TLS_ERR_SSL_WANT_READ && num_read != ESP_TLS_ERR_SSL_WANT_WRITE)
+    {
+        // 0 is a clean close, anything else is an error - either way the
+        // session is finished.
+        _tls_connected = false;
+    }
+    return false;
+#else
+    return false;
+#endif
+}
+
+size_t fnFtpControl::available()
+{
+    if (_tls == nullptr)
+        return _plain.available();
+    tls_fill();
+    return _rx.size();
+}
+
+int fnFtpControl::read()
+{
+    if (_tls == nullptr)
+        return _plain.read();
+    if (_rx.empty() && !tls_fill())
+        return -1;
+    int c = (uint8_t)_rx[0];
+    _rx.erase(0, 1);
+    return c;
+}
+
+int fnFtpControl::read(uint8_t *buf, size_t len)
+{
+    if (_tls == nullptr)
+        return _plain.read(buf, len);
+
+    // Every caller today clamps len to available(), so the wait below never
+    // actually runs. It is here because tls_fill() polls with a zero timeout:
+    // an unbounded caller would otherwise get a short read at any TCP segment
+    // or TLS record boundary, and fnFTP::read_file() reports a short read as a
+    // transfer failure.
+    size_t done = 0;
+    int tmout_counter = 1 + FTP_TIMEOUT / 10;
+    while (done < len)
+    {
+        if (_rx.empty() && !tls_fill())
+        {
+            if (!connected() || --tmout_counter == 0)
+                break;
+            fnSystem.delay(10);
+            continue;
+        }
+        size_t take = _rx.size();
+        if (take > len - done)
+            take = len - done;
+        memcpy(buf + done, _rx.data(), take);
+        _rx.erase(0, take);
+        done += take;
+    }
+    return (int)done;
+}
+
+int fnFtpControl::peek()
+{
+    if (_tls == nullptr)
+        return _plain.peek();
+    if (_rx.empty() && !tls_fill())
+        return -1;
+    return (uint8_t)_rx[0];
+}
+
+void fnFtpControl::flush()
+{
+    if (_tls == nullptr)
+    {
+        _plain.flush();
+        return;
+    }
+    _rx.clear();
+    while (tls_fill())
+        _rx.clear();
+}
+
+size_t fnFtpControl::write(const std::string &str)
+{
+    return write((const uint8_t *)str.data(), str.size());
+}
+
+size_t fnFtpControl::write(const uint8_t *buf, size_t len)
+{
+    if (_tls == nullptr)
+        return _plain.write(buf, len);
+
+#ifdef ESP_PLATFORM
+    const uint8_t *pos = buf;
+    size_t remaining = len;
+    int tmout_counter = 1 + FTP_TIMEOUT / 10;
+
+    while (remaining > 0 && tmout_counter-- > 0)
+    {
+        ssize_t written = esp_tls_conn_write((esp_tls_t *)_tls, pos, remaining);
+        if (written > 0)
+        {
+            pos += written;
+            remaining -= written;
+            continue;
+        }
+        if (written == ESP_TLS_ERR_SSL_WANT_READ || written == ESP_TLS_ERR_SSL_WANT_WRITE)
+        {
+            fnSystem.delay(10);
+            continue;
+        }
+        Debug_printf("fnFtpControl::write() - failed (%d).\r\n", (int)written);
+        _tls_connected = false;
+        break;
+    }
+    return len - remaining;
+#else
+    return 0;
+#endif
+}
+
+void fnFtpControl::adopt(const fnTcpClient &client)
+{
+    stop();
+    _plain = client;
+}
+
+in_addr_t fnFtpControl::localIP() const
+{
+    if (_tls != nullptr)
+        return _local_ip;
+    return _plain.localIP();
+}
+
+/** FTP CLIENT *********************************************************************************/
+
 fnFTP::fnFTP()
 {
     _stor = false;
     _expect_control_response = false;
-    control = new fnTcpClient();
-    data = new fnTcpClient();
+    control = new fnFtpControl();
+    data = new fnFtpControl();
 }
 
 fnFTP::~fnFTP()
@@ -665,6 +966,42 @@ bool fnFTP::login(const string &_username, const string &_password, const string
 
     Debug_printf("fnFTP::login(%s,%u)\r\n", hostname.c_str(), control_port);
 
+    // First attempt is in the clear unless a previous one already established
+    // that this server refuses that.
+    if (!do_login(_tls_required))
+        return false;
+
+    // A server that will not talk in the clear says so by refusing a command,
+    // not in its banner, so the discovery only happens mid-attempt. Retry once
+    // over TLS.
+    if (!_tls_required || control->is_tls())
+        return true;
+
+    Debug_printf("Server requires TLS. Retrying login with AUTH TLS.\r\n");
+    control->stop();
+    return do_login(true);
+}
+
+bool fnFTP::response_demands_tls()
+{
+    if (!is_negative_permanent_reply() && !is_negative_transient_reply())
+        return false;
+    return controlResponse.find("TLS") != string::npos ||
+           controlResponse.find("SSL") != string::npos;
+}
+
+bool fnFTP::start_data_tls()
+{
+    if (!_data_protected)
+        return false;
+    Debug_printf("fnFTP::start_data_tls() - securing data connection.\r\n");
+    return data->start_tls(hostname.c_str(), control_port);
+}
+
+bool fnFTP::do_login(bool use_tls)
+{
+    _data_protected = false;
+
     // Attempt to open control socket.
     if (!control->connect(hostname.c_str(), control_port, FTP_TIMEOUT))
     {
@@ -679,25 +1016,55 @@ bool fnFTP::login(const string &_username, const string &_password, const string
     if (parse_response())
     {
         Debug_printf("Timed out waiting for 220 banner.\r\n");
+        _tls_required = _tls_required || response_demands_tls();
         return true;
+    }
+
+    if (!is_positive_completion_reply() || !is_connection())
+    {
+        Debug_printf("Bad banner. Response was: %s\r\n", controlResponse.c_str());
+        _tls_required = _tls_required || response_demands_tls();
+        return true;
+    }
+
+    if (use_tls)
+    {
+        Debug_printf("Sending AUTH TLS.\r\n");
+        AUTH_TLS();
+
+        if (parse_response() || !is_positive_completion_reply())
+        {
+            Debug_printf("Server refused AUTH TLS. Response was: %s\r\n", controlResponse.c_str());
+            return true;
+        }
+
+        if (control->start_tls(hostname.c_str(), control_port))
+            return true;
+
+        // RFC 4217: PBSZ must precede PROT, and is always 0 for stream mode.
+        // Ask for protected data connections. A server that keeps data in the
+        // clear refuses this, and clear is the default when no PROT is in
+        // force, so a refusal needs no follow-up - it just leaves
+        // _data_protected false. Protecting the data channel costs a SECOND
+        // TLS session for the duration of each transfer, which a board without
+        // PSRAM will likely not have the internal heap for; there the
+        // handshake fails and the transfer reports an error.
+        PBSZ();
+        parse_response(); // advisory
+        PROT('P');
+        _data_protected = (!parse_response() && is_positive_completion_reply());
+        Debug_printf("Data connections will be %s.\r\n",
+                     _data_protected ? "TLS-protected" : "plaintext");
     }
 
     Debug_printf("Sending USER.\r\n");
 
-    if (is_positive_completion_reply() && is_connection())
-    {
-        // send username.
-        USER();
-    }
-    else
-    {
-        Debug_printf("Could not send username. Response was: %s\r\n", controlResponse.c_str());
-        return true;
-    }
+    USER();
 
     if (parse_response())
     {
         Debug_printf("Timed out waiting for 331 or 230.\r\n");
+        _tls_required = _tls_required || response_demands_tls();
         return true;
     }
 
@@ -710,6 +1077,7 @@ bool fnFTP::login(const string &_username, const string &_password, const string
         if (parse_response())
         {
             Debug_printf("Timed out waiting for 230.\r\n");
+            _tls_required = _tls_required || response_demands_tls();
             return true;
         }
     }
@@ -876,6 +1244,12 @@ bool fnFTP::open_file(string path, bool stor, unsigned long offset)
             Debug_printf("fnFTP::open_file(%s, %s) - active mode connection failed.\r\n", path.c_str(), stor ? "STOR" : "RETR");
             return true;
         }
+        if (start_data_tls())
+        {
+            Debug_printf("fnFTP::open_file(%s, %s) - data channel TLS failed.\r\n", path.c_str(), stor ? "STOR" : "RETR");
+            data->stop();
+            return true;
+        }
         _stor = stor;
         _expect_control_response = !stor;
         Debug_printf("Server began transfer.\r\n");
@@ -941,6 +1315,13 @@ bool fnFTP::open_directory(string path, string pattern)
     if (accept_active_connection())
     {
         Debug_printf("fnFTP::open_directory(%s%s) - active mode connection failed.\r\n", path.c_str(), pattern.c_str());
+        return true;
+    }
+
+    if (start_data_tls())
+    {
+        Debug_printf("fnFTP::open_directory(%s%s) - data channel TLS failed.\r\n", path.c_str(), pattern.c_str());
+        data->stop();
         return true;
     }
 
@@ -1441,7 +1822,7 @@ bool fnFTP::accept_active_connection()
         fnSystem.delay(50);
     }
 
-    *data = _active_server.client();
+    data->adopt(_active_server.client());
     _active_server.stop(); // done listening, we only needed the one connection
 
     Debug_printf("fnFTP::accept_active_connection() - server connected.\r\n");
@@ -1449,6 +1830,21 @@ bool fnFTP::accept_active_connection()
 }
 
 /** FTP VERBS **********************************************************************************/
+
+void fnFTP::AUTH_TLS()
+{
+    control->write("AUTH TLS\r\n");
+}
+
+void fnFTP::PBSZ()
+{
+    control->write("PBSZ 0\r\n");
+}
+
+void fnFTP::PROT(char level)
+{
+    control->write(string("PROT ") + level + "\r\n");
+}
 
 void fnFTP::USER()
 {

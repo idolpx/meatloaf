@@ -61,6 +61,15 @@ public:
     uint16_t localPort(int fd) const;
 
     int fd() const;
+
+    // Give up ownership of the socket WITHOUT closing it. The caller becomes
+    // responsible for closing the returned descriptor. Used to hand a
+    // connected socket to a layer that owns it from then on (esp-tls closes
+    // the descriptor itself in esp_tls_conn_destroy(), so leaving it with the
+    // handle as well would double-close it). The socket handle is a shared_ptr,
+    // so only detach a socket no other fnTcpClient holds a copy of - the other
+    // holder would go on believing it owns a descriptor someone else closes.
+    int detach();
 };
 
 #endif // _FN_TCPCLIENT_H_

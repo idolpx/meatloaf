@@ -13,6 +13,78 @@ using std::string;
 
 #define FTP_TIMEOUT 15000 // This is how long we wait for a reply packet from the server
 
+/**
+ * @brief The FTP control connection, which may be plaintext or TLS.
+ *
+ * Explicit FTPS (RFC 4217) upgrades an ALREADY CONNECTED control socket: the
+ * banner and the AUTH TLS command are exchanged in the clear, and only then
+ * does the handshake run over that same descriptor. So this owns an
+ * fnTcpClient up to the upgrade, then takes the raw descriptor off it
+ * (fnTcpClient::detach()) and hands it to esp-tls, which owns it from then on.
+ *
+ * The surface is exactly what fnFTP asks of a control connection, so call
+ * sites read the same in both modes. Only the control channel is ever
+ * wrapped - data connections stay plaintext (PROT C), which is what a server
+ * configured with ProFTPD's "TLSRequired ctrl" wants and what keeps the cost
+ * to a single TLS session.
+ */
+class fnFtpControl
+{
+public:
+    ~fnFtpControl();
+
+    int connect(const char *host, uint16_t port, int32_t timeout);
+
+    /**
+     * @brief Run the TLS handshake over the connected socket.
+     * @param host server name, used for certificate validation.
+     * @param port server port.
+     * @return TRUE on error, FALSE on success.
+     */
+    bool start_tls(const char *host, uint16_t port);
+
+    bool is_tls() const { return _tls != nullptr; }
+
+    /**
+     * @brief Take over an already-connected socket (active-mode data connection).
+     */
+    void adopt(const fnTcpClient &client);
+
+    void stop();
+    uint8_t connected();
+    size_t available();
+    int read();
+    int read(uint8_t *buf, size_t len);
+    int peek();
+    void flush();
+    size_t write(const std::string &str);
+    size_t write(const uint8_t *buf, size_t len);
+    in_addr_t localIP() const;
+
+private:
+    /**
+     * @brief Try to pull ciphertext off the socket into _rx, without blocking.
+     * @return true if _rx holds at least one byte afterwards.
+     */
+    bool tls_fill();
+
+    fnTcpClient _plain;
+
+    /* esp_tls_t*, kept as void* so esp_tls.h stays out of this header. */
+    void *_tls = nullptr;
+
+    /* Socket descriptor once TLS owns it, -1 otherwise. */
+    int _fd = -1;
+
+    /* Captured before the descriptor is handed over, for PORT (active mode). */
+    in_addr_t _local_ip = 0;
+
+    /* Plaintext bytes already decrypted but not yet consumed by the caller. */
+    std::string _rx;
+
+    bool _tls_connected = false;
+};
+
 class fnFTP
 {
 public:
@@ -180,14 +252,30 @@ private:
     unsigned short control_port = 21;
 
     /**
-     * The fnTCP client used for control connection
+     * The control connection, plaintext or TLS (see fnFtpControl).
      */
-    fnTcpClient *control = nullptr;
+    fnFtpControl *control = nullptr;
 
     /**
-     * The fnTCP client used for data connection
+     * TRUE once the server has told us it will not talk in the clear, so the
+     * next login attempt negotiates AUTH TLS. Servers differ on which command
+     * they refuse (some the banner, most USER), so this is set wherever a
+     * rejection names TLS or SSL rather than at one fixed point.
      */
-    fnTcpClient *data = nullptr;
+    bool _tls_required = false;
+
+    /**
+     * The data connection. Plaintext unless PROT P was accepted, in which case
+     * every data transfer gets its own TLS session over it.
+     */
+    fnFtpControl *data = nullptr;
+
+    /**
+     * TRUE once the server has accepted PROT P, so data connections must be
+     * TLS. A server that keeps data in the clear (the default, and what PROT C
+     * asks for) leaves this false.
+     */
+    bool _data_protected = false;
 
     /**
      * last response from control connection.
@@ -360,6 +448,42 @@ private:
      * @return true or false.
      */
     bool is_filesystem_related() { return controlResponse[1] == '5'; }
+
+    /**
+     * @brief One login attempt, over a freshly connected control socket.
+     * @param use_tls negotiate AUTH TLS immediately after the banner.
+     * @return TRUE on error, FALSE on success.
+     */
+    bool do_login(bool use_tls);
+
+    /**
+     * @brief Does the current response say the server wants TLS?
+     */
+    bool response_demands_tls();
+
+    /**
+     * @brief Run the TLS handshake on a just-established data connection.
+     * No-op unless PROT P was accepted. Called after the 150, which is when
+     * the server is listening for it.
+     * @return TRUE on error, FALSE on success.
+     */
+    bool start_data_tls();
+
+    /**
+     * @brief Ask for a TLS-protected control connection (RFC 4217).
+     */
+    void AUTH_TLS();
+
+    /**
+     * @brief Set the protection buffer size. Always 0 for stream mode.
+     */
+    void PBSZ();
+
+    /**
+     * @brief Set the data channel protection level.
+     * @param level 'C' for clear, 'P' for private.
+     */
+    void PROT(char level);
 
     /**
      * @brief Perform USER command on open control connection
