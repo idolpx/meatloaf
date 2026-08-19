@@ -15,10 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-// Z64 - ZipCode - Disk, File, SixPack
 //
-// https://ist.uwaterloo.ca/~schepers/formats/ZIP_DISK.TXT
-// https://ist.uwaterloo.ca/~schepers/formats/ZIP_SIX.TXT
-// https://ist.uwaterloo.ca/~schepers/formats/ZIP_FILE.TXT
-// https://www.infinite-loop.at/Power64/Documentation/Power64-ReadMe/AE-File_Formats.html#Section%20E.5
+// .ZOO - Zoo File Format
+//
+// https://en.wikipedia.org/wiki/Zoo_(file_format)
 //
