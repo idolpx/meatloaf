@@ -57,7 +57,13 @@ inline std::string ftpSessionHost(const std::string &user,
 class FTPMSession : public MSession {
    public:
     FTPMSession(std::string host, uint16_t port = 21)
-        : MSession("ftp://" + host + ":" + std::to_string(port), host, port)
+        : FTPMSession("ftp", std::move(host), port) {}
+
+    // The scheme must be spelled here exactly as SessionBroker::obtain()
+    // spells it, or the session is created under one name and filed under
+    // another.
+    FTPMSession(const char *scheme, std::string host, uint16_t port)
+        : MSession(std::string(scheme) + "://" + host + ":" + std::to_string(port), host, port)
     {
         // Split user[:pass]@ back off the key, leaving `host` the bare host.
         size_t at = host.rfind('@');
@@ -84,11 +90,16 @@ class FTPMSession : public MSession {
     // Get the scheme for this session type
     static std::string getScheme() { return "ftp"; }
 
+    // The scheme this session's URLs carry. FTPSMSession overrides it, and
+    // FileSystemFTP::start() reads it back off the base URL to decide whether
+    // to negotiate TLS up front.
+    virtual const char *urlScheme() const { return "ftp"; }
+
     bool connect() override {
         if (connected) return true;
         _fs = std::make_unique<FileSystemFTP>();
         // Build base URL
-        std::string base = std::string("ftp://") + host;
+        std::string base = std::string(urlScheme()) + "://" + host;
         if (port != 21) base += ":" + std::to_string(port);
 
         // nullptr, not "", when there are no credentials - start() picks its
@@ -132,6 +143,25 @@ class FTPMSession : public MSession {
     std::string _password;
 };
 
+/**
+ * An ftps:// session. Same client, but TLS is negotiated on the FIRST attempt
+ * rather than only after the server refuses to talk in the clear.
+ *
+ * It is a separate class purely so SessionBroker keys it separately -
+ * obtain<T>() builds the key from T::getScheme(). Explicit FTPS uses the same
+ * port 21 as plain FTP, so the port cannot distinguish them the way it does
+ * for http/https, and a server that accepts BOTH must not hand an ftps://
+ * caller a plaintext session that an ftp:// caller opened first.
+ */
+class FTPSMSession : public FTPMSession {
+   public:
+    FTPSMSession(std::string host, uint16_t port = 21)
+        : FTPMSession(std::move(host), port) {}
+
+    static std::string getScheme() { return "ftps"; }
+    const char *urlScheme() const override { return "ftps"; }
+};
+
 /********************************************************
  * MFile
  ********************************************************/
@@ -143,8 +173,10 @@ class FTPMFile : public MFile {
     FTPMFile(std::string path) : MFile(path) {
         // Obtain or create FTP session via SessionBroker
         uint16_t ftp_port = port.empty() ? 21 : std::stoi(port);
-        _session = SessionBroker::obtain<FTPMSession>(
-            ftpSessionHost(user, password, host), ftp_port);
+        std::string session_host = ftpSessionHost(user, password, host);
+        _session = (scheme == "ftps")
+                       ? SessionBroker::obtain<FTPSMSession>(session_host, ftp_port)
+                       : SessionBroker::obtain<FTPMSession>(session_host, ftp_port);
 
         if (!_session || !_session->isConnected()) {
             Debug_printv("Failed to obtain FTP session for %s:%d", host.c_str(), ftp_port);
@@ -244,6 +276,9 @@ class FTPMFileSystem : public MFileSystem {
 
     bool handles(std::string name) {
         if (mstr::equals(name, (char*)"ftp:", false)) return true;
+        // Explicit FTPS (RFC 4217) - same client, same port 21, TLS negotiated
+        // before login rather than only when the server insists.
+        if (mstr::equals(name, (char*)"ftps:", false)) return true;
 
         return false;
     }

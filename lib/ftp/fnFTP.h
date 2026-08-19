@@ -13,6 +13,12 @@ using std::string;
 
 #define FTP_TIMEOUT 15000 // This is how long we wait for a reply packet from the server
 
+// The registered port for implicit FTPS, where the TLS handshake happens the
+// moment the socket is up and the banner arrives already encrypted. Explicit
+// FTPS (AUTH TLS after a plaintext banner) runs on the ordinary port 21, so
+// the port is the only thing that distinguishes the two.
+#define FTPS_IMPLICIT_PORT 990
+
 /**
  * @brief The FTP control connection, which may be plaintext or TLS.
  *
@@ -115,6 +121,13 @@ public:
      * @return TRUE on error, FALSE on success
      */
     bool login(const string &_username, const string &_password, const string &_hostname, unsigned short _port = 21);
+
+    /**
+     * @brief Negotiate AUTH TLS on the first login attempt rather than only
+     * after the server refuses to talk in the clear. Set for an ftps:// URL.
+     * Sticky - once the server has demanded TLS it is set anyway.
+     */
+    void require_tls(bool required) { _tls_required = _tls_required || required; }
 
     /**
      * Log out of FTP server, closes control connection.
@@ -460,6 +473,14 @@ private:
      * @brief Does the current response say the server wants TLS?
      */
     bool response_demands_tls();
+
+    /**
+     * @brief Is this an implicit-FTPS connection (handshake before banner)?
+     * Decided by port alone, since that is the only thing separating implicit
+     * FTPS from explicit - and it holds for ftp:// as well, because 990 means
+     * implicit whatever the URL called itself.
+     */
+    bool implicit_tls() const { return control_port == FTPS_IMPLICIT_PORT; }
 
     /**
      * @brief Run the TLS handshake on a just-established data connection.

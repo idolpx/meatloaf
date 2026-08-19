@@ -966,15 +966,18 @@ bool fnFTP::login(const string &_username, const string &_password, const string
 
     Debug_printf("fnFTP::login(%s,%u)\r\n", hostname.c_str(), control_port);
 
-    // First attempt is in the clear unless a previous one already established
-    // that this server refuses that.
-    if (!do_login(_tls_required))
+    // First attempt is in the clear unless this is implicit FTPS, or the
+    // caller asked for ftps://, or a previous attempt already established that
+    // this server refuses that.
+    bool used_tls = _tls_required || implicit_tls();
+
+    if (!do_login(used_tls))
         return false;
 
     // A server that will not talk in the clear says so by refusing a command,
     // not in its banner, so the discovery only happens mid-attempt. Retry once
-    // over TLS.
-    if (!_tls_required || control->is_tls())
+    // over TLS - but only if this attempt was not already the TLS one.
+    if (used_tls || !_tls_required)
         return true;
 
     Debug_printf("Server requires TLS. Retrying login with AUTH TLS.\r\n");
@@ -1010,6 +1013,19 @@ bool fnFTP::do_login(bool use_tls)
         return true;
     }
 
+    // Implicit FTPS: the server expects the handshake the moment the socket is
+    // up, and its banner arrives already encrypted. There is no AUTH TLS and
+    // no plaintext phase to fall back from, so a failure here is fatal.
+    if (implicit_tls())
+    {
+        Debug_printf("Implicit FTPS - handshaking before the banner.\r\n");
+        if (control->start_tls(hostname.c_str(), control_port))
+        {
+            _statusCode = 421; // service not available
+            return true;
+        }
+    }
+
     Debug_printf("Connected, waiting for 220.\r\n");
 
     // Wait for banner.
@@ -1027,7 +1043,9 @@ bool fnFTP::do_login(bool use_tls)
         return true;
     }
 
-    if (use_tls)
+    // Explicit FTPS: upgrade the connection we have just read the banner on.
+    // Skipped when implicit already protected it before the banner.
+    if (use_tls && !control->is_tls())
     {
         Debug_printf("Sending AUTH TLS.\r\n");
         AUTH_TLS();
@@ -1040,7 +1058,10 @@ bool fnFTP::do_login(bool use_tls)
 
         if (control->start_tls(hostname.c_str(), control_port))
             return true;
+    }
 
+    if (control->is_tls())
+    {
         // RFC 4217: PBSZ must precede PROT, and is always 0 for stream mode.
         // Ask for protected data connections. A server that keeps data in the
         // clear refuses this, and clear is the default when no PROT is in

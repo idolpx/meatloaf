@@ -70,6 +70,10 @@ bool FileSystemFTP::start(const char *url, const char *user, const char *passwor
     _username = (user == nullptr ? "anonymous" : user);
     _password = (password == nullptr ? "fujinet@fujinet.online" : password);
 
+    // ftps:// means negotiate AUTH TLS up front instead of waiting for the
+    // server to refuse a plaintext command. Explicit FTPS, so still port 21.
+    _ftp->require_tls(_url->scheme == "ftps");
+
     res = _ftp->login(
         _username.c_str(),
         _password.c_str(),

@@ -159,7 +159,7 @@ bool FTPMStream::open(std::ios_base::openmode mode) {
     Debug_printv("Opening FTP stream url[%s] mode[%d]", url.c_str(), mode);
 
     auto parser = PeoplesUrlParser::parseURL(url);
-    if (!parser || parser->scheme != "ftp") {
+    if (!parser || (parser->scheme != "ftp" && parser->scheme != "ftps")) {
         Debug_printv("Invalid FTP URL: %s", url.c_str());
         _error = EINVAL;
         return false;
@@ -167,8 +167,11 @@ bool FTPMStream::open(std::ios_base::openmode mode) {
 
     // Obtain or create FTP session via SessionBroker
     uint16_t ftp_port = parser->port.empty() ? 21 : std::stoi(parser->port);
-    _session = SessionBroker::obtain<FTPMSession>(
-        ftpSessionHost(parser->user, parser->password, parser->host), ftp_port);
+    std::string session_host =
+        ftpSessionHost(parser->user, parser->password, parser->host);
+    _session = (parser->scheme == "ftps")
+                   ? SessionBroker::obtain<FTPSMSession>(session_host, ftp_port)
+                   : SessionBroker::obtain<FTPMSession>(session_host, ftp_port);
 
     if (!_session || !_session->isConnected()) {
         Debug_printv("Failed to obtain FTP session for %s:%d", parser->host.c_str(), ftp_port);
