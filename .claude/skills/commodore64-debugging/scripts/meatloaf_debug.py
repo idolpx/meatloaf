@@ -291,18 +291,26 @@ class U64Remote:
             self._flush_keyboard_buffer()
 
         # Build key code list, append RETURN if needed.
-        # Keyboard buffer at $0277 expects PETSCII key codes.
-        # The C64 keyboard encoder is case-inverting: sending PETSCII
-        # 0x41 ('A') produces lowercase 'a' on screen, and PETSCII
-        # 0x61 ('a') produces uppercase 'A' on screen.
-        # We swap the case of every letter so the injected keystrokes
-        # match the caller's intent.  Non-alphabetic chars pass through.
+        # The buffer at $0277 holds PETSCII, and PETSCII $41-$5A are the
+        # UNSHIFTED letters — the ones BASIC tokenises into keywords. Those
+        # are the same byte values as ASCII uppercase, so an uppercase
+        # ASCII string is passed straight through. ASCII lowercase is
+        # upcased into that range too, so both spellings of a command work.
+        #
+        # Do NOT case-swap here. $61-$7A is the SHIFTED range, which the
+        # C64 draws as graphics characters and BASIC refuses to tokenise:
+        # injecting "PRINT 6*7" through a swap puts the text on screen but
+        # answers ?SYNTAX ERROR (verified on hardware, 2026-08-19). The
+        # apparent inversion is an artifact of decoding the SCREEN, where
+        # codes 1-26 are rendered lowercase by _decode_screen() — it is not
+        # something the keyboard does.
+        #
+        # Shifted/graphics characters have no ASCII spelling; pass their
+        # PETSCII byte in directly via chr() if you need one.
         codes = []
         for c in text:
             if 'a' <= c <= 'z':
                 codes.append(ord(c.upper()))
-            elif 'A' <= c <= 'Z':
-                codes.append(ord(c.lower()))
             else:
                 codes.append(ord(c))
         if press_enter:
@@ -1107,7 +1115,11 @@ def main():
     p.add_argument("--url", default="")
 
     p = sub.add_parser("run", help="Type command + read screen")
-    p.add_argument("command", nargs="?", default="RUN")
+    # NOT "command": add_subparsers(dest="command") already owns that name, and
+    # a positional of the same name overwrites it with the user's text — the
+    # dispatch below then compares that text against "run", never matches, and
+    # the whole subcommand silently no-ops with exit 0.
+    p.add_argument("text", nargs="?", default="RUN")
     p.add_argument("--wait", type=float, default=1.5)
     p.add_argument("--url", default="")
 
@@ -1247,7 +1259,7 @@ def main():
             print(raw.hex())
 
     elif args.command == "run":
-        result = cycle.u64.type_command(args.command, wait=args.wait)
+        result = cycle.u64.type_command(args.text, wait=args.wait)
         print(result)
 
     elif args.command == "type":

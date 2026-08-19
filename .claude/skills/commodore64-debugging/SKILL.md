@@ -200,6 +200,23 @@ every operation. Run commands via CLI or import as a Python module.
 Meatloaf's UART debug output. **Does not require `meatloaf_debug.py`**
 to run — it's a standalone script.
 
+### Python dependencies
+
+Both scripts need `requests` (U64 REST API) and `pyserial` (capture daemon).
+
+A modern system Python is usually PEP 668 "externally managed", so
+`pip install --user requests pyserial` fails outright. Use a venv and call
+its interpreter explicitly rather than `python3`:
+
+```bash
+python3 -m venv /tmp/c64dbg && /tmp/c64dbg/bin/pip install requests pyserial
+/tmp/c64dbg/bin/python scripts/meatloaf_debug.py config
+```
+
+Symptom if you skip this: `Error: 'requests' library required. pip install
+requests` from `meatloaf_debug.py`, or `ModuleNotFoundError: No module named
+'serial'` from the capture daemon.
+
 ---
 
 ## Robust Serial Capture
@@ -224,11 +241,14 @@ resolved from `platformio.ini` (`monitor_port` / `monitor_speed` — run
 
 ### What survives
 
-- **Flashing firmware** — esptool takes over the serial port during flash.
-  The capture detects the port error, enters backoff mode, and reconnects
-  automatically when the ESP32 reboots and the port reappears. No action needed.
-- **ESP32 crash/reboot** — same auto-reconnect behavior.
+- **ESP32 crash/reboot** — the capture detects the port error, enters backoff
+  mode, and reconnects automatically when the port reappears.
 - **USB cable disconnect** — reconnects with backoff when cable goes back in.
+
+What does **not** survive:
+
+- **Flashing firmware** — stop the capture first. esptool needs the port to
+  itself on every platform, not just Windows (see "When to stop it").
 
 ### When to start it
 
@@ -256,12 +276,24 @@ python3 scripts/meatloaf_debug.py capture stop
 
 Leaving it running blocks the two things a person reaches for next: their own
 serial monitor (`pio device monitor`, PuTTY, the IDE terminal), and the next
-flash — `esptool` fails with `Could not open COM7, the port is busy` /
-`PermissionError(13, 'Access is denied.')`. The capture's auto-reconnect makes
-this survivable on Linux and macOS, where the port is shared, but on Windows
-it is a hard block.
+flash.
 
-So the flash sequence on Windows is: **stop capture, flash, start capture.**
+**Flashing fails while the capture holds the port — on every platform.** The
+error differs but the cause is the same:
+
+| Platform | What esptool reports |
+|---|---|
+| Windows | `Could not open COM7, the port is busy` / `PermissionError(13, 'Access is denied.')` |
+| macOS / Linux | `A serial exception error occurred: device reports readiness to read but returned no data (device disconnected or multiple access on port?)` |
+
+The macOS/Linux message is misleading — it reads like a cable or driver fault,
+and esptool's own note points you at the hardware. It is neither. The port is
+shared there, so the capture keeps reading bytes out from under esptool's
+`Connecting....` handshake and the sync never completes. Verified on macOS
+2026-08-19: `build --flash` failed this way with the capture running, and the
+identical `pio run -t upload` succeeded seconds later once it was stopped.
+
+So the flash sequence is always: **stop capture, flash, start capture.**
 And the last thing any session does is stop it.
 
 ### Health check
@@ -668,8 +700,12 @@ python3 scripts/meatloaf_debug.py config
 # Build only
 python3 scripts/meatloaf_debug.py build
 
-# Build + flash (takes 30-60s, capture auto-reconnects after)
+# Build + flash — STOP THE CAPTURE FIRST or the upload fails (see above).
+# A full rebuild after a framework/build-flag change takes several minutes;
+# a source-only change is much quicker.
+python3 scripts/meatloaf_debug.py capture stop
 python3 scripts/meatloaf_debug.py build --flash
+python3 scripts/meatloaf_debug.py capture start
 ```
 
 ### Echo Test Server
@@ -741,7 +777,7 @@ Run once at the start of a session:
 |--------|--------|-----------|
 | BASIC code only | `inject` + `run "RUN"` | ~2-3s |
 | C code (cc65) | `reset` → upload body → `type "RUN"` | ~8-10s |
-| Meatloaf C++ | `build --flash` (30-60s) then wait for serial | ~40-90s |
+| Meatloaf C++ | `capture stop` → `build --flash` → `capture start` → wait for serial | minutes |
 | Any combination | Do the slowest (flash) first, then C, then BASIC | N/A |
 
 ### Phase 3: Run and observe
@@ -890,8 +926,8 @@ If single-query passes but multi-query fails → the bug is in session/state reu
 
 ### D. Serial Recovery After Flash
 
-The `cycle` command with `--firmware` handles this automatically:
-1. Build + flash (serial disconnects — esptool takes the port)
+Stop the capture before flashing (see "When to stop it"). Afterwards:
+1. Build + flash (the capture must not be holding the port)
 2. Wait 3s for ESP to reboot
 3. Wait up to 20s for serial data to reappear
 4. Proceed with inject + RUN
@@ -1002,21 +1038,32 @@ as `run`). This is normal PETSCII display behavior — BASIC parses the
 commands correctly either way. It does NOT affect the screen output from
 `PRINT` statements, which show the correct mixed case.
 
-### Keyboard buffer injection (PETSCII case-inversion)
+### Keyboard buffer injection (send unshifted PETSCII — do NOT case-swap)
 
-The keyboard buffer at $0277 expects **PETSCII key codes**. PETSCII letter
-codes happen to share the same numerical values as ASCII, **BUT the C64
-keyboard handler inverts letter case**:
+The keyboard buffer at $0277 expects **PETSCII key codes**:
 
-| Code range | Injected PETSCII value | Display on screen |
+| Code range | Meaning | BASIC tokenises it? |
 |---|---|---|
-| `0x41`-`0x5A` | uppercase `A`-`Z` | lowercase `a`-`z` |
-| `0x61`-`0x7A` | lowercase `a`-`z` | uppercase `A`-`Z` |
+| `0x41`-`0x5A` | UNSHIFTED letters — same byte values as ASCII `A`-`Z` | **yes** |
+| `0x61`-`0x7A` | SHIFTED letters — drawn as graphics characters | no |
 
-**The `type_text` and `run` commands handle this for you** — they swap
-the case of every letter before sending so that the keystrokes match
-what you meant. Non-alphabetic characters (digits, quotes, commas)
-pass through unchanged.
+So a BASIC command is injected as plain **ASCII uppercase**, byte for byte.
+`type_text()` passes those through unchanged and upcases ASCII lowercase into
+the same range, so `type "PRINT 6*7"` and `type "print 6*7"` both work.
+
+**There is no keyboard case inversion — do not reintroduce a swap.** This
+skill used to swap the case of every letter before sending, which put every
+command in the `0x61`-`0x7A` shifted range: the text appears on screen but
+BASIC answers `?SYNTAX ERROR`, so it looks like a BASIC bug rather than an
+injection bug. Fixed and verified on hardware 2026-08-19 (`PRINT 6*7` → `42`).
+
+The inversion is an artifact of reading the SCREEN back, not of the keyboard.
+`_decode_screen()` renders screen codes 1-26 as lowercase (it assumes
+mixed-case mode), so a command typed as uppercase reads back lowercase. That
+is the cosmetic quirk described above — it is not a signal to swap on input.
+
+Shifted/graphics characters have no ASCII spelling; pass their PETSCII byte
+directly with `chr()` if you need one.
 
 ### A. String literals in BASIC (tokenizer uppercases them)
 
