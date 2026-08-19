@@ -19,6 +19,11 @@
 
 #include "endianness.h"
 
+// Bytes of file data in one Lynx block. A Lynx archive is a CBM file laid out
+// in disk blocks with their two link bytes stripped, so a block carries 254
+// bytes - NOT the 256 of MStream::block_size, which is the sector size.
+static constexpr uint32_t LNX_BLOCK_SIZE = 254;
+
 /********************************************************
  * Streams
  ********************************************************/
@@ -135,10 +140,14 @@ int8_t LNXMStream::loadEntries()
             e.rel_record_size = 0;
         }
 
-        // Calculate size: (blocks - 1) * 254 + LSU
-        if (e.block_count > 0)
+        // A Lynx block holds 254 bytes of file data - it is a CBM disk block
+        // with its two link bytes stripped - and LSU is the INDEX of the last
+        // used byte within the 256-byte sector, where data starts at index 2.
+        // So the last block contributes lsu - 1 bytes, not lsu. The inherited
+        // MStream::block_size is 256 and must not be used here.
+        if (e.block_count > 0 && e.lsu > 0)
         {
-            e.size = (e.block_count - 1) * block_size + e.lsu;
+            e.size = (e.block_count - 1) * LNX_BLOCK_SIZE + (e.lsu - 1);
         }
         else
         {
@@ -151,18 +160,19 @@ int8_t LNXMStream::loadEntries()
             i, e.filename.c_str(), e.type.c_str(), e.block_count, e.lsu, e.size);
     }
 
-    // Calculate file data start offset
-    // Files start after directory blocks (aligned to 254-byte boundaries)
-    uint32_t data_start = header.directory_blocks * block_size;
+    // The directory occupies the first directory_blocks blocks of the archive,
+    // counted from byte 0 - the BASIC loader and the archive's own two-byte
+    // load address are inside it.
+    uint32_t data_start = header.directory_blocks * LNX_BLOCK_SIZE;
 
-    // Assign offsets to each entry
+    // Assign offsets to each entry. The stride is the entry's DECLARED block
+    // count, not its byte size rounded up: the two differ for the last block,
+    // and deriving the stride from the size compounds any error in it.
     uint32_t offset = data_start;
     for (auto &e : entries)
     {
         e.offset = offset;
-        // Each file is padded to 254-byte boundaries
-        uint32_t padded_size = ((e.size + block_size - 1) / block_size) * block_size;
-        offset += padded_size;
+        offset += e.block_count * LNX_BLOCK_SIZE;
 
         Debug_printv("name[%.16s] type[%s] size[%d] offset[%d]",
             e.filename.c_str(), e.type.c_str(), e.size, e.offset);

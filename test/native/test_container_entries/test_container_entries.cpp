@@ -129,7 +129,10 @@ static void buildLnx()
         appendText(b, " 254 \r");       // last sector used
     }
 
-    b.resize(256 * 3, 0);               // directory_blocks * block_size data
+    // A Lynx block is 254 bytes of data, so this archive is 1 directory block
+    // plus 2 entries x 2 blocks = 5 blocks. Sizing it in 256-byte units left
+    // the second entry running past EOF.
+    b.resize(254 * 5, 0);
     writeFile(LNX_PATH, b);
 }
 
@@ -318,11 +321,66 @@ void test_lnx_repeated_lookups_do_not_grow_the_directory(void)
 // case that proves it - two entries whose names differ ONLY in six trailing
 // spaces. mstr::rtrimA0() strips whitespace as well as $A0, which collapsed
 // them into one name and made the second file unreachable.
+// A Lynx block carries 254 bytes - it is a CBM disk block minus its two link
+// bytes - and LSU is the INDEX of the last used byte in the 256-byte sector,
+// where data begins at index 2. So a block contributes 254, the last one
+// contributes lsu - 1, and the first entry begins at directory_blocks * 254.
+//
+// The inherited MStream::block_size is 256 and was being used for all three,
+// which put every entry two bytes late: the first byte a caller saw was the
+// THIRD byte of the file, so a PRG lost its load address and came back
+// starting at its BASIC link pointer instead.
+void test_lnx_entry_offsets_and_sizes_use_254_byte_blocks(void)
+{
+    auto image = openImage<TestLNXStream>(LNX_PATH);
+    TEST_ASSERT_NOT_NULL(image.get());
+
+    TEST_ASSERT_TRUE(image->seekEntry((uint16_t)1));
+    TEST_ASSERT_EQUAL_UINT32(254, image->entry.offset);          // 1 dir block
+    TEST_ASSERT_EQUAL_UINT32(254 + 253, image->entry.size);      // 2 blocks, lsu 254
+
+    TEST_ASSERT_TRUE(image->seekEntry((uint16_t)2));
+    TEST_ASSERT_EQUAL_UINT32(254 + 2 * 254, image->entry.offset);
+    TEST_ASSERT_EQUAL_UINT32(254 + 253, image->entry.size);
+}
+
+// The invariant that settles the arithmetic against media nobody here wrote:
+// entries tile the archive with no gaps, so the last one must end at EOF (or
+// within its final partly-used block of it). With 256-byte blocks the walk
+// overshoots by two bytes per block and the last entry runs past the end.
+void test_lnx_real_archive_entries_tile_the_file(void)
+{
+    static const char* PATH = ".archive/archive/lnx/Acid_Rain.lnx";
+    if (!haveFile(PATH))
+        TEST_IGNORE_MESSAGE("sample .archive/archive/lnx/Acid_Rain.lnx not present");
+
+    auto image = openImage<TestLNXStream>(PATH);
+    TEST_ASSERT_NOT_NULL(image.get());
+
+    uint32_t file_size = image->containerStream->size();
+    TEST_ASSERT_GREATER_THAN_UINT32(0, file_size);
+
+    uint16_t last = 0;
+    for (uint16_t i = 1; image->seekEntry(i); i++)
+    {
+        TEST_ASSERT_TRUE(image->entry.offset + image->entry.size <= file_size);
+        last = i;
+    }
+    TEST_ASSERT_GREATER_THAN_UINT16(0, last);
+
+    // The final entry ends inside its last block, so at most 253 bytes of
+    // padding separate it from EOF.
+    TEST_ASSERT_TRUE(image->seekEntry(last));
+    uint32_t end = image->entry.offset + image->entry.size;
+    TEST_ASSERT_TRUE(end <= file_size);
+    TEST_ASSERT_TRUE(file_size - end < 254);
+}
+
 void test_lnx_real_archive_keeps_trailing_spaces(void)
 {
-    static const char* PATH = ".archive/lnx/Cloud King.lnx";
+    static const char* PATH = ".archive/archive/lnx/Cloud King.lnx";
     if (!haveFile(PATH))
-        TEST_IGNORE_MESSAGE("sample .archive/lnx/Cloud King.lnx not present");
+        TEST_IGNORE_MESSAGE("sample .archive/archive/lnx/Cloud King.lnx not present");
 
     auto image = openImage<TestLNXStream>(PATH);
     TEST_ASSERT_NOT_NULL(image.get());
@@ -406,15 +464,15 @@ void test_t64_wildcard_without_listing(void)
  * .archive/ is gitignored, so these skip when the samples aren't present.
  ********************************************************/
 
-static const char* REAL_LBR = ".archive/lbr/zbbs-files!.lbr";
-static const char* REAL_ARK = ".archive/ark/Turbo_Assembler5t.ark";
+static const char* REAL_LBR = ".archive/archive/lbr/zbbs-files!.lbr";
+static const char* REAL_ARK = ".archive/archive/ark/Turbo_Assembler5t.ark";
 
 // LBR stores byte counts directly. Directory ends at 344 and the sizes sum
 // to 4774; 344 + 4774 = 5118 of the archive's 5120 bytes.
 void test_lbr_real_archive_sizes(void)
 {
     if (!haveFile(REAL_LBR))
-        TEST_IGNORE_MESSAGE("sample .archive/lbr/zbbs-files!.lbr not present");
+        TEST_IGNORE_MESSAGE("sample .archive/archive/lbr/zbbs-files!.lbr not present");
 
     auto image = openImage<TestLBRStream>(REAL_LBR);
     TEST_ASSERT_NOT_NULL(image.get());
@@ -439,7 +497,7 @@ void test_lbr_real_archive_sizes(void)
 void test_ark_real_archive_sizes(void)
 {
     if (!haveFile(REAL_ARK))
-        TEST_IGNORE_MESSAGE("sample .archive/ark/Turbo_Assembler5t.ark not present");
+        TEST_IGNORE_MESSAGE("sample .archive/archive/ark/Turbo_Assembler5t.ark not present");
 
     auto image = openImage<TestARKStream>(REAL_ARK);
     TEST_ASSERT_NOT_NULL(image.get());
@@ -477,7 +535,7 @@ void test_ark_real_archive_sizes(void)
 void test_ark_real_archive_data_offsets(void)
 {
     if (!haveFile(REAL_ARK))
-        TEST_IGNORE_MESSAGE("sample .archive/ark/Turbo_Assembler5t.ark not present");
+        TEST_IGNORE_MESSAGE("sample .archive/archive/ark/Turbo_Assembler5t.ark not present");
 
     // Directory is 3*29+1 bytes, so data starts on the 254 boundary at 254;
     // then each file occupies blocks*254 (3 and 64 blocks).
@@ -530,9 +588,9 @@ void test_ark_real_archive_data_offsets(void)
 // the backslash as its own escape character and drops "\T" entirely.
 void test_ark_backslash_name_round_trip(void)
 {
-    static const char* PATH = ".archive/ark/Tpztools.ark";
+    static const char* PATH = ".archive/archive/ark/Tpztools.ark";
     if (!haveFile(PATH))
-        TEST_IGNORE_MESSAGE("sample .archive/ark/Tpztools.ark not present");
+        TEST_IGNORE_MESSAGE("sample .archive/archive/ark/Tpztools.ark not present");
 
     auto image = openImage<TestARKStream>(PATH);
     TEST_ASSERT_NOT_NULL(image.get());
@@ -562,9 +620,9 @@ void test_ark_backslash_name_round_trip(void)
 // the invariant that made the mismatch visible.
 void test_ark_lookup_domain_is_utf8_not_raw(void)
 {
-    static const char* PATH = ".archive/ark/Tpztools.ark";
+    static const char* PATH = ".archive/archive/ark/Tpztools.ark";
     if (!haveFile(PATH))
-        TEST_IGNORE_MESSAGE("sample .archive/ark/Tpztools.ark not present");
+        TEST_IGNORE_MESSAGE("sample .archive/archive/ark/Tpztools.ark not present");
 
     // The conversion is not a no-op for these names.
     TEST_ASSERT_EQUAL_STRING("w.bazaar  /topaz", mstr::toUTF8("W.BAZAAR  /TOPAZ").c_str());
@@ -638,6 +696,8 @@ int main(int argc, char** argv)
 
     RUN_TEST(test_lnx_lookup_without_listing);
     RUN_TEST(test_lnx_repeated_lookups_do_not_grow_the_directory);
+    RUN_TEST(test_lnx_entry_offsets_and_sizes_use_254_byte_blocks);
+    RUN_TEST(test_lnx_real_archive_entries_tile_the_file);
     RUN_TEST(test_lnx_real_archive_keeps_trailing_spaces);
     RUN_TEST(test_rtrim_variants_differ_on_trailing_space);
 
