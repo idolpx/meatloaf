@@ -461,9 +461,16 @@ std::shared_ptr<MStream> MSession::CachedFile::openStream(std::ios_base::openmod
         if (!isAllocated()) return nullptr;
         return std::make_shared<CachedFileStream>(shared_from_this());
     }
-    // SD-backed
+    // SD-backed. default_fs=true is load-bearing: a cache entry keeps the
+    // remote file's NAME, so resolving it normally re-applies extension-based
+    // media decoding and hands back a decoder stream over the cached bytes
+    // instead of the bytes. The caller cached a byte range and wants that byte
+    // range back - it is the one that knows what the content is, and it wraps
+    // its own decoder around this. Without the flag, caching any container
+    // (.rp9, .zip, .d64, .gz ...) produced an unseeked decoder reporting size 0,
+    // which the caller's own decoder then failed to parse.
     if (m_sdPath.empty()) return nullptr;
-    std::unique_ptr<MFile> f(MFSOwner::File(m_sdPath));
+    std::unique_ptr<MFile> f(MFSOwner::File(m_sdPath, true));
     if (!f) return nullptr;
     auto stream = f->getSourceStream(mode);
     if (stream) size = stream->size();
