@@ -77,6 +77,15 @@ Memory locations used:
 - **$D7FF** — U64 debug register. Single free byte in the cartridge
   expansion area. Useful as a runtime checkpoint signal from C code
   (see "cc65 Debug Options" below).
+- **$DD00-$DD03** — CIA#2. `$DD00` is the IEC serial bus (ATN/CLK/DATA),
+  `$DD01`/`$DD03` the user port data and direction used by parallel speeders
+  (DolphinDOS, SpeedDOS), `$DD02` the Port A direction. Decoded by the `bus`
+  command — see "F. IEC bus and user port signals".
+- **$DC0D** — CIA#1 interrupt control/status. Bit 4 is the /FLAG pin, where
+  the IEC **SRQ** line arrives (shared with the datasette input). **Reading it
+  is destructive** on a 6526 — it clears latched interrupt flags.
+
+Full register reference: <https://csdb.idolpx.com/tools/mem64>
 
 ### Meatloaf Source Structure
 
@@ -589,6 +598,11 @@ python3 scripts/meatloaf_debug.py run "PRINT PEEK(53280)" --wait 1
 # Type text (no screen read, for interactive programs)
 python3 scripts/meatloaf_debug.py type "hello"
 
+# Decode IEC serial bus + user port ($DD00-$DD03)
+python3 scripts/meatloaf_debug.py bus
+python3 scripts/meatloaf_debug.py bus --samples 60 --interval 0.1  # is it moving?
+python3 scripts/meatloaf_debug.py bus --srq      # also $DC0D.4 — DESTRUCTIVE
+
 # STOP (interrupt running BASIC)
 python3 scripts/meatloaf_debug.py stop
 
@@ -953,6 +967,71 @@ If STOP doesn't work (program in KERNAL I/O), use reset:
 python3 scripts/meatloaf_debug.py reset
 ```
 
+### F. IEC bus and user port signals ($DD00-$DD03)
+
+`bus` decodes CIA#2 in one read — the IEC serial lines, the user port byte
+used by parallel speeders, and both data direction registers.
+
+```bash
+python3 scripts/meatloaf_debug.py bus
+```
+
+**The polarity is not uniform, and this is the easiest thing to get wrong
+reading `$DD00` by hand.** OUT bits are inverted; IN bits are not:
+
+| Bit | Line | Sense |
+|---|---|---|
+| 3 | ATN **OUT** | `1` = Low (asserted), `0` = High |
+| 4 | CLK **OUT** | `1` = Low (asserted), `0` = High |
+| 5 | DATA **OUT** | `1` = Low (asserted), `0` = High |
+| 6 | CLK **IN** | `1` = High, `0` = Low (asserted) |
+| 7 | DATA **IN** | `1` = High, `0` = Low (asserted) |
+| 0-1 | VIC-II bank (inverted) | bank = `3 - (bits 0-1)` |
+| 2 | RS-232 TXD / user port pin M | also a handshake line for parallel cables |
+
+**Known-good idle baseline** (C64 at READY, nothing on the bus) — compare
+against this first, since a stuck line shows up immediately:
+
+```
+$DD00 = $C7   all five IEC lines released
+$DD02 = $3F   Port A DDR: bits 0-5 output, 6-7 input  (KERNAL default)
+$DD01 = $FF   user port idle
+$DD03 = $00   user port all inputs
+```
+
+**SRQ is NOT in `$DD00`.** On the C64 the IEC SRQ line arrives at CIA#1
+`/FLAG` and is latched in `$DC0D` bit 4, shared with the datasette input.
+`bus --srq` samples it, but reading a 6526 ICR **clears its latched interrupt
+flags** — never do it during a live transfer or while anything depends on
+FLAG interrupts. That is why it is opt-in rather than part of the default read.
+
+**Parallel speeders (DolphinDOS / SpeedDOS)** move the byte over the user
+port: `$DD01` is the data, `$DD03` the direction (`$00` = all inputs, C64
+receiving; `$FF` = all outputs, C64 sending). A parallel cable that is not
+working usually shows as `$DD03` never leaving `$00`.
+
+#### What it can and cannot see
+
+Sampling goes over the U64 REST API at roughly 10 Hz, so it observes bus
+**phases**, not individual bit edges — IEC bit timing is microseconds.
+
+That is more useful than it sounds. Measured on hardware 2026-08-19, sampling
+every 100 ms across a real `LOAD"ML:RCS",8`: **65 samples, zero timeouts, six
+distinct `$DD00` values** (`$C7` idle, then `$07 $27 $47 $67 $87` as CLK/DATA
+handshaked). So it answers the questions that actually matter:
+
+- Is a line stuck asserted? (compare against the idle baseline)
+- Is the bus doing anything at all? → `bus --samples 60 --interval 0.1`
+  reports `bus active - N distinct states seen` or `bus idle or stuck`
+- Is the DDR configured the way the protocol needs?
+
+It will **not** give you a bit-level trace of a transfer. For that you need a
+logic analyser on the port, or Meatloaf-side `VERBOSE_PROTOCOL` logging.
+
+Note the C64 stays responsive to `readmem` during an IEC transfer — the
+blocking-KERNAL-I/O caveat that affects *keyboard* injection does not stop
+memory reads.
+
 ---
 
 ## Known Issues & Fix Patterns
@@ -1121,6 +1200,9 @@ exist to override it for a single run (a second board, a different port);
 "c64 debugging", "commodore networking", "commodore HTTP",
 "1541u", "c64 basic", "$0801", "$0400", "keyboard buffer",
 "screen memory", "dev/ttyUSB0", "ultimate 64 api",
+"iec signals", "atn", "clk", "data", "srq", "$dd00", "$dd01", "$dd03",
+"$dc0d", "cia2", "cia1", "user port", "parallel cable", "dolphindos",
+"speeddos", "bus state", "stuck line", "data direction register",
 "cc65", "cl65", "ld65", "ca65", ".prg", "load address",
 "vice label", "vice monitor", "vice label file", "debugreg",
 "$d7ff", "main start", "exe header", "exe hdr", "kickass"

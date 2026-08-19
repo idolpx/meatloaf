@@ -58,6 +58,9 @@ SCREEN_ADDR = "0400"       # Screen memory (40×25 = 1000 bytes)
 SCREEN_SIZE = 1000
 BASIC_ADDR = 0x0801        # BASIC program start
 VAR_PTR_ADDR = "002D"      # Variable pointer (2 bytes, LE)
+CIA2_ADDR = "DD00"         # CIA#2 $DD00-$DD03: IEC serial bus + user port
+CIA2_SIZE = 4
+CIA1_ICR_ADDR = "DC0D"     # CIA#1 interrupt control/status; bit 4 = /FLAG (SRQ)
 
 # ── Serial capture paths ──────────────────────────────────────────────
 
@@ -439,6 +442,80 @@ class U64Remote:
         """
         raw_screen = self._get_mem(SCREEN_ADDR, SCREEN_SIZE)
         return self._decode_screen(raw_screen)
+
+    def read_bus(self, *, include_srq: bool = False) -> dict:
+        """Read CIA#2 $DD00-$DD03 and decode IEC bus + user port state.
+
+        $DD00 Port A carries the IEC serial bus. The OUT bits and the IN bits
+        use OPPOSITE polarity, which is the single easiest thing to get wrong
+        when reading this register by hand:
+
+            bit 3  ATN  OUT   1 = Low (asserted)   0 = High (released)
+            bit 4  CLK  OUT   1 = Low (asserted)   0 = High (released)
+            bit 5  DATA OUT   1 = Low (asserted)   0 = High (released)
+            bit 6  CLK  IN    1 = High (released)  0 = Low (asserted)
+            bit 7  DATA IN    1 = High (released)  0 = Low (asserted)
+
+        bits 0-1 are the VIC-II bank (inverted), bit 2 is RS-232 TXD / user
+        port pin M — which parallel speeders also use as a handshake line.
+
+        $DD01 Port B is the 8-bit user port data path (PB0-PB7) that the
+        DolphinDOS / SpeedDOS style parallel cables use; $DD03 is its data
+        direction register (1 = output). $DD02 is the Port A DDR.
+
+        SRQ is NOT in $DD00 — see srq_note in the result.
+        """
+        raw = self._get_mem(f"0x{CIA2_ADDR}", CIA2_SIZE)
+        pa, pb, ddra, ddrb = raw[0], raw[1], raw[2], raw[3]
+
+        def out(bit):    # OUT bits: 1 = pulled Low = asserted
+            return "asserted (low)" if (pa >> bit) & 1 else "released (high)"
+
+        def inp(bit):    # IN bits: 0 = Low = asserted
+            return "released (high)" if (pa >> bit) & 1 else "asserted (low)"
+
+        bank = 3 - (pa & 0x03)
+        result = {
+            "registers": {
+                "$DD00": f"${pa:02X}", "$DD01": f"${pb:02X}",
+                "$DD02": f"${ddra:02X}", "$DD03": f"${ddrb:02X}",
+            },
+            "iec": {
+                "ATN_OUT":  out(3),
+                "CLK_OUT":  out(4),
+                "DATA_OUT": out(5),
+                "CLK_IN":   inp(6),
+                "DATA_IN":  inp(7),
+            },
+            "user_port": {
+                "data_$DD01":      f"${pb:02X}  %{pb:08b}",
+                "direction_$DD03": f"${ddrb:02X}  %{ddrb:08b}",
+                "direction_means": ("all inputs (C64 receiving)" if ddrb == 0x00
+                                    else "all outputs (C64 sending)" if ddrb == 0xFF
+                                    else "mixed - see bit pattern (1 = output)"),
+                "PA2_$DD00.2": (pa >> 2) & 1,
+            },
+            "vic_bank": f"{bank} (${bank * 0x4000:04X}-${bank * 0x4000 + 0x3FFF:04X})",
+            "ddra_$DD02": f"${ddra:02X}  %{ddra:08b}",
+            "srq_note": (
+                "SRQ is not readable from $DD00. On the C64 the IEC SRQ line "
+                "arrives at CIA#1 /FLAG, latched in $DC0D bit 4 (shared with "
+                "the datasette input). Pass include_srq=True to sample it."
+            ),
+        }
+
+        if include_srq:
+            # Destructive: reading a 6526 ICR clears its latched interrupt
+            # flags. Whether the U64's readmem DMA has the same side effect is
+            # unverified - treat it as if it does, and never sample it while
+            # the C64 is doing anything that depends on FLAG interrupts.
+            icr = self._get_mem(f"0x{CIA1_ICR_ADDR}", 1)[0]
+            result["srq_flag_$DC0D.4"] = (icr >> 4) & 1
+            result["srq_warning"] = (
+                "$DC0D was READ - on real 6526 hardware that clears pending "
+                "interrupt latches. Do not use during a live IEC transfer."
+            )
+        return result
 
     def inject_basic(self, text: str) -> None:
         """Compile bc64 source and inject into C64 memory at $0801.
@@ -1123,6 +1200,17 @@ def main():
     p.add_argument("--wait", type=float, default=1.5)
     p.add_argument("--url", default="")
 
+    p = sub.add_parser("bus",
+                       help="Decode IEC serial bus + user port ($DD00-$DD03)")
+    p.add_argument("--srq", action="store_true",
+                   help="Also sample CIA#1 $DC0D.4 (SRQ/FLAG). DESTRUCTIVE: "
+                        "reading a 6526 ICR clears latched interrupts.")
+    p.add_argument("--samples", type=int, default=1,
+                   help="Sample N times and report the distinct states seen "
+                        "(default 1). Use to tell a stuck line from a live one.")
+    p.add_argument("--interval", type=float, default=0.1,
+                   help="Seconds between samples (default 0.1)")
+
     p = sub.add_parser("type", help="Type text (no screen read)")
     p.add_argument("text", help="Text to type")
     p.add_argument("--url", default="")
@@ -1206,6 +1294,28 @@ def main():
 
     elif args.command == "screen":
         print(cycle.u64.read_screen())
+
+    elif args.command == "bus":
+        if args.samples <= 1:
+            print(json.dumps(cycle.u64.read_bus(include_srq=args.srq), indent=2))
+        else:
+            seen = {}
+            for _ in range(args.samples):
+                st = cycle.u64.read_bus(include_srq=args.srq)
+                key = json.dumps(st["registers"], sort_keys=True)
+                seen.setdefault(key, {"count": 0, "state": st})
+                seen[key]["count"] += 1
+                time.sleep(args.interval)
+            print(json.dumps({
+                "samples": args.samples,
+                "distinct_states": len(seen),
+                "verdict": ("bus idle or stuck - no line changed across the "
+                            "whole window"
+                            if len(seen) == 1 else
+                            f"bus active - {len(seen)} distinct states seen"),
+                "states": [{"count": v["count"], **v["state"]}
+                           for v in seen.values()],
+            }, indent=2))
 
     elif args.command == "reset":
         cycle.u64.reset()
