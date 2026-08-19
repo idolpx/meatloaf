@@ -1231,7 +1231,13 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
 
     uint8_t redirects = 0;
     uint8_t connectRetries = 0;
-    do {
+    // NOT a do/while.  `continue` in a do/while jumps to the CONDITION, and the
+    // condition here is "was this a redirect" — false for a connection failure.
+    // So the retry below used to fall straight out of the loop without ever
+    // re-issuing the request: it slept 500 ms, rebuilt the handle, and gave up.
+    // Harmless while every request built a fresh connection; load-bearing now
+    // that connections are reused and can be found closed.
+    for (;;) {
         if (redirects++ > 10) {
             Debug_printv("too many redirects");
             return false;
@@ -1244,18 +1250,26 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
         // Negative values mean fetch_headers failed (TLS/handshake error on redirect target).
         // In both cases, retry a few times before giving up.
         if (lastRC <= 0) {
+            // A reused connection found already closed.
+            // The server drops an idle keep-alive on its own schedule (Apache
+            // defaults to 5 s) and is not obliged to tell us, so the first
+            // write on a connection idle longer than that fails.  That is an
+            // EXPECTED condition rather than a network fault: reconnect at once,
+            // with no backoff and without spending a retry slot.  It can only
+            // happen once per request, because init() clears _reusedHandle
+            // whenever it builds a fresh handle.
+            if (_reusedHandle && _http != nullptr) {
+                Debug_printv("reused connection was closed by the server, reconnecting");
+                esp_http_client_cleanup(_http);
+                _http = nullptr;
+                _httpOrigin.clear();
+                init();
+                redirects--; // not a redirect
+                continue;
+            }
             if (connectRetries++ < 3) {
                 Debug_printv("connection failed, retrying (%d/3)...", connectRetries);
                 vTaskDelay(pdMS_TO_TICKS(500));
-                // A reused connection can fail because the server closed it
-                // between requests without having said so.  Drop the handle so
-                // the retry starts from a fresh connection rather than looping
-                // on the same dead socket.
-                if (_reusedHandle && _http != nullptr) {
-                    esp_http_client_cleanup(_http);
-                    _http = nullptr;
-                    _httpOrigin.clear();
-                }
                 init(); // reinitialize the client handle before retrying
                 redirects--; // don't count this as a redirect
                 continue;
@@ -1265,8 +1279,12 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
         }
         connectRetries = 0; // reset on success
 
-        if (lastRC >= 300 && lastRC <= 399) {
-            // Redirect.  When the target is on the same origin the connection
+        if (lastRC < 300 || lastRC > 399)
+            break; // final response — leave the redirect loop
+
+        {
+            // Redirect (3xx — anything else broke out above).  When the target
+            // is on the same origin the connection
             // is still good and worth keeping — a fresh HTTPS handshake costs
             // ~3 s here, and "add a trailing slash" is the single most common
             // redirect a directory URL hits, so paying for a second handshake
@@ -1315,7 +1333,7 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
             init();
             connectRetries = 0;
         }
-    } while (lastRC >= 300 && lastRC <= 399);
+    }
 
     // Negative status means connection failure (TLS, DNS, etc.) that
     // wasn't caught by the retry loop — always a fatal error here.
