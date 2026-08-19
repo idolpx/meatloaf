@@ -328,6 +328,15 @@ bool Archive::open(std::ios_base::openmode mode, bool rawOnly, bool randomAccess
         } else if (mstr::endsWith(u, ".lha") || mstr::endsWith(u, ".lzh") ||
                    mstr::endsWith(u, ".lzx")) {
             archive_read_support_format_lha(m_archive);
+        } else if (mstr::endsWith(u, ".sfx")) {
+            // A CBM self-extracting archive is a PRG: a two-byte load address,
+            // then a BASIC/ML extractor stub, then the archive itself a few KB
+            // in. libarchive only scans past a stub for a DOS/PE executable
+            // ("MZ"), so it has to be told this is one - otherwise the lha
+            // bidder sees a load address, bids 0, and `raw` wins with a single
+            // bogus entry spanning the whole file.
+            archive_read_support_format_lha(m_archive);
+            archive_read_set_options(m_archive, "lha:sfx");
         } else if (mstr::endsWith(u, ".xar")) {
             archive_read_support_format_xar(m_archive);
         } else if (mstr::endsWith(u, ".iso")) {

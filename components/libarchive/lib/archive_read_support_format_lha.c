@@ -271,6 +271,16 @@ struct lha {
 	struct archive_string_conv *sconv_dir;
 	struct archive_string_conv *sconv_fname;
 	struct archive_string_conv *opt_sconv;
+	/*
+	 * "lha:sfx" option. The SFX scan is otherwise only entered for a
+	 * DOS/PE executable ("MZ"), which no Commodore self-extracting
+	 * archive is - a .sfx from a CBM archive is a PRG, so it begins with
+	 * a two-byte load address and its LHA header sits a few KB in, behind
+	 * the extractor stub. The scan is opt-in rather than unconditional
+	 * because it reads up to 20 KB ahead, and lha is registered
+	 * speculatively for every unknown extension.
+	 */
+	char			 opt_sfx;
 
 	struct archive_string 	 dirname;
 	struct archive_string 	 filename;
@@ -466,6 +476,7 @@ archive_read_format_lha_bid(struct archive_read *a, int best_bid)
 	const void *buff;
 	ssize_t bytes_avail, offset, window;
 	size_t next;
+	struct lha *lha;
 
 	/* If there's already a better bid than we can ever
 	   make, don't bother testing. */
@@ -478,8 +489,12 @@ archive_read_format_lha_bid(struct archive_read *a, int best_bid)
 	if (lha_check_header_format(p) == 0)
 		return (30);
 
-	if (p[0] == 'M' && p[1] == 'Z') {
-		/* PE file */
+	/* choose_format() points a->format at the slot being bid, so the
+	 * format's own data is reachable here. */
+	lha = (struct lha *)(a->format->data);
+
+	if ((p[0] == 'M' && p[1] == 'Z') || (lha != NULL && lha->opt_sfx)) {
+		/* PE file, or a caller-declared self-extracting archive */
 		offset = 0;
 		window = 4096;
 		while (offset < (1024 * 20)) {
@@ -526,6 +541,11 @@ archive_read_format_lha_options(struct archive_read *a,
 				ret = ARCHIVE_FATAL;
 		}
 		return (ret);
+	}
+	if (strcmp(key, "sfx") == 0) {
+		/* A bare "lha:sfx" arrives here with val == "1". */
+		lha->opt_sfx = (val != NULL && val[0] != 0);
+		return (ARCHIVE_OK);
 	}
 
 	/* Note: The "warn" return is just to inform the options
@@ -624,7 +644,7 @@ archive_read_format_lha_read_header(struct archive_read *a,
 
 	signature = (const char *)p;
 	if (lha->found_first_header == 0 &&
-	    signature[0] == 'M' && signature[1] == 'Z') {
+	    ((signature[0] == 'M' && signature[1] == 'Z') || lha->opt_sfx)) {
                 /* This is an executable?  Must be self-extracting... 	*/
 		err = lha_skip_sfx(a);
 		if (err < ARCHIVE_WARN)
