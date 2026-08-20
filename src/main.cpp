@@ -110,7 +110,7 @@ bool initFailed = false;
 // }
 
 
-#if defined(BUILD_IEC) || defined(BUILD_GPIB)
+#if defined(BUILD_IEC)
 // Retries reloadConfig() for drives whose persisted network-scheme URL
 // (fsp://, http://, ...) was deferred at boot because WiFi wasn't connected
 // yet. Constructing a network MFile chain needs deep stack (PeoplesUrlParser
@@ -298,9 +298,7 @@ void main_setup()
 #ifdef BUILD_IEC
     printf(ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET "\r\n");
 #endif
-#ifdef BUILD_GPIB
-    printf(ANSI_GREEN_BOLD "GPIB Bus Initialized" ANSI_RESET "\r\n");
-#endif
+
     //log_heap_checkpoint("after IEC/GPIB bus setup");
 
     Meatloaf.setup(&SYSTEM_BUS);
@@ -371,7 +369,7 @@ void main_setup()
     // fnWiFi.start() creates via esp_netif_init(). Calling this any earlier
     // (e.g. from iecDrive::begin() during SYSTEM_BUS.setup()) crashes with
     // "assert failed: tcpip_send_msg_wait_sem ... Invalid mbox".
-#if defined(BUILD_IEC) || defined(BUILD_GPIB)
+#if defined(BUILD_IEC)
     bool network_drive_deferred = Meatloaf.reloadAllConfig();
 
     // At least one drive has a persisted network-scheme URL and WiFi isn't

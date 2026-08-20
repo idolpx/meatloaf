@@ -227,7 +227,6 @@ lib/
 Two main build platforms (set in `platformio.ini`):
 
 - **`BUILD_IEC`**: Standard IEC serial bus mode (default)
-- **`BUILD_GPIB`**: GPIB bus mode (experimental)
 
 ## Common Development Patterns
 
@@ -1110,7 +1109,7 @@ New: `use [device id]` selects the device the console drives (0 clears it, no ar
 - **`exec` refuses while the drive has channels open.** The IEC task owns the drive then, and `executeData()` from the console task would race it. This is a guard, not a fix — no other console command that mutates drive state (`mount`, `partition`) has one.
 - **New public wrappers on `iecDrive`**: `consoleSetCwd()` and `consoleExecDos()`. `set_cwd()`, `executeData()` and `getStatus()` are all protected and stay that way; these are the only console-facing surface. `consoleExecDos()` calls `executeData()` VIRTUALLY so device 30 still reaches `iecMeatloaf`'s FujiNet handling, and samples `hasError()` BEFORE consuming the status — `getStatusData()` resets the code to OK exactly as a channel-15 read does, so sampling afterwards always reads false.
 - **Registered in `registerIECCommands()`**, and the getters live in `namespace ESP32Console::Commands` while the two helpers the console core calls (`iecSelectedDeviceId()`, `iecSyncSelectedDeviceCwd()`) live in `namespace ESP32Console`. `IECCommands.h` declares both namespaces; putting a getter in the wrong one links cleanly against nothing and fails only at final link.
-- **Verified**: builds on `lolin-d32-pro` and `esp32-s3-devkitc-1`. NOT hardware-tested against a C64. The GPIB copy of `peekStatus()` is compile-unverified — `build_platform = BUILD_GPIB` is commented out in `platformio.ini`, so no environment exercises it.
+- **Verified**: builds on `lolin-d32-pro` and `esp32-s3-devkitc-1`. NOT hardware-tested against a C64. The GPIB copy of `peekStatus()` is compile-unverified.
 
 ### A network session was disposed mid-transfer
 

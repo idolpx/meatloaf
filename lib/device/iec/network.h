@@ -14,14 +14,8 @@
 #include "Protocol.h"
 #include "string_utils.h"
 
-#ifdef BUILD_IEC
 #include "../../bus/iec/IECFileDevice.h"
 #define SystemFileDevice IECFileDevice
-#endif  // BUILD_IEC
-#ifdef BUILD_GPIB
-#include "../../bus/gpib/GPIBFileDevice.h"
-#define SystemFileDevice GPIBFileDevice
-#endif  // BUILD_GPIB
 
 using namespace std;
 

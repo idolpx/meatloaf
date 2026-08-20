@@ -9,7 +9,7 @@
 #include "../media/apple/mediaType.h"
 #elif BUILD_MAC
 #include "../media/apple/mediaType.h"
-#elif defined(BUILD_IEC) || defined(BUILD_GPIB)
+#elif defined(BUILD_IEC)
 #include "../media/cbm/mediaType.h"
 #elif BUILD_LYNX
 #include "../media/lynx/mediaType.h"

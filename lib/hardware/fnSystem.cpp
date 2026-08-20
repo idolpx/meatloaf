@@ -77,8 +77,6 @@
     #define TARGET_PLATFORM_NAME "MAC"
 #elif defined(BUILD_IEC)
     #define TARGET_PLATFORM_NAME "IEC"
-#elif defined(BUILD_GPIB)
-    #define TARGET_PLATFORM_NAME "GPIB"
 #elif defined(BUILD_LYNX)
     #define TARGET_PLATFORM_NAME "LYNX"
 #elif defined(BUILD_S100)
@@ -1024,7 +1022,7 @@ const char *SystemManager::get_hardware_ver_str()
     case 1 :
         return "Rev0";
         break;
-#elif defined(BUILD_IEC) || defined(BUILD_GPIB)
+#elif defined(BUILD_IEC)
     /* Commodore */
     case 1 :
         return "FujiLoaf Rev0";
@@ -1278,7 +1276,7 @@ void SystemManager::check_hardware_ver()
     _hardware_version = 1;
     safe_reset_gpio = PIN_BUTTON_C;
     setup_card_detect(PIN_CARD_DETECT); // enable SD card detect
-#elif defined(BUILD_IEC) || defined(BUILD_GPIB)
+#elif defined(BUILD_IEC)
     /*  Commodore
     */
 #   if defined(PINMAP_FUJILOAF_REV0)

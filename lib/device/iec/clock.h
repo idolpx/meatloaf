@@ -2,14 +2,9 @@
 #define IECCLOCK_H
 
 #include "bus.h"
-#ifdef BUILD_IEC
+
 #include "../../bus/iec/IECDevice.h"
 #define SystemDevice IECDevice
-#endif  // BUILD_IEC
-#ifdef BUILD_GPIB
-#include "../../bus/gpib/GPIBDevice.h"
-#define SystemDevice GPIBDevice
-#endif  // BUILD_GPIB
 
 #define TC_SIZE 256 // size of returned time string.
 
