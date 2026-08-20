@@ -219,6 +219,15 @@ public:
         return false;
     };
 
+    // Optional BAM-style block allocation hook for writable media streams.
+    // Default is unsupported so callers can dispatch without RTTI and still
+    // work across every D64-family writable format derived from the same
+    // abstraction (D64, D71, D81, DNP, etc.).
+    virtual bool setBlockAllocation(uint8_t track, uint8_t sector, bool allocate) {
+        (void)track; (void)sector; (void)allocate;
+        return false;
+    }
+
     // For files with no directory structure
     // tap, crt, tar
     virtual std::string seekNextEntry() {

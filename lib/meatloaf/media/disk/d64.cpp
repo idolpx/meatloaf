@@ -248,7 +248,8 @@ bool D64MStream::setBlockAllocation(uint8_t track, uint8_t sector, bool allocate
         if ((buf[byte_index] & bitmask) == bitmask)
         {
             Debug_printv("Block already free: track[%d] sector[%d]", track, sector);
-            return false;
+            //return false; Don't fail if the block is already free - just leave it as is
+            return true;
         }
         buf[byte_index] |= bitmask; // 1 = free
         if (rec.has_count)
