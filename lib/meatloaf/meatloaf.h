@@ -130,8 +130,19 @@ public:
         return _position;
     }
     virtual bool position( uint32_t p) {
+        // Assign before delegating: implementations that override only
+        // seek(uint32_t) read _position. But take it back when the seek is
+        // refused -- otherwise the stream reports a position it is not at and
+        // every later read is attributed to the wrong offset. Same defect, and
+        // same fix, as seek(pos, mode).
+        uint32_t previous = _position;
         _position = p;
-        return seek( _position );
+        if ( !seek( _position ) )
+        {
+            _position = previous;
+            return false;
+        }
+        return true;
     }
 
     virtual size_t error() {
