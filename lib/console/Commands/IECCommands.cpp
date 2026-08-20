@@ -525,8 +525,20 @@ static int readChannel(int argc, char **argv)
     {
         Serial.printf("Usage: read {channel 0-15} [byte count]\r\n");
         Serial.printf("       reads to end of file when no count is given.\r\n");
+        Serial.printf("       channel 15 reads the status, as INPUT#15 does.\r\n");
         Serial.printf("       press ESC to cancel.\r\n");
         return EXIT_FAILURE;
+    }
+
+    // Channel 15 never reaches iecDrive::read() on the bus - IECFileDevice
+    // answers it from getStatusData(). That is what INPUT#15,A$ reads, so it
+    // must answer here too rather than "61, FILE NOT OPEN".  Printed once:
+    // falling through to reportStatus() would consume a second status.
+    if (channel == 15)
+    {
+        bool isError = false;
+        printStatus(drive->consoleStatus(&isError));
+        return isError ? EXIT_FAILURE : EXIT_SUCCESS;
     }
 
     size_t limit = 0;   // 0 = to end of file
@@ -582,10 +594,24 @@ static int writeChannel(int argc, char **argv)
         Serial.printf("       type lowercase (PETSCII); binary bytes are written 0xNN,\r\n");
         Serial.printf("       and one 0x may carry a run: 0x000009 == 0x000x000x09\r\n");
         Serial.printf("       runs of whitespace collapse to one space; quote to keep them\r\n");
+        Serial.printf("       channel 15 sends a DOS command, as PRINT#15 does.\r\n");
         return EXIT_FAILURE;
     }
 
     std::string data = ESP32Console::encodeDosCommand(joinArgs(argc, argv, 2));
+
+    // Channel 15 never reaches iecDrive::write() on the bus either - a write
+    // there IS a DOS command (IFD_EXEC is set only when m_channel == 15), so
+    // PRINT#15,"I0" and "exec i0:" are the same thing.
+    if (channel == 15)
+    {
+        if (data.size() > 255)
+            data.resize(255);
+
+        bool isError = false;
+        printStatus(drive->consoleExecDos(data, &isError));
+        return isError ? EXIT_FAILURE : EXIT_SUCCESS;
+    }
 
     ESP32Console::cancel_begin();
 
