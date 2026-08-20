@@ -24,6 +24,7 @@
 #include <string>
 #include <cstring>
 #include <unordered_map>
+#include <vector>
 #include <esp_rom_crc.h>
 #include <esp_heap_caps.h>
 
@@ -69,12 +70,90 @@ public:
   virtual uint8_t readBufferData()  = 0;
   virtual std::shared_ptr<MStream> getStream() { return nullptr; };
 
+  // What this channel has open, for the console "channels" listing.  Set by
+  // iecDrive::open() from the MFile's fullUrl(), because the stream cannot
+  // answer it: MStream carries only `url`, which for anything inside a
+  // container is the CONTAINER's path, not the file's.
+  void setName(const std::string &name) { m_name = name; }
+  const std::string &name() const { return m_name; }
+
+  // Bytes transferred on this channel -- where the READER is, which is NOT
+  // where the stream is, and the gap differs per path:
+  //   read           readBufferData() fills a whole BUFFER_SIZE ahead, so the
+  //                  stream LEADS -- 256 bytes read off a fresh channel leaves
+  //                  m_stream->position() at 512.
+  //   buffered write iecChannelHandler::write() accumulates until the buffer
+  //                  is full, so the stream LAGS by whatever is pending.
+  //   direct write   iecChannelHandlerFile::write() passes straight through to
+  //                  the stream, so they agree.
+  //
+  // Counted here rather than derived from m_stream->position() and the buffer
+  // occupancy, because that correction would need to know which of the three
+  // applies. Every override that moves bytes must advance it -- the direct
+  // write path returns before reaching the base and does so itself.
+  size_t position() const { return m_position; }
+
+  // Something repositioned the stream underneath this channel (B-P). Discard
+  // the buffered data and re-base the position, because read() serves from
+  // m_data before it touches the stream and would otherwise keep handing back
+  // bytes from BEFORE the seek -- a B-P back to 0 followed by a read returned
+  // the second half of the already-filled buffer.
+  //
+  // Note this drops anything pending in a BUFFERED write (the
+  // iecChannelHandler::write() path). The file handler writes straight
+  // through, so in practice there is nothing to lose.
+  void repositioned(size_t position)
+  {
+    m_ptr = 0;
+    m_len = 0;
+    m_eos = false;
+    m_position = position;
+  }
+
+  // A direct-access ("#") channel is a window on ONE block at a time, not on
+  // the whole image: B-R/U1 select the block and a read runs to the end of it.
+  //
+  //   base    where the block starts. B-P counts from HERE, not from the
+  //           readable start, because it addresses the block.
+  //   start   where reading begins -- the block start for U1/U2, one byte
+  //           later for B-R/B-W, which reserve byte 0 as the count.
+  //   len     how many bytes are readable: 256 for U1, and for B-R whatever
+  //           that count byte says.
+  void setBlockWindow(uint32_t base, uint32_t start, uint32_t len)
+  {
+    m_block_base = base;
+    m_block_len  = len;
+    m_has_block  = true;
+    repositioned(start);
+  }
+
+  // F-P leaves block mode: the whole container becomes readable from the
+  // target, so a direct-access channel can be read end to end. B-R/U1 put it
+  // back by selecting a block again.
+  void clearBlockWindow() { m_has_block = false; }
+
+  // Extent of the underlying stream, remembered at open because the block
+  // window overwrites the stream's size and leaving block mode has to put it
+  // back. 0 when unknown.
+  void     setFullSize(uint32_t size) { m_full_size = size; }
+  uint32_t fullSize() const { return m_full_size; }
+
+  bool     hasBlockWindow() const { return m_has_block; }
+  uint32_t blockBase()      const { return m_block_base; }
+  uint32_t blockLength()    const { return m_block_len; }
+
   bool m_eos = false;
 
 protected:
   iecDrive *m_drive;
   uint8_t  *m_data;
   size_t    m_len, m_ptr;
+  size_t    m_position = 0;
+  uint32_t  m_block_base = 0;
+  uint32_t  m_block_len = 0;
+  uint32_t  m_full_size = 0;
+  bool      m_has_block = false;
+  std::string m_name;
 };
 
 
@@ -153,6 +232,39 @@ public:
   // would.  *isError (when given) reports the status before it is consumed.
   std::string consoleExecDos(const std::string &command, bool *isError = nullptr);
 
+  // Console "open"/"read"/"write"/"close" support: drive the FILE channels the
+  // way a C64 does, so a read or a write inside any mounted media can be
+  // exercised without a Commodore attached.  `channel` is the secondary
+  // address, exactly as in OPEN <lfn>,<dev>,<sa>,"<name>".
+  //
+  // These call the protected virtuals, so device 30 still reaches
+  // iecMeatloaf's overrides.  They are the only console-facing surface --
+  // open()/read()/write()/close() stay protected.
+  // One row of the console "channels" listing.  A directory channel has no
+  // stream (the listing is generated, not read), so size and position are not
+  // knowable for it -- has_stream says which.
+  struct ChannelInfo
+  {
+    uint8_t     channel;
+    std::string name;
+    bool        has_stream;
+    uint32_t    size;
+    uint32_t    position;
+  };
+  std::vector<ChannelInfo> consoleChannels();
+
+  bool    consoleOpen(uint8_t channel, const std::string &name);
+  uint8_t consoleRead(uint8_t channel, uint8_t *buffer, uint8_t bufferSize);
+  uint8_t consoleWrite(uint8_t channel, const uint8_t *buffer, uint8_t bufferSize, bool eoi);
+  void    consoleClose(uint8_t channel);
+
+  // Read the status the way the bus master would, consuming it: a reply
+  // already pushed into the status buffer wins, and only an empty buffer falls
+  // through to getStatusData().  *isError (when given) reports the state
+  // BEFORE it is consumed -- getStatusData() resets the code to OK, just as a
+  // channel-15 read does, so sampling afterwards always reads false.
+  std::string consoleStatus(bool *isError = nullptr);
+
   uint8_t getStatusCode() { return m_statusCode; }
   void    setStatusCode(uint8_t code, uint8_t trk = 0, uint8_t sec = 0);
   // Overrides the canned getStatus() text.  For failures whose reason the
@@ -207,6 +319,14 @@ protected:
   virtual bool epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer);
   virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer);
 #endif
+
+  // Point a channel at a disk block for B-R/B-W and U1/U2 -- see the comment
+  // on the definition for why a block command is a seek here.
+  bool seekChannelToBlock(uint8_t channel_num, uint8_t track, uint8_t sector,
+                          uint8_t extra, bool for_write);
+
+  // B-P (within_block: relative to the selected block) and F-P (absolute).
+  bool positionChannel(uint32_t chan, uint32_t pos, bool within_block);
 
   void set_cwd(std::string path, bool verified = false);
   void changePartition(int pnum);   // CMD "CP<n>" on a mounted DHD/D1M/D2M/D4M image

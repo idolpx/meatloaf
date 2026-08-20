@@ -119,6 +119,15 @@ public:
         return _size;
     };
 
+    // Declare the extent of a stream that cannot work it out for itself. A
+    // media stream opened with NO entry selected (direct access, "#") is the
+    // raw container, and nothing sets _size for that view -- which leaves
+    // eos() true from the first byte, so a reader stops refilling almost
+    // immediately. Only the opener knows the container's real length.
+    void setSize(uint32_t size) {
+        _size = size;
+    };
+
     virtual uint32_t available() {
         if ( _position > _size )
             return 0;
@@ -130,8 +139,19 @@ public:
         return _position;
     }
     virtual bool position( uint32_t p) {
+        // Assign before delegating: implementations that override only
+        // seek(uint32_t) read _position. But take it back when the seek is
+        // refused -- otherwise the stream reports a position it is not at and
+        // every later read is attributed to the wrong offset. Same defect, and
+        // same fix, as seek(pos, mode).
+        uint32_t previous = _position;
         _position = p;
-        return seek( _position );
+        if ( !seek( _position ) )
+        {
+            _position = previous;
+            return false;
+        }
+        return true;
     }
 
     virtual size_t error() {
@@ -216,6 +236,16 @@ public:
     virtual bool seekBlock( uint64_t index, uint8_t offset = 0 );
     virtual bool seekSector( uint8_t track, uint8_t sector, uint8_t offset = 0 );
     virtual bool seekSector( std::vector<uint8_t> trackSectorOffset );
+
+    // Byte offset of a track/sector within the container, or -1 when the
+    // medium has no such block.
+    //
+    // Block commands (B-R/B-W, U1/U2) need this to keep the CHANNEL position
+    // in step with the seek. seekSector() cannot report it: when a file is
+    // selected, _position is the offset within the FILE, and readFile() calls
+    // seekSector() while walking the block chain -- so seekSector() must not
+    // touch _position, and the caller has to be told the offset separately.
+    virtual int32_t sectorByteOffset( uint8_t track, uint8_t sector ) { return -1; }
 
 // private:
 

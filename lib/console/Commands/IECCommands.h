@@ -15,6 +15,18 @@ namespace ESP32Console::Commands
     const ConsoleCommand getUseCommand();
 
     const ConsoleCommand getExecCommand();
+
+    // File channels on the selected device - the console's stand-in for
+    // OPEN/GET#/PRINT#/CLOSE on a C64.
+    const ConsoleCommand getOpenCommand();
+
+    const ConsoleCommand getReadCommand();
+
+    const ConsoleCommand getWriteCommand();
+
+    const ConsoleCommand getCloseCommand();
+
+    const ConsoleCommand getChannelsCommand();
 }
 
 namespace ESP32Console

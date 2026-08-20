@@ -175,6 +175,7 @@ uint8_t iecChannelHandler::read(uint8_t *data, uint8_t n)
         {
             // common case during regular (non-fastloader) load
             data[0] = m_data[m_ptr++];
+            m_position++;
             return 1;
         }
         else
@@ -183,6 +184,7 @@ uint8_t iecChannelHandler::read(uint8_t *data, uint8_t n)
             n = std::min((size_t) n, (size_t) (m_len - m_ptr));
             memcpy(data, m_data + m_ptr, n);
             m_ptr += n;
+            m_position += n;
             return n;
         }
     }
@@ -222,6 +224,7 @@ uint8_t iecChannelHandler::write(uint8_t *data, uint8_t n)
         m_len += n;
     }
 
+    m_position += n;
     return n;
 }
 
@@ -302,6 +305,9 @@ uint8_t iecChannelHandlerFile::write(uint8_t *data, uint8_t n) {
         size_t written = m_stream->write(data, n);
         m_transportTimeUS += (esp_timer_get_time() - t);
         m_byteCount += written;
+        // This path returns without reaching iecChannelHandler::write(), so
+        // the channel position has to be advanced here too.
+        m_position += written;
         // Clear EOS and reset the IEC buffer so the next readBufferData()
         // refills from the stream's freshly-positioned cursor.
         // Mode-switch commands (r-h, r-b, status) reposition the stream's
@@ -950,6 +956,75 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                 close(channel);
             }
 
+            // "#" is DIRECT ACCESS: the channel gets the CONTAINER's own byte
+            // stream instead of a file inside it, so B-P and B-R can roam the
+            // whole image. A real drive takes a buffer number ("#3"); there is
+            // one stream per channel here, so a trailing number is accepted
+            // and ignored. Anything else after the '#' is a filename.
+            if( name[0] == '#' &&
+                name.find_first_not_of("0123456789", 1) == std::string::npos )
+            {
+                if( m_cwd == nullptr )
+                {
+                    setStatusCode(ST_DRIVE_NOT_READY);
+                    return false;
+                }
+
+                // NEVER plain out: opening a container for write TRUNCATES the
+                // image. Writing to it has to be read-modify-write.
+                std::ios_base::openmode container_mode =
+                    (mode & std::ios_base::out) ? (std::ios_base::in | std::ios_base::out)
+                                                : std::ios_base::in;
+
+                // A fresh MFile on the cwd's own url carries no pathInStream,
+                // so getSourceStream() selects no entry: seekCalled stays false
+                // and reads pipe raw container bytes through readContainer(),
+                // which is exactly the direct-access view. getSourceStream()
+                // also builds a FRESH stream per open, so this cannot disturb
+                // the ImageBroker instance a directory listing is using.
+                std::unique_ptr<MFile> image(MFSOwner::File(m_cwd->url));
+                auto stream = image ? image->getSourceStream(container_mode) : nullptr;
+                if( stream == nullptr || !stream->isOpen() )
+                {
+                    Debug_printv("Error: no container stream for direct access [%s]",
+                                 m_cwd->url.c_str());
+                    setStatusCode(ST_DRIVE_NOT_READY);
+                    return false;
+                }
+
+                m_channels[channel] = new iecChannelHandlerFile(this, stream);
+                m_channels[channel]->setName(m_cwd->url + " (direct)");
+
+                // Nothing sets _size for the no-entry view, so the container's
+                // real length is taken off the raw file -- MFSOwner::File(url,
+                // true) forces defaultFS, the established "give me the bytes"
+                // primitive, so the name is not extension-sniffed back into
+                // another D64MFile. Remembered on the channel because the block
+                // window below overwrites the stream's size, and F-P has to be
+                // able to put it back.
+                uint32_t full_size = 0;
+                {
+                    std::unique_ptr<MFile> raw(MFSOwner::File(m_cwd->url, true));
+                    auto raw_stream = raw ? raw->getSourceStream() : nullptr;
+                    if( raw_stream != nullptr )
+                        full_size = raw_stream->size();
+                }
+                m_channels[channel]->setFullSize(full_size);
+
+                // Direct access reads ONE block at a time, so the channel
+                // starts as a window on block 0 rather than on the whole
+                // image. B-R/U1 move it, B-P addresses within it, F-P leaves
+                // block mode entirely.
+                stream->setSize(stream->block_size);
+                m_channels[channel]->setBlockWindow(0, 0, stream->block_size);
+
+                m_numOpenChannels++;
+                setStatusCode(ST_OK);
+                Debug_printv("Direct access channel[%d] on [%s] block size[%lu]",
+                             channel, m_cwd->url.c_str(), (unsigned long) stream->block_size);
+                return true;
+            }
+
             // Handle CMD-style directory filters by preserving them in URL
             bool wasDirListing = false;
             if ( name[0] == '$' ) {
@@ -1044,6 +1119,7 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                                 }
 
                                 m_channels[channel] = new iecChannelHandlerDir(this, f);
+                                m_channels[channel]->setName(f->fullUrl());
                                 m_numOpenChannels++;
                                 Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! channel[%d] numChannels[%d] dir[%s]", channel, m_numOpenChannels, f->url.c_str());
                                 //m_cwd.reset(MFSOwner::File(f->url));
@@ -1145,6 +1221,9 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                             Debug_printv("Stream created for file [%s] pathInStream[%s]", f->url.c_str(), f->pathInStream.c_str());
                             // new_stream will be deleted in iecChannelHandlerFile destructor
                             m_channels[channel] = new iecChannelHandlerFile(this, new_stream, is_dir ? 0x0801 : -1); // 0x0801 = overrides load address to start of basic for C64
+                            // fullUrl(), not url: for a file inside a container url
+                            // names the CONTAINER, and the entry is in pathInStream.
+                            m_channels[channel]->setName(f->fullUrl());
                             m_numOpenChannels++;
                             setStatusCode(ST_OK);
 
@@ -1351,6 +1430,206 @@ uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool 
 }
 
 // we override the "executeData" because some commands may include NUL or CR characters which 
+// Parse one decimal DOS command argument.  strtoul, never stoi/stol: ESP-IDF
+// builds -fno-exceptions, so a throwing parser on a string that came off the
+// IEC bus is std::terminate.  Rejects an empty string and any trailing
+// rubbish rather than accepting a prefix, so a malformed argument is a syntax
+// error instead of a silently different number.
+static bool dosParseUint(const std::string &s, uint32_t *out)
+{
+    if ( s.empty() ) return false;
+
+    char *end = nullptr;
+    unsigned long value = strtoul(s.c_str(), &end, 10);
+    if ( end == s.c_str() || *end != '\0' ) return false;
+
+    *out = (uint32_t) value;
+    return true;
+}
+
+
+// Move a channel's pointer, for B-P and F-P.
+//
+//   B-P (within_block)  the pointer WITHIN the block B-R/U1 selected, 0-255.
+//                       It addresses the block, so it counts from the block's
+//                       byte 0 even when B-R left the readable window
+//                       starting at byte 1.
+//   F-P                 an absolute offset. On a direct-access channel it
+//                       re-bases the block window onto the block containing
+//                       that offset, so "one block at a time" still holds.
+bool iecDrive::positionChannel(uint32_t chan, uint32_t pos, bool within_block)
+{
+    if( chan > 15 )
+    {
+        setStatusCode(ST_SYNTAX_UNKNOWN);
+        return false;
+    }
+
+    iecChannelHandler *channel = m_channels[chan];
+    if( channel == nullptr )
+    {
+        setStatusCode(ST_FILE_NOT_OPEN);
+        return false;
+    }
+
+    // A directory channel generates its listing and has no stream.
+    auto stream = channel->getStream();
+    if( stream == nullptr )
+    {
+        setStatusCode(ST_SYNTAX_INVALID);
+        return false;
+    }
+
+    uint32_t target = pos;
+
+    if( within_block )
+    {
+        // No block selected means no origin to count from -- B-P is not a
+        // file-channel command, F-P is.
+        if( !channel->hasBlockWindow() )
+        {
+            setStatusCode(ST_SYNTAX_INVALID);
+            return false;
+        }
+
+        if( pos >= stream->block_size )
+        {
+            setStatusCode(ST_SYNTAX_UNKNOWN);
+            return false;
+        }
+
+        // Only the pointer moves; the window's end is whatever B-R/U1 set.
+        target = channel->blockBase() + pos;
+
+        if( !stream->position(target) )
+        {
+            setStatusCode(ST_SYNTAX_UNKNOWN);
+            return false;
+        }
+
+        channel->repositioned(target);
+        setStatusCode(ST_OK);
+        return true;
+    }
+
+    // F-P seeks anywhere in the file or container, so on a direct-access
+    // channel it LEAVES block mode and restores the container's full extent --
+    // otherwise the block window would stop the read 256 bytes later. B-R/U1
+    // put the channel back into block mode.
+    if( channel->hasBlockWindow() )
+    {
+        if( channel->fullSize() > 0 )
+            stream->setSize(channel->fullSize());
+
+        channel->clearBlockWindow();
+    }
+
+    if( !stream->position(target) )
+    {
+        setStatusCode(ST_SYNTAX_UNKNOWN);
+        return false;
+    }
+
+    channel->repositioned(target);
+    setStatusCode(ST_OK);
+    return true;
+}
+
+
+// Point a channel at a disk block, for B-R/B-W and U1/U2.
+//
+// There is no separate 256-byte block buffer here the way a real drive has
+// one: a channel IS a stream at an offset. So a block command is a seek --
+// the data then moves through ordinary reads and writes on that channel,
+// which is also what makes it work from the console.
+//
+// `extra` is the offset within the block to land on: B-R uses 1 because CBM
+// treats byte 0 as the count of valid bytes, U1 uses 0 and gives the whole
+// 256. Sets the status and returns false on every failure.
+bool iecDrive::seekChannelToBlock(uint8_t channel_num, uint8_t track, uint8_t sector,
+                                  uint8_t extra, bool for_write)
+{
+    // m_channels has 16 entries and the parsed channel is a full byte.
+    if( channel_num > 15 )
+    {
+        setStatusCode(ST_SYNTAX_UNKNOWN);
+        return false;
+    }
+
+    iecChannelHandler *channel = m_channels[channel_num];
+    if( channel == nullptr )
+    {
+        setStatusCode(ST_FILE_NOT_OPEN);
+        return false;
+    }
+
+    // A directory channel generates its listing and has no stream.
+    auto stream = channel->getStream();
+    if( stream == nullptr )
+    {
+        setStatusCode(ST_SYNTAX_INVALID);
+        return false;
+    }
+
+    if( for_write && !(stream->mode & std::ios_base::out) )
+    {
+        // Opened read-only: OPEN <ch>,8,<sa>,"#,S,W" gets a writable one.
+        setStatusCode(ST_WRITE_PROTECT_ON, track, sector);
+        return false;
+    }
+
+    int32_t offset = stream->sectorByteOffset(track, sector);
+    if( offset < 0 )
+    {
+        setStatusCode(ST_ILLEGAL_TS_COMMAND, track, sector);
+        return false;
+    }
+
+    uint32_t base   = (uint32_t) offset;
+    uint32_t start  = base + extra;
+    uint32_t length = stream->block_size;
+
+    // B-R/B-W reserve byte 0 of the block as the count of valid bytes, so the
+    // window is that many bytes starting at byte 1. U1/U2 have no count byte
+    // and give the whole block. Reading the count costs one container read,
+    // and the seek below puts the stream back where the caller expects it.
+    if( extra > 0 )
+    {
+        if( !stream->position(base) )
+        {
+            setStatusCode(ST_ILLEGAL_TS_COMMAND, track, sector);
+            return false;
+        }
+
+        uint8_t count = 0;
+        if( stream->read(&count, 1) != 1 )
+        {
+            setStatusCode(ST_READ_NO_DATA, track, sector);
+            return false;
+        }
+        length = count;
+    }
+
+    // The window is expressed to the stream as its size: that is what stops a
+    // read at the end of the block, since the reader asks for BUFFER_SIZE.
+    stream->setSize(start + length);
+
+    // position() seeks AND records where it is, which seekSector() cannot do.
+    if( !stream->position(start) )
+    {
+        setStatusCode(ST_ILLEGAL_TS_COMMAND, track, sector);
+        return false;
+    }
+
+    // The channel holds bytes read AHEAD of the stream; without this the next
+    // read serves them instead of the block just seeked to.
+    channel->setBlockWindow(base, start, length);
+
+    setStatusCode(ST_OK);
+    return true;
+}
+
+
 // may not work in the text-based "execute" function. Note that while commands handled here
 // are all text-based, M-R and M-W commands passed on to the VDrive may contain binary data.
 void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
@@ -1509,27 +1788,27 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                     command = mstr::drop(command, 3);
                     mstr::trim(command);
                     mstr::replaceAll(command, "  ", " ");
-                    std::vector<uint8_t> pti = util_tokenize_uint8(command);
-                    if ( pti.size() < 2 )
+
+                    std::vector<std::string> pt = util_tokenize(command, ' ');
+                    uint32_t chan = 0, pos = 0;
+                    if ( pt.size() < 2 || !dosParseUint(pt[0], &chan) || !dosParseUint(pt[1], &pos) )
                     {
                         setStatusCode(ST_SYNTAX_UNKNOWN);
                         return;
                     }
-                    Debug_printv("command[%s] channel[%d] position[%d]", command.c_str(), pti[0], pti[1]);
 
-                    auto channel = m_channels[pti[0]];
-                    if ( channel != nullptr )
-                    {
-                        auto stream = channel->getStream();
-                        stream->position( pti[1] );
-                        //setStatusCode(ST_OK);
-                    }
+                    Debug_printv("B-P channel[%lu] position-in-block[%lu]",
+                                 (unsigned long) chan, (unsigned long) pos);
+
+                    positionChannel( chan, pos, true );
                     return;
                 }
-                // B-R read block
-                else if (command[2] == 'R')
+                // B-R read block / B-W write block
+                else if (command[2] == 'R' || command[2] == 'W')
                 {
-                    Debug_printv( "read block");
+                    bool for_write = (command[2] == 'W');
+                    Debug_printv("%s block", for_write ? "write" : "read");
+
                     command = mstr::drop(command, 3);
                     mstr::trim(command);
                     mstr::replaceAll(command, "  ", " ");
@@ -1541,35 +1820,25 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                     }
                     Debug_printv("command[%s] channel[%d] media[%d] track[%d] sector[%d]", command.c_str(), pti[0], pti[1], pti[2], pti[3]);
 
-                    auto channel = m_channels[pti[0]];
-                    if ( channel != nullptr )
-                    {
-                        auto stream = channel->getStream();
-                        stream->seekSector( pti[2], pti[3] );
-                        uint8_t size;
-                        stream->read(&size, 1);
-                        uint8_t *data = (uint8_t *) malloc(size);
-                        //memset(data, 0, size);
-                        stream->read(data, size);
-                        setStatus((char *) data, size);
-                        free(data);
-                        return;
-                    }
-                }
-                // B-W write block
-                else if (command[2] == 'W')
-                {
-                    Debug_printv( "write block");
+                    // CBM keeps byte 0 of a B-R/B-W block as the count of
+                    // valid bytes, so both land on byte 1; U1/U2 give the
+                    // whole 256.
+                    seekChannelToBlock( pti[0], pti[2], pti[3], 1, for_write );
+                    return;
                 }
                 // B-A allocate block in BAM
                 else if (command[2] == 'A')
                 {
                     Debug_printv( "allocate bit in BAM");
+                    // Checks to see if the specified track/sector is free, and if so marks it as allocated in the BAM. 
+                    // If the block is already allocated then a "65 NO BLOCK" error is returned.
                 }
                 // B-F free block in BAM
                 else if (command[2] == 'F')
                 {
                     Debug_printv( "free bit in BAM");
+                    // Frees the specified track/sector in the BAM. It doesn't care if it's already free or not,
+                    // it just marks it as free.
                 }
                 // B-E block execute
                 else if (command[2] == 'E')
@@ -1590,6 +1859,37 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
         case 'D':
             Debug_printv( "duplicate disk");
             //Error(ERROR_31_SYNTAX_ERROR);	// DI, DR, DW not implemented yet
+        break;
+        case 'F':
+            if (command[1] == '-')
+            {
+                // F-P file position
+                if (command[2] == 'P')
+                {
+                    command = mstr::drop(command, 3);
+                    mstr::trim(command);
+                    mstr::replaceAll(command, "  ", " ");
+
+                    // Parsed as 32-bit, not through util_tokenize_uint8():
+                    // F-P's argument is an absolute offset in the file and a
+                    // uint8_t silently WRAPS it -- 300 became 44, answering OK.
+                    std::vector<std::string> pt = util_tokenize(command, ' ');
+                    uint32_t chan = 0, pos = 0;
+                    if ( pt.size() < 2 || !dosParseUint(pt[0], &chan) || !dosParseUint(pt[1], &pos) )
+                    {
+                        setStatusCode(ST_SYNTAX_UNKNOWN);
+                        return;
+                    }
+
+                    Debug_printv("F-P channel[%lu] position[%lu]",
+                                 (unsigned long) chan, (unsigned long) pos);
+
+                    positionChannel( chan, pos, false );
+                    return;
+                }
+            }
+            // Without this an unmatched F-* falls straight into 'I' and
+            // resets the drive.
         break;
         case 'I':
             // Initialize
@@ -1816,39 +2116,17 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                 }
                 Debug_printv("command[%s] channel[%d] media[%d] track[%d] sector[%d]", command.c_str(), pti[0], pti[1], pti[2], pti[3]);
 
-                auto channel = m_channels[pti[0]];
-                if ( channel != nullptr )
-                {
-                    auto stream = channel->getStream();
-                    if (stream == nullptr)
-                    {
-                        // TODO: Check for C128 Auto boot and if track/sector is 1/0
+                // TODO: Check for C128 Auto boot and if track/sector is 1/0
 
-                        // if ( m_cwd->url == "/" )
-                        // {
-                        //     Debug_printv("Error: block read/write commands not supported on root directory");
-                        //     setStatusCode(ST_PERMISSION_DENIED, pti[2], pti[3]);
-                        //     return;
-                        // }
-                        Debug_printv("Error: channel[%d] stream is null", pti[0]);
-                        setStatusCode(ST_READ_NO_SYNC, pti[2], pti[3]);
-                        return;
-                    }
-                    else
-                    {
-                        // For block read/write commands, the drive needs to seek to the specified track and sector before reading/writing the block.  This is because some fast loaders expect the drive to update its internal track and sector registers on seek, which are then used for subsequent read/write commands that don't specify track and sector.
-                        stream->seekSector( pti[2], pti[3] );
-                    }
-                    if ( read )
-                    {
-                        Debug_printv("Block-Read");
-                        return;
-                    }
-
-                    // Write Block
-                    Debug_printv("Block-Write");
-                    return;
-                }
+                // Unlike B-R/B-W, U1/U2 give the WHOLE block -- there is no
+                // count byte -- so they land on byte 0.
+                //
+                // The seek matters beyond the data: some fast loaders expect
+                // the drive's track/sector registers to be updated here and
+                // then issue reads that do not name a block.
+                Debug_printv("Block-%s", read ? "Read" : "Write");
+                seekChannelToBlock( pti[0], pti[2], pti[3], 0, !read );
+                return;
             }
             else if ((command[1] >= '3' && command[1] <= '9') || (command[1] >= 'C' && command[1] <= 'H')) // U3-U9, UC-UH
             {
@@ -2312,6 +2590,12 @@ std::string iecDrive::consoleExecDos(const std::string &command, bool *isError)
     // answers FujiNet commands by filling the status buffer directly.
     executeData((const uint8_t *) command.data(), (uint8_t) std::min<size_t>(command.size(), 255));
 
+    return consoleStatus(isError);
+}
+
+
+std::string iecDrive::consoleStatus(bool *isError)
+{
     // Sample the error state before consuming the status - getStatusData()
     // resets the code to OK, just as a channel-15 read does.
     if (isError != nullptr)
@@ -2339,6 +2623,96 @@ std::string iecDrive::consoleExecDos(const std::string &command, bool *isError)
         status.pop_back();
 
     return status;
+}
+
+
+std::vector<iecDrive::ChannelInfo> iecDrive::consoleChannels()
+{
+    std::vector<ChannelInfo> open_channels;
+
+    // VDrive keeps its own channel table and offers no per-channel query, so
+    // there is nothing to walk in that mode.  The caller compares the row
+    // count against getNumOpenChannels() so the gap is visible rather than
+    // silently reported as "no channels open".
+    if( Meatloaf.use_vdrive && m_vdrive!=nullptr )
+        return open_channels;
+
+    for(uint8_t channel = 0; channel <= 15; channel++)
+    {
+        iecChannelHandler *handler = m_channels[channel];
+        if( handler==nullptr ) continue;
+
+        ChannelInfo info;
+        info.channel    = channel;
+        info.name       = handler->name();
+        info.has_stream = false;
+        info.size       = 0;
+        // Where the READER is, not where the stream is -- see
+        // iecChannelHandler::position(). A directory channel has a real
+        // position too, even though it has no stream to give a size.
+        info.position   = handler->position();
+
+        // A directory channel generates its listing rather than reading one,
+        // so it has no stream and no size to report.
+        auto stream = handler->getStream();
+        if( stream != nullptr )
+        {
+            info.has_stream = true;
+            info.size       = stream->size();
+        }
+
+        // A direct-access channel is a window on one block: report the block's
+        // readable length and the pointer WITHIN it, which is what B-P speaks.
+        // Reporting the stream's size there would show the window's end offset
+        // in the image, which is not a size at all.
+        if( handler->hasBlockWindow() )
+        {
+            info.has_stream = true;
+            info.size       = handler->blockLength();
+            info.position   = handler->position() >= handler->blockBase()
+                                ? handler->position() - handler->blockBase()
+                                : 0;
+        }
+
+        open_channels.push_back(info);
+    }
+
+    return open_channels;
+}
+
+
+bool iecDrive::consoleOpen(uint8_t channel, const std::string &name)
+{
+    // open() is virtual, so device 30 reaches iecMeatloaf's override.  The
+    // length is a uint8_t on the bus too, so a longer name is not a case the
+    // drive could ever see from a C64.
+    return open(channel, name.c_str(), (uint8_t) std::min<size_t>(name.size(), 255));
+}
+
+
+uint8_t iecDrive::consoleRead(uint8_t channel, uint8_t *buffer, uint8_t bufferSize)
+{
+    // The non-VDrive path never writes eoi - end of file is a return of 0 -
+    // but read() takes the pointer, so give it somewhere real to write.
+    bool eoi = false;
+    return read(channel, buffer, bufferSize, &eoi);
+}
+
+
+uint8_t iecDrive::consoleWrite(uint8_t channel, const uint8_t *buffer, uint8_t bufferSize, bool eoi)
+{
+    // write() takes a non-const pointer because the bus handler hands it its
+    // own receive buffer; nothing in the path modifies it.
+    return write(channel, const_cast<uint8_t *>(buffer), bufferSize, eoi);
+}
+
+
+void iecDrive::consoleClose(uint8_t channel)
+{
+    // close() is a no-op for a channel that is not open, on both the VDrive
+    // and the MStream path, so the console's "close everything" can simply
+    // sweep 0-15 rather than needing a per-channel query VDrive does not have.
+    close(channel);
 }
 
 
@@ -2435,6 +2809,10 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
         case ST_FILE_NOT_FOUND      : msg = "FILE NOT FOUND"; break;
         case ST_FILE_NOT_OPEN       : msg = "FILE NOT OPEN"; break;
         case ST_FILE_EXISTS         : msg = "FILE EXISTS"; break;
+        // 66 became reachable when the block commands started validating
+        // track/sector; without a case here it printed "UNKNOWN ERROR", the
+        // same gap code 30 had.
+        case ST_ILLEGAL_TS_COMMAND  : msg = "ILLEGAL TRACK OR SECTOR"; break;
         case ST_DOSVERSION          :
             dosVersionMsg = std::string(PRODUCT_ID " ") + ESP.getFirmwareVersion().c_str();
             msg = dosVersionMsg.c_str();

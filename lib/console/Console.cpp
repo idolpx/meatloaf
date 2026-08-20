@@ -197,6 +197,11 @@ namespace ESP32Console
         registerCommand(getIECCommand());
         registerCommand(getUseCommand());
         registerCommand(getExecCommand());
+        registerCommand(getOpenCommand());
+        registerCommand(getReadCommand());
+        registerCommand(getWriteCommand());
+        registerCommand(getCloseCommand());
+        registerCommand(getChannelsCommand());
     }
 
     void ESP32Console::Console::registerNetworkCommands()

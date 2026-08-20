@@ -308,6 +308,8 @@ public:
     bool seekBlock( uint64_t index, uint8_t offset = 0 ) override;
     bool seekSector( uint8_t track, uint8_t sector, uint8_t offset = 0 ) override;
     bool seekSector( std::vector<uint8_t> trackSectorOffset ) override;
+    int32_t sectorByteOffset( uint8_t track, uint8_t sector ) override;
+    int32_t linearBlock( uint8_t track, uint8_t sector );
 
 
     uint16_t getSectorCount( uint16_t track )
@@ -321,6 +323,16 @@ public:
 
     virtual bool seekPath(std::string path) override;
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
+
+    // Seek to any byte offset within the SELECTED file, by walking its block
+    // chain -- the base class seeks the container, which is meaningless for a
+    // file whose bytes are scattered across blocks (it left every later read
+    // returning zeros). With no file selected the stream IS the raw image and
+    // the base class is already right.
+    bool seek(uint32_t offset) override;
+    // seek(uint32_t) would otherwise HIDE the inherited two-argument form
+    // from anything holding a D64MStream*.
+    using MMediaStream::seek;
     uint32_t writeFile(uint8_t* buf, uint32_t size) override;
 
     // Finalizes a streamed file write (last block + directory entry)

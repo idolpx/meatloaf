@@ -300,6 +300,35 @@ void TCPServer::send(std::string data)
     }
 }
 
+bool TCPServer::pollCancel()
+{
+    if (_client_socket <= 0)
+        return false;
+
+    // MSG_DONTWAIT rather than a socket flag change: this runs on a different
+    // task than the one that owns the socket's normal blocking recv, and
+    // leaving O_NONBLOCK behind would turn that recv into a spin loop.
+    uint8_t buf[64];
+    bool saw_cancel = false;
+
+    for (;;)
+    {
+        int n = recv(_client_socket, buf, sizeof(buf), MSG_DONTWAIT);
+        if (n <= 0)
+            break;      // nothing waiting, or the client went away
+
+        for (int i = 0; i < n; i++)
+            if (buf[i] == 0x1B)
+                saw_cancel = true;
+
+        if (n < (int)sizeof(buf))
+            break;      // drained
+    }
+
+    return saw_cancel;
+}
+
+
 void TCPServer::disconnect()
 {
     if (_client_socket > 0)

@@ -33,6 +33,8 @@ static inline void *psram_malloc(size_t sz) {
 #include "freertos/task.h"
 #endif
 #include "../Console.h"
+#include "../console_cancel.h"
+#include "../dos_transfer.h"
 #include "../Helpers/PWDHelpers.h"
 #include "../ute/ute.h"
 #include "../../www/ws/activity.h"
@@ -55,6 +57,8 @@ int cat(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
+    ESP32Console::cancel_begin();
+
     for (int n = 1; n < argc; n++)
     {
         std::unique_ptr<MFile> path(getCurrentPath()->cd(argv[n]));
@@ -64,12 +68,27 @@ int cat(int argc, char **argv)
             if(istream.eof()) {
                 Serial.print("Stream returned EOF!");
             } else {
+                size_t pending = 0;
+                bool cancelled = false;
                 while(!istream.eof()) {
                     char chr = istream.get();
                     if(!istream.eof())
                         Serial.printf("%c", chr);
+
+                    if (++pending >= ESP32Console::DOS_CANCEL_INTERVAL) {
+                        pending = 0;
+                        if (ESP32Console::cancel_requested()) {
+                            cancelled = true;
+                            break;
+                        }
+                    }
                 }
                 Serial.printf("\r\n");
+                if (cancelled) {
+                    Serial.printf("cancelled\r\n");
+                    istream.close();
+                    return EXIT_SUCCESS;
+                }
             }
             istream.close();
         }
@@ -89,6 +108,8 @@ int hex(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
+    ESP32Console::cancel_begin();
+
     for (int n = 1; n < argc; n++)
     {
         std::unique_ptr<MFile> path(getCurrentPath()->cd(argv[n]));
@@ -103,7 +124,9 @@ int hex(int argc, char **argv)
                 uint32_t size = 0;
                 int address = 0;
                 char b[17] = {0};
-                while(!istream.eof()) 
+                size_t pending = 0;
+                bool cancelled = false;
+                while(!istream.eof())
                 {
                     char chr = istream.get();
 
@@ -152,9 +175,28 @@ int hex(int argc, char **argv)
                         Serial.printf(" |%-16s|\r\n", b);
                         c = 0;
                         memset(b, 0, sizeof(b));
+
+                        // One completed line is 16 bytes, so this lands on the
+                        // cancel interval exactly.
+                        pending += 0x10;
+                        if ( pending >= ESP32Console::DOS_CANCEL_INTERVAL )
+                        {
+                            pending = 0;
+                            if ( ESP32Console::cancel_requested() )
+                            {
+                                cancelled = true;
+                                break;
+                            }
+                        }
                     }
                 }
                 Serial.printf("\r\n");
+                if ( cancelled )
+                {
+                    Serial.printf("cancelled after %u bytes\r\n", size);
+                    istream.close();
+                    return EXIT_SUCCESS;
+                }
                 Serial.printf("url[%s] size[%u]\r\n", path->url.c_str(), --size);
             }
             istream.close();

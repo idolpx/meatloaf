@@ -249,7 +249,22 @@ uint32_t MMediaStream::read(uint8_t* buf, uint32_t size) {
 
     }
     else {
-        // seekXXX not called - just pipe image bytes, so it can be i.e. copied verbatim
+        // seekXXX not called - just pipe image bytes, so it can be i.e. copied verbatim.
+        //
+        // Same boundary enforcement as the branch above: readContainer() reads
+        // linearly and knows nothing of where this stream is meant to end, so
+        // without the cap a caller asking for more than remains reads straight
+        // past it. That is what bounds a direct-access ("#") channel to the
+        // one block B-R/U1 selected -- the block window is expressed by
+        // setting _size, and a reader asks for BUFFER_SIZE at a time.
+        if( _size > 0 )
+        {
+            if( _position >= _size )
+                return 0;
+            if( size > _size - _position )
+                size = _size - _position;
+        }
+
         bytesRead = readContainer(buf, size);
     }
 

@@ -58,6 +58,43 @@ bool D64MStream::seekBlock(uint64_t index, uint8_t offset)
     return containerStream->seek((index * block_size) + offset);
 }
 
+int32_t D64MStream::sectorByteOffset(uint8_t track, uint8_t sector)
+{
+    int32_t block_index = linearBlock(track, sector);
+    if (block_index < 0)
+        return -1;
+
+    return block_index * (int32_t) block_size;
+}
+
+
+// Linear block index of a track/sector, or -1 when it is not on this medium.
+// Shared by seekSector() and sectorByteOffset() so the geometry walk exists
+// once -- they disagreed about nothing today, and that is worth keeping.
+int32_t D64MStream::linearBlock(uint8_t track, uint8_t sector)
+{
+    uint16_t sectorOffset = 0;
+
+    // Is this a valid track?
+    uint16_t c = curPartition().block_allocation_map.size() - 1;
+    uint8_t start_track = curPartition().block_allocation_map[0].start_track;
+    uint8_t end_track = curPartition().block_allocation_map[c].end_track;
+    if (track < start_track || track > end_track)
+        return -1;
+
+    // Is this a valid sector?
+    if (sector > getSectorCount(track))
+        return -1;
+
+    if (dos_version != 0xFF) track--; // D9060/D9090: Track 1 is at index 0, not 1
+    for (uint8_t index = 0; index < track; ++index)
+        sectorOffset += getSectorCount(index + 1);
+    if (dos_version != 0xFF) track++;
+
+    return (int32_t) (sectorOffset + sector);
+}
+
+
 bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
 {
     uint16_t sectorOffset = 0;
@@ -1082,6 +1119,71 @@ uint16_t D64MStream::blocksFree()
 
     return free_count;
 }
+
+bool D64MStream::seek(uint32_t offset)
+{
+    // No file selected: the stream is the raw image, and MMediaStream::seek()
+    // seeking the container is exactly right.
+    if ( !seekCalled )
+        return MMediaStream::seek( offset );
+
+    if ( entry.start_track == 0 )
+        return false;
+
+    // A block carries block_size bytes, the first two of which are the link to
+    // the next block -- so 254 bytes of FILE data per block on a 1541.
+    const uint32_t data_per_block = block_size - 2;
+
+    uint8_t t = entry.start_track;
+    uint8_t s = entry.start_sector;
+    uint32_t remaining = offset;
+
+    // Walk the chain from the file's first block. Bounded by the entry's own
+    // block count where it has one, so a corrupt link cannot spin forever on
+    // the IEC task.
+    uint32_t guard = entry.blocks ? (uint32_t) entry.blocks + 2 : 10000;
+    while ( remaining >= data_per_block )
+    {
+        if ( !seekSector( t, s ) )
+            return false;
+
+        uint8_t link_track = 0, link_sector = 0;
+        readContainer( &link_track, 1 );
+        readContainer( &link_sector, 1 );
+
+        // Last block of the file: the requested offset is past its end.
+        if ( link_track == 0 )
+            return false;
+
+        t = link_track;
+        s = link_sector;
+        remaining -= data_per_block;
+
+        if ( guard-- == 0 )
+            return false;
+    }
+
+    // Land inside block t/s. Read its link first so readFile() can follow the
+    // chain from here, then position past the two link bytes plus the
+    // remainder -- sector_offset is deliberately non-zero so readFile() does
+    // NOT re-read the header it has just been handed.
+    if ( !seekSector( t, s ) )
+        return false;
+
+    readContainer( &next_track, 1 );
+    readContainer( &next_sector, 1 );
+
+    track  = t;
+    sector = s;
+    sector_offset = (uint8_t) ( 2 + remaining );   // < block_size, fits uint8_t
+
+    if ( !seekSector( t, s, sector_offset ) )
+        return false;
+
+    _position = offset;
+    return true;
+}
+
 
 uint32_t D64MStream::readFile(uint8_t *buf, uint32_t size)
 {
