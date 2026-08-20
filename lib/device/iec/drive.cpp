@@ -46,8 +46,6 @@
 #include "time_converter.h"
 
 #include "meat_media.h"
-#include "media/disk/d64.h"
-#include "media/disk/d71.h"
 #include "media/hd/partition_select.h"
 #include "media/tape/tap.h"
 #include "qrmanager.h"
