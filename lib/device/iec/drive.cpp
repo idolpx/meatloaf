@@ -992,26 +992,22 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                     return false;
                 }
 
-                // Nothing sets _size for the no-entry-selected view, and at 0
-                // eos() is true from the first byte. The container's real
-                // length comes off the raw file: MFSOwner::File(url, true)
-                // forces defaultFS, the established "give me the bytes"
-                // primitive, so the name is not extension-sniffed back into
-                // another D64MFile.
-                if( stream->size() == 0 )
-                {
-                    std::unique_ptr<MFile> raw(MFSOwner::File(m_cwd->url, true));
-                    auto raw_stream = raw ? raw->getSourceStream() : nullptr;
-                    if( raw_stream != nullptr && raw_stream->size() > 0 )
-                        stream->setSize(raw_stream->size());
-                }
-
                 m_channels[channel] = new iecChannelHandlerFile(this, stream);
                 m_channels[channel]->setName(m_cwd->url + " (direct)");
+
+                // Direct access reads ONE block at a time, so the channel
+                // starts as a window on block 0 rather than on the whole
+                // image. B-R/U1 move it; B-P addresses within it. Nothing
+                // sets _size for the no-entry view, and the window is what
+                // expresses the bound -- at 0 eos() would be true from the
+                // first byte.
+                stream->setSize(stream->block_size);
+                m_channels[channel]->setBlockWindow(0, 0, stream->block_size);
+
                 m_numOpenChannels++;
                 setStatusCode(ST_OK);
-                Debug_printv("Direct access channel[%d] on [%s] size[%lu]",
-                             channel, m_cwd->url.c_str(), (unsigned long) stream->size());
+                Debug_printv("Direct access channel[%d] on [%s] block size[%lu]",
+                             channel, m_cwd->url.c_str(), (unsigned long) stream->block_size);
                 return true;
             }
 
@@ -1438,6 +1434,99 @@ static bool dosParseUint(const std::string &s, uint32_t *out)
 }
 
 
+// Move a channel's pointer, for B-P and F-P.
+//
+//   B-P (within_block)  the pointer WITHIN the block B-R/U1 selected, 0-255.
+//                       It addresses the block, so it counts from the block's
+//                       byte 0 even when B-R left the readable window
+//                       starting at byte 1.
+//   F-P                 an absolute offset. On a direct-access channel it
+//                       re-bases the block window onto the block containing
+//                       that offset, so "one block at a time" still holds.
+bool iecDrive::positionChannel(uint32_t chan, uint32_t pos, bool within_block)
+{
+    if( chan > 15 )
+    {
+        setStatusCode(ST_SYNTAX_UNKNOWN);
+        return false;
+    }
+
+    iecChannelHandler *channel = m_channels[chan];
+    if( channel == nullptr )
+    {
+        setStatusCode(ST_FILE_NOT_OPEN);
+        return false;
+    }
+
+    // A directory channel generates its listing and has no stream.
+    auto stream = channel->getStream();
+    if( stream == nullptr )
+    {
+        setStatusCode(ST_SYNTAX_INVALID);
+        return false;
+    }
+
+    uint32_t target = pos;
+
+    if( within_block )
+    {
+        // No block selected means no origin to count from -- B-P is not a
+        // file-channel command, F-P is.
+        if( !channel->hasBlockWindow() )
+        {
+            setStatusCode(ST_SYNTAX_INVALID);
+            return false;
+        }
+
+        if( pos >= stream->block_size )
+        {
+            setStatusCode(ST_SYNTAX_UNKNOWN);
+            return false;
+        }
+
+        // Only the pointer moves; the window's end is whatever B-R/U1 set.
+        target = channel->blockBase() + pos;
+
+        if( !stream->position(target) )
+        {
+            setStatusCode(ST_SYNTAX_UNKNOWN);
+            return false;
+        }
+
+        channel->repositioned(target);
+        setStatusCode(ST_OK);
+        return true;
+    }
+
+    if( channel->hasBlockWindow() )
+    {
+        uint32_t bs   = stream->block_size;
+        uint32_t base = (target / bs) * bs;
+
+        stream->setSize(base + bs);
+        if( !stream->position(target) )
+        {
+            setStatusCode(ST_SYNTAX_UNKNOWN);
+            return false;
+        }
+
+        channel->setBlockWindow(base, target, bs);
+        setStatusCode(ST_OK);
+        return true;
+    }
+
+    if( !stream->position(target) )
+    {
+        setStatusCode(ST_SYNTAX_UNKNOWN);
+        return false;
+    }
+
+    channel->repositioned(target);
+    setStatusCode(ST_OK);
+    return true;
+}
+
+
 // Point a channel at a disk block, for B-R/B-W and U1/U2.
 //
 // There is no separate 256-byte block buffer here the way a real drive has
@@ -1487,8 +1576,37 @@ bool iecDrive::seekChannelToBlock(uint8_t channel_num, uint8_t track, uint8_t se
         return false;
     }
 
+    uint32_t base   = (uint32_t) offset;
+    uint32_t start  = base + extra;
+    uint32_t length = stream->block_size;
+
+    // B-R/B-W reserve byte 0 of the block as the count of valid bytes, so the
+    // window is that many bytes starting at byte 1. U1/U2 have no count byte
+    // and give the whole block. Reading the count costs one container read,
+    // and the seek below puts the stream back where the caller expects it.
+    if( extra > 0 )
+    {
+        if( !stream->position(base) )
+        {
+            setStatusCode(ST_ILLEGAL_TS_COMMAND, track, sector);
+            return false;
+        }
+
+        uint8_t count = 0;
+        if( stream->read(&count, 1) != 1 )
+        {
+            setStatusCode(ST_READ_NO_DATA, track, sector);
+            return false;
+        }
+        length = count;
+    }
+
+    // The window is expressed to the stream as its size: that is what stops a
+    // read at the end of the block, since the reader asks for BUFFER_SIZE.
+    stream->setSize(start + length);
+
     // position() seeks AND records where it is, which seekSector() cannot do.
-    if( !stream->position((uint32_t) offset + extra) )
+    if( !stream->position(start) )
     {
         setStatusCode(ST_ILLEGAL_TS_COMMAND, track, sector);
         return false;
@@ -1496,7 +1614,7 @@ bool iecDrive::seekChannelToBlock(uint8_t channel_num, uint8_t track, uint8_t se
 
     // The channel holds bytes read AHEAD of the stream; without this the next
     // read serves them instead of the block just seeked to.
-    channel->repositioned((uint32_t) offset + extra);
+    channel->setBlockWindow(base, start, length);
 
     setStatusCode(ST_OK);
     return true;
@@ -1662,12 +1780,6 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                     mstr::trim(command);
                     mstr::replaceAll(command, "  ", " ");
 
-                    // Parsed as 32-bit, NOT through util_tokenize_uint8():
-                    // Meatloaf treats B-P's argument as an absolute offset in
-                    // the file, and a uint8_t silently WRAPS it -- "B-P 2 300"
-                    // seeked to 44 and answered OK. A real 1541's buffer
-                    // pointer is 0-255 because its buffer is one 256-byte
-                    // sector; here there is no such limit.
                     std::vector<std::string> pt = util_tokenize(command, ' ');
                     uint32_t chan = 0, pos = 0;
                     if ( pt.size() < 2 || !dosParseUint(pt[0], &chan) || !dosParseUint(pt[1], &pos) )
@@ -1676,42 +1788,10 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                         return;
                     }
 
-                    // m_channels has 16 entries; an unchecked index read past
-                    // the end of the object.
-                    if ( chan > 15 )
-                    {
-                        setStatusCode(ST_SYNTAX_UNKNOWN);
-                        return;
-                    }
-                    Debug_printv("command[%s] channel[%lu] position[%lu]", command.c_str(),
+                    Debug_printv("B-P channel[%lu] position-in-block[%lu]",
                                  (unsigned long) chan, (unsigned long) pos);
 
-                    auto channel = m_channels[chan];
-                    if ( channel == nullptr )
-                    {
-                        setStatusCode(ST_FILE_NOT_OPEN);
-                        return;
-                    }
-
-                    // A directory channel generates its listing and has no
-                    // stream, so there is nothing to reposition.
-                    auto stream = channel->getStream();
-                    if ( stream == nullptr )
-                    {
-                        setStatusCode(ST_SYNTAX_INVALID);
-                        return;
-                    }
-
-                    if ( !stream->position( pos ) )
-                    {
-                        setStatusCode(ST_SYNTAX_UNKNOWN);
-                        return;
-                    }
-
-                    // The seek alone is not enough: the channel still holds up
-                    // to BUFFER_SIZE bytes read AHEAD of it, and read() serves
-                    // those first.
-                    channel->repositioned( pos );
+                    positionChannel( chan, pos, true );
                     return;
                 }
                 // B-R read block / B-W write block
@@ -1741,11 +1821,15 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                 else if (command[2] == 'A')
                 {
                     Debug_printv( "allocate bit in BAM");
+                    // Checks to see if the specified track/sector is free, and if so marks it as allocated in the BAM. 
+                    // If the block is already allocated then a "65 NO BLOCK" error is returned.
                 }
                 // B-F free block in BAM
                 else if (command[2] == 'F')
                 {
                     Debug_printv( "free bit in BAM");
+                    // Frees the specified track/sector in the BAM. It doesn't care if it's already free or not,
+                    // it just marks it as free.
                 }
                 // B-E block execute
                 else if (command[2] == 'E')
@@ -1777,12 +1861,9 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                     mstr::trim(command);
                     mstr::replaceAll(command, "  ", " ");
 
-                    // Parsed as 32-bit, NOT through util_tokenize_uint8():
-                    // Meatloaf treats B-P's argument as an absolute offset in
-                    // the file, and a uint8_t silently WRAPS it -- "B-P 2 300"
-                    // seeked to 44 and answered OK. A real 1541's buffer
-                    // pointer is 0-255 because its buffer is one 256-byte
-                    // sector; here there is no such limit.
+                    // Parsed as 32-bit, not through util_tokenize_uint8():
+                    // F-P's argument is an absolute offset in the file and a
+                    // uint8_t silently WRAPS it -- 300 became 44, answering OK.
                     std::vector<std::string> pt = util_tokenize(command, ' ');
                     uint32_t chan = 0, pos = 0;
                     if ( pt.size() < 2 || !dosParseUint(pt[0], &chan) || !dosParseUint(pt[1], &pos) )
@@ -1791,45 +1872,16 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                         return;
                     }
 
-                    // m_channels has 16 entries; an unchecked index read past
-                    // the end of the object.
-                    if ( chan > 15 )
-                    {
-                        setStatusCode(ST_SYNTAX_UNKNOWN);
-                        return;
-                    }
-                    Debug_printv("command[%s] channel[%lu] position[%lu]", command.c_str(),
+                    Debug_printv("F-P channel[%lu] position[%lu]",
                                  (unsigned long) chan, (unsigned long) pos);
 
-                    auto channel = m_channels[chan];
-                    if ( channel == nullptr )
-                    {
-                        setStatusCode(ST_FILE_NOT_OPEN);
-                        return;
-                    }
-
-                    // A directory channel generates its listing and has no
-                    // stream, so there is nothing to reposition.
-                    auto stream = channel->getStream();
-                    if ( stream == nullptr )
-                    {
-                        setStatusCode(ST_SYNTAX_INVALID);
-                        return;
-                    }
-
-                    if ( !stream->position( pos ) )
-                    {
-                        setStatusCode(ST_SYNTAX_UNKNOWN);
-                        return;
-                    }
-
-                    // The seek alone is not enough: the channel still holds up
-                    // to BUFFER_SIZE bytes read AHEAD of it, and read() serves
-                    // those first.
-                    channel->repositioned( pos );
+                    positionChannel( chan, pos, false );
                     return;
                 }
             }
+            // Without this an unmatched F-* falls straight into 'I' and
+            // resets the drive.
+        break;
         case 'I':
             // Initialize
             Debug_printv( "initialize");
@@ -2598,6 +2650,19 @@ std::vector<iecDrive::ChannelInfo> iecDrive::consoleChannels()
         {
             info.has_stream = true;
             info.size       = stream->size();
+        }
+
+        // A direct-access channel is a window on one block: report the block's
+        // readable length and the pointer WITHIN it, which is what B-P speaks.
+        // Reporting the stream's size there would show the window's end offset
+        // in the image, which is not a size at all.
+        if( handler->hasBlockWindow() )
+        {
+            info.has_stream = true;
+            info.size       = handler->blockLength();
+            info.position   = handler->position() >= handler->blockBase()
+                                ? handler->position() - handler->blockBase()
+                                : 0;
         }
 
         open_channels.push_back(info);

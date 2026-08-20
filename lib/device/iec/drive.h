@@ -110,6 +110,27 @@ public:
     m_position = position;
   }
 
+  // A direct-access ("#") channel is a window on ONE block at a time, not on
+  // the whole image: B-R/U1 select the block and a read runs to the end of it.
+  //
+  //   base    where the block starts. B-P counts from HERE, not from the
+  //           readable start, because it addresses the block.
+  //   start   where reading begins -- the block start for U1/U2, one byte
+  //           later for B-R/B-W, which reserve byte 0 as the count.
+  //   len     how many bytes are readable: 256 for U1, and for B-R whatever
+  //           that count byte says.
+  void setBlockWindow(uint32_t base, uint32_t start, uint32_t len)
+  {
+    m_block_base = base;
+    m_block_len  = len;
+    m_has_block  = true;
+    repositioned(start);
+  }
+
+  bool     hasBlockWindow() const { return m_has_block; }
+  uint32_t blockBase()      const { return m_block_base; }
+  uint32_t blockLength()    const { return m_block_len; }
+
   bool m_eos = false;
 
 protected:
@@ -117,6 +138,9 @@ protected:
   uint8_t  *m_data;
   size_t    m_len, m_ptr;
   size_t    m_position = 0;
+  uint32_t  m_block_base = 0;
+  uint32_t  m_block_len = 0;
+  bool      m_has_block = false;
   std::string m_name;
 };
 
@@ -288,6 +312,9 @@ protected:
   // on the definition for why a block command is a seek here.
   bool seekChannelToBlock(uint8_t channel_num, uint8_t track, uint8_t sector,
                           uint8_t extra, bool for_write);
+
+  // B-P (within_block: relative to the selected block) and F-P (absolute).
+  bool positionChannel(uint32_t chan, uint32_t pos, bool within_block);
 
   void set_cwd(std::string path, bool verified = false);
   void changePartition(int pnum);   // CMD "CP<n>" on a mounted DHD/D1M/D2M/D4M image
