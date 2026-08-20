@@ -995,12 +995,26 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                 m_channels[channel] = new iecChannelHandlerFile(this, stream);
                 m_channels[channel]->setName(m_cwd->url + " (direct)");
 
+                // Nothing sets _size for the no-entry view, so the container's
+                // real length is taken off the raw file -- MFSOwner::File(url,
+                // true) forces defaultFS, the established "give me the bytes"
+                // primitive, so the name is not extension-sniffed back into
+                // another D64MFile. Remembered on the channel because the block
+                // window below overwrites the stream's size, and F-P has to be
+                // able to put it back.
+                uint32_t full_size = 0;
+                {
+                    std::unique_ptr<MFile> raw(MFSOwner::File(m_cwd->url, true));
+                    auto raw_stream = raw ? raw->getSourceStream() : nullptr;
+                    if( raw_stream != nullptr )
+                        full_size = raw_stream->size();
+                }
+                m_channels[channel]->setFullSize(full_size);
+
                 // Direct access reads ONE block at a time, so the channel
                 // starts as a window on block 0 rather than on the whole
-                // image. B-R/U1 move it; B-P addresses within it. Nothing
-                // sets _size for the no-entry view, and the window is what
-                // expresses the bound -- at 0 eos() would be true from the
-                // first byte.
+                // image. B-R/U1 move it, B-P addresses within it, F-P leaves
+                // block mode entirely.
                 stream->setSize(stream->block_size);
                 m_channels[channel]->setBlockWindow(0, 0, stream->block_size);
 
@@ -1498,21 +1512,16 @@ bool iecDrive::positionChannel(uint32_t chan, uint32_t pos, bool within_block)
         return true;
     }
 
+    // F-P seeks anywhere in the file or container, so on a direct-access
+    // channel it LEAVES block mode and restores the container's full extent --
+    // otherwise the block window would stop the read 256 bytes later. B-R/U1
+    // put the channel back into block mode.
     if( channel->hasBlockWindow() )
     {
-        uint32_t bs   = stream->block_size;
-        uint32_t base = (target / bs) * bs;
+        if( channel->fullSize() > 0 )
+            stream->setSize(channel->fullSize());
 
-        stream->setSize(base + bs);
-        if( !stream->position(target) )
-        {
-            setStatusCode(ST_SYNTAX_UNKNOWN);
-            return false;
-        }
-
-        channel->setBlockWindow(base, target, bs);
-        setStatusCode(ST_OK);
-        return true;
+        channel->clearBlockWindow();
     }
 
     if( !stream->position(target) )

@@ -127,6 +127,17 @@ public:
     repositioned(start);
   }
 
+  // F-P leaves block mode: the whole container becomes readable from the
+  // target, so a direct-access channel can be read end to end. B-R/U1 put it
+  // back by selecting a block again.
+  void clearBlockWindow() { m_has_block = false; }
+
+  // Extent of the underlying stream, remembered at open because the block
+  // window overwrites the stream's size and leaving block mode has to put it
+  // back. 0 when unknown.
+  void     setFullSize(uint32_t size) { m_full_size = size; }
+  uint32_t fullSize() const { return m_full_size; }
+
   bool     hasBlockWindow() const { return m_has_block; }
   uint32_t blockBase()      const { return m_block_base; }
   uint32_t blockLength()    const { return m_block_len; }
@@ -140,6 +151,7 @@ protected:
   size_t    m_position = 0;
   uint32_t  m_block_base = 0;
   uint32_t  m_block_len = 0;
+  uint32_t  m_full_size = 0;
   bool      m_has_block = false;
   std::string m_name;
 };
