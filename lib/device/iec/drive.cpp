@@ -2312,6 +2312,12 @@ std::string iecDrive::consoleExecDos(const std::string &command, bool *isError)
     // answers FujiNet commands by filling the status buffer directly.
     executeData((const uint8_t *) command.data(), (uint8_t) std::min<size_t>(command.size(), 255));
 
+    return consoleStatus(isError);
+}
+
+
+std::string iecDrive::consoleStatus(bool *isError)
+{
     // Sample the error state before consuming the status - getStatusData()
     // resets the code to OK, just as a channel-15 read does.
     if (isError != nullptr)
@@ -2339,6 +2345,41 @@ std::string iecDrive::consoleExecDos(const std::string &command, bool *isError)
         status.pop_back();
 
     return status;
+}
+
+
+bool iecDrive::consoleOpen(uint8_t channel, const std::string &name)
+{
+    // open() is virtual, so device 30 reaches iecMeatloaf's override.  The
+    // length is a uint8_t on the bus too, so a longer name is not a case the
+    // drive could ever see from a C64.
+    return open(channel, name.c_str(), (uint8_t) std::min<size_t>(name.size(), 255));
+}
+
+
+uint8_t iecDrive::consoleRead(uint8_t channel, uint8_t *buffer, uint8_t bufferSize)
+{
+    // The non-VDrive path never writes eoi - end of file is a return of 0 -
+    // but read() takes the pointer, so give it somewhere real to write.
+    bool eoi = false;
+    return read(channel, buffer, bufferSize, &eoi);
+}
+
+
+uint8_t iecDrive::consoleWrite(uint8_t channel, const uint8_t *buffer, uint8_t bufferSize, bool eoi)
+{
+    // write() takes a non-const pointer because the bus handler hands it its
+    // own receive buffer; nothing in the path modifies it.
+    return write(channel, const_cast<uint8_t *>(buffer), bufferSize, eoi);
+}
+
+
+void iecDrive::consoleClose(uint8_t channel)
+{
+    // close() is a no-op for a channel that is not open, on both the VDrive
+    // and the MStream path, so the console's "close everything" can simply
+    // sweep 0-15 rather than needing a per-channel query VDrive does not have.
+    close(channel);
 }
 
 

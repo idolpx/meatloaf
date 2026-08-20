@@ -153,6 +153,26 @@ public:
   // would.  *isError (when given) reports the status before it is consumed.
   std::string consoleExecDos(const std::string &command, bool *isError = nullptr);
 
+  // Console "open"/"read"/"write"/"close" support: drive the FILE channels the
+  // way a C64 does, so a read or a write inside any mounted media can be
+  // exercised without a Commodore attached.  `channel` is the secondary
+  // address, exactly as in OPEN <lfn>,<dev>,<sa>,"<name>".
+  //
+  // These call the protected virtuals, so device 30 still reaches
+  // iecMeatloaf's overrides.  They are the only console-facing surface --
+  // open()/read()/write()/close() stay protected.
+  bool    consoleOpen(uint8_t channel, const std::string &name);
+  uint8_t consoleRead(uint8_t channel, uint8_t *buffer, uint8_t bufferSize);
+  uint8_t consoleWrite(uint8_t channel, const uint8_t *buffer, uint8_t bufferSize, bool eoi);
+  void    consoleClose(uint8_t channel);
+
+  // Read the status the way the bus master would, consuming it: a reply
+  // already pushed into the status buffer wins, and only an empty buffer falls
+  // through to getStatusData().  *isError (when given) reports the state
+  // BEFORE it is consumed -- getStatusData() resets the code to OK, just as a
+  // channel-15 read does, so sampling afterwards always reads false.
+  std::string consoleStatus(bool *isError = nullptr);
+
   uint8_t getStatusCode() { return m_statusCode; }
   void    setStatusCode(uint8_t code, uint8_t trk = 0, uint8_t sec = 0);
   // Overrides the canned getStatus() text.  For failures whose reason the

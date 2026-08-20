@@ -6,6 +6,9 @@
 #include "../Helpers/PWDHelpers.h"
 #include "../../www/ws/activity.h"
 #include "../../device/iec/meatloaf.h"
+#include "../console_cancel.h"
+#include "../dos_encode.h"
+#include "../dos_transfer.h"
 #include "string_utils.h"
 
 #include <algorithm>
@@ -289,80 +292,32 @@ static int use(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
-// Encode a console-typed DOS command the way the C64 would put it on the wire.
-//
-// Text is PETSCII encoded and nothing else.  mstr::toPETSCII2() maps LOWERCASE
-// ASCII onto $41-$5A, which is exactly what an unshifted C64 sends and what
-// executeData() dispatches on ("CD", "N0", "T-Z") -- so TYPE THE COMMAND IN
-// LOWERCASE, as you would at the READY prompt, and the translation makes it
-// the right case on the wire.
-//
-// Nothing is case-folded here, and that is deliberate: commands and their
-// parameters can be mixed case, and lowercasing the line to make the VERB
-// match would corrupt every filename and path in it.  One encoding, no hidden
-// transforms.
-//
-// Uppercase input is therefore not equivalent -- it maps to the SHIFTED range
-// (measured: "M-R" -> CD 2D D2, "I0:" -> C9 30 3A), valid PETSCII that matches
-// no command.  It is not a silent trap: executeData() falls through to
-// ST_SYNTAX_INVALID, so "exec M-R" answers "31,INVALID COMMAND".
-//
-// Binary bytes -- M-R/M-W/B-P carry addresses and data that are not text at
-// all -- are written as "0x" followed by an even number of hex digits, and
-// pass through verbatim, unconverted.  ONE "0x" introduces a RUN of bytes:
-// "0x000009" is three bytes 00 00 09, not one byte followed by the text
-// "0009".  The per-byte form still works, so "0x000x030x01" is the same three
-// bytes as "0x000301" -- the run stops at the 'x', which is not a hex digit.
-//
-// The ambiguity this accepts, deliberately: a hex escape immediately followed
-// by text whose first two characters are hex digits will swallow them
-// ("0x00cd" is two bytes 00 CD, not one byte then "cd").  That is tolerable
-// because every command carrying binary -- M-R, M-W, M-E, B-P -- is all
-// binary after the verb.  Put the text before the escape, or split the run
-// with a space, when it matters.
-//
-// A trailing odd hex digit is left as text rather than guessed at.
-static std::string encodeDosCommand(const std::string &line)
+// Offset/hex/ASCII dump. `base` is where these bytes sit in the whole
+// transfer, so "read" can dump each chunk as it arrives without accumulating
+// the file - the offset column stays continuous across calls.
+static void printBytes(const uint8_t *data, size_t size, size_t base)
 {
-    std::string out;
-    std::string text;   // pending text, converted on the next flush
-
-    auto flushText = [&out, &text]()
+    for (size_t offset = 0; offset < size; offset += 16)
     {
-        if (text.empty())
-            return;
-        out += mstr::toPETSCII2(text);
-        text.clear();
-    };
+        size_t len = std::min<size_t>(16, size - offset);
 
-    // Rejoin the tokens the console split on whitespace.
-    for (size_t i = 0; i < line.size(); )
-    {
-        // Hex bytes are written verbatim -- one "0x" introduces a run of them.
-        if (i + 4 <= line.size() && line[i] == '0' && (line[i + 1] == 'x' || line[i + 1] == 'X') &&
-            isxdigit(static_cast<unsigned char>(line[i + 2])) &&
-            isxdigit(static_cast<unsigned char>(line[i + 3])))
+        Serial.printf("%04X: ", static_cast<unsigned>(base + offset));
+        for (size_t i = 0; i < 16; i++)
         {
-            flushText();
-            size_t j = i + 2;
-            while (j + 2 <= line.size() &&
-                   isxdigit(static_cast<unsigned char>(line[j])) &&
-                   isxdigit(static_cast<unsigned char>(line[j + 1])))
-            {
-                char hex[3] = { line[j], line[j + 1], '\0' };
-                out += static_cast<char>(strtol(hex, nullptr, 16));
-                j += 2;
-            }
-            i = j;
+            if (i < len)
+                Serial.printf("%02X ", data[offset + i]);
+            else
+                Serial.printf("   ");
         }
-        else
+
+        Serial.printf(" ");
+        for (size_t i = 0; i < len; i++)
         {
-            text += line[i++];
+            uint8_t c = data[offset + i];
+            Serial.printf("%c", (c >= 0x20 && c <= 0x7E) ? c : '.');
         }
+        Serial.printf("\r\n");
     }
-    flushText();
-
-    return out;
 }
 
 // Render a status line. M-R and friends answer with raw drive memory, so
@@ -380,32 +335,9 @@ static void printStatus(const std::string &status)
     }
 
     if (printable)
-    {
         Serial.printf("%s\r\n", status.c_str());
-        return;
-    }
-
-    for (size_t offset = 0; offset < status.size(); offset += 16)
-    {
-        size_t len = std::min<size_t>(16, status.size() - offset);
-
-        Serial.printf("%04X: ", static_cast<unsigned>(offset));
-        for (size_t i = 0; i < 16; i++)
-        {
-            if (i < len)
-                Serial.printf("%02X ", static_cast<unsigned char>(status[offset + i]));
-            else
-                Serial.printf("   ");
-        }
-
-        Serial.printf(" ");
-        for (size_t i = 0; i < len; i++)
-        {
-            unsigned char c = static_cast<unsigned char>(status[offset + i]);
-            Serial.printf("%c", (c >= 0x20 && c <= 0x7E) ? c : '.');
-        }
-        Serial.printf("\r\n");
-    }
+    else
+        printBytes(reinterpret_cast<const uint8_t *>(status.data()), status.size(), 0);
 }
 
 static int execDos(int argc, char **argv)
@@ -430,14 +362,11 @@ static int execDos(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    // The C64 owns the drive while it has channels open; stepping in from the
-    // console task would race the IEC bus task over the same drive state.
-    if (drive->getNumOpenChannels() > 0)
-    {
-        Serial.printf("Device #%u is busy (%u open channel(s)).\r\n",
-                      s_use_device, drive->getNumOpenChannels());
-        return EXIT_FAILURE;
-    }
+    // No busy check: the console's own "open" leaves channels open, and being
+    // able to read the status mid-transfer is most of the point of simulating
+    // the C64.  The cost is real and accepted -- if a C64 is mid-transfer on
+    // this drive, the console task can step on the IEC task -- and it is the
+    // same exposure "mount" and "partition" already carry.
 
     // Rejoin the tokens the console split on whitespace.
     std::string line;
@@ -447,7 +376,7 @@ static int execDos(int argc, char **argv)
         line += argv[i];
     }
 
-    std::string command = encodeDosCommand(line);
+    std::string command = ESP32Console::encodeDosCommand(line);
     if (command.size() > 255)
         command.resize(255);
 
@@ -500,6 +429,224 @@ int disable(int argc, char **argv)
 }
 
 
+// ------------------------------------------------ file channels: open/read/
+//                                                   write/close
+//
+// These drive the selected device's FILE channels the way a C64 does, so a
+// read or a write inside any mounted media can be exercised without a
+// Commodore attached.  The channel number IS the secondary address, exactly as
+// in OPEN <lfn>,<dev>,<sa>,"<name>" -- 0 loads, 1 saves, 2-14 are data
+// channels and 15 is the command channel.
+
+// Parse a channel argument, rejecting anything a secondary address cannot be.
+static bool parseChannel(const char *arg, uint8_t *out)
+{
+    char *end = nullptr;
+    long value = strtol(arg, &end, 10);
+    if (end == arg || *end != '\0' || value < 0 || value > 15)
+        return false;
+
+    *out = (uint8_t) value;
+    return true;
+}
+
+// Rejoin the tokens the console split on whitespace, so spacing reaches the
+// drive exactly as typed.
+static std::string joinArgs(int argc, char **argv, int from)
+{
+    std::string line;
+    for (int i = from; i < argc; i++)
+    {
+        if (i > from) line += ' ';
+        line += argv[i];
+    }
+    return line;
+}
+
+// Print the status the drive is left holding, and report whether it is an error.
+static int reportStatus(iecDrive *drive)
+{
+    bool isError = false;
+    printStatus(drive->consoleStatus(&isError));
+    return isError ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
+static int openChannel(int argc, char **argv)
+{
+    iecDrive *drive = selectedDrive();
+    if (drive == nullptr)
+    {
+        Serial.printf("No device selected. Run \"use {device id}\" first.\r\n");
+        return EXIT_FAILURE;
+    }
+
+    uint8_t channel = 0;
+    if (argc < 3 || !parseChannel(argv[1], &channel))
+    {
+        Serial.printf("Usage: open {channel 0-15} {filename}\r\n");
+        Serial.printf("       channel is the secondary address: 0 load, 1 save,\r\n");
+        Serial.printf("       2-14 data, 15 command.  Type lowercase (PETSCII).\r\n");
+        Serial.printf("       e.g. open 0 $            open 2 \"data,s,r\"\r\n");
+        Serial.printf("            open 1 @:notes.seq  open 15 i0:\r\n");
+        return EXIT_FAILURE;
+    }
+
+    std::string name = ESP32Console::encodeDosCommand(joinArgs(argc, argv, 2));
+
+    // Opening 15 with a name RUNS that command on a real C64 -- that is what
+    // OPEN 15,8,15,"I0" does -- so route it where "exec" goes rather than
+    // handing a command string to the file-open path.
+    if (channel == 15)
+    {
+        bool isError = false;
+        printStatus(drive->consoleExecDos(name, &isError));
+        return isError ? EXIT_FAILURE : EXIT_SUCCESS;
+    }
+
+    drive->consoleOpen(channel, name);
+
+    // The open's own return is not the answer: a lazy stream reports failure
+    // through the status channel, which is what the C64 reads too.
+    return reportStatus(drive);
+}
+
+static int readChannel(int argc, char **argv)
+{
+    iecDrive *drive = selectedDrive();
+    if (drive == nullptr)
+    {
+        Serial.printf("No device selected. Run \"use {device id}\" first.\r\n");
+        return EXIT_FAILURE;
+    }
+
+    uint8_t channel = 0;
+    if (argc < 2 || !parseChannel(argv[1], &channel))
+    {
+        Serial.printf("Usage: read {channel 0-15} [byte count]\r\n");
+        Serial.printf("       reads to end of file when no count is given.\r\n");
+        Serial.printf("       press ESC to cancel.\r\n");
+        return EXIT_FAILURE;
+    }
+
+    size_t limit = 0;   // 0 = to end of file
+    if (argc > 2)
+    {
+        char *end = nullptr;
+        long value = strtol(argv[2], &end, 10);
+        if (end == argv[2] || *end != '\0' || value < 0)
+        {
+            Serial.printf("Invalid byte count: %s\r\n", argv[2]);
+            return EXIT_FAILURE;
+        }
+        limit = (size_t) value;
+    }
+
+    ESP32Console::cancel_begin();
+
+    bool cancelled = false;
+    size_t total = ESP32Console::dos_read_loop(
+        limit,
+        [drive, channel](uint8_t *buf, uint8_t len) {
+            return drive->consoleRead(channel, buf, len);
+        },
+        [](const uint8_t *buf, size_t len, size_t offset) {
+            printBytes(buf, len, offset);
+        },
+        [] { return ESP32Console::cancel_requested(); },
+        &cancelled);
+
+    if (cancelled)
+        Serial.printf("cancelled after %u bytes\r\n", (unsigned) total);
+    else
+        Serial.printf("%u bytes\r\n", (unsigned) total);
+
+    // A read of 0 on the FIRST call is the device's error signal, not an empty
+    // file, and the reason is on the status channel (62, FILE NOT FOUND).
+    return reportStatus(drive);
+}
+
+static int writeChannel(int argc, char **argv)
+{
+    iecDrive *drive = selectedDrive();
+    if (drive == nullptr)
+    {
+        Serial.printf("No device selected. Run \"use {device id}\" first.\r\n");
+        return EXIT_FAILURE;
+    }
+
+    uint8_t channel = 0;
+    if (argc < 3 || !parseChannel(argv[1], &channel))
+    {
+        Serial.printf("Usage: write {channel 0-15} {data}\r\n");
+        Serial.printf("       type lowercase (PETSCII); binary bytes are written 0xNN,\r\n");
+        Serial.printf("       and one 0x may carry a run: 0x000009 == 0x000x000x09\r\n");
+        return EXIT_FAILURE;
+    }
+
+    std::string data = ESP32Console::encodeDosCommand(joinArgs(argc, argv, 2));
+
+    ESP32Console::cancel_begin();
+
+    bool cancelled = false;
+    size_t total = ESP32Console::dos_write_loop(
+        reinterpret_cast<const uint8_t *>(data.data()), data.size(),
+        [drive, channel](const uint8_t *buf, uint8_t len, bool eoi) {
+            return drive->consoleWrite(channel, buf, len, eoi);
+        },
+        [] { return ESP32Console::cancel_requested(); },
+        &cancelled);
+
+    if (cancelled)
+        Serial.printf("cancelled after %u of %u bytes\r\n",
+                      (unsigned) total, (unsigned) data.size());
+    else if (total < data.size())
+        Serial.printf("%u of %u bytes accepted\r\n",
+                      (unsigned) total, (unsigned) data.size());
+    else
+        Serial.printf("%u bytes\r\n", (unsigned) total);
+
+    return reportStatus(drive);
+}
+
+static int closeChannel(int argc, char **argv)
+{
+    iecDrive *drive = selectedDrive();
+    if (drive == nullptr)
+    {
+        Serial.printf("No device selected. Run \"use {device id}\" first.\r\n");
+        return EXIT_FAILURE;
+    }
+
+    uint8_t before = drive->getNumOpenChannels();
+
+    if (argc < 2)
+    {
+        // Sweep every channel: close() is a no-op on one that is not open, so
+        // this needs no per-channel query.
+        for (uint8_t channel = 0; channel <= 15; channel++)
+            drive->consoleClose(channel);
+    }
+    else
+    {
+        uint8_t channel = 0;
+        if (!parseChannel(argv[1], &channel))
+        {
+            Serial.printf("Usage: close [channel 0-15]   (no channel closes all)\r\n");
+            return EXIT_FAILURE;
+        }
+        drive->consoleClose(channel);
+    }
+
+    Serial.printf("%u channel(s) closed, %u open\r\n",
+                  (unsigned)(before - drive->getNumOpenChannels()),
+                  (unsigned) drive->getNumOpenChannels());
+
+    // A write error surfaces HERE - iecChannelHandlerFile's destructor maps
+    // the stream's error onto the drive status when the channel is closed.
+    return reportStatus(drive);
+}
+
+
 namespace ESP32Console::Commands
 {
     const ConsoleCommand getIECCommand()
@@ -524,5 +671,25 @@ namespace ESP32Console::Commands
     {
         return ConsoleCommand("exec", &execDos,
             "Send a DOS command to the selected device (type lowercase; write binary bytes as 0xNN, one 0x may carry a run). Usage: exec {DOS command}");
+    }
+    const ConsoleCommand getOpenCommand()
+    {
+        return ConsoleCommand("open", &openChannel,
+            "Open a file on a channel of the selected device. Usage: open {channel 0-15} {filename}");
+    }
+    const ConsoleCommand getReadCommand()
+    {
+        return ConsoleCommand("read", &readChannel,
+            "Read a channel of the selected device to end of file (ESC cancels). Usage: read {channel} [byte count]");
+    }
+    const ConsoleCommand getWriteCommand()
+    {
+        return ConsoleCommand("write", &writeChannel,
+            "Write data to a channel of the selected device. Usage: write {channel} {data}");
+    }
+    const ConsoleCommand getCloseCommand()
+    {
+        return ConsoleCommand("close", &closeChannel,
+            "Close a channel of the selected device, or all channels. Usage: close [channel]");
     }
 }

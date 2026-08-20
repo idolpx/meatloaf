@@ -42,6 +42,15 @@ public:
 
     static void send(std::string data);
     static void disconnect();
+
+    // Non-blocking check for ESC (0x1B) from the connected client, so a long
+    // console command can be cancelled over TCP the way it can over serial.
+    //
+    // Safe to call from the console executor task, and ONLY from there: while a
+    // command runs, session_task() is blocked inside console.execute() and is
+    // not reading the socket, so there is no second reader to race. Bytes that
+    // are not ESC are discarded -- see console_cancel.h.
+    static bool pollCancel();
 };
 
 extern TCPServer tcp_server;
