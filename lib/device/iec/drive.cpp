@@ -1044,6 +1044,7 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                                 }
 
                                 m_channels[channel] = new iecChannelHandlerDir(this, f);
+                                m_channels[channel]->setName(f->fullUrl());
                                 m_numOpenChannels++;
                                 Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! channel[%d] numChannels[%d] dir[%s]", channel, m_numOpenChannels, f->url.c_str());
                                 //m_cwd.reset(MFSOwner::File(f->url));
@@ -1145,6 +1146,9 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                             Debug_printv("Stream created for file [%s] pathInStream[%s]", f->url.c_str(), f->pathInStream.c_str());
                             // new_stream will be deleted in iecChannelHandlerFile destructor
                             m_channels[channel] = new iecChannelHandlerFile(this, new_stream, is_dir ? 0x0801 : -1); // 0x0801 = overrides load address to start of basic for C64
+                            // fullUrl(), not url: for a file inside a container url
+                            // names the CONTAINER, and the entry is in pathInStream.
+                            m_channels[channel]->setName(f->fullUrl());
                             m_numOpenChannels++;
                             setStatusCode(ST_OK);
 
@@ -2345,6 +2349,46 @@ std::string iecDrive::consoleStatus(bool *isError)
         status.pop_back();
 
     return status;
+}
+
+
+std::vector<iecDrive::ChannelInfo> iecDrive::consoleChannels()
+{
+    std::vector<ChannelInfo> open_channels;
+
+    // VDrive keeps its own channel table and offers no per-channel query, so
+    // there is nothing to walk in that mode.  The caller compares the row
+    // count against getNumOpenChannels() so the gap is visible rather than
+    // silently reported as "no channels open".
+    if( Meatloaf.use_vdrive && m_vdrive!=nullptr )
+        return open_channels;
+
+    for(uint8_t channel = 0; channel <= 15; channel++)
+    {
+        iecChannelHandler *handler = m_channels[channel];
+        if( handler==nullptr ) continue;
+
+        ChannelInfo info;
+        info.channel    = channel;
+        info.name       = handler->name();
+        info.has_stream = false;
+        info.size       = 0;
+        info.position   = 0;
+
+        // A directory channel generates its listing rather than reading one,
+        // so it has no stream and neither figure exists for it.
+        auto stream = handler->getStream();
+        if( stream != nullptr )
+        {
+            info.has_stream = true;
+            info.size       = stream->size();
+            info.position   = stream->position();
+        }
+
+        open_channels.push_back(info);
+    }
+
+    return open_channels;
 }
 
 

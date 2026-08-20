@@ -636,6 +636,50 @@ static int writeChannel(int argc, char **argv)
     return reportStatus(drive);
 }
 
+static int listChannels(int argc, char **argv)
+{
+    iecDrive *drive = selectedDrive();
+    if (drive == nullptr)
+    {
+        Serial.printf("No device selected. Run \"use {device id}\" first.\r\n");
+        return EXIT_FAILURE;
+    }
+
+    std::vector<iecDrive::ChannelInfo> open_channels = drive->consoleChannels();
+    unsigned reported = drive->getNumOpenChannels();
+
+    if (open_channels.empty())
+    {
+        // A non-zero count with no rows means VDrive owns the channels; say so
+        // rather than claiming the drive is idle.
+        if (reported > 0)
+            Serial.printf("%u channel(s) open, not listable (VDrive owns them).\r\n", reported);
+        else
+            Serial.printf("No open channels on device #%u.\r\n", (unsigned) drive->id());
+        return EXIT_SUCCESS;
+    }
+
+    Serial.printf("CH        SIZE         POS  NAME\r\n");
+    for (const auto &info : open_channels)
+    {
+        if (info.has_stream)
+            Serial.printf("%2u  %10u  %10u  %s\r\n",
+                          (unsigned) info.channel, (unsigned) info.size,
+                          (unsigned) info.position, info.name.c_str());
+        else
+            // A directory listing is generated, not read: no stream, so
+            // neither figure exists. Printing 0 would read as an empty file.
+            Serial.printf("%2u  %10s  %10s  %s\r\n",
+                          (unsigned) info.channel, "-", "-", info.name.c_str());
+    }
+
+    if (reported != open_channels.size())
+        Serial.printf("(drive reports %u open, listed %u)\r\n",
+                      reported, (unsigned) open_channels.size());
+
+    return EXIT_SUCCESS;
+}
+
 static int closeChannel(int argc, char **argv)
 {
     iecDrive *drive = selectedDrive();
@@ -714,6 +758,11 @@ namespace ESP32Console::Commands
     {
         return ConsoleCommand("write", &writeChannel,
             "Write data to a channel of the selected device. Usage: write {channel} {data}");
+    }
+    const ConsoleCommand getChannelsCommand()
+    {
+        return ConsoleCommand("channels", &listChannels,
+            "List the open channels on the selected device (number, size, position, name). Usage: channels");
     }
     const ConsoleCommand getCloseCommand()
     {

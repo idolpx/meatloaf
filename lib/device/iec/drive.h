@@ -24,6 +24,7 @@
 #include <string>
 #include <cstring>
 #include <unordered_map>
+#include <vector>
 #include <esp_rom_crc.h>
 #include <esp_heap_caps.h>
 
@@ -69,12 +70,20 @@ public:
   virtual uint8_t readBufferData()  = 0;
   virtual std::shared_ptr<MStream> getStream() { return nullptr; };
 
+  // What this channel has open, for the console "channels" listing.  Set by
+  // iecDrive::open() from the MFile's fullUrl(), because the stream cannot
+  // answer it: MStream carries only `url`, which for anything inside a
+  // container is the CONTAINER's path, not the file's.
+  void setName(const std::string &name) { m_name = name; }
+  const std::string &name() const { return m_name; }
+
   bool m_eos = false;
 
 protected:
   iecDrive *m_drive;
   uint8_t  *m_data;
   size_t    m_len, m_ptr;
+  std::string m_name;
 };
 
 
@@ -161,6 +170,19 @@ public:
   // These call the protected virtuals, so device 30 still reaches
   // iecMeatloaf's overrides.  They are the only console-facing surface --
   // open()/read()/write()/close() stay protected.
+  // One row of the console "channels" listing.  A directory channel has no
+  // stream (the listing is generated, not read), so size and position are not
+  // knowable for it -- has_stream says which.
+  struct ChannelInfo
+  {
+    uint8_t     channel;
+    std::string name;
+    bool        has_stream;
+    uint32_t    size;
+    uint32_t    position;
+  };
+  std::vector<ChannelInfo> consoleChannels();
+
   bool    consoleOpen(uint8_t channel, const std::string &name);
   uint8_t consoleRead(uint8_t channel, uint8_t *buffer, uint8_t bufferSize);
   uint8_t consoleWrite(uint8_t channel, const uint8_t *buffer, uint8_t bufferSize, bool eoi);

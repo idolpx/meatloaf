@@ -25,6 +25,8 @@ namespace ESP32Console::Commands
     const ConsoleCommand getWriteCommand();
 
     const ConsoleCommand getCloseCommand();
+
+    const ConsoleCommand getChannelsCommand();
 }
 
 namespace ESP32Console
