@@ -4247,39 +4247,39 @@ void IECBusHandler::task()
   // ------------------ transmitting data -------------------
 
   if( (m_flags & (P_ATN|P_TALKING|P_DONE))==P_TALKING && (m_currentDevice!=NULL) )
-   {
-     // we are not under ATN, are in "talking" mode and not done with the transaction
+  {
+    // we are not under ATN, are in "talking" mode and not done with the transaction
 
 #ifdef IEC_FP_JIFFY
-     if( (m_currentDevice->m_flFlags & S_JIFFY_BLOCK)!=0 )
-       {
-         // JiffyDOS block transfer mode
-         m_inTask = false;
-         uint8_t numData = m_currentDevice->read(m_buffer, m_bufferSize);
-         m_inTask = true;
+    if( (m_currentDevice->m_flFlags & S_JIFFY_BLOCK)!=0 )
+      {
+        // JiffyDOS block transfer mode
+        m_inTask = false;
+        uint8_t numData = m_currentDevice->read(m_buffer, m_bufferSize);
+        m_inTask = true;
 
-         // delay to make sure receiver sees our CLK LOW and enters "new data block" state.
-         // If a possible VIC "bad line" occurs right after reading bits 6+7 it may take
-         // the receiver up to 160us after reading bits 6+7 (at FB71) to checking for CLK low (at FB54).
-         // If we make it back into transmitJiffyBlock() during that time period
-         // then we may already set CLK HIGH again before receiver sees the CLK LOW, 
-         // preventing the receiver from going into "new data block" state
-         while( (micros()-m_timeoutStart)<175 );
+        // delay to make sure receiver sees our CLK LOW and enters "new data block" state.
+        // If a possible VIC "bad line" occurs right after reading bits 6+7 it may take
+        // the receiver up to 160us after reading bits 6+7 (at FB71) to checking for CLK low (at FB54).
+        // If we make it back into transmitJiffyBlock() during that time period
+        // then we may already set CLK HIGH again before receiver sees the CLK LOW, 
+        // preventing the receiver from going into "new data block" state
+        while( (micros()-m_timeoutStart)<175 );
 
-         if( (m_flags & P_ATN) || !readPinATN() || !transmitJiffyBlock(m_buffer, numData) )
-           {
-             // either a transmission error, no more data to send or falling edge on ATN
-             m_flags |= P_DONE;
-           }
-         else
-           {
-             // remember time when previous transmission finished
-             m_timeoutStart = micros();
-           }
-       }
-     else
+        if( (m_flags & P_ATN) || !readPinATN() || !transmitJiffyBlock(m_buffer, numData) )
+          {
+            // either a transmission error, no more data to send or falling edge on ATN
+            m_flags |= P_DONE;
+          }
+        else
+          {
+            // remember time when previous transmission finished
+            m_timeoutStart = micros();
+          }
+      }
+    else
 #endif
-       {
+      {
         // check if we can read (also gives devices a chance to
         // execute time-consuming tasks while bus master waits for ready-to-send)
         m_inTask = false;
@@ -4344,8 +4344,8 @@ void IECBusHandler::task()
                 m_flags |= P_DONE;
               }
           }
-       }
-   }
+      }
+  }
 
   // allow the interrupt handler to call atnRequest() again
   m_inTask = false;
