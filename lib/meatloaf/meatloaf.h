@@ -237,6 +237,16 @@ public:
     virtual bool seekSector( uint8_t track, uint8_t sector, uint8_t offset = 0 );
     virtual bool seekSector( std::vector<uint8_t> trackSectorOffset );
 
+    // Byte offset of a track/sector within the container, or -1 when the
+    // medium has no such block.
+    //
+    // Block commands (B-R/B-W, U1/U2) need this to keep the CHANNEL position
+    // in step with the seek. seekSector() cannot report it: when a file is
+    // selected, _position is the offset within the FILE, and readFile() calls
+    // seekSector() while walking the block chain -- so seekSector() must not
+    // touch _position, and the caller has to be told the offset separately.
+    virtual int32_t sectorByteOffset( uint8_t track, uint8_t sector ) { return -1; }
+
 // private:
 
 //     // DEVICE

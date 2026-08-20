@@ -284,6 +284,11 @@ protected:
   virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer);
 #endif
 
+  // Point a channel at a disk block for B-R/B-W and U1/U2 -- see the comment
+  // on the definition for why a block command is a seek here.
+  bool seekChannelToBlock(uint8_t channel_num, uint8_t track, uint8_t sector,
+                          uint8_t extra, bool for_write);
+
   void set_cwd(std::string path, bool verified = false);
   void changePartition(int pnum);   // CMD "CP<n>" on a mounted DHD/D1M/D2M/D4M image
   void tapeCommand(std::string command);  // "T-C"/"T-I" on a mounted tape image

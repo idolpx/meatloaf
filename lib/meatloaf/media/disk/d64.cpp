@@ -58,6 +58,43 @@ bool D64MStream::seekBlock(uint64_t index, uint8_t offset)
     return containerStream->seek((index * block_size) + offset);
 }
 
+int32_t D64MStream::sectorByteOffset(uint8_t track, uint8_t sector)
+{
+    int32_t block_index = linearBlock(track, sector);
+    if (block_index < 0)
+        return -1;
+
+    return block_index * (int32_t) block_size;
+}
+
+
+// Linear block index of a track/sector, or -1 when it is not on this medium.
+// Shared by seekSector() and sectorByteOffset() so the geometry walk exists
+// once -- they disagreed about nothing today, and that is worth keeping.
+int32_t D64MStream::linearBlock(uint8_t track, uint8_t sector)
+{
+    uint16_t sectorOffset = 0;
+
+    // Is this a valid track?
+    uint16_t c = curPartition().block_allocation_map.size() - 1;
+    uint8_t start_track = curPartition().block_allocation_map[0].start_track;
+    uint8_t end_track = curPartition().block_allocation_map[c].end_track;
+    if (track < start_track || track > end_track)
+        return -1;
+
+    // Is this a valid sector?
+    if (sector > getSectorCount(track))
+        return -1;
+
+    if (dos_version != 0xFF) track--; // D9060/D9090: Track 1 is at index 0, not 1
+    for (uint8_t index = 0; index < track; ++index)
+        sectorOffset += getSectorCount(index + 1);
+    if (dos_version != 0xFF) track++;
+
+    return (int32_t) (sectorOffset + sector);
+}
+
+
 bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
 {
     uint16_t sectorOffset = 0;

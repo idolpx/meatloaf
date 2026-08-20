@@ -308,6 +308,8 @@ public:
     bool seekBlock( uint64_t index, uint8_t offset = 0 ) override;
     bool seekSector( uint8_t track, uint8_t sector, uint8_t offset = 0 ) override;
     bool seekSector( std::vector<uint8_t> trackSectorOffset ) override;
+    int32_t sectorByteOffset( uint8_t track, uint8_t sector ) override;
+    int32_t linearBlock( uint8_t track, uint8_t sector );
 
 
     uint16_t getSectorCount( uint16_t track )
