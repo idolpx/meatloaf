@@ -450,8 +450,9 @@ static bool parseChannel(const char *arg, uint8_t *out)
     return true;
 }
 
-// Rejoin the tokens the console split on whitespace, so spacing reaches the
-// drive exactly as typed.
+// Rejoin the tokens the console split on whitespace.  Runs of whitespace
+// collapse to one space, because that is all the splitter leaves behind -- put
+// the text in quotes when the exact spacing matters.
 static std::string joinArgs(int argc, char **argv, int from)
 {
     std::string line;
@@ -580,6 +581,7 @@ static int writeChannel(int argc, char **argv)
         Serial.printf("Usage: write {channel 0-15} {data}\r\n");
         Serial.printf("       type lowercase (PETSCII); binary bytes are written 0xNN,\r\n");
         Serial.printf("       and one 0x may carry a run: 0x000009 == 0x000x000x09\r\n");
+        Serial.printf("       runs of whitespace collapse to one space; quote to keep them\r\n");
         return EXIT_FAILURE;
     }
 

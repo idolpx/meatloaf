@@ -21,7 +21,14 @@
 #include "linenoise/linenoise.h"
 #include "argtable3/argtable3.h"
 
-#define CONSOLE_MAX_CMDLINE_ARGS 8
+/* esp_console_run() splits the line into at most this many arguments and
+ * SILENTLY DROPS the rest - there is no error, the command simply never sees
+ * the tail. At 8 (the IDF example's value) a line was cut after seven words,
+ * which is easy to reach for any command that takes free text: "write 2 hello
+ * from the console 0x0D0x00 second line" wrote everything up to "console" and
+ * lost the rest with an OK status. The cost of raising it is one calloc of
+ * this many pointers per command line. */
+#define CONSOLE_MAX_CMDLINE_ARGS 32
 #define CONSOLE_MAX_CMDLINE_LENGTH 256
 #define CONSOLE_PROMPT_MAX_LEN (32)
 
