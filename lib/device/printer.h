@@ -13,7 +13,7 @@
 # define PRINTER_CLASS rs232Printer
 #endif
 
-#if defined(BUILD_IEC) || defined(BUILD_GPIB)
+#if defined(BUILD_IEC)
 # include "iec/printer.h"
 # include "iec/printerlist.h"
 # define PRINTER_CLASS iecPrinter

@@ -16,11 +16,6 @@
 #define SYSTEM_BUS IEC
 #endif
 
-#ifdef BUILD_GPIB
-#include "gpib/gpib.h"
-#define SYSTEM_BUS GPIB
-#endif
-
 #ifdef BUILD_ADAM
 #include "adamnet/adamnet.h"
 #define FN_BUS_PORT fnUartBUS

@@ -463,7 +463,7 @@ protected:
     // Virtual so formats whose BAM splits the free COUNT away from the BITMAP
     // can maintain both halves - see D71MStream, where side 2's counts live in
     // 18/0 at 0xDD while its bitmaps live at 53/0.
-    virtual bool setBlockAllocation( uint8_t track, uint8_t sector, bool allocate );
+    bool setBlockAllocation( uint8_t track, uint8_t sector, bool allocate ) override;
     uint16_t getTrackFreeCount( uint8_t track );
     bool findFreeSectorOnTrack( uint8_t track, uint8_t startSector, uint8_t *foundSector );
 

@@ -16,11 +16,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-#if defined(BUILD_IEC) || defined(BUILD_GPIB)
-
-#ifdef BUILD_GPIB
-#define IECFILEDEVICE_STATUS_BUFFER_SIZE GPIBFILEDEVICE_STATUS_BUFFER_SIZE
-#endif
+#if defined(BUILD_IEC)
 
 #include "drive.h"
 
@@ -1829,16 +1825,68 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                 // B-A allocate block in BAM
                 else if (command[2] == 'A')
                 {
-                    Debug_printv( "allocate bit in BAM");
-                    // Checks to see if the specified track/sector is free, and if so marks it as allocated in the BAM. 
-                    // If the block is already allocated then a "65 NO BLOCK" error is returned.
+                    Debug_printv("allocate block in BAM");
+
+                    command = mstr::drop(command, 3);
+                    mstr::trim(command);
+                    mstr::replaceAll(command, "  ", " ");
+                    std::vector<uint8_t> pti = util_tokenize_uint8(command);
+                    if (pti.size() < 3)
+                    {
+                        setStatusCode(ST_SYNTAX_UNKNOWN);
+                        return;
+                    }
+                    Debug_printv("track[%d] sector[%d]", pti[0], pti[1]);
+
+                    std::unique_ptr<MFile> image(MFSOwner::File(m_cwd->url));
+                    auto stream = image ? image->getSourceStream() : nullptr;
+                    if (stream == nullptr || !stream->isOpen() || !image || !image->isWritable)
+                    {
+                        setStatusCode(ST_DRIVE_NOT_READY);
+                        return;
+                    }
+
+                    // B-A allocates: true = allocate (mark as used)
+                    if (!stream->setBlockAllocation(pti[0], pti[1], true))
+                    {
+                        setStatusCode(ST_NO_BLOCK, pti[0], pti[1]);
+                        return;
+                    }
+                    setStatusCode(ST_OK);
+                    return;
                 }
                 // B-F free block in BAM
                 else if (command[2] == 'F')
                 {
-                    Debug_printv( "free bit in BAM");
-                    // Frees the specified track/sector in the BAM. It doesn't care if it's already free or not,
-                    // it just marks it as free.
+                    Debug_printv("free block in BAM");
+
+                    command = mstr::drop(command, 3);
+                    mstr::trim(command);
+                    mstr::replaceAll(command, "  ", " ");
+                    std::vector<uint8_t> pti = util_tokenize_uint8(command);
+                    if (pti.size() < 3)
+                    {
+                        setStatusCode(ST_SYNTAX_UNKNOWN);
+                        return;
+                    }
+                    Debug_printv("track[%d] sector[%d]", pti[0], pti[1]);
+
+                    std::unique_ptr<MFile> image(MFSOwner::File(m_cwd->url));
+                    auto stream = image ? image->getSourceStream() : nullptr;
+                    if (stream == nullptr || !stream->isOpen() || !image || !image->isWritable)
+                    {
+                        setStatusCode(ST_DRIVE_NOT_READY);
+                        return;
+                    }
+
+                    // B-F frees: false = deallocate (mark as free)
+                    if (!stream->setBlockAllocation(pti[0], pti[1], false))
+                    {
+                        setStatusCode(ST_NO_BLOCK, pti[0], pti[1]);
+                        return;
+                    }
+                    setStatusCode(ST_OK);
+                    return;
                 }
                 // B-E block execute
                 else if (command[2] == 'E')

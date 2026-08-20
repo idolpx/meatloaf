@@ -160,7 +160,7 @@ bool FileSystemSPIFFS::start()
 
     // Set our basepath
 #ifdef ESP_PLATFORM
-#if defined(BUILD_IEC) || defined(BUILD_GPIB)
+#if defined(BUILD_IEC)
     strlcpy(_basepath, "", sizeof(_basepath));
 #else
     strlcpy(_basepath, "/spiffs", sizeof(_basepath));

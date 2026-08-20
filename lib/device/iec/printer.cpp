@@ -1,4 +1,4 @@
-#if defined(BUILD_IEC) || defined(BUILD_GPIB)
+#if defined(BUILD_IEC)
 
 #include "printer.h"
 
