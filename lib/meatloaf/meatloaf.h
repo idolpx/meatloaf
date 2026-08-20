@@ -119,6 +119,15 @@ public:
         return _size;
     };
 
+    // Declare the extent of a stream that cannot work it out for itself. A
+    // media stream opened with NO entry selected (direct access, "#") is the
+    // raw container, and nothing sets _size for that view -- which leaves
+    // eos() true from the first byte, so a reader stops refilling almost
+    // immediately. Only the opener knows the container's real length.
+    void setSize(uint32_t size) {
+        _size = size;
+    };
+
     virtual uint32_t available() {
         if ( _position > _size )
             return 0;

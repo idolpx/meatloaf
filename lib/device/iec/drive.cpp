@@ -956,6 +956,65 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                 close(channel);
             }
 
+            // "#" is DIRECT ACCESS: the channel gets the CONTAINER's own byte
+            // stream instead of a file inside it, so B-P and B-R can roam the
+            // whole image. A real drive takes a buffer number ("#3"); there is
+            // one stream per channel here, so a trailing number is accepted
+            // and ignored. Anything else after the '#' is a filename.
+            if( name[0] == '#' &&
+                name.find_first_not_of("0123456789", 1) == std::string::npos )
+            {
+                if( m_cwd == nullptr )
+                {
+                    setStatusCode(ST_DRIVE_NOT_READY);
+                    return false;
+                }
+
+                // NEVER plain out: opening a container for write TRUNCATES the
+                // image. Writing to it has to be read-modify-write.
+                std::ios_base::openmode container_mode =
+                    (mode & std::ios_base::out) ? (std::ios_base::in | std::ios_base::out)
+                                                : std::ios_base::in;
+
+                // A fresh MFile on the cwd's own url carries no pathInStream,
+                // so getSourceStream() selects no entry: seekCalled stays false
+                // and reads pipe raw container bytes through readContainer(),
+                // which is exactly the direct-access view. getSourceStream()
+                // also builds a FRESH stream per open, so this cannot disturb
+                // the ImageBroker instance a directory listing is using.
+                std::unique_ptr<MFile> image(MFSOwner::File(m_cwd->url));
+                auto stream = image ? image->getSourceStream(container_mode) : nullptr;
+                if( stream == nullptr || !stream->isOpen() )
+                {
+                    Debug_printv("Error: no container stream for direct access [%s]",
+                                 m_cwd->url.c_str());
+                    setStatusCode(ST_DRIVE_NOT_READY);
+                    return false;
+                }
+
+                // Nothing sets _size for the no-entry-selected view, and at 0
+                // eos() is true from the first byte. The container's real
+                // length comes off the raw file: MFSOwner::File(url, true)
+                // forces defaultFS, the established "give me the bytes"
+                // primitive, so the name is not extension-sniffed back into
+                // another D64MFile.
+                if( stream->size() == 0 )
+                {
+                    std::unique_ptr<MFile> raw(MFSOwner::File(m_cwd->url, true));
+                    auto raw_stream = raw ? raw->getSourceStream() : nullptr;
+                    if( raw_stream != nullptr && raw_stream->size() > 0 )
+                        stream->setSize(raw_stream->size());
+                }
+
+                m_channels[channel] = new iecChannelHandlerFile(this, stream);
+                m_channels[channel]->setName(m_cwd->url + " (direct)");
+                m_numOpenChannels++;
+                setStatusCode(ST_OK);
+                Debug_printv("Direct access channel[%d] on [%s] size[%lu]",
+                             channel, m_cwd->url.c_str(), (unsigned long) stream->size());
+                return true;
+            }
+
             // Handle CMD-style directory filters by preserving them in URL
             bool wasDirListing = false;
             if ( name[0] == '$' ) {
