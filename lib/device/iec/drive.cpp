@@ -175,6 +175,7 @@ uint8_t iecChannelHandler::read(uint8_t *data, uint8_t n)
         {
             // common case during regular (non-fastloader) load
             data[0] = m_data[m_ptr++];
+            m_position++;
             return 1;
         }
         else
@@ -183,6 +184,7 @@ uint8_t iecChannelHandler::read(uint8_t *data, uint8_t n)
             n = std::min((size_t) n, (size_t) (m_len - m_ptr));
             memcpy(data, m_data + m_ptr, n);
             m_ptr += n;
+            m_position += n;
             return n;
         }
     }
@@ -222,6 +224,7 @@ uint8_t iecChannelHandler::write(uint8_t *data, uint8_t n)
         m_len += n;
     }
 
+    m_position += n;
     return n;
 }
 
@@ -2373,16 +2376,18 @@ std::vector<iecDrive::ChannelInfo> iecDrive::consoleChannels()
         info.name       = handler->name();
         info.has_stream = false;
         info.size       = 0;
-        info.position   = 0;
+        // Where the READER is, not where the stream is -- see
+        // iecChannelHandler::position(). A directory channel has a real
+        // position too, even though it has no stream to give a size.
+        info.position   = handler->position();
 
         // A directory channel generates its listing rather than reading one,
-        // so it has no stream and neither figure exists for it.
+        // so it has no stream and no size to report.
         auto stream = handler->getStream();
         if( stream != nullptr )
         {
             info.has_stream = true;
             info.size       = stream->size();
-            info.position   = stream->position();
         }
 
         open_channels.push_back(info);

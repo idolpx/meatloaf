@@ -667,10 +667,11 @@ static int listChannels(int argc, char **argv)
                           (unsigned) info.channel, (unsigned) info.size,
                           (unsigned) info.position, info.name.c_str());
         else
-            // A directory listing is generated, not read: no stream, so
-            // neither figure exists. Printing 0 would read as an empty file.
-            Serial.printf("%2u  %10s  %10s  %s\r\n",
-                          (unsigned) info.channel, "-", "-", info.name.c_str());
+            // A directory listing is generated, not read, so it has no size.
+            // Printing 0 would read as an empty file. Its position is real.
+            Serial.printf("%2u  %10s  %10u  %s\r\n",
+                          (unsigned) info.channel, "-",
+                          (unsigned) info.position, info.name.c_str());
     }
 
     if (reported != open_channels.size())
