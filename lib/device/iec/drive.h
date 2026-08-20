@@ -93,6 +93,23 @@ public:
   // write path returns before reaching the base and does so itself.
   size_t position() const { return m_position; }
 
+  // Something repositioned the stream underneath this channel (B-P). Discard
+  // the buffered data and re-base the position, because read() serves from
+  // m_data before it touches the stream and would otherwise keep handing back
+  // bytes from BEFORE the seek -- a B-P back to 0 followed by a read returned
+  // the second half of the already-filled buffer.
+  //
+  // Note this drops anything pending in a BUFFERED write (the
+  // iecChannelHandler::write() path). The file handler writes straight
+  // through, so in practice there is nothing to lose.
+  void repositioned(size_t position)
+  {
+    m_ptr = 0;
+    m_len = 0;
+    m_eos = false;
+    m_position = position;
+  }
+
   bool m_eos = false;
 
 protected:

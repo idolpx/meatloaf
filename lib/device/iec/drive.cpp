@@ -1528,12 +1528,31 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                     Debug_printv("command[%s] channel[%d] position[%d]", command.c_str(), pti[0], pti[1]);
 
                     auto channel = m_channels[pti[0]];
-                    if ( channel != nullptr )
+                    if ( channel == nullptr )
                     {
-                        auto stream = channel->getStream();
-                        stream->position( pti[1] );
-                        //setStatusCode(ST_OK);
+                        setStatusCode(ST_FILE_NOT_OPEN);
+                        return;
                     }
+
+                    // A directory channel generates its listing and has no
+                    // stream, so there is nothing to reposition.
+                    auto stream = channel->getStream();
+                    if ( stream == nullptr )
+                    {
+                        setStatusCode(ST_SYNTAX_INVALID);
+                        return;
+                    }
+
+                    if ( !stream->position( pti[1] ) )
+                    {
+                        setStatusCode(ST_SYNTAX_UNKNOWN);
+                        return;
+                    }
+
+                    // The seek alone is not enough: the channel still holds up
+                    // to BUFFER_SIZE bytes read AHEAD of it, and read() serves
+                    // those first.
+                    channel->repositioned( pti[1] );
                     return;
                 }
                 // B-R read block
@@ -1554,7 +1573,13 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                     auto channel = m_channels[pti[0]];
                     if ( channel != nullptr )
                     {
+                        // Same nullptr as B-P: a directory channel has no stream.
                         auto stream = channel->getStream();
+                        if ( stream == nullptr )
+                        {
+                            setStatusCode(ST_SYNTAX_INVALID);
+                            return;
+                        }
                         stream->seekSector( pti[2], pti[3] );
                         uint8_t size;
                         stream->read(&size, 1);
