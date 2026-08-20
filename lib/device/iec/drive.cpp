@@ -1361,6 +1361,24 @@ uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool 
 }
 
 // we override the "executeData" because some commands may include NUL or CR characters which 
+// Parse one decimal DOS command argument.  strtoul, never stoi/stol: ESP-IDF
+// builds -fno-exceptions, so a throwing parser on a string that came off the
+// IEC bus is std::terminate.  Rejects an empty string and any trailing
+// rubbish rather than accepting a prefix, so a malformed argument is a syntax
+// error instead of a silently different number.
+static bool dosParseUint(const std::string &s, uint32_t *out)
+{
+    if ( s.empty() ) return false;
+
+    char *end = nullptr;
+    unsigned long value = strtoul(s.c_str(), &end, 10);
+    if ( end == s.c_str() || *end != '\0' ) return false;
+
+    *out = (uint32_t) value;
+    return true;
+}
+
+
 // may not work in the text-based "execute" function. Note that while commands handled here
 // are all text-based, M-R and M-W commands passed on to the VDrive may contain binary data.
 void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
@@ -1519,15 +1537,32 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                     command = mstr::drop(command, 3);
                     mstr::trim(command);
                     mstr::replaceAll(command, "  ", " ");
-                    std::vector<uint8_t> pti = util_tokenize_uint8(command);
-                    if ( pti.size() < 2 )
+
+                    // Parsed as 32-bit, NOT through util_tokenize_uint8():
+                    // Meatloaf treats B-P's argument as an absolute offset in
+                    // the file, and a uint8_t silently WRAPS it -- "B-P 2 300"
+                    // seeked to 44 and answered OK. A real 1541's buffer
+                    // pointer is 0-255 because its buffer is one 256-byte
+                    // sector; here there is no such limit.
+                    std::vector<std::string> pt = util_tokenize(command, ' ');
+                    uint32_t chan = 0, pos = 0;
+                    if ( pt.size() < 2 || !dosParseUint(pt[0], &chan) || !dosParseUint(pt[1], &pos) )
                     {
                         setStatusCode(ST_SYNTAX_UNKNOWN);
                         return;
                     }
-                    Debug_printv("command[%s] channel[%d] position[%d]", command.c_str(), pti[0], pti[1]);
 
-                    auto channel = m_channels[pti[0]];
+                    // m_channels has 16 entries; an unchecked index read past
+                    // the end of the object.
+                    if ( chan > 15 )
+                    {
+                        setStatusCode(ST_SYNTAX_UNKNOWN);
+                        return;
+                    }
+                    Debug_printv("command[%s] channel[%lu] position[%lu]", command.c_str(),
+                                 (unsigned long) chan, (unsigned long) pos);
+
+                    auto channel = m_channels[chan];
                     if ( channel == nullptr )
                     {
                         setStatusCode(ST_FILE_NOT_OPEN);
@@ -1543,7 +1578,7 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                         return;
                     }
 
-                    if ( !stream->position( pti[1] ) )
+                    if ( !stream->position( pos ) )
                     {
                         setStatusCode(ST_SYNTAX_UNKNOWN);
                         return;
@@ -1552,7 +1587,7 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                     // The seek alone is not enough: the channel still holds up
                     // to BUFFER_SIZE bytes read AHEAD of it, and read() serves
                     // those first.
-                    channel->repositioned( pti[1] );
+                    channel->repositioned( pos );
                     return;
                 }
                 // B-R read block
@@ -1569,6 +1604,13 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                         return;
                     }
                     Debug_printv("command[%s] channel[%d] media[%d] track[%d] sector[%d]", command.c_str(), pti[0], pti[1], pti[2], pti[3]);
+
+                    // Same out-of-range index as B-P: m_channels has 16 entries.
+                    if ( pti[0] > 15 )
+                    {
+                        setStatusCode(ST_SYNTAX_UNKNOWN);
+                        return;
+                    }
 
                     auto channel = m_channels[pti[0]];
                     if ( channel != nullptr )
