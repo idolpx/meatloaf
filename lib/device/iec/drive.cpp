@@ -305,6 +305,9 @@ uint8_t iecChannelHandlerFile::write(uint8_t *data, uint8_t n) {
         size_t written = m_stream->write(data, n);
         m_transportTimeUS += (esp_timer_get_time() - t);
         m_byteCount += written;
+        // This path returns without reaching iecChannelHandler::write(), so
+        // the channel position has to be advanced here too.
+        m_position += written;
         // Clear EOS and reset the IEC buffer so the next readBufferData()
         // refills from the stream's freshly-positioned cursor.
         // Mode-switch commands (r-h, r-b, status) reposition the stream's

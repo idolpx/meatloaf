@@ -77,18 +77,20 @@ public:
   void setName(const std::string &name) { m_name = name; }
   const std::string &name() const { return m_name; }
 
-  // Bytes transferred on this channel -- where the READER is, which is not
-  // where the stream is. The two never agree while a transfer is running, and
-  // they disagree in OPPOSITE directions: readBufferData() fills a whole
-  // BUFFER_SIZE ahead, so the stream leads (256 bytes read off a fresh channel
-  // leaves the stream at 512), while write() accumulates until the buffer is
-  // full, so the stream lags by whatever is still pending.
+  // Bytes transferred on this channel -- where the READER is, which is NOT
+  // where the stream is, and the gap differs per path:
+  //   read           readBufferData() fills a whole BUFFER_SIZE ahead, so the
+  //                  stream LEADS -- 256 bytes read off a fresh channel leaves
+  //                  m_stream->position() at 512.
+  //   buffered write iecChannelHandler::write() accumulates until the buffer
+  //                  is full, so the stream LAGS by whatever is pending.
+  //   direct write   iecChannelHandlerFile::write() passes straight through to
+  //                  the stream, so they agree.
   //
   // Counted here rather than derived from m_stream->position() and the buffer
-  // occupancy, because that correction needs the direction and the direction
-  // is not knowable: m_stream->mode is not initialized for a stream inside a
-  // disk image -- which is why writeBufferData()'s own mode check is
-  // commented out.
+  // occupancy, because that correction would need to know which of the three
+  // applies. Every override that moves bytes must advance it -- the direct
+  // write path returns before reaching the base and does so itself.
   size_t position() const { return m_position; }
 
   bool m_eos = false;
