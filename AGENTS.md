@@ -572,9 +572,12 @@ gitignored.
 - **`esp_console_run()` splits a line into at most `CONSOLE_MAX_CMDLINE_ARGS` arguments and SILENTLY DROPS the rest** (`lib/console/console_settings.c`). There is no error and no truncation marker — the command simply never sees the tail. It was **8** (the IDF example's value, which reserves one slot for the NULL, so seven words), and `write 2 hello from the console 0x0D0x00 second line` wrote everything up to `console` and reported `00, OK`. Now 32; the cost is one `calloc` of that many pointers per line. `exec` had the same trap and nobody had reached it. Related: the splitter only strips a LEADING quote, so `"a b"0x0D"c d"` yields `a b`, `0x0D"c`, `d"` — quoting keeps spaces inside one argument but is not a general escape, and `joinArgs()` collapses runs of whitespace to one space because that is all the splitter leaves.
 - **The console's file channels are driven by `open`/`read`/`write`/`close`, and the channel number IS the secondary address** (`lib/console/Commands/IECCommands.cpp`). **All three of `open 15`, `read 15` and `write 15` are special-cased, because channel 15 NEVER reaches `iecDrive::open()`/`read()`/`write()` on the bus** — `IECFileDevice` intercepts it, answering a read from `getStatusData()` and routing a write to `executeData()` (`IFD_EXEC` is set only when `m_channel == 15`). So `open 15 i0:` and `write 15 i0:` both run the command, as `OPEN 15,8,15,"I0"` and `PRINT#15,"I0"` do, and `read 15` returns the status line, as `INPUT#15,A$` does. Without the special cases the file path is taken and all three answer `61,FILE NOT OPEN`. `read 15` prints the status ONCE and returns — falling through to the shared `reportStatus()` would consume a second one. Five public wrappers on `iecDrive` — `consoleOpen`/`consoleRead`/`consoleWrite`/`consoleClose`/`consoleStatus` — are the only console-facing surface; `open()`/`read()`/`write()`/`close()` stay protected and are called VIRTUALLY so device 30 still reaches `iecMeatloaf`. `consoleStatus()` is the status-consuming tail factored out of `consoleExecDos()`. `close` with no argument sweeps channels 0-15, which is safe because `close()` is a no-op on a channel that is not open — VDrive has no per-channel query to ask instead.
 - **A block command (`B-R`/`B-W`, `U1`/`U2`) is a SEEK here, not a buffer transfer.** There is no separate 256-byte block buffer the way a real drive has one — a channel IS a stream at an offset — so all four resolve through `iecDrive::seekChannelToBlock()`, which points the channel at the block and lets the data move through ordinary reads and writes on that channel. **`B-R`/`B-W` land on byte 1 and `U1`/`U2` on byte 0**, which is the real CBM distinction: B-R/B-W reserve byte 0 as the count of valid bytes, U1/U2 give the whole 256. The seek matters beyond the data — some fast loaders expect the track/sector registers updated by a block command and then issue reads that name no block. Three things the old code got wrong and the helper now centralises: `m_channels[pti[0]]` was indexed with a full byte against a 16-entry array (**out-of-bounds read**, in B-R, U1 and U2 alike); a directory channel's `getStream()` is nullptr and was dereferenced; and the seek never synced the CHANNEL, so `channels` reported a stale position and the next read started mid-block. `B-R` additionally used to consume byte 0 as a length and dump the result to the STATUS channel, losing it. **`seekSector()` cannot report the byte offset** the channel needs — when a file is selected `_position` is the offset within the FILE and `readFile()` calls `seekSector()` while walking the chain, so it must not touch `_position`; the new `MStream::sectorByteOffset()` supplies it separately, and `D64MStream` shares one geometry walk (`linearBlock()`) between the two.
-- **A direct-access (`"#"`) channel is a window on ONE BLOCK, not on the whole image.** It opens as block 0, 256 bytes; `B-R`/`U1` move the window and `B-P` addresses within it. The window is expressed to the stream by `setSize(start + length)`, because that is what stops a read at the block's end — the reader asks for `BUFFER_SIZE` (512) at a time, so nothing shorter bounds it. `U1`/`U2` give the whole 256; **`B-R`/`B-W` shorten the window to the block's own count byte** (byte 0), which is why `B-R` on a directory sector reports SIZE 18 — the link byte `$12` read as a count. `iecChannelHandler` carries `m_block_base`/`m_block_len` for this, and `channels` reports the block's length and the pointer within it rather than the stream's size and absolute offset, which for a window would be an end-offset in the image and not a size at all. **`MMediaStream::read()`'s non-`seekCalled` branch had no `_size` cap** — only the file branch did — so a block window would have been read straight past; both branches cap now. **`F-P` LEAVES block mode** and restores the container's full extent, so the image can then be read end to end from any offset; `B-R`/`U1` put the channel back into block mode. That is why the container's real length is captured at open (`MFSOwner::File(url, /*default_fs=*/true)`) and remembered on the channel as `m_full_size` — the block window overwrites the stream's size, and nothing else can put it back.
-- **`OPEN <ch>,8,<sa>,"#"` is DIRECT ACCESS: the channel gets the CONTAINER's own byte stream instead of a file inside it**, so `B-R` and `U1` roam the whole image. The mechanism is that a fresh `MFile` on the cwd's own url carries an empty `pathInStream`, so `getSourceStream()` selects no entry, `seekCalled` stays false, and `MMediaStream::read()` takes its `readContainer()` branch — the same path that already existed for copying an image verbatim. It stays a `D64MStream`, so `seekSector()` remains available for block commands, and `getSourceStream()` builds a FRESH stream per open so this cannot disturb the ImageBroker instance a directory listing is using. A trailing buffer number (`"#3"`) is accepted and ignored — a real drive allocates one of its buffers, here there is one stream per channel. Two traps: the container is opened `in|out` and **never plain `out`**, which would truncate the image; and **nothing sets `_size` for the no-entry view**, which leaves `eos()` true from the very first byte so a reader stops refilling almost at once — the length is taken from the raw file (`MFSOwner::File(url, /*default_fs=*/true)`, the established "give me the bytes" primitive) and applied with the new `MStream::setSize()`.
-- **`B-P` and `F-P` are different commands and must not be conflated.** `B-P <ch> <pos>` moves the pointer WITHIN the block `B-R`/`U1` selected — 0-255, counted from the block's byte 0 even when `B-R` left the readable window starting at byte 1, because it addresses the block. `F-P <ch> <pos>` (File Position, a Meatloaf addition) is an ABSOLUTE offset. B-P on a channel with no block window is `31,INVALID COMMAND`: it is not a file-channel command, F-P is. Both go through `iecDrive::positionChannel()`. **B-P was briefly implemented as the absolute seek before F-P existed** — if a commit looks like it treats B-P as a file offset, that is the old meaning.
+- **`OPEN <ch>,8,<sa>,"#"` is DIRECT ACCESS: the channel gets the CONTAINER's own byte stream instead of a file inside it — and it is a window on ONE BLOCK at a time, not on the whole image.** The mechanism is that a fresh `MFile` on the cwd's own url carries an empty `pathInStream`, so `getSourceStream()` selects no entry, `seekCalled` stays false, and `MMediaStream::read()` takes its `readContainer()` branch — the same path that already existed for copying an image verbatim. It stays a `D64MStream`, so `seekSector()` remains available for the block commands, and `getSourceStream()` builds a FRESH stream per open so this cannot disturb the ImageBroker instance a directory listing is using. A trailing buffer number (`"#3"`) is accepted and ignored — a real drive allocates one of its buffers, here there is one stream per channel.
+  - **The window.** It opens as block 0, 256 bytes. `B-R`/`U1` move it, `B-P` addresses within it, `F-P` leaves it. The window is expressed to the stream by `setSize(start + length)`, because that is what stops a read at the block's end — the reader asks for `BUFFER_SIZE` (512) at a time, so nothing shorter bounds it. `U1`/`U2` give the whole 256; **`B-R`/`B-W` shorten it to the block's own count byte** (byte 0), which is why `B-R` on a directory sector reports SIZE 18 — the link byte `$12` read as a count. `iecChannelHandler` carries `m_block_base`/`m_block_len`, and `channels` reports the block's length and the pointer within it rather than the stream's size and absolute offset, which for a window would be an end-offset in the image and not a size at all.
+  - **`F-P` LEAVES block mode** and restores the container's full extent, so the image can be read end to end from any offset; `B-R`/`U1` put the channel back into it. That is why the container's real length is captured at open — `MFSOwner::File(url, /*default_fs=*/true)`, the established "give me the bytes" primitive, so the name is not extension-sniffed back into another `D64MFile` — and remembered on the channel as `m_full_size`: the block window overwrites the stream's size and nothing else can put it back.
+  - **Two traps.** The container is opened `in|out` and **never plain `out`**, which would truncate the image. And **nothing sets `_size` for the no-entry view**, which leaves `eos()` true from the very first byte so a reader stops refilling almost at once — hence `MStream::setSize()`, used both for the window and for the full extent.
+  - **`MMediaStream::read()`'s non-`seekCalled` branch had no `_size` cap** — only the file branch did — so a block window would have been read straight past. Both branches cap now, which makes the bound apply to every raw-container reader, not just this one.
+- **`B-P` and `F-P` are different commands and must not be conflated.** `B-P <ch> <pos>` moves the pointer WITHIN the block `B-R`/`U1` selected — 0-255, counted from the block's byte 0 even when `B-R` left the readable window starting at byte 1, because it addresses the block, not the window. `F-P <ch> <pos>` (File Position, a Meatloaf addition) is an ABSOLUTE offset into the file or container, and on a direct-access channel it leaves block mode. `B-P` on a channel with no block window answers `31,INVALID COMMAND`: it is not a file-channel command, `F-P` is. Both go through `iecDrive::positionChannel()`. **`B-P` was briefly implemented as the absolute seek, before `F-P` existed** — a commit that treats it as a file offset is using the old meaning.
 - **Repositioning a channel needs THREE things, and doing only the obvious one leaves it silently wrong.** (1) The channel's buffer must be invalidated (`iecChannelHandler::repositioned()`) — `read()` serves from `m_data` before it touches the stream, and `readBufferData()` has filled up to `BUFFER_SIZE` AHEAD, so a seek back to 0 followed by a read returned the second half of the stale buffer and looked exactly like a continuation. (2) The position must be parsed as **32-bit**: `util_tokenize_uint8()` is `atoi` truncated to `uint8_t`, so `300` silently WRAPPED to 44 and answered OK. (3) `D64MStream::seek()` must **walk the block chain** from `entry.start_track/start_sector`, 254 data bytes per block, and land with `sector_offset = 2 + remainder` so `readFile()` does not re-read the link it was just handed — `MMediaStream::seek()` seeks the CONTAINER, which is meaningless for a file scattered across blocks and left every later read returning zeros. Note `m_channels` has 16 entries and was indexed with an unbounded byte, so `200` as a channel read past the object; every command that takes a channel bounds it now, and refuses a directory channel, whose `getStream()` is nullptr and was dereferenced unchecked.
 - **A `case` in `executeData()`'s command switch without a `break` reaches `I` and RESETS THE DRIVE.** `case 'F'` was added without one, so any unmatched `F-*` reinitialised the device. The switch is long enough that the fall-through is not visible at the point of editing.
 - **`channels` reports the CHANNEL's position, never `m_stream->position()` — the two are not the same number and the gap differs per path.** A read fills a whole `BUFFER_SIZE` (512) ahead, so the stream LEADS: reading 256 bytes off a fresh channel leaves the stream at 512, which is what `channels` printed before this was fixed. `iecChannelHandler::write()` buffers until full, so there the stream LAGS. `iecChannelHandlerFile::write()` passes straight through, so those agree. The correction cannot be derived from the buffer occupancy because it needs to know which of the three applies, and the direction is not reliably knowable — `m_stream->mode` is uninitialised for a stream inside a disk image, which is exactly why `writeBufferData()`'s own mode check is commented out. So `iecChannelHandler` counts `m_position` as bytes cross the boundary. **Every override that moves bytes must advance it**: `iecChannelHandlerFile::write()` returns before reaching the base and does so itself — missing that showed a write channel frozen at 0 while bytes were landing on disk. A directory channel has a real position but no size (`-`), since its listing is generated rather than read.
@@ -617,14 +620,20 @@ gitignored.
 - **`DISABLE_DIRCACHE` (undefined by default) makes `FileSystemFTP` stream its directory listing** instead of caching it. `DirCache` holds a `fsdir_entry` per entry — `char filename[256]` plus size and flags, **272 bytes** — from the internal heap on a board without PSRAM, which is the largest single cost of an `ls` over FTP. With the flag set, one entry is held at a time: no sorting (`FTPMFile` passes `DIR_OPTION_UNSORTED` anyway, so only a fuji host slot notices), no listing re-use, and `dir_seek()` re-lists and skips forward. Only `FileSystemFTP` honours the flag; SD, NFS, SMB, HTTP and TNFS still cache unconditionally.
 - **`FTPMFile::readEntry()`'s `dir_open` test was inverted** (`if (!fs->dir_open(...))`) — `dir_open` returns true on success, so the scan loop only ever ran on a listing that had FAILED to open, and an FTP wildcard could never match. Fixed; note the same call must `dir_close()` on both exits now that streaming leaves the data connection open.
 
-## Recent Changes (August 19, 2026)
+## Recent Changes (August 19-20, 2026)
 
-### `open`/`read`/`write`/`close` console commands, and ESC cancel
+### Console file channels, ESC cancel, and the block/direct-access commands
 
-Four commands that drive the selected device's FILE channels the way a C64 does, so a read or a
-write inside any mounted media can be exercised without a Commodore attached. The channel number IS
-the secondary address. Durable rules are in the Important Notes above; design spec in
+`open`/`read`/`write`/`close`/`channels` drive the selected device's FILE channels the way a C64
+does, so a read or a write inside any mounted media can be exercised without a Commodore attached —
+the channel number IS the secondary address. That then made the block commands reachable and worth
+finishing: `B-R`/`B-W`, `U1`/`U2`, `B-P`, the new `F-P`, and `"#"` direct access. Durable rules are
+in the Important Notes above; design spec for the console half in
 `docs/superpowers/specs/2026-08-19-console-file-io-design.md`.
+
+**The command set, since three of these changed meaning during the work:** `F-P` is the absolute
+seek (any offset in a file or container). `B-P` is the pointer within the block `B-R`/`U1` selected.
+`"#"` opens a one-block window that `F-P` widens to the whole container and `B-R`/`U1` narrow again.
 
 - **Hardware-verified on lolin-d32-pro**, console over serial and over TCP:
   - `open 0 $` + `read 0` inside `zetawingii.d64` returns the directory as a PRG — `01 08`, disk
@@ -644,23 +653,26 @@ the secondary address. Durable rules are in the Important Notes above; design sp
     truncate the image rather than fail.
   - Channel 15: `read 15` answers `00, OK,00,00` and `write 15 i0:` answers
     `73,MEATLOAF CBM 20260819.22` — the status and the DOS banner a C64 gets.
-  - `B-P` and direct access, cross-validated against the image's own structures:
-    `B-P 2 91392` (17 tracks x 21 sectors x 256) on a `"#"` channel reads `12 01 41 00 15 FF FF 1F`
-    — the D64 BAM; `B-P 2 91648` reads track 18 sector 1, `12 04 82 11 00 "THE GOONIES+"` ending
-    `9B 00` = 155 blocks, and 155 x 254 = 39370, the size `seekPath()` reported for that file.
-    On a FILE channel, `B-P` to 0 repeats the first bytes exactly, and 254 and 508 match the
-    linear dump byte for byte at both block boundaries.
-  - Block windows, on a `"#"` channel over `goonies.d64`: `open` gives SIZE 256 POS 0 and `read`
-    returns exactly 256 bytes; `U1 2 0 18 1` SIZE 256 POS 0 reads the whole directory sector;
-    `B-R 2 0 18 1` SIZE **18** POS 1 reads exactly 18 bytes — the count byte `$12` — starting
-    `04 82 11 00 "THE GOONIES+"`; `B-P 2 5` POS 5 reads `"THE GOON"`, i.e. block byte 5, counted
-    from the block base and not from B-R's byte-1 start. The mode switch both ways:
-    `F-P 2 91648` leaves block mode (SIZE 174848, POS 91648 absolute) and `read 2 300` returns 300
-    bytes across the block boundary, while the same read in block mode is capped at 18; `B-R` then
-    puts it straight back to SIZE 18 POS 1. On a FILE channel `B-P` answers `31,INVALID COMMAND`
-    while `F-P 3 254` seeks absolutely and reads `59 1A 4A 16 09 BF 90 A9`, matching the linear dump. Bad track and bad sector both
-    answer `66,ILLEGAL TRACK OR SECTOR` carrying the offending track/sector; an unopened channel
-    `61,FILE NOT OPEN`; a write command on a read-only channel `26,WRITE PROTECT`.
+  - **Direct access, cross-validated against the image's own structures rather than against itself.**
+    On a `"#"` channel over `goonies.d64`, seeking to 91392 (17 tracks x 21 sectors x 256) reads
+    `12 01 41 00 15 FF FF 1F` — the D64 BAM — and 91648 reads track 18 sector 1,
+    `12 04 82 11 00 "THE GOONIES+"` ending `9B 00` = 155 blocks; 155 x 254 = 39370, the size
+    `seekPath()` reports for that same file opened normally. Two independent paths agreeing.
+  - **Block windows**: `open 2 "#"` gives SIZE 256 POS 0 and `read` returns exactly 256 bytes;
+    `U1 2 0 18 1` SIZE 256 POS 0 reads the whole directory sector; `B-R 2 0 18 1` SIZE **18** POS 1
+    reads exactly 18 bytes — the count byte `$12` — starting `04 82 11 00 "THE GOONIES+"`;
+    `B-P 2 5` POS 5 reads `"THE GOON"`, block byte 5, counted from the block base and not from
+    B-R's byte-1 start.
+  - **The mode switch, both ways**: `F-P 2 91648` leaves block mode (SIZE 174848, POS 91648
+    absolute) and `read 2 300` returns 300 bytes ACROSS the block boundary, where the same read in
+    block mode is capped at 18; `B-R` then puts it straight back to SIZE 18 POS 1.
+  - **On a FILE channel**: `B-P` answers `31,INVALID COMMAND`, while `F-P 3 254` seeks absolutely
+    and reads `59 1A 4A 16 09 BF 90 A9` — matching the linear dump at that offset. Seeking to 0
+    repeats the first bytes exactly, and 254 and 508 match byte for byte at both block boundaries,
+    which is where a wrong `data_per_block` or a re-read link would show.
+  - Block-command errors: bad track and bad sector both answer `66,ILLEGAL TRACK OR SECTOR`
+    carrying the offending track/sector; an unopened channel `61,FILE NOT OPEN`; a write command on
+    a read-only channel `26,WRITE PROTECT`.
   - **`U2` writes**, verified non-destructively: `DE AD BE EF 01 02 ... 0D` written to track 1
     sector 0 of `blueangels-xiphoid.d64`, read back byte-exact, then the saved original written
     back and re-verified.
@@ -687,11 +699,21 @@ the secondary address. Durable rules are in the Important Notes above; design sp
   compiles and runs, and silently accumulates into a copy the caller never sees — the sink reported
   zero bytes while the return value was right. The native suite caught it on the first run; nothing
   about the firmware behaviour would have.
+- **A `case` without a `break` in `executeData()`'s switch reaches `I` and resets the drive.** `case
+  'F'` was added without one, so any unmatched `F-*` reinitialised the device. The switch is long
+  enough that the fall-through is invisible at the point of editing.
+- **The `_size` cap added to `MMediaStream::read()`'s raw-container branch reaches every reader of
+  that path**, not just direct access — image copying included. It is the correct bound (the file
+  branch already had it, and `_size` is now set for that view), but it is the one change here that
+  is not confined to the new commands. The full native suite passing is the evidence.
 - **Native suite**: `test/native/test_console_dos/` (21 cases) covers `encodeDosCommand` and both
   transfer loops. Full suite 274 passed, 10 skipped; `test_EdUrlParser`, `test_hdd_read` and
   `test_strings` error identically at baseline.
-- **Not covered**: the C64-side path. Every one of these commands reaches the same
-  `iecDrive` entry points the bus does, but nothing here was driven from a real Commodore.
+- **Not covered.** The C64-side path: every one of these commands reaches the same `iecDrive` entry
+  points the bus does, but nothing here was driven from a real Commodore. And nothing below the
+  console — channels, block commands, `B-P`/`F-P`, direct access, `D64MStream::seek()` — has a
+  native regression test, because `lib/console` and `lib/device` are not compiled in that
+  environment; all of it is hardware-verified only, so a refactor has no net under it.
 
 ### Debug-loop note
 
