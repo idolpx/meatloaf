@@ -117,13 +117,21 @@ public:
         if (addr < 0x0FFF) {
             if (addr >= 0x0800) addr -= 0x0800;  // RAM Mirror
 
-            if (ram.empty() || addr + len > ram.size()) {
+            // RAM is lazy-allocated on first write. Before that it reads as
+            // zeros rather than failing -- a drive always has RAM, and an
+            // M-R before any M-W is an ordinary thing for a fastloader to do.
+            if (ram.empty()) {
+                if (addr + len > _ramSize) return 0;
+                memset(data, 0, len);
+                return len;
+            }
+
+            if (addr + len > ram.size()) {
                 return 0;
             }
 
             memcpy(data, &ram[addr], len);
             Debug_printv("RAM read %04X:%s", addr, mstr::toHex(data, len).c_str());
-            printf("%s", util_hexdump((const uint8_t*)ram.data(), ram.size()).c_str());
             return len;
         }
 
@@ -167,7 +175,6 @@ public:
 
             if (!ram.empty()) {
                 Debug_printv("RAM execute %04X", addr);
-                printf("%s", util_hexdump((const uint8_t*)ram.data(), ram.size()).c_str());
                 mw_hash = 0xFFFF;
             }
         }

@@ -1609,10 +1609,14 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                     Debug_printv("Memory Read [%s]", code.c_str());
                     Debug_printv("address[%04X] size[%d]", address, size);
 
-                    uint8_t data[size] = { 0 };
-                    m_memory.read(address, data, size);
-                    setStatus((char *) data, size);
-                    Debug_printv("address[%04X] data[%s]", address, mstr::toHex(data, size).c_str());
+                    // size is uint8_t, so 255 is the most that can be asked for.
+                    uint8_t data[256] = { 0 };
+                    // read() answers with what it could actually supply --
+                    // publishing `size` bytes regardless would hand the caller
+                    // buffer contents for an address that is not mapped.
+                    size_t got = m_memory.read(address, data, size);
+                    setStatus((char *) data, got);
+                    Debug_printv("address[%04X] data[%s]", address, mstr::toHex(data, got).c_str());
                 }
                 else if (command[2] == 'W') // M-W memory write
                 {
@@ -1622,8 +1626,11 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
 
                     command = mstr::drop(command, 3); // Drop address, size
 
-                    //std::string code = mstr::toHex((const uint8_t *)command.c_str(), size);
-                    //Debug_printv("Memory Write [%04X][%d]:[%s]", address, size, code.c_str());
+                    if (size > command.size())
+                        size = command.size();
+
+                    Debug_printv("Memory Write address[%04X] size[%d] data[%s]", address, size,
+                                 mstr::toHex((const uint8_t *)command.c_str(), size).c_str());
 
                     m_memory.write(address, (const uint8_t *)command.c_str(), size);
                 }

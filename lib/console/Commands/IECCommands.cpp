@@ -308,7 +308,20 @@ static int use(int argc, char **argv)
 // ST_SYNTAX_INVALID, so "exec M-R" answers "31,INVALID COMMAND".
 //
 // Binary bytes -- M-R/M-W/B-P carry addresses and data that are not text at
-// all -- are written as "0xNN" and pass through verbatim, unconverted.
+// all -- are written as "0x" followed by an even number of hex digits, and
+// pass through verbatim, unconverted.  ONE "0x" introduces a RUN of bytes:
+// "0x000009" is three bytes 00 00 09, not one byte followed by the text
+// "0009".  The per-byte form still works, so "0x000x030x01" is the same three
+// bytes as "0x000301" -- the run stops at the 'x', which is not a hex digit.
+//
+// The ambiguity this accepts, deliberately: a hex escape immediately followed
+// by text whose first two characters are hex digits will swallow them
+// ("0x00cd" is two bytes 00 CD, not one byte then "cd").  That is tolerable
+// because every command carrying binary -- M-R, M-W, M-E, B-P -- is all
+// binary after the verb.  Put the text before the escape, or split the run
+// with a space, when it matters.
+//
+// A trailing odd hex digit is left as text rather than guessed at.
 static std::string encodeDosCommand(const std::string &line)
 {
     std::string out;
@@ -325,15 +338,22 @@ static std::string encodeDosCommand(const std::string &line)
     // Rejoin the tokens the console split on whitespace.
     for (size_t i = 0; i < line.size(); )
     {
-        // Hex bytes are written verbatim.
+        // Hex bytes are written verbatim -- one "0x" introduces a run of them.
         if (i + 4 <= line.size() && line[i] == '0' && (line[i + 1] == 'x' || line[i + 1] == 'X') &&
             isxdigit(static_cast<unsigned char>(line[i + 2])) &&
             isxdigit(static_cast<unsigned char>(line[i + 3])))
         {
             flushText();
-            char hex[3] = { line[i + 2], line[i + 3], '\0' };
-            out += static_cast<char>(strtol(hex, nullptr, 16));
-            i += 4;
+            size_t j = i + 2;
+            while (j + 2 <= line.size() &&
+                   isxdigit(static_cast<unsigned char>(line[j])) &&
+                   isxdigit(static_cast<unsigned char>(line[j + 1])))
+            {
+                char hex[3] = { line[j], line[j + 1], '\0' };
+                out += static_cast<char>(strtol(hex, nullptr, 16));
+                j += 2;
+            }
+            i = j;
         }
         else
         {
@@ -402,9 +422,11 @@ static int execDos(int argc, char **argv)
         // Spacing is sent exactly as typed: "B-P 2 0" wants its separators,
         // "M-R" wants its address bytes butted straight up against the verb.
         Serial.printf("Usage: exec {DOS command}\r\n");
-        Serial.printf("       type in lowercase (PETSCII); binary bytes are written 0xNN\r\n");
+        Serial.printf("       type in lowercase (PETSCII); binary bytes are written 0xNN,\r\n");
+        Serial.printf("       and one 0x may carry a run: 0x000009 == 0x000x000x09\r\n");
         Serial.printf("       e.g. exec i0:            exec \"s0:filename\"\r\n");
-        Serial.printf("            exec m-r0x000x030x01\r\n");
+        Serial.printf("            exec m-r0x000009                 read 9 bytes at $0000\r\n");
+        Serial.printf("            exec m-w0x000009010203040506070809  write 9 bytes at $0000\r\n");
         return EXIT_FAILURE;
     }
 
@@ -501,6 +523,6 @@ namespace ESP32Console::Commands
     const ConsoleCommand getExecCommand()
     {
         return ConsoleCommand("exec", &execDos,
-            "Send a DOS command to the selected device (type lowercase; write binary bytes as 0xNN). Usage: exec {DOS command}");
+            "Send a DOS command to the selected device (type lowercase; write binary bytes as 0xNN, one 0x may carry a run). Usage: exec {DOS command}");
     }
 }
