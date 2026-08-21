@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <iomanip>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -241,6 +242,19 @@ void iecFuji::local_ip()
     response = ss.str();
 }
 
+void iecFuji::mac_address()
+{
+    fnWiFi.get_mac(cfg.macAddress);
+    std::ostringstream ss;
+    // Output the MAC address as string
+    ss << std::hex << std::uppercase;
+    for (int i = 0; i < 6; ++i) {
+        if (i > 0) ss << ":";
+        ss << std::setw(2) << std::setfill('0') << (int)cfg.macAddress[i];
+    }
+    response = ss.str();
+}
+
 
 void iecFuji::process_basic_commands()
 {
@@ -322,8 +336,8 @@ void iecFuji::process_basic_commands()
     //     gateway();
     // else if (payload.find("dnsip") != std::string::npos)
     //     dns_ip();
-    // else if (payload.find("macaddress") != std::string::npos)
-    //     mac_address();
+    else if (payload.find("macaddress") != std::string::npos)
+        mac_address();
     // else if (payload.find("bssid") != std::string::npos)
     //     bssid();
     // else if (payload.find("fnversion") != std::string::npos)

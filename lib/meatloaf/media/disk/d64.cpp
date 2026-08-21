@@ -611,6 +611,11 @@ bool D64MStream::seekEntry( uint16_t index )
     //Debug_printv("----------");
     //Debug_printv("index[%d] sectorOffset[%d] entryOffset[%d] entry_index[%d]", index, sectorOffset, entryOffset, entry_index);
 
+    // Set once the entry we want has already been read into `entry`, so the
+    // unconditional readContainer() below is skipped instead of re-seeking to
+    // the exact same offset and reading it a second time.
+    bool haveEntry = false;
+
     if (index == 0 || index != entry_index)
     {
         // Start at first sector of directory
@@ -638,8 +643,21 @@ bool D64MStream::seekEntry( uint16_t index )
             //Debug_printv("sectorOffset[%d] -> track[%d] sector[%d]", sectorOffset, track, sector);
 
         } while (sectorOffset-- > 0);
-        if (!seekSector(track, sector, entryOffset))
+
+        if (entryOffset == 0)
+        {
+            // The loop above just landed on and read entry 0 of the target
+            // sector -- which IS the entry being sought. Re-seeking to that
+            // same offset and reading it again was pure duplication: a
+            // second seek()/read() round trip over the exact same bytes,
+            // and on a reused HTTP connection that extra round trip is what
+            // came back with corrupted/blank data instead of a cache hit.
+            haveEntry = true;
+        }
+        else if (!seekSector(track, sector, entryOffset))
+        {
             return false;
+        }
     }
     else
     {
@@ -654,7 +672,8 @@ bool D64MStream::seekEntry( uint16_t index )
         }
     }
 
-    readContainer((uint8_t *)&entry, sizeof(entry));
+    if (!haveEntry)
+        readContainer((uint8_t *)&entry, sizeof(entry));
 
     // If we are at the first entry in the sector then get next_track/next_sector
     if (entryOffset == 0)

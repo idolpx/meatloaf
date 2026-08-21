@@ -354,7 +354,7 @@ protected:
     // void netmask();
     // void gateway();
     // void dns_ip();
-    // void mac_address();
+    void mac_address();
     // void bssid();
     // void fn_version();
     
