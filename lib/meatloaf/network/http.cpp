@@ -1650,7 +1650,21 @@ uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
 
     if (_is_open) {
         //Debug_printv("Reading HTTP Stream!");
+
         auto bytesRead = esp_http_client_read(_http, (char *)buf, size);
+
+        // If read returns negative (error), try to recover by reopening the stream
+        if (bytesRead < 0) {
+            Debug_printv("esp_http_client_read error %d, attempting to reopen", bytesRead);
+            _is_open = false;
+            if (processRedirectsAndOpen(_position, size)) {
+                bytesRead = esp_http_client_read(_http, (char *)buf, size);
+            }
+            if (bytesRead < 0) {
+                Debug_printv("Reopen failed, returning 0");
+                return 0;
+            }
+        }
 
         if (bytesRead >= 0) {
             _position+=bytesRead;
