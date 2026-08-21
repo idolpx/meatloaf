@@ -99,7 +99,7 @@ bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
 {
     uint16_t sectorOffset = 0;
 
-    //Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
+    Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
 
     // Is this a valid track?
     uint16_t c = curPartition().block_allocation_map.size() - 1;
@@ -138,7 +138,7 @@ bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
     this->track = track;
     this->sector = sector;
 
-    //Debug_printv("track[%d] sector[%d] speedZone[%d] sectorOffset[%d]", track, sector, speedZone(track), sectorOffset);
+    Debug_printv("track[%d] sector[%d] speedZone[%d] sectorOffset[%d]", track, sector, speedZone(track), sectorOffset);
 
     return containerStream->seek((sectorOffset * block_size) + offset);
 }
@@ -608,8 +608,8 @@ bool D64MStream::seekEntry( uint16_t index )
     uint16_t sectorOffset = index / 8;
     uint16_t entryOffset = (index % 8) * 32;
 
-    //Debug_printv("----------");
-    //Debug_printv("index[%d] sectorOffset[%d] entryOffset[%d] entry_index[%d]", index, sectorOffset, entryOffset, entry_index);
+    Debug_printv("----------");
+    Debug_printv("index[%d] sectorOffset[%d] entryOffset[%d] entry_index[%d]", index, sectorOffset, entryOffset, entry_index);
 
     // Set once the entry we want has already been read into `entry`, so the
     // unconditional readContainer() below is skipped instead of re-seeking to
@@ -631,7 +631,7 @@ bool D64MStream::seekEntry( uint16_t index )
         {
             if (next_track)
             {
-                //Debug_printv("next_track[%d] next_sector[%d]", entry.next_track, entry.next_sector);
+                Debug_printv("next_track[%d] next_sector[%d]", entry.next_track, entry.next_sector);
                 if (!seekSector(entry.next_track, entry.next_sector))
                     return false;
             }
@@ -640,7 +640,7 @@ bool D64MStream::seekEntry( uint16_t index )
             next_track = entry.next_track;
             next_sector = entry.next_sector;
 
-            //Debug_printv("sectorOffset[%d] -> track[%d] sector[%d]", sectorOffset, track, sector);
+            Debug_printv("sectorOffset[%d] -> track[%d] sector[%d]", sectorOffset, track, sector);
 
         } while (sectorOffset-- > 0);
 
@@ -683,7 +683,7 @@ bool D64MStream::seekEntry( uint16_t index )
     }
 
     std::string e = mstr::toHex((uint8_t *)&entry, sizeof(entry));
-    //Debug_printv("file_type[%02X] file_name[%.16s] entry[%s]", entry.file_type, entry.filename, e.c_str());
+    Debug_printv("file_type[%02X] file_name[%.16s] entry[%s]", entry.file_type, entry.filename, e.c_str());
 
     // if ( next_track == 0 && next_sector == 0xFF )
     entry_index = index + 1;
