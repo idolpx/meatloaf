@@ -1720,7 +1720,7 @@ uint32_t MeatHttpClient::write(const uint8_t* buf, uint32_t size) {
 
 int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_t position, uint32_t size) {
 
-    //Debug_printv("openAndFetchHeaders: method=%d, position=%u, size=%u, url=%s", method, position, size, url.c_str());
+    Debug_printv("openAndFetchHeaders: method=%d, position=%u, size=%u, url=%s", method, position, size, url.c_str());
 
     if ( url.size() < 5)
         return 0;
@@ -1729,13 +1729,6 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     // calling set_url/set_method on a NULL handle crashes (StoreProhibited).
     if ( _http == nullptr )
         return 0;
-
-    // static esp_err_t esp_http_client_prepare(esp_http_client_handle_t client)
-    // {
-    // // Reset the response buffer before each new request to ensure raw_data == orig_raw_data.
-    // esp_http_client_cached_buf_cleanup(client->response->buffer);
-    // // Also unconditionally reset raw_len.
-    // client->response->buffer->raw_len = 0;
 
     // Set URL and Method
     mstr::replaceAll(url, " ", "%20");
@@ -1792,20 +1785,20 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
         }
         else
         {
-        uint32_t rangeEnd = position + size + 5;
-        // _range_size (from a prior 206's Content-Range ".../TOTAL") is the
-        // authoritative total once any ranged response has occurred — on a
-        // 206, _size (Content-Length) is only that partial chunk's length,
-        // not the resource's total, so it must never win once _range_size
-        // is known. _size is the right fallback only for a server that
-        // answers with a plain 200 (full body) and never sends a 206.
-        uint32_t knownSize = (_range_size > 0) ? _range_size : ((_size > 0) ? _size : 0);
-        if (knownSize > 0 && rangeEnd >= knownSize)
-            rangeEnd = knownSize - 1;
-        snprintf(str, sizeof str, "bytes=%" PRIu32 "-%" PRIu32, position, rangeEnd);
-        esp_http_client_set_header(_http, "Range", str);
-        sentRange = true;
-        //Debug_printv("seeking range[%s] url[%s]", str, url.c_str());
+            uint32_t rangeEnd = position + size + 5;
+            // _range_size (from a prior 206's Content-Range ".../TOTAL") is the
+            // authoritative total once any ranged response has occurred — on a
+            // 206, _size (Content-Length) is only that partial chunk's length,
+            // not the resource's total, so it must never win once _range_size
+            // is known. _size is the right fallback only for a server that
+            // answers with a plain 200 (full body) and never sends a 206.
+            uint32_t knownSize = (_range_size > 0) ? _range_size : ((_size > 0) ? _size : 0);
+            if (knownSize > 0 && rangeEnd >= knownSize)
+                rangeEnd = knownSize - 1;
+            snprintf(str, sizeof str, "bytes=%" PRIu32 "-%" PRIu32, position, rangeEnd);
+            esp_http_client_set_header(_http, "Range", str);
+            sentRange = true;
+            //Debug_printv("seeking range[%s] url[%s]", str, url.c_str());
         }
     }
 

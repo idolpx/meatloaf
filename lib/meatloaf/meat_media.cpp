@@ -201,11 +201,27 @@ void MMediaStream::close()
 uint32_t MMediaStream::readContainer(uint8_t *buf, uint32_t size)
 {
     //Debug_printv("readContainer[%lu]", size);
-    uint32_t bytesRead = containerStream->read(buf, size);
-    // if (bytesRead < size) {
-    //     Debug_printv("WARNING: Short read - requested %lu, got %lu", size, bytesRead);
-    // }
-    return bytesRead;
+    // A single containerStream->read() call can return fewer bytes than
+    // requested without that meaning EOF -- notably over HTTP, where a read
+    // can land on the tail of an already-open ranged response window that is
+    // shorter than the request (e.g. seek()'s "already there" fast path
+    // reusing a response with only a few bytes left before its Content-Length
+    // is exhausted). MeatHttpClient::read() already re-pages a fresh range
+    // request when that happens, but only a SECOND read() call picks up the
+    // bytes it fetches. Without looping here, a short read left the caller's
+    // struct (an Entry, a BAM record, a header, ...) with its tail untouched
+    // -- stale or zeroed -- which is how a directory sector landing on that
+    // exact boundary (D81's two-sided BAM does, D64's single BAM usually
+    // doesn't) came back with blank filenames instead of real ones.
+    uint32_t total = 0;
+    while (total < size)
+    {
+        uint32_t n = containerStream->read(buf + total, size - total);
+        if (n == 0)
+            break;
+        total += n;
+    }
+    return total;
 }
 uint32_t MMediaStream::writeContainer(uint8_t *buf, uint32_t size)
 {

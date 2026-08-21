@@ -158,7 +158,7 @@ uint8_t iecChannelHandler::read(uint8_t *data, uint8_t n)
         // (e.g. HTTP complete() flag racing with the ESP-IDF event loop).
         if( m_len == 0 )
         {
-            Debug_printv("EOS latched: m_ptr[%d] m_len[%d]", m_ptr, m_len);
+            //Debug_printv("EOS latched: m_ptr[%d] m_len[%d]", m_ptr, m_len);
             m_eos = true;
             return 0;
         }
@@ -685,7 +685,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
             // range the C64 renders as capitals - which is why literal strings
             // destined for a listing are written in lowercase.
             name = mstr::toPETSCII2( name );
-            Debug_printv("converted name[%s] ext[%s]", name.c_str(), ext.c_str());
+            // Debug_printv("converted name[%s] ext[%s]", name.c_str(), ext.c_str());
 
 #if 0
             // C64 compatibale filename (16+3 chars)
