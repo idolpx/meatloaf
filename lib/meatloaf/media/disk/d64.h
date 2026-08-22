@@ -466,6 +466,7 @@ protected:
     bool setBlockAllocation( uint8_t track, uint8_t sector, bool allocate ) override;
     uint16_t getTrackFreeCount( uint8_t track );
     bool findFreeSectorOnTrack( uint8_t track, uint8_t startSector, uint8_t *foundSector );
+    bool validateBAM() override;
 
     // Streamed new-file write (SAVE): blocks are allocated one at a time as
     // data arrives, the directory entry is added when the stream is closed.

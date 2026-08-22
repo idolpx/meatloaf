@@ -2233,7 +2233,24 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
             }
         break;
         case 'V':
-            Debug_printv( "validate bam");
+            {
+                Debug_printv( "validate bam");
+
+                std::unique_ptr<MFile> image(MFSOwner::File(m_cwd->url));
+                auto stream = image ? image->getSourceStream() : nullptr;
+                if (stream == nullptr || !stream->isOpen() || !image || !image->isWritable)
+                {
+                    setStatusCode(ST_DRIVE_NOT_READY);
+                    return;
+                }
+
+                if (!stream->validateBAM())
+                {
+                    setStatusCode(ST_DRIVE_NOT_READY);
+                    return;
+                }
+                return;
+            }
         break;
         default:
             //Error(ERROR_31_SYNTAX_ERROR);
