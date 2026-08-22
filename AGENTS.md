@@ -588,6 +588,14 @@ gitignored.
 - **A CBM status can carry raw binary** (`M-R` answers with drive memory), so anything rendering one to a human must hex-dump it when a byte falls outside `0x20-0x7E` rather than printing it as text. `printStatus()` in `IECCommands.cpp` is the reference.
 - **A Lynx block is 254 bytes, and `MStream::block_size` is 256 — never use the inherited member for LNX geometry.** `lnx.cpp` used it for all three of the entry size, the data start offset and the per-entry stride, so **every entry came out two bytes late per block**: the first byte a caller saw was the third byte of the file, and a PRG lost its `01 08` load address, appearing to start at its BASIC link pointer. A Lynx archive is a CBM file laid out in disk blocks with the two link bytes stripped, so a block carries 254; `LSU` is the INDEX of the last used byte within the 256-byte sector, where data begins at index 2, so the last block contributes `lsu - 1`. Correct: `data_start = directory_blocks * 254`, `stride = block_count * 254`, `size = (block_count - 1) * 254 + (lsu - 1)`. **Derive the stride from the declared block count, not from the byte size rounded up** — the two differ in the last block, so deriving it from the size compounds any error in the size.
 - **The invariant that settles LNX arithmetic against media nobody here wrote: entries tile the archive, so the last one ends at EOF** (within its final partly-used block). On `Tetrix.lnx` that is exact — `254 + 77*254 = 19812`, `+ (254 + 176) = 20242 = EOF` — and it is what `test_lnx_real_archive_entries_tile_the_file` asserts over a real sample. With 256-byte blocks the walk overshoots and the last entry runs past the end, which is the cheapest possible detector.
+- **A SPYne is the LNX geometry again, and gets the 254 rule with it** (`media/archive/spy.h/.cpp`, read-only). Files are stored uncompressed, each occupying a whole number of 254-byte blocks; the extraction code is the first 15 blocks, the central directory starts at block 15 ($0EE2), and file data starts in the block after the directory ends — so `data_start = (15 + ceil(entries/8)) * 254`. Size is `(blocks - 1) * 254 + (lsu - 1)`, the same LSU convention LNX uses. **Eight entries fit one directory block, and the eighth is 30 bytes rather than 32**: `7 * 32 + 30 = 254` exactly, because the eighth entry's two filler bytes would cross the boundary and so are never written. The stride WITHIN a block and the stride BETWEEN blocks are therefore different numbers, and a flat `i * 32` walks two bytes further adrift with every block. **There is no signature** — the format has none — so `readHeader()` validates that the first directory entry is structurally one (type $81-$83, last-file marker $00 or $FF); the $02A7 load address is logged when it differs but not required. The walk ends at the entry whose marker is $00.
+- **A SPYne's computed end misses EOF in BOTH directions, by under one block, and that is the tiling invariant to assert** — not LNX's exact-tiling one, which fails here. Over when the archiver stored no padding after the last file's real bytes (three of the five corpus containers), under when the container carries a few trailing bytes (NTSC4K-2 by 42, TURBO-MP by 20). Reads clamp to `_size` and a short return at the end is correct, not truncation.
+- **Wraptor (`.wra`/`.wr3`) is ONE implementation for both extensions** (`media/archive/wra.h/.cpp`, read-only). The version difference is entirely in how Wraptor 1/2 versus 3 reconstruct GEOS files — a bug-fix lineage, not a container or compression change — and since nothing here reconstructs a GEOS file there is nothing to switch on. Layout is a bare concatenation: `FF 42 4C FF`, a NUL-terminated name, a type byte (1 SEQ, 2 PRG, 3 USR, 4 GEOS), then LZSS data running to two bytes before the next signature. Those two bytes are a CRC **whose algorithm the format documentation does not give**, so nothing verifies it. There is no directory, no stored size and no next-entry offset — the entry list is a buffered signature scan, and a hit not followed by a plausible name and a valid type byte is dropped as a false positive so the entry before it keeps running to the next real signature.
+- **Wraptor's LZSS is MSB-first, and its dictionary offset is an ABSOLUTE index into the 32 KB output window, not a distance back.** One flag bit selects a literal (8 bits) or a code; a code of 0 escapes to either end-of-stream or "widen the code by one bit", starting at 8. The copy source is `window[(offset - 1 + i) % 32768]` — one-based, and the window wraps rather than sliding. **Bit order was established by measurement**, from the worked example in the format document: MSB-first yields `01 08` and then a BASIC link pointer that walks correctly, LSB-first yields nothing that parses. Do not "fix" it by symmetry with another format.
+- **A Wraptor GEOS payload carries nine bytes Wraptor invented, and they are NOT stripped.** Layout, established by inspection since the format document does not describe it: structure (0 sequential, 1 VLIR), GEOS file type, year, month, day, hour, minute, block count low/high — then the GEOS info sector at offset 9, whose first three bytes are always `03 15 BF`. **The payload is served verbatim**, matching what D64 already does for VLIR (`AGENTS.md`: there is no VLIR support anywhere in the codebase); stripping would need a content heuristic that the corpus, being 100% GEOS, cannot validate the negative case of. Two of those fields are duplicated inside the info sector 254 bytes further on, which is what makes the decode self-checking — see the native suite.
+- **The Wraptor type byte does not mean what the format document implies, so never use it to detect a GEOS payload.** It tracks the C64 file type, not GEOS-ness: every type-4 entry in the corpus reports PRG in its info sector and every type-3 one reports USR, while BOTH carry the nine-byte GEOS header. So `.decodeType()` maps 4 to `prg`, and anything wanting to know whether a payload is GEOS must look at the payload.
+- **A Wraptor name's encoding is decided PER NAME, not per archive** (`WRAMStream::decodeName()`). Wraptor writes the name exactly as the CBM directory held it and flags nothing, and one archive can hold both kinds: a plain CBM name is PETSCII, a GEOS name is the ASCII GEOS itself uses (`ReadPaint`, `M.Randall`). PETSCII has no ASCII lowercase range — $61-$7A are graphics there — so a name carrying any of those bytes is GEOS ASCII and passes through untouched; anything else is read as PETSCII and `toUTF8()`d, which lowercases it (`GEOS` is held as `geos`) per the repository-wide convention. Running `toUTF8()` over a GEOS name instead maps its lowercase bytes to graphics characters. Both sides — the listing and the lookup — must call this one function.
+- **A Wraptor listing reports the COMPRESSED span, and the true size only exists after decoding.** Nothing in the container states the decompressed length, and the format document calls decode-to-list "very slow"; `seekPath()` sets the real `_size`. The 32 KB window is heap-allocated with `malloc` + placement new (`-fno-exceptions`, and a 32 KB stack frame is reserved on function ENTRY — the defect `ArcDecoder` shipped with), and decoding one entry needs the window plus the compressed span plus the whole output at once, so **WRA is effectively a PSRAM-board feature**. A stream that runs out of input before its own end marker FAILS rather than serving a short file that looks whole.
 - **The `.archive` corpus moved into `.archive/archive/<format>/` and five `test_container_entries` cases still pointed at the old paths**, so they had been silently `TEST_IGNORE`-skipping rather than testing anything — including `test_ark_real_archive_data_offsets`, which covers the same class of defect as the LNX one. Paths fixed; the suite now runs 19/19 with none skipped. **A skipped corpus test reads as a pass in the summary line** — check the skip count, not just the status, after any corpus reorganisation.
 - **A CBM `.sfx` is a PRG wrapped round an LHA archive, and libarchive will not find it without being told.** `archive_read_format_lha_bid()` enters its self-extracting scan only when the file starts with `MZ` — a DOS/PE executable — and a Commodore self-extractor starts with a two-byte load address (`01 1C` on the sample), so the bidder saw no header, bid 0, and **`raw` won with a single bogus entry spanning the whole file**: `Archive format: (null)`, `filter none`, one `d`-flagged entry the exact size of the container. New `lha:sfx` option sets `lha->opt_sfx`, and both gates — the bidder and `read_header`'s call to `lha_skip_sfx()` — now accept `MZ || opt_sfx`. `Archive::open()` sets it for `.sfx` and registers lha alone. **The scan is opt-in on purpose**: it reads up to 20 KB ahead, and the unknown-extension fallback registers lha speculatively for every file it cannot name, so making it unconditional would put a 20 KB probe in front of every `.gz`. `lha_skip_sfx()` itself was already MZ-agnostic and needed no change — it just scans for a header, and consumes 0 when the archive starts at offset 0, so a plain `.lha` renamed `.sfx` still works.
 - **A bidder CAN reach its own format data**: `choose_format()` sets `a->format` to the slot being bid before calling it ("Set up a->format for convenience of bidders"), even though `archive_read_open1()` only assigns `a->format` for real after the winner is chosen. That is what lets the bidder read `opt_sfx`.
@@ -618,6 +626,80 @@ gitignored.
 - **FTP file reads STREAM; they are not cached first** (`lib/FileSystem/fnFileFTP.h/.cpp`). `FileHandlerFTP` reads straight off the live RETR connection through a 512-byte buffer, so the RAM cost is the same whatever the file's size. **The transfer starts LAZILY, on the first read** — that is what lets `FTPMStream::open()` keep its seek-to-end/tell/seek-to-start size probe with no network traffic, and is why that code needed no change. Backwards seeks (and forward seeks past 8 KB) restart the transfer at the new offset with `REST`; shorter forward seeks read and discard. `FileCache::open()` is still tried first, so `#cache=sd` is unaffected, and a server that will not answer `SIZE` falls back to the old caching path. **`REST` itself is not hardware-verified** — every read so far has been forward-only.
 - **`DISABLE_DIRCACHE` (undefined by default) makes `FileSystemFTP` stream its directory listing** instead of caching it. `DirCache` holds a `fsdir_entry` per entry — `char filename[256]` plus size and flags, **272 bytes** — from the internal heap on a board without PSRAM, which is the largest single cost of an `ls` over FTP. With the flag set, one entry is held at a time: no sorting (`FTPMFile` passes `DIR_OPTION_UNSORTED` anyway, so only a fuji host slot notices), no listing re-use, and `dir_seek()` re-lists and skips forward. Only `FileSystemFTP` honours the flag; SD, NFS, SMB, HTTP and TNFS still cache unconditionally.
 - **`FTPMFile::readEntry()`'s `dir_open` test was inverted** (`if (!fs->dir_open(...))`) — `dir_open` returns true on success, so the scan loop only ever ran on a listing that had FAILED to open, and an FTP wildcard could never match. Fixed; note the same call must `dir_close()` on both exits now that streaming leaves the data connection open.
+
+## Recent Changes (August 22, 2026)
+
+### SPY and WRA/WR3 filesystems
+
+Two new read-only filesystems, `spyFS` (`.spy`) and `wraFS` (`.wra` + `.wr3`), both registered
+behind `EXTRA_DISK_FORMATS` alongside arc/g71/g81/p81. Durable rules are in the Important Notes
+above; format detail is in `lib/meatloaf/AGENTS.md`.
+
+- **Both formats were decoded from their specifications and then validated against the real corpus
+  before any firmware code was written.** That is what made the implementation cheap: the layouts
+  were already known-good, and both native suites went green on their first run bar one wrong
+  assertion of mine (see the SPY tiling note above).
+- **SPY's oracle is the checksum every directory entry carries** — a 16-bit sum without carry over
+  the file's own bytes. All **67 entries across the five corpus containers** read through the stream
+  and match, and they match over exactly the derived size rather than over the padded block, which
+  is what pins the `(blocks - 1) * 254 + (lsu - 1)` size formula as well as the offsets.
+- **WRA has no usable checksum** — the format document gives no CRC algorithm — so the suite uses
+  two other oracles: clean termination inside the span the container frames, and the fact that
+  Wraptor's nine-byte GEOS header duplicates two fields into the info sector 254 bytes further on
+  and states a block count that reconciles with the decoded length. All **28 entries across seven
+  archives** satisfy both. A third check decodes the same entry out of three independently built
+  archives and compares byte for byte.
+- **Termination alone is NOT sufficient, and the suite says so because it was measured.** Reversing
+  the bit reader to LSB-first still terminates cleanly on every entry in the corpus — it just
+  produces 176 bytes where 511 belong. Only the reconciliation catches it. The header comment in
+  `test_wra_read.cpp` originally claimed termination would catch a wrong bit order; the mutation run
+  disproved that and the comment was corrected rather than left flattering.
+- **Both suites were mutation-checked.** Changing SPY's block size 254 → 256 fails 6 of its 9 cases;
+  reversing WRA's bit order fails 5 of its 12. Worth repeating after any change to either decoder —
+  a suite that cannot reach the defect it exists for is the trap the g64 and nib entries document.
+- **An off-by-one over-read in WRA's name scan was found by re-reading the code, not by the tests**:
+  the type byte is read out of the same buffer as the name, so a window sized to the name alone
+  over-reads it by one when the terminator lands on the last byte. The corpus never reaches it
+  (names are ≤ 13 bytes against a 32-byte window), which is exactly why no test caught it.
+- **Builds**: `lolin-d32-pro` (feature compiled but not registered) Flash 42.4%, RAM 32.4%;
+  `esp32-s3-devkitc-1` (feature registered) Flash 82.0%, RAM 30.8%. Neither overflows
+  `iram0_2_seg`, and `lolin-d32-pro` is an ESP32-WROVER PSRAM board — the same small-window
+  exposure class as `fujiloaf-rev0` — so the flash-window question is answered for that class.
+  Native suites `test_spy_read` 9/9 and `test_wra_read` 14/14, **no skips**; full suite 308 cases,
+  295 succeeded, 10 skipped (all pre-existing), 3 errored (`test_EdUrlParser`, `test_hdd_read`,
+  `test_strings` — the documented baseline trio). 274 + 21 new = 295, so nothing regressed.
+- **`fujiloaf-rev0` and `iec-nugget` do NOT build, for a reason unrelated to this work.**
+  `lib/bus/iec/IECConfig.h` has an unbalanced preprocessor chain — line 67 closes the
+  `#ifndef IECCONFIG_H` include guard early, so line 106 is `#endif without #if` and everything
+  from line 83 down falls outside the guard. `iec-nugget` reports that directly; on
+  `fujiloaf-rev0` it surfaces one level on, as `IEC_SUPPORT_FASTLOAD` never being defined and
+  `m_buffer`/`m_bufferSize` therefore being undeclared across `IECBusHandler.cpp`. That whole
+  subsystem is mid-edit (304 uncommitted lines adding AR6/Hypraload fast loaders) and was not
+  touched here. Re-check both boards once it balances.
+- **NOT hardware-tested, and currently not reachable on the board this repo is usually tested with.**
+  `EXTRA_DISK_FORMATS` is set only for `esp32-s3-devkitc-1`, while every hardware verification in
+  this file was done on `lolin-d32-pro` — so exercising either format on real hardware means using
+  the S3, or adding the flag to another board and checking it still links. Nothing has been driven
+  from a real C64 or from the device console; the whole of the evidence above is the native suites
+  plus the corpus. The `MFile` half (`rewindDirectory`/`getNextFileInDir`) is not natively testable
+  at all, since `MFSOwner::File()` aborts under the stubs — the same limitation the M2I, HDD and
+  CSM suites carry.
+- **The one non-GEOS Wraptor sample that exists anywhere is the format document's own worked
+  example, and it is now a fixture.** The corpus is 100% GEOS, so nothing in it exercises a plain
+  file — and "a plain file carries no nine-byte header", which is what the serve-verbatim decision
+  rests on, had no test behind it. That 128-byte dump decodes to 80 bytes of real C64 BASIC
+  (`$0801`, link to `$0823`, `LOAD "POOYAN.LOADER",8,1`) with the load address at offset 0 and no
+  header, terminating exactly at its CRC. It also re-establishes the bit order independently of the
+  GEOS corpus: a BASIC link pointer that walks correctly cannot come out of a decoder reading its
+  bits the other way round.
+- **The buffered signature scan's chunk-boundary carry has its own fixture**, because no corpus
+  archive happens to put a signature across a 1024-byte boundary and the carry would otherwise be
+  untested.
+- **GEOS files are not reconstructed, deliberately.** A `.wr3` entry reads back as Wraptor's nine
+  bytes plus the GEOS info sector plus the file's data, which is the honest content and consistent
+  with how a VLIR file already reads out of a D64. Emitting CVT would make `wra.cpp` the only place
+  in the tree that understands GEOS file structure, and there is no known-good CVT for these entries
+  to verify it against.
 
 ## Recent Changes (August 19-20, 2026)
 

@@ -513,6 +513,54 @@ When implementing a new stream:
 6. Verify ImageBroker caching works correctly
 7. Check memory leaks with stream chains
 
+## Recent Changes (August 22, 2026)
+
+### SPY containers, and Wraptor's LZSS
+
+Two read-only filesystems: `spyFS` (`media/archive/spy.h/.cpp`, `.spy`) and `wraFS`
+(`media/archive/wra.h/.cpp`, `.wra` + `.wr3`). Both are registered only under
+`EXTRA_DISK_FORMATS`, for the flash-text reason the ARC entry above describes.
+
+- **SPY is LNX's geometry with a different directory.** Files stored uncompressed, each a whole
+  number of 254-byte blocks; 15 blocks of self-extracting code, then the central directory, then the
+  data. It inherits every 254-vs-256 hazard LNX had, and `spy.cpp` names the constant once and uses
+  it in all three places that need it.
+- **The eighth directory entry in each block is 30 bytes, not 32.** `7 * 32 + 30 = 254`: the two
+  filler bytes at the end of an entry are simply not written when they would cross the block
+  boundary. So the entry offset is `dir_start + (i / 8) * 254 + (i % 8) * 32`, and a flat `i * 32`
+  drifts two bytes per block from the ninth entry on. `test_ninth_entry_starts_at_the_next_directory_block`
+  pins it by reading the name field out of the container directly and comparing.
+- **A SPYne has no signature at all.** `readHeader()` instead requires the first directory entry to
+  be structurally one — a CBM type of $81-$83 and a last-file marker of $00 or $FF. The $02A7 load
+  address of the extraction code is checked only to log a mismatch; a variant that loaded elsewhere
+  would still be read.
+- **Wraptor's compression is LZSS with a variable-width code, and two of its details are easy to get
+  backwards.** Bits are consumed MSB-first. The dictionary offset is an ABSOLUTE, one-based index
+  into a 32768-byte output window that WRAPS — `window[(offset - 1 + i) % 32768]` — not a distance
+  back from the write position, and not a sliding window. A code of 0 escapes to end-of-stream or to
+  "widen by one bit" (from 8). Both were established from the format document's own worked example,
+  which decodes to a valid PRG load address and BASIC link chain one way and to nothing the other.
+- **The 32 KB window is heap-allocated**, `malloc` + NULL check + placement new, per the rule the
+  ARC entry documents: a stack frame is reserved on function entry, so a 32 KB local faults before
+  the decoder runs. With the compressed span and the full output alongside it, decoding one entry
+  costs ~100 KB transient — WRA is a PSRAM-board feature.
+- **A GEOS payload keeps Wraptor's nine-byte header.** Nothing here reconstructs a GEOS file, which
+  matches the codebase's existing position (a VLIR file already reads back as its index block out of
+  a D64). Those nine bytes are documented in `wra.h` and in the test's header comment so a later
+  revisit is cheap, and the read path does not branch on them.
+- **The `.wra`/`.wr3` split needs no code.** It is a GEOS-reconstruction bug-fix lineage only; one
+  class handles both, and the corpus's single `.wra` decodes with the same decoder as its six
+  `.wr3`s.
+- **Host tests**: `test/native/test_spy_read/` (9 cases) and `test/native/test_wra_read/`
+  (12 cases), both against real corpora in `.archive/archive/spy` and `.archive/archive/wr3` and
+  both skipping cleanly without them. SPY checks all 67 entries against the checksum each directory
+  entry stores. WRA has no usable checksum — the format gives no CRC algorithm — so it checks all 28
+  entries against the GEOS header's own redundancy and block count, plus byte-identical decoding of
+  the same entry out of three independently built archives. **Termination is necessary but not
+  sufficient**: an LSB-first bit reader still terminates cleanly on every entry and simply produces
+  the wrong bytes, which is why the reconciliation is the load-bearing case and why the suite's
+  header says so.
+
 ## Recent Changes (August 17, 2026)
 
 ### ARC/SDA archives, and a flash-text ceiling that now gates the newer formats

@@ -70,6 +70,8 @@
 #include "media/archive/ark.h"
 #include "media/archive/lbr.h"
 #include "media/archive/lnx.h"
+#include "media/archive/spy.h"
+#include "media/archive/wra.h"
 #endif
 
 // Cartridge
@@ -358,6 +360,8 @@ ARCMFileSystem arcFS;
 ARKMFileSystem arkFS;
 LBRMFileSystem lbrFS;
 LNXMFileSystem lnxFS;
+SPYMFileSystem spyFS;
+WRAMFileSystem wraFS;
 #endif
 
 
@@ -470,6 +474,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &archiveFS,     // extension-based FS have to be on top to be picked first, otherwise the scheme will pick them!
     &arcFS,
     &arkFS, &lbrFS, &lnxFS,
+    &spyFS, &wraFS,
 #endif
 
     // Cartridge
