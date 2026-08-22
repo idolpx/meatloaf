@@ -119,7 +119,7 @@ namespace mstr {
         "._", ".DS_Store", ".fseventsd", ".Spotlight-V", ".TemporaryItems",
         ".Trashes", ".VolumeIcon.icns",
         // Windows
-        "Desktop.ini", "Thumbs.db", "System Volume Information", "$Recycle.bin",
+        "Desktop.ini", "Thumbs.db", "System Volume Information", "$Recycle.bin", "FOUND.000",
         nullptr
     };
 
