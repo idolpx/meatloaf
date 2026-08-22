@@ -64,19 +64,13 @@ typedef void (*interruptFcn)(void *);
 #define max(x, y) ((x)>(y) ? (x) : (y))
 
 #define PROGMEM
-#define pgm_read_word_near(p) (*(p))
-#define pgm_read_byte_near(p) (*(p))
-#define F(s) s
+#define pgm_read_word_near(p) (*p)
+#define pgm_read_byte_near(p) (*p)
 
 static void delayMicroseconds(uint32_t n) 
 { 
   uint32_t s = micros(); 
   while((micros()-s)<n); 
-}
-
-static void delay(int n) 
-{ 
-  delayMicroseconds(n*1000); 
 }
 
 static void attachInterrupt(uint8_t pin, interruptFcn userFunc, gpio_int_type_t intr_type)

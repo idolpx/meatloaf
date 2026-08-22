@@ -106,7 +106,7 @@ class IECDevice
   // read() is allowed to take an indefinite amount of time
   virtual uint8_t read() { return 0; }
 
-#if defined(IEC_FP_JIFFY) || defined(IEC_FP_DOLPHIN) || defined(IEC_FP_SPEEDDOS) || defined(IEC_FP_AR6)
+#if defined(IEC_FP_JIFFY) || defined(IEC_FP_DOLPHIN) || defined(IEC_FP_SPEEDDOS) || defined(IEC_FP_AR6) || defined(IEC_FP_HYPRALOAD)
   // called when the device is sending data using JiffyDOS byte-by-byte protocol
   // peek() will only be called if the last call to canRead() returned >0
   // peek() should return the next character that will be read with read()
@@ -126,7 +126,7 @@ class IECDevice
   virtual uint8_t write(uint8_t *buffer, uint8_t bufferSize, bool eoi);
 #endif
 
-#if defined(IEC_FP_JIFFY) || defined(IEC_FP_DOLPHIN) || defined(IEC_FP_SPEEDDOS) || defined(IEC_FP_EPYX) || defined(IEC_FP_FC3) || defined(IEC_FP_AR6)
+#ifdef IEC_SUPPORT_FASTLOAD
   // called when the device is sending data using the JiffyDOS block transfer
   // or DolphinDos burst transfer (LOAD protocols)
   // - should fill the buffer with as much data as possible (up to bufferSize)

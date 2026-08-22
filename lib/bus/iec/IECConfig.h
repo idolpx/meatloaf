@@ -21,19 +21,23 @@
 #include "../../include/pinmap.h"
 
 // un-comment this if you are using open-collector drivers for the CLK/DATA
-// lines (e.g. a 74LS07). If so, the IECBusHandler constructor requires
+// lines (e.g. a 7406 or 7407). If so, the IECBusHandler constructor requires
 // two extra pins for the CLK/DATA output signals
 #ifdef IEC_SPLIT_LINES
 #define IEC_USE_LINE_DRIVERS
 #endif
 
-// un-comment this IN ADDITION to USE_LINE_DRIVERS if you are using inverted
-// line drivers (such as 74LS06)
+// un-comment this IN ADDITION to IEC_USE_LINE_DRIVERS if you are using inverted
+// line drivers (such as 7406)
 #ifdef IEC_INVERTED_LINES
 #define IEC_USE_INVERTED_LINE_DRIVERS
 #endif
 
-// un-comment these #defines to completely disable support for the
+// un-comment this if you are using inverters on the IEC bus input signals
+// (only has an effect if IEC_USE_LINE_DRIVERS is also enabled)
+//#define IEC_USE_INVERTED_INPUTS
+
+// comment out these #defines to completely disable support for the
 // corresponding fast-load protocols (saves program memory in small devices)
 #define IEC_FP_JIFFY     0 // JiffyDos
 #define IEC_FP_EPYX      1 // EPYX FastLoad
@@ -42,20 +46,25 @@
 #if defined(PIN_PARALLEL_PC2) && defined(PIN_PARALLEL_FLAG2)
 #define IEC_FP_DOLPHIN   4 // Dolphin Dos
 #define IEC_FP_SPEEDDOS  5 // Speed Dos
+#define IEC_FP_HYPRALOAD 6 // Hypra-Load (64er Magazin)
 #ifdef PIN_PARALLEL_PA2
-#define IEC_FP_WIC64     6 // WiC64 Protocol Available
-#endif
-#ifdef PIN_XRA1405_CS
-#define IEC_SUPPORT_PARALLEL_XRA1405 // Use XRA1405 port extender for parallel cable
+#define IEC_FP_WIC64     7 // WiC64 Protocol Available
 #endif
 #endif
+
 
 // convenience macro, IEC_SUPPORT_FASTLOAD is defined if any fast-load protocols
 // are enabled
-#if defined(IEC_FP_JIFFY) || defined(IEC_FP_EPYX) || defined(IEC_FP_FC3) || defined(IEC_FP_AR6) || defined(IEC_FP_DOLPHIN) || defined(IEC_FP_SPEEDDOS)
+#if defined(IEC_FP_JIFFY) || defined(IEC_FP_EPYX) || defined(IEC_FP_FC3) || defined(IEC_FP_AR6) || defined(IEC_FP_DOLPHIN) || defined(IEC_FP_SPEEDDOS) || defined(IEC_FP_HYPRALOAD)
 #define IEC_SUPPORT_FASTLOAD
 #endif
 
+// un-comment this to use a XRA1405 port expander for the 8-bit parallel cable
+// instead of connecting the parallel pins directly to the microcontroller
+#ifdef PIN_XRA1405_CS
+#define IEC_SUPPORT_PARALLEL_XRA1405
+#endif
+#endif
 // support Epyx FastLoad sector operations (disk editor, disk copy, file copy)
 // if this is enabled then the buffer in the setBuffer() call must have a size of
 // at least 256 bytes. Note that the "bufferSize" argument is a byte and therefore
@@ -92,6 +101,4 @@
 // fast-load protocols use a parallel cable
 #if defined(IEC_FP_DOLPHIN) || defined(IEC_FP_SPEEDDOS)
 #define IEC_SUPPORT_PARALLEL
-#endif
-
 #endif

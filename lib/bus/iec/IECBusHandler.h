@@ -161,11 +161,7 @@ class IECBusHandler
   uint8_t m_primary, m_secondary;
 
   // Dedicated enable/disable latch for end()/begin(), checked by task() before
-  // touching anything else. m_flags is NOT safe for this purpose: task() does
-  // many m_flags|=/&=~ bit updates throughout its body, so a task() call that
-  // is already in flight when end() runs can clobber an m_flags==0xFF sentinel
-  // back to a non-sentinel value, un-disabling the bus. Nothing but begin()/end()
-  // ever writes m_enabled, so it can't be corrupted that way.
+  // touching anything else.
   volatile bool m_enabled;
 
 #ifdef IOREG_TYPE
@@ -272,13 +268,18 @@ class IECBusHandler
   int8_t transmitAR6Block(bool ar6Protocol);
   int8_t receiveAR6Block();
 #endif
-  
+
+#ifdef IEC_FP_HYPRALOAD
+  bool transmitHypraLoadByte(uint8_t data);
+  bool transmitHypraLoadBlock();
+#endif
+
 #if defined(IEC_SUPPORT_FASTLOAD)
   uint8_t m_bufferSize;
 #if IEC_DEFAULT_FASTLOAD_BUFFER_SIZE>0
 #if defined(IEC_FP_FC3)
   uint8_t  m_buffer[260];
-#elif (defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)) || defined(IEC_FP_AR6)
+#elif (defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)) || defined(IEC_FP_AR6) || defined(IEC_FP_HYPRALOAD)
   uint8_t  m_buffer[256];
 #else
   uint8_t  m_buffer[IEC_DEFAULT_FASTLOAD_BUFFER_SIZE];

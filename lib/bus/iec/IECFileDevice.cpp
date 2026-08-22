@@ -25,9 +25,9 @@
 #include "../../../include/esp-idf-arduino.h"
 #endif
 
-// DEBUG==0 => debug logging disabled
-// DEBUG==1 => debug logging enabled, default on, can be disabled by calling IECFileDevice::setLogging()
-// DEBUG==2 => debug logging enabled, default off, can be enabled by calling IECFileDevice::setLogging()
+// DEBUG==0 => debug data logging disabled
+// DEBUG==1 => debug data logging enabled, default on, can be disabled by calling IECFileDevice::setLogging()
+// DEBUG==2 => debug data logging enabled, default off, can be enabled by calling IECFileDevice::setLogging()
 // DEBUG >2 => additional debug logging that may break some timing (be careful!), default on
 #define DEBUG 0
 
@@ -156,6 +156,12 @@ void IECFileDevice::begin()
   ok = IECDevice::enableFastLoader(IEC_FP_EPYX, true);
 #if DEBUG>0
   Serial.print(F("Epyx FastLoad support ")); Serial.println(ok ? F("enabled") : F("disabled"));
+#endif
+#endif
+#ifdef IEC_FP_HYPRALOAD
+  ok = IECDevice::enableFastLoader(IEC_FP_HYPRALOAD, true);
+#if DEBUG>0
+  Serial.print(F("Hypra-Load support ")); Serial.println(ok ? F("enabled") : F("disabled"));
 #endif
 #endif
 #ifdef IEC_FP_FC3
@@ -879,6 +885,39 @@ bool IECFileDevice::isFastLoaderRequest(const char *cmd)
       m_uploadCtr = 0;
       m_eoi = false;
       m_channel = 1;
+      return true;
+    }
+#endif
+
+  // --------------------------- Hypra-Load ----------------------------
+
+#ifdef IEC_FP_HYPRALOAD
+  static const struct MWSignature hypraLoadSig[19] PROGMEM =
+    { {0x300,0x1e,0x6d}, {0x31e,0x1e,0xbc}, {0x33c,0x1e,0x4a}, {0x35a,0x1e,0xbf},
+      {0x378,0x1e,0xe3}, {0x396,0x1e,0x4c}, {0x3b4,0x1e,0x38}, {0x3d2,0x1e,0x82},
+      {0x3f0,0x1e,0x43}, {0x40e,0x1e,0x31}, {0x42c,0x1e,0x34}, {0x44a,0x1e,0xc1},
+      {0x468,0x1e,0x46}, {0x486,0x1e,0x5b}, {0x4a4,0x1e,0x78}, {0x4c2,0x1e,0xa4},
+      {0x4e0,0x1e,0xb4}, {0x4fe,0x1e,0x68}, {0x51c,0x1e,0x7f} };
+
+  if( !isFastLoaderEnabled(IEC_FP_HYPRALOAD) )
+    { /* Hypra-Load is disabled */ }
+  else if( checkMWcmds(hypraLoadSig, 19, 220) )
+    return true;
+  else if( (m_uploadCtr==237 || m_uploadCtr==238) && strncmp_P(cmd, PSTR("M-W"), 3)==0 )
+    {
+      // variations of HypraLoad uploads differ in final two segments
+      m_uploadCtr++;
+      return true;
+    }
+  else if( m_uploadCtr==239 && strncmp_P(cmd, PSTR("M-E\x8b\x04"), 5)==0 )
+    {
+      fastLoadRequest(IEC_FP_HYPRALOAD, IEC_FL_PROT_LOAD);
+#if DEBUG>0
+      Serial.println(F("HYPRALOAD FASTLOAD DETECTED"));
+#endif
+      m_uploadCtr = 0;
+      m_eoi = false;
+      m_channel = 0;
       return true;
     }
 #endif
