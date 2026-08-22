@@ -271,6 +271,14 @@ bool D64MStream::deallocateBlock(uint8_t track, uint8_t sector)
     return setBlockAllocation(track, sector, false);
 }
 
+bool D64MStream::validateBAM()
+{
+    // TODO: Walk each files blocks to ensure the BAM accurately reflects the allocation.
+    // Correct the BAM if it is not accurate.
+    // Make safe for REL and VLIR files.
+    return false;
+}
+
 // Returns uint16_t, not uint8_t: a CMD native track (DNP, DHD) has 256 sectors,
 // so a fully free one counts 256 - which truncates to 0 in a byte. That made
 // blocksFree() report 0 and, worse, made getNextFreeBlock() treat every track as

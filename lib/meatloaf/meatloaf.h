@@ -219,6 +219,7 @@ public:
         return false;
     };
 
+
     // Optional BAM-style block allocation hook for writable media streams.
     // Default is unsupported so callers can dispatch without RTTI and still
     // work across every D64-family writable format derived from the same
@@ -227,6 +228,13 @@ public:
         (void)track; (void)sector; (void)allocate;
         return false;
     }
+
+    // Walk each files blocks to ensure the BAM accurately reflects the allocation.
+    // Correct the BAM if it is not accurate.
+    // Make safe for REL and VLIR files.
+    virtual bool validateBAM() {
+        return false;
+    };
 
     // For files with no directory structure
     // tap, crt, tar
