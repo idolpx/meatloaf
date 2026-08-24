@@ -1,6 +1,14 @@
 [![Meatloaf (C64/C128/VIC20/+4)](images/meatloaf.logo.png)](https://meatloaf.cc)
 
-[![Meatloaf Maniacs](https://facebook.com/favicon.ico)](https://fb.meatloaf.cc)  [![Jaime Idolpx](https://www.youtube.com/s/desktop/513a5249/img/favicon_48x48.png)](https://yt.meatloaf.cc)
+[![discord chat](https://meatloaf.cc/media/discord.sm.png)](https://discord.gg/FwJUe8kQpS) &nbsp;
+[![Meatloaf Maniacs](https://facebook.com/favicon.ico)](https://fb.meatloaf.cc) &nbsp;
+[![Jaime Idolpx](https://www.youtube.com/s/desktop/513a5249/img/favicon_48x48.png)](https://yt.meatloaf.cc)
+
+```diff
+*** Be sure to use an ESP32-S3-WROOM-1-N16R8 dev module for all new builds!!!
+*** The wiring is a little bit different but otherwise Deadline's video below is still valid
+*** You can also flash using the web flasher instead of compiling the firmware yourself.
+```
 
 # What is Meatloaf?
 
@@ -101,6 +109,21 @@ You can find internet apps using `LOAD"ML:$",8`
 Meatloaf is not limited to be just your standard drive 8, you can configure it to respond to any number of Commodore-DOS devices, from 4 to 30, at the same time.
 
 # Instructions
+
+## Ingredients
+
+* ESP32-S3-WROOM-1-N16R8
+https://www.aliexpress.us/item/3256809024494642.html - $4.48<br/>
+This is the recommended board for new Meatloaf devices!<br/>
+The Lolin D32 Pro is a good board but the S3 is faster and will support more functionality!
+
+* DIN 6Pin Male Plug 5pcs
+https://www.aliexpress.us/item/3256805997791683.html - $3.21
+
+* 24AWG 6 Core Sheathed Wire 2 Meters
+https://www.aliexpress.us/item/3256812182521208.html - $7.32
+
+That is enough plugs and wire to make 5 IEC pigtails.
 
 ## Build and installation
 
