@@ -116,7 +116,7 @@ class IECFileDevice : public IECDevice
   // transmitted or received data is begin logged (logging reduces performance)
   void setLogging(bool enable);
 
-#if defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)
+#ifdef IEC_SUPPORT_SECTOROPS
   virtual bool epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer);
   virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer);
 #endif
@@ -139,7 +139,7 @@ class IECFileDevice : public IECDevice
   // "cmd"/"cmdLen" are the whole M-E command. Some loaders carry arguments
   // after the address -- Turbodisk appends the name of the file to load -- so
   // the address alone is not enough.
-  virtual bool startFastLoader(uint8_t variant, uint8_t param, const uint8_t *cmd, uint8_t cmdLen, uint16_t crc);
+  virtual bool startFastLoader(uint8_t variant, uint8_t param, uint8_t rxtx, const uint8_t *cmd, uint8_t cmdLen, uint16_t crc);
 #endif
 
  private:

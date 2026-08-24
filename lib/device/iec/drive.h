@@ -308,7 +308,7 @@ protected:
   // called on falling edge of RESET line
   virtual void reset();
 
-#if defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)
+#ifdef IEC_SUPPORT_SECTOROPS
   virtual bool epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer);
   virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer);
 #endif
@@ -316,7 +316,7 @@ protected:
 #ifdef IEC_SUPPORT_SOFTLOAD
   // The switch point for a software fast loader identified from the code the
   // host uploaded -- see IECFileDevice::startFastLoader.
-  virtual bool startFastLoader(uint8_t variant, uint8_t param, const uint8_t *cmd, uint8_t cmdLen, uint16_t crc);
+  virtual bool startFastLoader(uint8_t variant, uint8_t param, uint8_t rxtx, const uint8_t *cmd, uint8_t cmdLen, uint16_t crc);
 #endif
 
   // Point a channel at a disk block for B-R/B-W and U1/U2 -- see the comment

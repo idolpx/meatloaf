@@ -3290,7 +3290,7 @@ void iecDrive::restoreActiveFromConfig()
 }
 
 
-#if defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)
+#ifdef IEC_SUPPORT_SECTOROPS
 bool iecDrive::epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer)
 {
     return m_vdrive==nullptr ? false : m_vdrive->readSector(track, sector, buffer);
@@ -3305,7 +3305,7 @@ bool iecDrive::epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer)
 
 
 #ifdef IEC_SUPPORT_SOFTLOAD
-bool iecDrive::startFastLoader(uint8_t variant, uint8_t param, const uint8_t *cmd, uint8_t cmdLen, uint16_t crc)
+bool iecDrive::startFastLoader(uint8_t variant, uint8_t param, uint8_t rxtx, const uint8_t *cmd, uint8_t cmdLen, uint16_t crc)
 {
     uint16_t address = cmdLen>=5 ? (cmd[3] | (cmd[4]<<8)) : 0;
 
@@ -3317,7 +3317,7 @@ bool iecDrive::startFastLoader(uint8_t variant, uint8_t param, const uint8_t *cm
     else
         Debug_printv("M-E address[%04X] crc[%04X] - %s", address, crc, iecFastLoadName(variant));
 
-    bool started = SystemFileDevice::startFastLoader(variant, param, cmd, cmdLen, crc);
+    bool started = SystemFileDevice::startFastLoader(variant, param, rxtx, cmd, cmdLen, crc);
     if( variant != IEC_FLV_NONE && !started )
         Debug_printv("%s is detected but not implemented - falling back", iecFastLoadName(variant));
 

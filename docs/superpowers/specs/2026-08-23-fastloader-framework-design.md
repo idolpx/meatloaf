@@ -105,8 +105,16 @@ rather than return garbage.
 
 ## Plan
 
-Status as of 2026-08-23: phases 0, 1 and 2 are done and building; phase 3 (Turbodisk) is written but
-not hardware verified. Phase 4 is not started.
+Status as of 2026-08-24: all phases are done and building. Every loader sd2iec supports is
+implemented — Turbodisk, GI Joe, Nippon, ULoad Model 3, ELoad1, MMZak, N0SDOS, Sam's Journey, FC3
+older-freezed, DreamLoad, GEOS and Wheels — with EpyxCart and the AR6 1581 pair routed to protocols
+`IECBusHandler` already speaks. **None of it is hardware verified.**
+
+The four session loaders are gated on `EXTRA_FASTLOADERS` because together they put a plain ESP32
+about 600 bytes past its `iram0_2_seg` flash-text window. Detection is not gated: a board without
+the flag still recognises them and falls back. `#pragma GCC optimize("Os")` was tried on those four
+files and made the overflow worse (629 → 977 bytes), which is the third time this repository has
+seen `-Os` grow that segment.
 
 Phase 0 — unblock (must land first)
 

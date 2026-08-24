@@ -138,9 +138,11 @@ class IECDevice
   virtual uint8_t read(uint8_t *buffer, uint8_t bufferSize);
 #endif
 
-#if defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)
-  // these functions are experimental, they are called when the Epyx Cartridge uses
-  // sector read/write operations (disk editor, disk copy or file copy).
+#ifdef IEC_SUPPORT_SECTOROPS
+  // raw track/sector access. Called by any loader that addresses the disk by
+  // block rather than by file -- the Epyx cartridge (disk editor, disk copy,
+  // file copy) and Nippon so far. The names are historical; the hooks are not
+  // Epyx-specific.
   virtual bool epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer)  { return false; }
   virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer) { return false; }
 #endif

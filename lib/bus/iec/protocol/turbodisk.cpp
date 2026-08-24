@@ -1,35 +1,23 @@
-// -----------------------------------------------------------------------------
-// Copyright (C) 2023 David Hansel
+// Meatloaf - A Commodore 64/128 multi-device emulator
+// https://github.com/idolpx/meatloaf
+// Copyright(C) 2020 James Johnston
 //
-// This program is free software; you can redistribute it and/or modify
+// Meatloaf is free software : you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 3 of the License, or
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// This program is distributed in the hope that it will be useful,
+// Meatloaf is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with this program; if not, write to the Free Software Foundation,
-// Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
+// along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 // -----------------------------------------------------------------------------
 //
-// Turbodisk
+// Turbodisk. Ported from sd2iec's fl-turbodisk.c (Ingo Korb, GPL v2).
 //
-// These are IECBusHandler member functions living in their own translation
-// unit. Everything they need from the bus handler -- the timer macros, the
-// inline pin accessors and the state flags -- comes from
-// IECBusHandlerInternal.h.
-// -----------------------------------------------------------------------------
-
-#include "../IECBusHandlerInternal.h"
-
-// ------------------------------------  Turbodisk support routines  ------------------------------------
-
-#ifdef IEC_FP_TURBODISK
-
 // Turbodisk is clocked by the drive, not by the computer: after a handshake
 // the receiver samples CLK and DATA at fixed times, two bits at a time, most
 // significant pair first. The times below are sd2iec's, converted from its
@@ -38,6 +26,14 @@
 // Two forms exist and they are NOT interchangeable -- the receiver decides
 // which one it is running. The single-byte form re-handshakes for every byte;
 // the block form handshakes once and then streams 254 bytes back to back.
+// -----------------------------------------------------------------------------
+
+#include "../IECBusHandlerInternal.h"
+
+// ------------------------------------  Turbodisk support routines  ------------------------------------
+
+#ifdef IEC_FP_TURBODISK
+
 
 #define TURBODISK_BYTE_PAIR0   31
 #define TURBODISK_BYTE_PAIR1   60
@@ -234,10 +230,12 @@ bool IECBusHandler::startTurbodiskLoad(const uint8_t *cmd, uint8_t cmdLen)
 
 #ifdef IEC_SUPPORT_SOFTLOAD
 
-bool IECBusHandler::runFastLoader(IECDevice *dev, uint8_t variant, uint8_t param, const uint8_t *cmd, uint8_t cmdLen)
+bool IECBusHandler::runFastLoader(IECDevice *dev, uint8_t variant, uint8_t param, uint8_t rxtx, const uint8_t *cmd, uint8_t cmdLen, const uint8_t *captured)
 {
   m_currentDevice = dev;
   (void) param;
+  (void) rxtx;
+  (void) captured;
 
   switch( variant )
     {
@@ -246,9 +244,73 @@ bool IECBusHandler::runFastLoader(IECDevice *dev, uint8_t variant, uint8_t param
       return startTurbodiskLoad(cmd, cmdLen);
 #endif
 
-#ifdef IEC_FP_GIJOE
+#if defined(IEC_FP_GIJOE) && defined(IEC_IMPL_SOFTLOAD)
     case IEC_FLV_GI_JOE:
       return runGIJoeLoader();
+#endif
+
+#if defined(IEC_FP_NIPPON) && defined(IEC_IMPL_SOFTLOAD)
+    case IEC_FLV_NIPPON:
+      return runNipponLoader();
+#endif
+
+#if defined(IEC_FP_ULOAD3) && defined(IEC_IMPL_SOFTLOAD)
+    case IEC_FLV_ULOAD3:
+      return runULoad3Loader();
+#endif
+
+#if defined(IEC_FP_ELOAD1) && defined(IEC_IMPL_SOFTLOAD)
+    case IEC_FLV_ELOAD1:
+      return runELoad1Loader();
+#endif
+
+#if defined(IEC_FP_MMZAK) && defined(IEC_IMPL_SOFTLOAD)
+    case IEC_FLV_MMZAK:
+      return runMMZakLoader();
+#endif
+
+#if defined(IEC_FP_N0SDOS) && defined(IEC_IMPL_SOFTLOAD)
+    case IEC_FLV_N0SDOS_FILEREAD:
+      return runN0SDOSLoader();
+#endif
+
+#if defined(IEC_FP_SAMSJOURNEY) && defined(IEC_IMPL_SOFTLOAD)
+    case IEC_FLV_SAMSJOURNEY:
+      return runSamsJourneyLoader();
+#endif
+
+#if defined(IEC_FP_FC3) && defined(IEC_IMPL_SOFTLOAD)
+    case IEC_FLV_FC3_OLDFREEZED:
+      return runFC3OldFreezeLoader(rxtx);
+#endif
+
+#if defined(IEC_FP_DREAMLOAD) && defined(IEC_IMPL_SOFTLOAD)
+    case IEC_FLV_DREAMLOAD:
+    case IEC_FLV_DREAMLOAD_OLD:
+      return runDreamloadLoader();
+#endif
+
+#if defined(IEC_FP_GEOS) && defined(IEC_IMPL_SOFTLOAD)
+    case IEC_FLV_GEOS_S23_1541:
+    case IEC_FLV_GEOS_S23_1571:
+    case IEC_FLV_GEOS_S23_1581:
+      return runGeosLoader(rxtx, variant);
+
+    case IEC_FLV_GEOS_S1_64:
+    case IEC_FLV_GEOS_S1_128:
+      // stage 1 needs the decryption key detection lifted out of the upload
+      return runGeosStage1Loader(rxtx, variant, captured);
+#endif
+
+#if defined(IEC_FP_WHEELS) && defined(IEC_IMPL_SOFTLOAD)
+    case IEC_FLV_WHEELS_S1_64:
+    case IEC_FLV_WHEELS_S1_128:
+      return runWheelsStage1Loader(rxtx, variant);
+
+    case IEC_FLV_WHEELS_S2:
+    case IEC_FLV_WHEELS44_S2:
+    case IEC_FLV_WHEELS44_S2_1581:
+      return runWheelsStage2Loader(rxtx, variant);
 #endif
 
     default:

@@ -1,19 +1,19 @@
-// -----------------------------------------------------------------------------
-// Copyright (C) 2023 David Hansel
+// Meatloaf - A Commodore 64/128 multi-device emulator
+// https://github.com/idolpx/meatloaf
+// Copyright(C) 2020 James Johnston
 //
-// This program is free software; you can redistribute it and/or modify
+// Meatloaf is free software : you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 3 of the License, or
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// This program is distributed in the hope that it will be useful,
+// Meatloaf is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with this program; if not, write to the Free Software Foundation,
-// Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
+// along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 // -----------------------------------------------------------------------------
 //
 // GI Joe. Ported from sd2iec's fl-gijoe.c (Ingo Korb, GPL v2).
@@ -32,7 +32,7 @@
 
 #include "../IECBusHandlerInternal.h"
 
-#ifdef IEC_FP_GIJOE
+#if defined(IEC_FP_GIJOE) && defined(IEC_IMPL_SOFTLOAD)
 
 // sd2iec leaves this loop when a button on the device is pressed. There is no
 // equivalent here, so the escape is the computer asserting ATN (it wants the
@@ -132,6 +132,12 @@ bool RAMFUNC(IECBusHandler::transmitGIJoeError)()
 
 bool IECBusHandler::runGIJoeLoader()
 {
+  // Let the bus settle BEFORE taking it over. delay() yields to the scheduler,
+  // and ten milliseconds of not servicing the bus is exactly the window in
+  // which the computer starts its first handshake -- so it has to happen while
+  // the ATN interrupt is still live, not after.
+  delay(10);
+
   // The loader owns the bus from here, so the ATN interrupt has to stand down
   // -- an atnRequest() in the middle of a bit would corrupt the transfer.
   bool atnInterruptWasEnabled = isATNInterruptEnabled();
@@ -140,8 +146,6 @@ bool IECBusHandler::runGIJoeLoader()
   writePinDATA(HIGH);
   writePinCLK(HIGH);
 
-  // wait for the bus to settle
-  delay(10);
   while( !readPinDATA() || !readPinCLK() )
     if( gijoeAbort() ) { setATNInterruptEnabled(atnInterruptWasEnabled); return true; }
 

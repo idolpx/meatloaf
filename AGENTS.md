@@ -670,6 +670,50 @@ Important Notes above.
   handed over, and `IECBusHandler::runFastLoader()` is where it is served. `iecDrive` overrides
   `startFastLoader()` to log every `M-E` that reaches the dispatch — including the ones that matched
   nothing, with their CRC, which is exactly what is needed to add a loader that is not in the table.
+- **Detection covers everything sd2iec knows (120 CRC entries, 102 handler entries, 65 variants,
+  20 rx/tx timings); the transfer code covers the classic set.** The tables are GENERATED from
+  `doscmd.c` by a throwaway script rather than transcribed, because at this size hand-copying is
+  where the errors would be. The 2026-08-24 sd2iec refresh added seven modern demoscene families --
+  Ultraboot, Krill (r58 to r192), Booze, Spindle, Bitfire, Sparkle and Transwarp -- which are
+  DETECTED and named but whose transfer code is not written; they fall back cleanly. Hypra-Load is
+  now CRC-detected upstream too and is routed to the implementation the bus handler already has.
+- **`IEC_FLV_NONE` is a VALID loadertype in the handler table.** sd2iec's newer `run_loader()` uses
+  such rows as catch-alls matched on the M-E address alone, and terminates on a NULL handler rather
+  than on FL_NONE. So the table here carries its length instead of a sentinel row, and `memExec()`
+  matches in two passes -- once for the loader the CRC identified, then again as IEC_FLV_NONE.
+  Terminating that table on FL_NONE silently truncates it at the first catch-all.
+- **The classic loaders are implemented, none hardware verified**: Turbodisk, GI Joe,
+  Nippon, ULoad Model 3, ELoad1, Maniac Mansion / Zak McKracken, N0SDOS file read, Sam's Journey,
+  the FC3 older-freezed loader, DreamLoad, and the GEOS and Wheels families -- each in its own file
+  under `lib/bus/iec/protocol/`. EpyxCart and the AR6 1581 pair are routed to protocols the bus
+  handler already speaks, see below. Turbodisk streams through
+  `handleFastLoadProtocols()`; the other four are session owners that keep the bus after their `M-E`
+  and return when the computer is done. GI Joe and Nippon are fully handshake-clocked and contain no
+  absolute timing at all; ULoad3's and ELoad1's shared bit timing came from sd2iec's AVR assembly
+  (`uload3_get_byte`/`uload3_send_byte`), where a `delay_cycles` unit of 8 at 8 MHz is 1 µs.
+- **The session loaders are gated on `EXTRA_FASTLOADERS`, and DETECTION is not.** Together they put
+  a plain ESP32 about 600 bytes over its `iram0_2_seg` flash-text window — the same budget that
+  gates `EXTRA_DISK_FORMATS`. A board without the flag still recognises every one of them, logs it,
+  and returns false from `startFastLoader()`, so the computer falls back to the standard protocol
+  instead of hanging. The flag is set for `esp32-s3-devkitc-1`. **`#pragma GCC optimize("Os")` makes
+  this WORSE, not better** — it took the overflow from 629 to 977 bytes, the same inversion the ARC
+  and `-lh1-` work hit; do not retry it.
+- **`IEC_SUPPORT_SECTOROPS` replaces the old Epyx-only guard on `epyxReadSector`/`epyxWriteSector`.**
+  Nippon and ULoad3 address the disk by block rather than by file and need the same hooks; the names
+  stay because Epyx was merely the first caller. The guard follows the IMPLEMENTATIONS, not the
+  detection, so a board without `EXTRA_FASTLOADERS` does not compile the hooks it cannot reach.
+- **A session loader must disable the ATN interrupt while it holds the bus** (`setATNInterruptEnabled`,
+  restored on exit) and call `atnRequest()` itself on the way out if ATN is asserted. For Nippon this
+  is not an optimisation but a correctness requirement: ATN is part of its bit protocol — the
+  computer asserts it to mean "resync" — so an `atnRequest()` would consume the very signal the
+  loader is reading. That also means **ATN cannot be Nippon's abort condition**; only RESET can.
+- **Every unbounded wait in a loader feeds the watchdog** with the `interrupts(); noInterrupts();`
+  pattern `transmitHypraLoadByte()` established. With interrupts disabled those loops are the one
+  place a computer that has been switched off mid-transfer can hold the IEC task forever.
+- **ULoad3's `$` (directory) command is deliberately refused with `0xFF`.** It asks for the chain
+  starting at the current directory's first block, which is only a fixed track and sector on a D64;
+  nothing here can supply it for the media Meatloaf mounts. A directory read under ULoad3 therefore
+  fails cleanly rather than serving the wrong blocks.
 - **Turbodisk is implemented but NOT hardware verified**
   (`lib/bus/iec/protocol/turbodisk.cpp`). Bit timings are sd2iec's, converted from its 100 ns units:
   pairs at 31/60/89/118 µs for the single-byte form, 43 µs to the first pair and 29/51 µs steps for
@@ -681,12 +725,60 @@ Important Notes above.
   `lib/bus/iec/IECBusHandlerInternal.h`. `IECBusHandler.cpp` went from ~4500 lines to ~1900.
   The eight legacy files that were in that directory (the pre-dhansel protocol layer, compiled but
   included by nothing) were deleted.
-- **Builds**: `lolin-d32-pro` Flash 42.5% RAM 32.6%, `iec-nugget` 42.6%, `fujiloaf-rev0` 42.6%,
-  `esp32-s3-devkitc-1` Flash 82.1% RAM 31.0%. The ~430 bytes of RAM against the pre-split build is
-  the inline pin accessors being emitted per translation unit.
+- **Builds**: `lolin-d32-pro` Flash 42.6% RAM 32.7% (detection only), `esp32-s3-devkitc-1` Flash
+  82.2% RAM 31.0% (all five loaders compiled), plus `iec-nugget` and `fujiloaf-rev0`. The ~430 bytes
+  of RAM against the pre-split build is the inline pin accessors being emitted per translation unit.
 - **Nothing here is hardware-tested.** No C64 has been attached. Detection has never seen a real
-  upload, so no table entry is confirmed, and the Turbodisk transfer has never run. The next step is
-  to load something with a real loader and read the `M-E address[…] crc[…]` lines the drive logs.
+  upload, so no table entry is confirmed, and no transfer has ever run. The next step is to load
+  something with a real loader and read the `M-E address[…] crc[…]` lines the drive logs.
+- **EpyxCart and the AR6 1581 pair are NOT separate loaders — they are protocols `IECBusHandler`
+  already speaks, at the very same `M-E` addresses the signature matchers watch.** sd2iec's
+  `load_epyxcart` receives a 256-byte stage 2 and then a file name, which is exactly what
+  `receiveEpyxHeader()` does; `load_ar6_1581`/`save_ar6_1581` sit at `0x0500`/`0x05F4`, which is
+  where the AR6 matcher already fires. `IECFileDevice::startFastLoader()` routes all three CRC
+  variants into the existing `fastLoadRequest()` path, so the CRC now acts as a BACKSTOP catching an
+  upload variation whose byte sequence the matcher does not recognise. They are handled there rather
+  than in `runFastLoader()` because they need `m_channel`/`m_eoi`, which the bus handler cannot reach.
+- **The GEOS/Wheels BYTE LAYER is ported; the session loops are not** (`protocol/geos.cpp`). All
+  seven `IEC_FLRX_*` variants are implemented from the AVR assembly as one table-driven pair of
+  routines. Two conventions differ between variants and both are in the original: whether a set bit
+  leaves its line asserted or released (GEOS 1 MHz and 2 MHz send their first four bits one way and
+  the last four the other; 1581-2.1 and Wheels 4.4 invert up front; plain Wheels never inverts), and
+  which bit rides CLK versus DATA at each of the four sample points. What remains is sd2iec's
+  `fl-geos.c` — stage 1 with its chain tables and decryption key, the stage 2/3 sector server,
+  Wheels native partitions and disk-change handling — plus porting the `fl_capture_table` key grab
+  into detection. Until that lands GEOS and Wheels still fall back cleanly.
+- **Dreamload is deliberately NOT implemented.** sd2iec refuses to build it without a CLK interrupt
+  (`#error "Sorry, DreamLoad is only supported on platforms with a CLK interrupt"`): the computer
+  sends job codes asynchronously and the drive must latch them while it is busy with disk I/O. This
+  layer has an ATN interrupt but no CLK one, and Dreamload also wants the first block of the current
+  directory, which is only a fixed track and sector on a D64. A polled approximation would compile
+  and could not work, so it stays detection-only and falls back.
+- **The rx/tx timing variant is plumbed from the CRC table to the loader**, because for FC3
+  old-freezed it is the ONLY thing that distinguishes PAL from NTSC: two separate uploads with two
+  CRCs (`0x0281` and `0xC196`), the same handler, and cadences of 14/22/30/38 with the busy signal
+  restored at 46 µs against 14/24/34/44 with 52. `startFastLoader()` and `runFastLoader()` both
+  carry it. GEOS and Wheels will need it for their seven variants too.
+- **FC3 old-freezed is NOT the FC3 loader the signature matcher handles.** It is what an older
+  cartridge uses to read a freezed file back, its file is already open on channel 0 when the `M-E`
+  arrives, and DATA doubles as its busy signal — asserted means "not ready", so it is released
+  before each byte and re-asserted after. Its byte is not inverted, so a set bit ASSERTS a line;
+  ULoad3's is inverted and does the opposite. Getting that backwards produces a clean-looking
+  transfer of complemented data.
+- **Three loaders clock on something other than CLK, and getting that wrong is silent.** Nippon reads
+  ATN as a protocol signal (assert = "resync"); Sam's Journey clocks its SEND on ATN transitions,
+  four of them per byte; MMZak and GI Joe clock on CLK like everything else. Every one of them needs
+  the ATN interrupt disabled for the duration, and ATN can only be the abort condition for the
+  loaders that do not use it.
+- **Sam's Journey reads the directory through `$`, not through disk structures.** sd2iec walks its
+  own directory entries; nothing at the bus-handler layer can, so the loader opens `"$"`, parses the
+  BASIC lines for a quoted name followed by `PRG`, and hex-decodes the two-character names the game
+  uses. Entries go out one behind — each new one with marker 0, the last with marker 1 — and an
+  empty directory still sends one placeholder entry, because the protocol has no way to say
+  "nothing here".
+- **N0SDOS never sends an end marker and must not stop on its own.** It streams 254-byte blocks and
+  re-sends the last block at end of file until the computer raises CLK; the computer is the side
+  that knows when the file is complete. A loop that stops at EOF hangs the load.
 
 ## Recent Changes (August 22, 2026)
 

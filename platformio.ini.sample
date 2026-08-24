@@ -384,6 +384,12 @@ build_flags =
     ; out rather than failing to link. .p64, .nib/.nb2/.nbz and .g64 are always
     ; built.
     -D EXTRA_DISK_FORMATS
+    ; The session-owning software fast loaders - GI Joe, Nippon, ULoad3, ELoad1
+    ; - are opt-in for the same reason: each takes the bus and serves a whole
+    ; transfer itself, and together they put a plain ESP32 about 600 bytes over
+    ; that same window. Detection is always compiled, so a board without this
+    ; flag still recognises those loaders and falls back cleanly.
+    -D EXTRA_FASTLOADERS
 
 [env:esp32-s3-makemagazin]
 extends = esp32_base

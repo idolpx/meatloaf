@@ -99,7 +99,7 @@ class IECBusHandler
   // arguments after the address. Returns false for a loader that is detected
   // but has no implementation here, which leaves the computer free to fall
   // back to the standard protocol.
-  bool runFastLoader(IECDevice *dev, uint8_t variant, uint8_t param, const uint8_t *cmd, uint8_t cmdLen);
+  bool runFastLoader(IECDevice *dev, uint8_t variant, uint8_t param, uint8_t rxtx, const uint8_t *cmd, uint8_t cmdLen, const uint8_t *captured);
 #endif
 
 #ifdef IEC_FP_DOLPHIN
@@ -288,7 +288,101 @@ class IECBusHandler
   bool transmitHypraLoadBlock();
 #endif
 
-#ifdef IEC_FP_GIJOE
+#if (defined(IEC_FP_ULOAD3) || defined(IEC_FP_ELOAD1)) && defined(IEC_IMPL_SOFTLOAD)
+  // shared bit protocol -- ELoad1 sends and receives bytes exactly as ULoad3 does
+  bool uload3Handshake();
+  bool receiveULoad3Byte(uint8_t &data);
+  bool transmitULoad3Byte(uint8_t value);
+#endif
+
+#if defined(IEC_FP_ULOAD3) && defined(IEC_IMPL_SOFTLOAD)
+  bool uload3TransferChain(uint8_t track, uint8_t sector, bool saving);
+  bool runULoad3Loader();
+#endif
+
+#if defined(IEC_FP_ELOAD1) && defined(IEC_IMPL_SOFTLOAD)
+  bool runELoad1Loader();
+#endif
+
+#if defined(IEC_FP_NIPPON) && defined(IEC_IMPL_SOFTLOAD)
+  bool nipponAbort();
+  bool nipponWait(bool clkNotAtn, bool state);
+  bool nipponHandshake();
+  bool receiveNipponByte(uint8_t &data);
+  bool transmitNipponByte(uint8_t value);
+  bool runNipponLoader();
+#endif
+
+#if defined(IEC_FP_MMZAK) && defined(IEC_IMPL_SOFTLOAD)
+  bool mmzakWaitCLK(bool state);
+  bool transmitMMZakByte(uint8_t value);
+  bool receiveMMZakByte(uint8_t &data);
+  bool transmitMMZakError();
+  bool mmzakReadSector(uint8_t track, uint8_t sector);
+  bool mmzakWriteSector(uint8_t track, uint8_t sector);
+  bool runMMZakLoader();
+#endif
+
+#if defined(IEC_FP_DREAMLOAD) && defined(IEC_IMPL_SOFTLOAD)
+  bool dreamloadWait(bool atnNotCLK, bool state);
+  bool receiveDreamloadByte(uint8_t &data);
+  bool transmitDreamloadByte(uint8_t value);
+  bool dreamloadSendBlock(const uint8_t *data);
+  bool runDreamloadLoader();
+#endif
+
+#if defined(IEC_FP_GEOS) && defined(IEC_IMPL_SOFTLOAD)
+  // GEOS/Wheels byte layer. The session loops are not ported yet -- see
+  // protocol/geos.cpp.
+  bool geosWaitByteStart();
+  bool geosSendByteCommon();
+  bool receiveGeosByte(uint8_t rxtx, uint8_t &data);
+  bool transmitGeosByte(uint8_t rxtx, uint8_t value);
+  // session layer, protocol/geos_session.cpp
+  bool geosWaitCLK(bool state);
+  bool geosTransmitByteWait(uint8_t rxtx, uint8_t byte);
+  bool geosTransmitBuffer(uint8_t rxtx, const uint8_t *data, uint16_t len);
+  bool geosReceiveBuffer(uint8_t rxtx, uint8_t *data, uint16_t len);
+  bool geosReceiveLenBlock(uint8_t rxtx, uint8_t *data);
+  bool geosTransmitStatus(uint8_t rxtx, bool ok);
+  bool geosSendChain(uint8_t rxtx, uint8_t track, uint8_t sector, const uint8_t *key);
+  bool runGeosLoader(uint8_t rxtx, uint8_t variant);
+  bool runGeosStage1Loader(uint8_t rxtx, uint8_t variant, const uint8_t *key);
+#ifdef IEC_FP_WHEELS
+  bool wheelsTransmitBuffer(uint8_t rxtx, uint8_t variant, const uint8_t *data, uint16_t len);
+  bool wheelsTransmitByteWait(uint8_t rxtx, uint8_t variant, uint8_t byte);
+  bool wheelsReceiveBuffer(uint8_t rxtx, uint8_t variant, uint8_t *data, uint16_t len);
+  bool runWheelsStage1Loader(uint8_t rxtx, uint8_t variant);
+  bool runWheelsStage2Loader(uint8_t rxtx, uint8_t variant);
+#endif
+#endif
+
+#if defined(IEC_FP_FC3) && defined(IEC_IMPL_SOFTLOAD)
+  bool transmitFC3OldFreezeByte(uint8_t value, bool ntsc);
+  bool runFC3OldFreezeLoader(uint8_t rxtx);
+#endif
+
+#if defined(IEC_FP_SAMSJOURNEY) && defined(IEC_IMPL_SOFTLOAD)
+  bool samsWaitATN(bool state);
+  bool receiveSamsByte(uint8_t &data);
+  bool transmitSamsByte(uint8_t value);
+  bool transmitSamsBlock(uint8_t marker, uint8_t length, const uint8_t *data);
+  bool samsOpenByName(uint8_t channel, uint8_t name, bool replace);
+  bool samsReadFile(uint8_t name);
+  bool samsWriteFile(uint8_t name, bool &aborted);
+  bool samsScanDirectory();
+  bool runSamsJourneyLoader();
+  static uint8_t samsNameFromTS(uint8_t track, uint8_t sector);
+  static uint8_t samsHexPairToByte(const char *s, uint8_t len);
+#endif
+
+#if defined(IEC_FP_N0SDOS) && defined(IEC_IMPL_SOFTLOAD)
+  bool receiveN0SDOSByte(uint8_t &data);
+  bool transmitN0SDOSByte(uint8_t value);
+  bool runN0SDOSLoader();
+#endif
+
+#if defined(IEC_FP_GIJOE) && defined(IEC_IMPL_SOFTLOAD)
   bool gijoeAbort();
   bool gijoeWaitCLK(bool state);
   bool receiveGIJoeByte(uint8_t &data);

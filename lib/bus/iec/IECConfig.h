@@ -39,15 +39,19 @@
 
 // comment out these #defines to completely disable support for the
 // corresponding fast-load protocols (saves program memory in small devices)
-#define IEC_FP_JIFFY     0 // JiffyDos
-#define IEC_FP_EPYX      1 // EPYX FastLoad
-#define IEC_FP_FC3       2 // Final Cartridge 3
-#define IEC_FP_AR6       3 // Action Replay 6
+// Hardware fast loaders. These require specific hardware on the host and/or the drive.
+// Some upload 6502 code into the drive RAM like the software fast loaders.
+#define IEC_FP_JIFFY        0 // JiffyDos
+#define IEC_FP_EPYX         1 // EPYX FastLoad
+#define IEC_FP_FC3          2 // Final Cartridge 3
+#define IEC_FP_AR6          3 // Action Replay 6
+
+// Parallel fast loaders.
 #if defined(PIN_PARALLEL_PC2) && defined(PIN_PARALLEL_FLAG2)
-#define IEC_FP_DOLPHIN   4 // Dolphin Dos
-#define IEC_FP_SPEEDDOS  5 // Speed Dos
+#define IEC_FP_DOLPHIN      4 // Dolphin Dos
+#define IEC_FP_SPEEDDOS     5 // Speed Dos
 #ifdef PIN_PARALLEL_PA2
-#define IEC_FP_WIC64     6 // WiC64 Protocol Available
+#define IEC_FP_WIC64        6 // WiC64 Protocol Available
 #endif
 #endif
 
@@ -55,18 +59,39 @@
 // then start it with M-E, so they need no extra wiring -- unlike the parallel
 // loaders above they are available on every board. Detection is by CRC of the
 // uploaded bytes, see fastload.h.
-#define IEC_FP_HYPRALOAD 7  // Hypra-Load (64er Magazin)
-#define IEC_FP_TURBODISK 8  // Turbodisk
-#define IEC_FP_DREAMLOAD 9  // Dreamload
-#define IEC_FP_ULOAD3   10  // ULoad Model 3
-#define IEC_FP_GIJOE    11  // GI Joe
-#define IEC_FP_GEOS     12  // GEOS
-#define IEC_FP_WHEELS   13  // Wheels (needs IEC_FP_GEOS)
-#define IEC_FP_NIPPON   14  // Nippon
-#define IEC_FP_ELOAD1   15  // ELoad version 1
-#define IEC_FP_MMZAK    16  // Maniac Mansion / Zak McKracken
-#define IEC_FP_N0SDOS   17  // N0SDOS file read
-#define IEC_FP_SAMSJOURNEY 18 // Sam's Journey
+#define IEC_FP_HYPRALOAD    7  // Hypra-Load (64er Magazin)
+#define IEC_FP_TURBODISK    8  // Turbodisk
+#define IEC_FP_DREAMLOAD    9  // Dreamload
+#define IEC_FP_ULOAD3       10  // ULoad Model 3
+#define IEC_FP_GIJOE        11  // GI Joe
+#define IEC_FP_GEOS         12  // GEOS
+#define IEC_FP_WHEELS       13  // Wheels (needs IEC_FP_GEOS)
+#define IEC_FP_NIPPON       14  // Nippon
+#define IEC_FP_ELOAD1       15  // ELoad version 1
+#define IEC_FP_MMZAK        16  // Maniac Mansion / Zak McKracken
+#define IEC_FP_N0SDOS       17  // N0SDOS file read
+#define IEC_FP_SAMSJOURNEY  18 // Sam's Journey
+#define IEC_FP_ULTRABOOT    19 // Ultraboot
+#define IEC_FP_KRILL        20 // Krill's loader (r58 through r192)
+#define IEC_FP_BOOZE        21 // Booze Design
+#define IEC_FP_SPINDLE      22 // Spindle 2.1 and later
+#define IEC_FP_BITFIRE      23 // Bitfire 0.1 through 1.3
+#define IEC_FP_SPARKLE      24 // Sparkle 1.0 through 3.2
+#define IEC_FP_TRANSWARP    25 // Transwarp
+
+// A session-owning software loader takes the bus after its M-E and serves the
+// whole transfer itself, so each one is a few KB of flash text. An ESP32 with
+// the small ~3.3 MB iram0_2_seg window (lolin-d32-pro and its family) does not
+// have room for all of them -- the same budget that gates EXTRA_DISK_FORMATS.
+//
+// DETECTION is always compiled: it is two tables and costs almost nothing. A
+// board without the implementation still recognises the loader, logs it, and
+// returns false from startFastLoader(), which lets the M-E through so the
+// computer falls back to the standard protocol rather than hanging. Define
+// EXTRA_FASTLOADERS in a board's build_flags to compile the transfer code.
+#ifdef EXTRA_FASTLOADERS
+#define IEC_IMPL_SOFTLOAD
+#endif
 
 // Wheels is an extension of the GEOS loader and shares its transfer routines
 #if defined(IEC_FP_WHEELS) && !defined(IEC_FP_GEOS)
@@ -77,7 +102,7 @@
 // convenience macro, IEC_SUPPORT_FASTLOAD is defined if any fast-load protocols
 // are enabled
 #if defined(IEC_FP_JIFFY) || defined(IEC_FP_EPYX) || defined(IEC_FP_FC3) || defined(IEC_FP_AR6) || defined(IEC_FP_DOLPHIN) || defined(IEC_FP_SPEEDDOS) || defined(IEC_FP_HYPRALOAD) || \
-    defined(IEC_FP_TURBODISK) || defined(IEC_FP_DREAMLOAD) || defined(IEC_FP_ULOAD3) || defined(IEC_FP_GIJOE) || defined(IEC_FP_GEOS) || defined(IEC_FP_NIPPON) || defined(IEC_FP_ELOAD1) || defined(IEC_FP_MMZAK) || defined(IEC_FP_N0SDOS) || defined(IEC_FP_SAMSJOURNEY)
+    defined(IEC_FP_TURBODISK) || defined(IEC_FP_DREAMLOAD) || defined(IEC_FP_ULOAD3) || defined(IEC_FP_GIJOE) || defined(IEC_FP_GEOS) || defined(IEC_FP_NIPPON) || defined(IEC_FP_ELOAD1) || defined(IEC_FP_MMZAK) || defined(IEC_FP_N0SDOS) || defined(IEC_FP_SAMSJOURNEY) || defined(IEC_FP_ULTRABOOT) || defined(IEC_FP_KRILL) || defined(IEC_FP_BOOZE) || defined(IEC_FP_SPINDLE) || defined(IEC_FP_BITFIRE) || defined(IEC_FP_SPARKLE) || defined(IEC_FP_TRANSWARP)
 #define IEC_SUPPORT_FASTLOAD
 #endif
 
@@ -85,7 +110,7 @@
 // detected from uploaded drive code is enabled. Those loaders need the CRC
 // tracking in driveMemory and the detection tables in fastload.cpp.
 #if defined(IEC_FP_TURBODISK) || defined(IEC_FP_DREAMLOAD) || defined(IEC_FP_ULOAD3) || defined(IEC_FP_GIJOE) || \
-    defined(IEC_FP_GEOS) || defined(IEC_FP_NIPPON) || defined(IEC_FP_ELOAD1) || defined(IEC_FP_MMZAK) || defined(IEC_FP_N0SDOS) || defined(IEC_FP_SAMSJOURNEY) || defined(IEC_FP_FC3) || defined(IEC_FP_AR6) || defined(IEC_FP_EPYX)
+    defined(IEC_FP_GEOS) || defined(IEC_FP_NIPPON) || defined(IEC_FP_ELOAD1) || defined(IEC_FP_MMZAK) || defined(IEC_FP_N0SDOS) || defined(IEC_FP_SAMSJOURNEY) || defined(IEC_FP_FC3) || defined(IEC_FP_AR6) || defined(IEC_FP_EPYX) || defined(IEC_FP_ULTRABOOT) || defined(IEC_FP_KRILL) || defined(IEC_FP_BOOZE) || defined(IEC_FP_SPINDLE) || defined(IEC_FP_BITFIRE) || defined(IEC_FP_SPARKLE) || defined(IEC_FP_TRANSWARP)
 #define IEC_SUPPORT_SOFTLOAD
 #endif
 
@@ -101,6 +126,14 @@
 // capped at 255 bytes. Make sure the buffer itself has >=256 bytes and use a 
 // bufferSize argument of 255 or less
 #define IEC_FP_EPYX_SECTOROPS
+
+// convenience macro, IEC_SUPPORT_SECTOROPS is defined if any enabled loader
+// asks the device for raw track/sector access rather than for a file. The
+// hooks are still called epyxReadSector/epyxWriteSector because Epyx was the
+// first loader to need them, but they are not Epyx-specific.
+#if (defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)) || (defined(IEC_IMPL_SOFTLOAD) && (defined(IEC_FP_NIPPON) || defined(IEC_FP_ULOAD3) || defined(IEC_FP_MMZAK) || defined(IEC_FP_GEOS) || defined(IEC_FP_DREAMLOAD)))
+#define IEC_SUPPORT_SECTOROPS
+#endif
 
 // defines the maximum number of devices that the bus handler will be
 // able to support - set to 4 by default but can be increased to up to 30 devices
