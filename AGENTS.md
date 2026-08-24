@@ -502,6 +502,14 @@ gitignored.
 
 ## Important Notes
 
+- **A software fast loader is identified by a CRC-16 with the REFLECTED polynomial `0xA001`, initial value `0xFFFF`** — AVR libc's `_crc16_update`, which sd2iec calls `crc16_update`. Ported as `iecCrc16Update()` in `lib/bus/iec/fastload.cpp`; verified against the published vectors (`0x4B37` for `"123456789"` from `0xFFFF`, `0xBB3D` from `0`). **No `esp_rom_crc16_*` variant can reproduce sd2iec's published constants** — they are all `0x1021` based — so a table of loader CRCs is worthless without this exact routine. The earlier `esp_rom_crc16_be` hash in `driveMemory` was never comparable with anything and has been removed.
+- **Four things about that CRC are load-bearing and each one silently breaks detection on its own.** (1) **Writes to address 119 and to `0x1C06`/`0x1C07` must not reach the CRC** — the first is a 1541-style device-address change, the others are the VIA timer, and neither carries loader code; a loader preceded by one of them hashes differently than every table says. (2) **The table is consulted after EVERY `M-W`, not only at `M-E`** — a loader is recognisable part way through its upload while later blocks keep adding to the CRC. (3) **`previous_loader` is required for multi-stage loaders**: FC3 and GEOS upload once and then send a second `M-E` with nothing in between, so that round detects nothing and must fall back to what the previous round found. (4) **GI Joe has no end-of-upload CRC at all** — it is uploaded in a dozen different chunkings — and is matched mid-stream on CRC `0x38A2` arriving together with a `0x60` byte.
+- **Detection must see an `M-E` even when something else consumes it.** `IECFileDevice::isFastLoaderRequest()` runs the CRC feed and `memExec()` BEFORE the `m_uploadCtr` signature matchers, because a matcher that claims the command would otherwise leave the detector's CRC accumulating into the next loader's upload. The two mechanisms are deliberately both alive: the signature matcher owns Epyx, AR6, FC3, Hypra-Load and SpeedDOS (it is hardware-proven and it also sets `m_channel`/`m_eoi`), the CRC path owns the rest.
+- **`IECFileDevice::startFastLoader()` is called for every `M-E` that reaches the dispatch, including the ones that matched nothing.** That is the point: an unrecognised `M-E` plus its CRC is the only evidence of a loader that is not in the table yet, and `iecDrive` logs both. A loader that is detected but not implemented returns false, which lets the `M-E` through so the computer falls back to the standard protocol instead of waiting for a transfer that never starts.
+- **`IECBusHandlerInternal.h`'s globals are one definition, not one per file.** `IECBusHandler.cpp` defines `IEC_BUSHANDLER_DEFINE_GLOBALS` before including it and so provides them; every other file gets `extern`. **Never turn them back into file-scope statics in that header** — every translation unit would get its own copy, so `timer_init()` in one file leaves another file's `timer_cycles_per_us_div2` at zero and every `timer_wait_until()` there returns IMMEDIATELY, and the `haveInterrupts` flag that `waitPinDATA`/`waitPinCLK` read to decide whether they may feed the watchdog goes out of step with the `noInterrupts()` that set it. The deleted `protocol/_protocol.h` had exactly this defect.
+- **The pin accessors are inline definitions in `IECBusHandlerInternal.h`, not declarations.** A loader's bit loop sets CLK and DATA at microsecond-resolution absolute times and cannot afford a call per edge. They were declared `inline` in `IECBusHandler.h` and defined once in the .cpp, which is why `isResetPinIdle()` still carries a comment about deliberately not being inline so that `IECHost.cpp` could link against it — that is the hazard moving them removed. Cost is ~432 bytes of RAM from per-translation-unit copies.
+- **Turbodisk's first block is a judgement call, not a fact.** sd2iec sends the two load-address bytes on their own and then still streams a full 254 bytes out of the same 254-byte sector buffer starting two bytes further in, so its last two bytes come from the next buffer in the array rather than from the file. Either the receiver wants 2 + 254 = 256 bytes of file on that block and sd2iec has a benign over-read, or it wants 2 + 252 and discards two. `transmitTurbodiskBlock()` takes the first reading and reads 256 bytes for the first block. **If a Turbodisk load is correct through byte 253 and corrupt from 254, the other reading is right** and the fix is the one constant.
+- **`IEC_FLV_*` (variant) and `IEC_FP_*` (family) are different id spaces and both are needed.** A family is a bit index in the enable mask — what a user turns on. A variant is one concrete uploaded routine; several share a family (FC3 has load/save/freezed, GEOS one per drive type and version). The variant numbering mirrors sd2iec's `FL_*` exactly so its tables transcribe without re-numbering, and `iecFastLoadFamily()` is the one place that maps between them.
 - **IEC timing is critical**: Code changes in bus handlers can break compatibility
 - **PSRAM availability**: Some boards have PSRAM (ESP32-WROVER), others don't (ESP32-WROOM32). Adjust memory allocation accordingly.
 - **Filesystem first**: Always upload filesystem before testing WebDAV or web features
@@ -626,6 +634,59 @@ gitignored.
 - **FTP file reads STREAM; they are not cached first** (`lib/FileSystem/fnFileFTP.h/.cpp`). `FileHandlerFTP` reads straight off the live RETR connection through a 512-byte buffer, so the RAM cost is the same whatever the file's size. **The transfer starts LAZILY, on the first read** — that is what lets `FTPMStream::open()` keep its seek-to-end/tell/seek-to-start size probe with no network traffic, and is why that code needed no change. Backwards seeks (and forward seeks past 8 KB) restart the transfer at the new offset with `REST`; shorter forward seeks read and discard. `FileCache::open()` is still tried first, so `#cache=sd` is unaffected, and a server that will not answer `SIZE` falls back to the old caching path. **`REST` itself is not hardware-verified** — every read so far has been forward-only.
 - **`DISABLE_DIRCACHE` (undefined by default) makes `FileSystemFTP` stream its directory listing** instead of caching it. `DirCache` holds a `fsdir_entry` per entry — `char filename[256]` plus size and flags, **272 bytes** — from the internal heap on a board without PSRAM, which is the largest single cost of an `ls` over FTP. With the flag set, one entry is held at a time: no sorting (`FTPMFile` passes `DIR_OPTION_UNSORTED` anyway, so only a fuji host slot notices), no listing re-use, and `dir_seek()` re-lists and skips forward. Only `FileSystemFTP` honours the flag; SD, NFS, SMB, HTTP and TNFS still cache unconditionally.
 - **`FTPMFile::readEntry()`'s `dir_open` test was inverted** (`if (!fs->dir_open(...))`) — `dir_open` returns true on success, so the scan loop only ever ran on a listing that had FAILED to open, and an FTP wildcard could never match. Fixed; note the same call must `dir_close()` on both exits now that streaming leaves the data connection open.
+
+## Recent Changes (August 23, 2026)
+
+### Fast loader framework: detection, one file per loader, Turbodisk
+
+Groundwork for supporting the loaders sd2iec supports. Design and the full reasoning are in
+`docs/superpowers/specs/2026-08-23-fastloader-framework-design.md`; durable rules are in the
+Important Notes above.
+
+- **`IECConfig.h`'s include guard closed early and that is why `iec-nugget` and `fujiloaf-rev0` did
+  not build.** The `#endif` after the XRA1405 block closed `#ifndef IECCONFIG_H`, so everything
+  below it — `IEC_DEFAULT_FASTLOAD_BUFFER_SIZE` and `IEC_SUPPORT_PARALLEL` among them — fell outside
+  the guard, and there was no closing `#endif` at end of file. `iec-nugget` reported it directly; on
+  `fujiloaf-rev0` it surfaced one level on, as `IEC_SUPPORT_FASTLOAD` never being defined and
+  `m_buffer`/`m_bufferSize` being undeclared throughout `IECBusHandler.cpp`. Both boards build now.
+- **The loader enable mask is 32 bits.** `getSupportedFastLoaders()` returned `uint8_t`,
+  `isFastLoaderSupported()` tested `loader<=7`, and `IECDevice::m_flEnabled` was a byte, so any
+  loader id past 7 failed the guard silently. All three are `uint32_t` and the bound is 31.
+  `m_flProtocol` still packs `loader<<3 | protocol` in a byte, which survives to loader 31 unchanged.
+- **Software loader detection is ported from sd2iec** (`lib/bus/iec/fastload.h`/`.cpp`): a CRC-16
+  over every `M-W` data byte, a table mapping known CRCs to a loader variant, and a second table
+  mapping (variant, `M-E` address) to the handler. 57 CRC entries and 26 handler entries transcribed
+  from `doscmd.c`, gated per loader family. Re-derived from the sd2iec tree the user refreshed on
+  2026-08-24, which adds FC3 old-freezed (PAL and NTSC), Maniac Mansion / Zak McKracken, N0SDOS file
+  read and Sam's Journey, adds `0x1802` to the excluded addresses, gives GI Joe a CRC entry
+  (`0x0C92`) alongside its mid-stream rule, and splits `FL_GEOS_S1` into 64 and 128 variants with a
+  general `fl_capture_table` in place of the hard-coded key grab. **The capture table is not ported**
+  — it is GEOS-only and belongs with that phase.
+- **Two detection mechanisms now coexist and they do different jobs.** dhansel's `m_uploadCtr`
+  signature matcher still owns Epyx, AR6, FC3, Hypra-Load and SpeedDOS — it is hardware-proven and
+  it also sets up `m_channel`/`m_eoi`, which detection alone does not. The CRC path owns everything
+  sd2iec knows that the matcher does not.
+- **`IECFileDevice::startFastLoader()` is the single switch point** where a detected loader is
+  handed over, and `IECBusHandler::runFastLoader()` is where it is served. `iecDrive` overrides
+  `startFastLoader()` to log every `M-E` that reaches the dispatch — including the ones that matched
+  nothing, with their CRC, which is exactly what is needed to add a loader that is not in the table.
+- **Turbodisk is implemented but NOT hardware verified**
+  (`lib/bus/iec/protocol/turbodisk.cpp`). Bit timings are sd2iec's, converted from its 100 ns units:
+  pairs at 31/60/89/118 µs for the single-byte form, 43 µs to the first pair and 29/51 µs steps for
+  the block form. It serves one block per `handleFastLoadProtocols()` pass rather than blocking for
+  the whole file the way sd2iec does. **Its first block is a judgement call** — see the entry in
+  Important Notes and the comment on `transmitTurbodiskBlock()`.
+- **Every loader has its own source file now** under `lib/bus/iec/protocol/`, holding
+  `IECBusHandler` member definitions, with the shared machinery in the new
+  `lib/bus/iec/IECBusHandlerInternal.h`. `IECBusHandler.cpp` went from ~4500 lines to ~1900.
+  The eight legacy files that were in that directory (the pre-dhansel protocol layer, compiled but
+  included by nothing) were deleted.
+- **Builds**: `lolin-d32-pro` Flash 42.5% RAM 32.6%, `iec-nugget` 42.6%, `fujiloaf-rev0` 42.6%,
+  `esp32-s3-devkitc-1` Flash 82.1% RAM 31.0%. The ~430 bytes of RAM against the pre-split build is
+  the inline pin accessors being emitted per translation unit.
+- **Nothing here is hardware-tested.** No C64 has been attached. Detection has never seen a real
+  upload, so no table entry is confirmed, and the Turbodisk transfer has never run. The next step is
+  to load something with a real loader and read the `M-E address[…] crc[…]` lines the drive logs.
 
 ## Recent Changes (August 22, 2026)
 

@@ -11,7 +11,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have receikved a copy of the GNU General Public License
+// You should have received a copy of the GNU General Public License
 // along with this program; if not, write to the Free Software Foundation,
 // Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 // -----------------------------------------------------------------------------
@@ -83,10 +83,24 @@ class IECBusHandler
   void setBuffer(uint8_t *buffer, uint8_t bufferSize);
 #endif
 
-  static uint8_t getSupportedFastLoaders();
+  // bit-mask of supported fast loaders. 32 bits wide because the loader ids
+  // (IEC_FP_* in IECConfig.h) go well past 8 once the software loaders are
+  // included -- a uint8_t mask made every id >7 fail isFastLoaderSupported()
+  // silently.
+  static uint32_t getSupportedFastLoaders();
   static bool isFastLoaderSupported(uint8_t loader);
   bool enableFastLoader(IECDevice *dev, uint8_t protocol, bool enable);
   void fastLoadRequest(IECDevice *dev, uint8_t loader, uint8_t request);
+
+#ifdef IEC_SUPPORT_SOFTLOAD
+  // Switch in a software fast loader that has just been identified from the
+  // code the computer uploaded -- called by IECFileDevice::startFastLoader.
+  // "cmd"/"cmdLen" are the whole M-E command, which for some loaders carries
+  // arguments after the address. Returns false for a loader that is detected
+  // but has no implementation here, which leaves the computer free to fall
+  // back to the standard protocol.
+  bool runFastLoader(IECDevice *dev, uint8_t variant, uint8_t param, const uint8_t *cmd, uint8_t cmdLen);
+#endif
 
 #ifdef IEC_FP_DOLPHIN
   void enableDolphinBurstMode(IECDevice *dev, bool enable);
@@ -133,12 +147,12 @@ class IECBusHandler
   friend class IECHost;
 
  private:
-  inline bool readPinATN();
-  inline bool readPinCLK();
-  inline bool readPinDATA();
-  inline bool readPinRESET();
-  inline void writePinCLK(bool v);
-  inline void writePinDATA(bool v);
+  bool readPinATN();
+  bool readPinCLK();
+  bool readPinDATA();
+  bool readPinRESET();
+  void writePinCLK(bool v);
+  void writePinDATA(bool v);
   void writePinCTRL(bool v);
   bool waitTimeout(uint16_t timeout, uint8_t cond = 0);
   bool waitPinDATA(bool state, uint16_t timeout = 1000);
@@ -274,12 +288,30 @@ class IECBusHandler
   bool transmitHypraLoadBlock();
 #endif
 
+#ifdef IEC_FP_GIJOE
+  bool gijoeAbort();
+  bool gijoeWaitCLK(bool state);
+  bool receiveGIJoeByte(uint8_t &data);
+  bool transmitGIJoeByte(uint8_t value);
+  bool transmitGIJoeData(uint8_t value);
+  bool transmitGIJoeError();
+  bool runGIJoeLoader();
+#endif
+
+#ifdef IEC_FP_TURBODISK
+  bool waitTurbodiskHandshake();
+  bool transmitTurbodiskByte(uint8_t data);
+  bool transmitTurbodiskBuffer(const uint8_t *data, uint8_t len);
+  bool transmitTurbodiskBlock();
+  bool startTurbodiskLoad(const uint8_t *cmd, uint8_t cmdLen);
+#endif
+
 #if defined(IEC_SUPPORT_FASTLOAD)
   uint8_t m_bufferSize;
 #if IEC_DEFAULT_FASTLOAD_BUFFER_SIZE>0
 #if defined(IEC_FP_FC3)
   uint8_t  m_buffer[260];
-#elif (defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)) || defined(IEC_FP_AR6) || defined(IEC_FP_HYPRALOAD)
+#elif (defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)) || defined(IEC_FP_AR6) || defined(IEC_FP_HYPRALOAD) || defined(IEC_FP_TURBODISK)
   uint8_t  m_buffer[256];
 #else
   uint8_t  m_buffer[IEC_DEFAULT_FASTLOAD_BUFFER_SIZE];

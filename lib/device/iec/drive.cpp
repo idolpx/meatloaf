@@ -1989,12 +1989,10 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                     uint16_t address = (command[0] | command[1] << 8);
                     Debug_printv("Memory Execute address[%04X][%s]", address, code.c_str());
 
-                    // Compare m_mw_hash to known software fastload hashes
-                    Debug_printv("Final M-W Hash [%02X]", m_memory.mw_hash);
-
+                    // Fast loader detection happens earlier, in
+                    // IECFileDevice::isFastLoaderRequest -- an M-E only reaches
+                    // here when no loader claimed it.
                     m_memory.execute(address);
-
-                    // Execute detected fast loader
                 }
                 //setStatusCode(ST_OK);
                 return;
@@ -3302,6 +3300,28 @@ bool iecDrive::epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer)
 bool iecDrive::epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer)
 {
     return m_vdrive==nullptr ? false : m_vdrive->writeSector(track, sector, buffer);
+}
+#endif
+
+
+#ifdef IEC_SUPPORT_SOFTLOAD
+bool iecDrive::startFastLoader(uint8_t variant, uint8_t param, const uint8_t *cmd, uint8_t cmdLen, uint16_t crc)
+{
+    uint16_t address = cmdLen>=5 ? (cmd[3] | (cmd[4]<<8)) : 0;
+
+    // Every M-E that reaches the software fast loader dispatch lands here,
+    // including the ones that matched nothing -- that is the case worth
+    // reporting, since its CRC is what identifies a loader we do not know yet.
+    if( variant == IEC_FLV_NONE )
+        Debug_printv("M-E address[%04X] crc[%04X] - no known fast loader", address, crc);
+    else
+        Debug_printv("M-E address[%04X] crc[%04X] - %s", address, crc, iecFastLoadName(variant));
+
+    bool started = SystemFileDevice::startFastLoader(variant, param, cmd, cmdLen, crc);
+    if( variant != IEC_FLV_NONE && !started )
+        Debug_printv("%s is detected but not implemented - falling back", iecFastLoadName(variant));
+
+    return started;
 }
 #endif
 

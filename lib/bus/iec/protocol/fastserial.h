@@ -21,24 +21,3 @@
 // https://web.archive.org/web/20220125025330/https://sites.google.com/site/h2obsession/CBM/C128/fast-serial-for-uiec
 // https://github.com/GideonZ/1541ultimate/issues/60
 //
-
-// #ifndef PROTOCOL_CPBFASTSERIAL_H
-// #define PROTOCOL_CPBFASTSERIAL_H
-
-// Commodore Peripheral Bus: Fast Serial
-
-//#include "cpbstandardserial.h"
-
-// namespace Protocol
-// {
-// 	class CPBFastSerial : public CBMStandardSerial
-// 	{
-// 	public:
-
-// 		virtual int16_t receiveByte(uint8_t device) override;
-// 		virtual bool sendByte(uint8_t data, bool signalEOI) override;
-
-// 	};
-// }
-
-// #endif // PROTOCOL_CPBFASTSERIAL_H

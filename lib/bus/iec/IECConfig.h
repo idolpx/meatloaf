@@ -46,17 +46,47 @@
 #if defined(PIN_PARALLEL_PC2) && defined(PIN_PARALLEL_FLAG2)
 #define IEC_FP_DOLPHIN   4 // Dolphin Dos
 #define IEC_FP_SPEEDDOS  5 // Speed Dos
-#define IEC_FP_HYPRALOAD 6 // Hypra-Load (64er Magazin)
 #ifdef PIN_PARALLEL_PA2
-#define IEC_FP_WIC64     7 // WiC64 Protocol Available
+#define IEC_FP_WIC64     6 // WiC64 Protocol Available
 #endif
+#endif
+
+// Software fast loaders. These upload 6502 code into drive RAM with M-W and
+// then start it with M-E, so they need no extra wiring -- unlike the parallel
+// loaders above they are available on every board. Detection is by CRC of the
+// uploaded bytes, see fastload.h.
+#define IEC_FP_HYPRALOAD 7  // Hypra-Load (64er Magazin)
+#define IEC_FP_TURBODISK 8  // Turbodisk
+#define IEC_FP_DREAMLOAD 9  // Dreamload
+#define IEC_FP_ULOAD3   10  // ULoad Model 3
+#define IEC_FP_GIJOE    11  // GI Joe
+#define IEC_FP_GEOS     12  // GEOS
+#define IEC_FP_WHEELS   13  // Wheels (needs IEC_FP_GEOS)
+#define IEC_FP_NIPPON   14  // Nippon
+#define IEC_FP_ELOAD1   15  // ELoad version 1
+#define IEC_FP_MMZAK    16  // Maniac Mansion / Zak McKracken
+#define IEC_FP_N0SDOS   17  // N0SDOS file read
+#define IEC_FP_SAMSJOURNEY 18 // Sam's Journey
+
+// Wheels is an extension of the GEOS loader and shares its transfer routines
+#if defined(IEC_FP_WHEELS) && !defined(IEC_FP_GEOS)
+#undef IEC_FP_WHEELS
 #endif
 
 
 // convenience macro, IEC_SUPPORT_FASTLOAD is defined if any fast-load protocols
 // are enabled
-#if defined(IEC_FP_JIFFY) || defined(IEC_FP_EPYX) || defined(IEC_FP_FC3) || defined(IEC_FP_AR6) || defined(IEC_FP_DOLPHIN) || defined(IEC_FP_SPEEDDOS) || defined(IEC_FP_HYPRALOAD)
+#if defined(IEC_FP_JIFFY) || defined(IEC_FP_EPYX) || defined(IEC_FP_FC3) || defined(IEC_FP_AR6) || defined(IEC_FP_DOLPHIN) || defined(IEC_FP_SPEEDDOS) || defined(IEC_FP_HYPRALOAD) || \
+    defined(IEC_FP_TURBODISK) || defined(IEC_FP_DREAMLOAD) || defined(IEC_FP_ULOAD3) || defined(IEC_FP_GIJOE) || defined(IEC_FP_GEOS) || defined(IEC_FP_NIPPON) || defined(IEC_FP_ELOAD1) || defined(IEC_FP_MMZAK) || defined(IEC_FP_N0SDOS) || defined(IEC_FP_SAMSJOURNEY)
 #define IEC_SUPPORT_FASTLOAD
+#endif
+
+// convenience macro, IEC_SUPPORT_SOFTLOAD is defined if any fast loader that is
+// detected from uploaded drive code is enabled. Those loaders need the CRC
+// tracking in driveMemory and the detection tables in fastload.cpp.
+#if defined(IEC_FP_TURBODISK) || defined(IEC_FP_DREAMLOAD) || defined(IEC_FP_ULOAD3) || defined(IEC_FP_GIJOE) || \
+    defined(IEC_FP_GEOS) || defined(IEC_FP_NIPPON) || defined(IEC_FP_ELOAD1) || defined(IEC_FP_MMZAK) || defined(IEC_FP_N0SDOS) || defined(IEC_FP_SAMSJOURNEY) || defined(IEC_FP_FC3) || defined(IEC_FP_AR6) || defined(IEC_FP_EPYX)
+#define IEC_SUPPORT_SOFTLOAD
 #endif
 
 // un-comment this to use a XRA1405 port expander for the 8-bit parallel cable
@@ -64,7 +94,7 @@
 #ifdef PIN_XRA1405_CS
 #define IEC_SUPPORT_PARALLEL_XRA1405
 #endif
-#endif
+
 // support Epyx FastLoad sector operations (disk editor, disk copy, file copy)
 // if this is enabled then the buffer in the setBuffer() call must have a size of
 // at least 256 bytes. Note that the "bufferSize" argument is a byte and therefore
@@ -102,3 +132,5 @@
 #if defined(IEC_FP_DOLPHIN) || defined(IEC_FP_SPEEDDOS)
 #define IEC_SUPPORT_PARALLEL
 #endif
+
+#endif /* IECCONFIG_H */

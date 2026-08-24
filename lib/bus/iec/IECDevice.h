@@ -11,7 +11,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have receikved a copy of the GNU General Public License
+// You should have received a copy of the GNU General Public License
 // along with this program; if not, write to the Free Software Foundation,
 // Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 // -----------------------------------------------------------------------------
@@ -160,7 +160,7 @@ class IECDevice
  protected:
   bool       m_isActive;
   uint8_t    m_devnr;
-  uint8_t    m_flEnabled;  // bit-mask for which fast-loaders are enabled (IEC_FP_* in IECConfig.h)
+  uint32_t   m_flEnabled;  // bit-mask for which fast-loaders are enabled (IEC_FP_* in IECConfig.h)
   uint32_t   m_flFlags;    // internal fast-loader flags
   uint8_t    m_flProtocol; // currently active fast-load protocol
   IECBusHandler *m_handler;
