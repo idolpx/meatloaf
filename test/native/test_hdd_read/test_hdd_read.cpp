@@ -2,7 +2,7 @@
 //
 // These run against a real image because the CFS layout (boot sector,
 // partition directory, sliced NEXTS pointers, balanced data trees) is too
-// intertwined to synthesize meaningfully. The image lives in .archive/, which
+// intertwined to synthesize meaningfully. The image lives in .data/media/, which
 // is gitignored, so every test skips cleanly when it isn't present.
 
 #include <unity.h>
@@ -17,11 +17,11 @@
 
 // The image is opened relative to the project root, which is where
 // `pio test -e native` runs the test binary from.
-static const char* IMAGE_PATH = ".archive/hdd/ide20201227.hdd";
+static const char* IMAGE_PATH = ".data/media/hdd/ide20201227.hdd";
 
 // The only corpus image with more than one partition, so every selection
 // test uses it: slot 0 "C64 OS" (root LBA 5), slot 1 "DISK IMAGES" (32773).
-static const char* MULTI_IMAGE_PATH = ".archive/hdd/c64os v1.09-clean.hdd";
+static const char* MULTI_IMAGE_PATH = ".data/media/hdd/c64os v1.09-clean.hdd";
 
 // A file that sits three levels down: partition STUFF, then two
 // subdirectories. Its size comes from the CFS directory entry.
@@ -509,9 +509,9 @@ int main(int argc, char** argv)
 
     if (!imageAvailable())
     {
-        // .archive/ is gitignored, so the sample image is only present on
+        // .data/media/ is gitignored, so the sample image is only present on
         // machines that have it. Skip rather than fail.
-        TEST_IGNORE_MESSAGE("sample image .archive/hdd/ide20201227.hdd not present");
+        TEST_IGNORE_MESSAGE("sample image .data/media/hdd/ide20201227.hdd not present");
         return UNITY_END();
     }
 

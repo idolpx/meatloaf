@@ -48,12 +48,12 @@ unknown/ambiguous extensions, where it is the right answer.
 
 The `.gz` fixture is written byte by byte by the test and removed afterwards.
 
-The zip case uses `.archive/zip/Donnie_Russell_II_d64.zip`. Everything under
-`.archive/` is gitignored, so those tests `TEST_IGNORE` themselves when the
+The zip case uses `.data/media/zip/Donnie_Russell_II_d64.zip`. Everything under
+`.data/media/` is gitignored, so those tests `TEST_IGNORE` themselves when the
 sample is absent — a green run without it has not tested the zip path. Any
 multi-entry zip works if you adjust the expected first entry name.
 
-The `-lh1-` cases use `.archive/archive/lzh/games.lzh`, `Taboo.lzh` and
+The `-lh1-` cases use `.data/media/archive/lzh/games.lzh`, `Taboo.lzh` and
 `Tomb.lzh` and skip the same way; their expected entry counts (25, 4, 71) are
 in the test. They need no known-good output of their own — each entry's CRC-16
 is in the archive, written by the original compressor, so a single wrong byte

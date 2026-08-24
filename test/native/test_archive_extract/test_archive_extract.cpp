@@ -33,10 +33,10 @@
 #include "../test_disk_write/file_container_stream.h"
 #include "media/archive/archive.h"
 
-// A real multi-entry zip. Samples under .archive/ are gitignored, so tests
+// A real multi-entry zip. Samples under .data/media/ are gitignored, so tests
 // that need one skip when it isn't there (same convention as the container
 // entry tests). Paths are relative to the repo root, which is pio test's cwd.
-static const char* ZIP_PATH = ".archive/zip/Donnie_Russell_II_d64.zip";
+static const char* ZIP_PATH = ".data/media/zip/Donnie_Russell_II_d64.zip";
 
 // Artifacts this suite writes; see tearDown().
 static const char* GZ_PATH = "build_test_archive.gz";
@@ -115,7 +115,7 @@ static std::vector<std::string> walkEntries(std::shared_ptr<MStream> src, bool* 
 void test_zip_walk_lists_real_entries(void)
 {
     if (!haveFile(ZIP_PATH))
-        TEST_IGNORE_MESSAGE("sample missing: .archive/zip/Donnie_Russell_II_d64.zip");
+        TEST_IGNORE_MESSAGE("sample missing: .data/media/zip/Donnie_Russell_II_d64.zip");
 
     auto src = std::make_shared<FileContainerStream>(ZIP_PATH);
     TEST_ASSERT_TRUE(src->isOpen());
@@ -134,7 +134,7 @@ void test_zip_walk_lists_real_entries(void)
 void test_misaligned_zip_is_not_extracted_as_raw_data(void)
 {
     if (!haveFile(ZIP_PATH))
-        TEST_IGNORE_MESSAGE("sample missing: .archive/zip/Donnie_Russell_II_d64.zip");
+        TEST_IGNORE_MESSAGE("sample missing: .data/media/zip/Donnie_Russell_II_d64.zip");
 
     auto src = std::make_shared<SkewedStream>(ZIP_PATH, 64);
     TEST_ASSERT_TRUE(src->isOpen());
@@ -152,7 +152,7 @@ void test_misaligned_zip_is_not_extracted_as_raw_data(void)
 void test_unreadable_zip_fails_rather_than_succeeding_with_junk(void)
 {
     if (!haveFile(ZIP_PATH))
-        TEST_IGNORE_MESSAGE("sample missing: .archive/zip/Donnie_Russell_II_d64.zip");
+        TEST_IGNORE_MESSAGE("sample missing: .data/media/zip/Donnie_Russell_II_d64.zip");
 
     auto src = std::make_shared<SkewedStream>(ZIP_PATH, 64);
     bool opened = false;
@@ -494,15 +494,15 @@ void test_image_broker_survives_a_null_source_file(void)
 // all of a real archive is a bit-exactness test, not just a smoke test: a
 // single wrong byte anywhere fails.
 //
-// The samples under .archive/ are gitignored, so these skip when absent.
+// The samples under .data/media/ are gitignored, so these skip when absent.
 struct Lh1Sample {
     const char* path;
     size_t      entries;
 };
 static const Lh1Sample LH1_SAMPLES[] = {
-    { ".archive/archive/lzh/games.lzh", 25 },
-    { ".archive/archive/lzh/Taboo.lzh", 4 },
-    { ".archive/archive/lzh/Tomb.lzh", 71 },
+    { ".data/media/archive/lzh/games.lzh", 25 },
+    { ".data/media/archive/lzh/Taboo.lzh", 4 },
+    { ".data/media/archive/lzh/Tomb.lzh", 71 },
 };
 
 static std::vector<unsigned char> readWholeFile(const char* path)
@@ -587,7 +587,7 @@ void test_lh1_entries_decode_and_pass_their_crc(void)
     for (const auto& sample : LH1_SAMPLES) {
         auto bytes = readWholeFile(sample.path);
         if (bytes.empty())
-            TEST_IGNORE_MESSAGE("sample missing under .archive/archive/lzh/");
+            TEST_IGNORE_MESSAGE("sample missing under .data/media/archive/lzh/");
 
         int walk = ARCHIVE_OK;
         auto entries = walkLzh(bytes, true, &walk);
@@ -616,7 +616,7 @@ void test_lh1_reading_an_entry_leaves_the_walk_aligned(void)
 {
     auto bytes = readWholeFile(LH1_SAMPLES[0].path);
     if (bytes.empty())
-        TEST_IGNORE_MESSAGE("sample missing: .archive/archive/lzh/games.lzh");
+        TEST_IGNORE_MESSAGE("sample missing: .data/media/archive/lzh/games.lzh");
 
     int listed_walk = ARCHIVE_OK, read_walk = ARCHIVE_OK;
     auto listed = walkLzh(bytes, false, &listed_walk);
@@ -654,12 +654,12 @@ void test_lh1_reading_an_entry_leaves_the_walk_aligned(void)
 void test_lh5_entries_still_decode_and_pass_their_crc(void)
 {
     static const Lh1Sample samples[] = {
-        { ".archive/archive/lha/Bonanza.lha", 6 },
-        { ".archive/archive/lha/BountyHunter.lha", 5 },
-        { ".archive/archive/lha/LoveThisNow.lha", 9 },
-        { ".archive/archive/lha/MorbidArt3fx.lha", 4 },
-        { ".archive/archive/lha/rasm.lha", 135 },
-        { ".archive/archive/lha/mce.lha", 997 },
+        { ".data/media/archive/lha/Bonanza.lha", 6 },
+        { ".data/media/archive/lha/BountyHunter.lha", 5 },
+        { ".data/media/archive/lha/LoveThisNow.lha", 9 },
+        { ".data/media/archive/lha/MorbidArt3fx.lha", 4 },
+        { ".data/media/archive/lha/rasm.lha", 135 },
+        { ".data/media/archive/lha/mce.lha", 997 },
     };
     size_t tested = 0;
     for (const auto& sample : samples) {
@@ -691,7 +691,7 @@ void test_lh5_entries_still_decode_and_pass_their_crc(void)
         }
     }
     if (tested == 0)
-        TEST_IGNORE_MESSAGE("no samples under .archive/archive/lha/");
+        TEST_IGNORE_MESSAGE("no samples under .data/media/archive/lha/");
 }
 
 // Same alignment property, forced. The samples above cannot reach the case
@@ -704,7 +704,7 @@ void test_lh1_short_origsize_still_leaves_the_walk_aligned(void)
 {
     auto bytes = readWholeFile(LH1_SAMPLES[0].path);
     if (bytes.empty())
-        TEST_IGNORE_MESSAGE("sample missing: .archive/archive/lzh/games.lzh");
+        TEST_IGNORE_MESSAGE("sample missing: .data/media/archive/lzh/games.lzh");
 
     int listed_walk = ARCHIVE_OK;
     auto listed = walkLzh(bytes, false, &listed_walk);
@@ -752,9 +752,9 @@ void test_lh1_short_origsize_still_leaves_the_walk_aligned(void)
 // in this layer.
 void test_empty_entry_does_not_restart_the_walk(void)
 {
-    const char* path = ".archive/archive/lha/mce.lha";
+    const char* path = ".data/media/archive/lha/mce.lha";
     if (!haveFile(path))
-        TEST_IGNORE_MESSAGE("sample missing: .archive/archive/lha/mce.lha");
+        TEST_IGNORE_MESSAGE("sample missing: .data/media/archive/lha/mce.lha");
 
     // A regression here does not fail this test, it HANGS it: the probe loop is
     // unbounded. A hung suite is the signal.
@@ -783,7 +783,7 @@ void test_unimplemented_lzh_method_is_still_refused(void)
 {
     auto bytes = readWholeFile(LH1_SAMPLES[0].path);
     if (bytes.empty())
-        TEST_IGNORE_MESSAGE("sample missing: .archive/archive/lzh/games.lzh");
+        TEST_IGNORE_MESSAGE("sample missing: .data/media/archive/lzh/games.lzh");
 
     // Level-0 header: [0] size, [1] checksum, [2..6] "-lhN-", so the method
     // digit is byte 5. The checksum covers bytes 2.. so patch it too, to keep

@@ -35,12 +35,12 @@ Update the spec's `HDDMStream` section to record this once Task 4 is done (Task 
 
 `pio` is not on PATH on this machine — use `~/.platformio/penv/Scripts/pio.exe`. Never pipe it through `tail`/`head`; redirect to a file and grep, or the error text is lost. If the native build fails with "Access is denied" on `program.exe`, a previous test binary is still running: `Get-Process program | Stop-Process -Force`.
 
-### Sample corpus (`.archive/` is gitignored — tests skip when absent)
+### Sample corpus (`.data/media/` is gitignored — tests skip when absent)
 
 | Image | Label | DP | Partitions |
 |---|---|---|---|
-| `.archive/hdd/ide20201227.hdd` | `SOCI/SINGULAR` | slot 0 | partition **1** `STUFF`, type 1, start 2, end 16383, root LBA **5** |
-| `.archive/hdd/c64os v1.09-clean.hdd` | `C64 OS` | slot 0 | partition **1** `C64 OS`, type 1, root LBA **5**; partition **2** `DISK IMAGES`, type 1, root LBA **32773** |
+| `.data/media/hdd/ide20201227.hdd` | `SOCI/SINGULAR` | slot 0 | partition **1** `STUFF`, type 1, start 2, end 16383, root LBA **5** |
+| `.data/media/hdd/c64os v1.09-clean.hdd` | `C64 OS` | slot 0 | partition **1** `C64 OS`, type 1, root LBA **5**; partition **2** `DISK IMAGES`, type 1, root LBA **32773** |
 
 The C64 OS image is the only one with two partitions, so it carries every selection test.
 
@@ -155,7 +155,7 @@ In `lib/meatloaf/media/hd/hdd.h`, replace the `BootSector` struct body:
 ```cpp
     // Boot sector (sector 0). Offsets per the CFS 0.11 spec, whose table is
     // colspan-encoded: "Unused" spans $00-$02, DP is $03, and @Last disk
-    // sector spans $04-$07. Confirmed against every image in .archive/hdd/,
+    // sector spans $04-$07. Confirmed against every image in .data/media/hdd/,
     // where @Last disk sector is @Partition directory backup + 1.
     struct BootSector {
         uint8_t reserved0[3];       // $00-$02: unused
@@ -207,7 +207,7 @@ Add to `test/native/test_hdd_read/test_hdd_read.cpp`. Add a second image constan
 ```cpp
 // The only corpus image with more than one partition, so every selection
 // test uses it: slot 0 "C64 OS" (root LBA 5), slot 1 "DISK IMAGES" (32773).
-static const char* MULTI_IMAGE_PATH = ".archive/hdd/c64os v1.09-clean.hdd";
+static const char* MULTI_IMAGE_PATH = ".data/media/hdd/c64os v1.09-clean.hdd";
 ```
 
 and a helper beside `openImage()`:
@@ -728,7 +728,7 @@ Register them in `main()`. `test_containerOf_finds_the_hdd_component` parses no 
 
     if (!imageAvailable())
     {
-        TEST_IGNORE_MESSAGE("sample image .archive/hdd/ide20201227.hdd not present");
+        TEST_IGNORE_MESSAGE("sample image .data/media/hdd/ide20201227.hdd not present");
         return UNITY_END();
     }
 ```
@@ -1961,7 +1961,7 @@ Add to the "Important Notes" bullet list, after the existing CMD media images en
 
 ```markdown
 - **IDE64 CFS images (.hdd) follow the same partition model as CMD images.** `HDDImageRegistry` (lib/meatloaf/media/hd/hdd.h/cpp) holds the per-image partition table and selection exactly as `DHDImageRegistry` does; `HDDResolvePartition()` binds a partition to a path without ever calling `select()`; `hdpart::` (media/hd/partition_select.h) is the one surface `CP<n>` and the `partition` console command both use. **Partition 0 means "the currently selected partition" in a path and is refused by `select()`, identical to DHD.** Two things are CFS-specific: (1) **there are two numbering spaces** — the raw table SLOT 0-15, which is how the 16-entry partition directory is laid out and what the boot sector's DP byte holds, and the partition NUMBER 1-N, which counts only VALID entries and is what paths, `CP<n>`, `$=P` and the `partition` command speak. `parse()` converts DP between them exactly once; nothing downstream sees a slot, and the numbering must match `HDDMStream::seekPartitionEntry()` entry for entry. (2) There is **no `cached_part`/`brokerUrl()` machinery and no dispose-on-select**, because `HDDMStream` re-derives its position from `seekDirectory(pathInStream)` on every operation, so a broker-cached stream carries no partition identity that can go stale. Only CFS-type partitions (`type == 1`) are selectable; unformatted, GEOS and reserved types are listed but refused.
-- **The CFS boot sector's default-partition byte is `$03`, not `$01`** (`HDDMStream::BootSector`). The spec's table is colspan-encoded — `Unused` spans `$00-$02`, `DP` is `$03`, `@Last disk sector` spans `$04-$07` — and the struct had both `default_partition` and `last_sector` off by two. It was latent because every sample image in `.archive/hdd/` has `$00-$03 = 00 00 00 00`. The corpus invariant that pins it: `@Last disk sector == @Partition directory backup + 1`, since the backup directory lives on the last sector of the disk.
+- **The CFS boot sector's default-partition byte is `$03`, not `$01`** (`HDDMStream::BootSector`). The spec's table is colspan-encoded — `Unused` spans `$00-$02`, `DP` is `$03`, `@Last disk sector` spans `$04-$07` — and the struct had both `default_partition` and `last_sector` off by two. It was latent because every sample image in `.data/media/hdd/` has `$00-$03 = 00 00 00 00`. The corpus invariant that pins it: `@Last disk sector == @Partition directory backup + 1`, since the backup directory lives on the last sector of the disk.
 - **`HDDMStream` must never call `HDDImageRegistry`.** The selection is written into `HDDMStream::selected_partition` by `HDDMFile` (`applyPartition()`), at all five sites that touch a stream: `getDecodedStream()`, `rewindDirectory()`, `getNextFileInDir()`, `isDirectory()`, and `exists()`. A registry lookup from inside the stream would need `MFSOwner::File()`, which `abort()`s under the native test stubs — and `FileContainerStream` sets `url` to a path ending in `.hdd`, so the lookup would fire. `selected_partition == 0` means "fall back to the boot sector's DP" — unambiguous precisely because partitions are numbered from 1 — and is what a directly constructed stream gets.
 ```
 

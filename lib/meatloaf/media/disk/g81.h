@@ -48,7 +48,7 @@
 //
 // ** VERIFICATION STATUS - read this before trusting the layout. **
 //
-// There is no .g81 anywhere in .archive, VICE has no MFM-1581 support at all
+// There is no .g81 anywhere in .data/media, VICE has no MFM-1581 support at all
 // (`grep MFM-1581 lib/vdrive` finds nothing), and the P64 reference
 // implementation does not know the format either. The four bullets above are
 // the entire specification this is written from. Two of them cannot be checked

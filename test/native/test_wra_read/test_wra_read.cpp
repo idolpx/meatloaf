@@ -39,8 +39,8 @@
 // D64 already does for VLIR - so this header is documentation, not something
 // the read path acts on.
 //
-// The corpus is real: six .WR3 and one .WRA in .archive/archive/wr3, none of
-// them written by this project. .archive is gitignored, so these skip cleanly
+// The corpus is real: six .WR3 and one .WRA in .data/media/archive/wr3, none of
+// them written by this project. .data/media is gitignored, so these skip cleanly
 // without it.
 
 #include <unity.h>
@@ -55,7 +55,7 @@
 #include "media/archive/wra.h"
 #include "string_utils.h"
 
-static const char* CORPUS_DIR = ".archive/archive/wr3";
+static const char* CORPUS_DIR = ".data/media/archive/wr3";
 
 static const char* CORPUS[] = {
     "G12841.WR3", "G12871.WR3", "G12881.WR3",
@@ -131,7 +131,7 @@ void test_directory_lists_entries(void)
     {
         auto image = openImage(std::string(CORPUS_DIR) + "/" + CORPUS[c], g_src);
         if (image == nullptr)
-            TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/wr3");
+            TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/wr3");
 
         char message[128];
         snprintf(message, sizeof(message), "%s", CORPUS[c]);
@@ -186,7 +186,7 @@ void test_entries_are_found_by_their_listed_name(void)
 {
     auto image = openImage(std::string(CORPUS_DIR) + "/PAINTVIEW_CODE.WRA", g_src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/wr3");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/wr3");
 
     TEST_ASSERT_TRUE(image->readHeader());
     TEST_ASSERT_EQUAL_STRING("ReadPaint", image->entries[0].filename.c_str());
@@ -212,7 +212,7 @@ void test_wildcard_resolves_to_the_first_entry(void)
 {
     auto image = openImage(std::string(CORPUS_DIR) + "/G6441.WR3", g_src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/wr3");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/wr3");
 
     TEST_ASSERT_TRUE(image->readHeader());
     TEST_ASSERT_TRUE(image->seekEntry(std::string("*")));
@@ -231,7 +231,7 @@ void test_every_entry_decodes_and_reconciles(void)
     {
         auto image = openImage(std::string(CORPUS_DIR) + "/" + CORPUS[c], g_src);
         if (image == nullptr)
-            TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/wr3");
+            TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/wr3");
 
         TEST_ASSERT_TRUE(image->readHeader());
 
@@ -321,7 +321,7 @@ void test_the_same_entry_decodes_identically_across_archives(void)
         {
             auto image = openImage(std::string(CORPUS_DIR) + "/" + group.files[i], g_src);
             if (image == nullptr)
-                TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/wr3");
+                TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/wr3");
 
             char message[128];
             snprintf(message, sizeof(message), "%s [%s]", group.files[i], group.entry);
@@ -347,7 +347,7 @@ void test_reading_an_entry_serves_exactly_its_bytes(void)
 {
     auto image = openImage(std::string(CORPUS_DIR) + "/G6441.WR3", g_src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/wr3");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/wr3");
 
     TEST_ASSERT_TRUE(image->readHeader());
     TEST_ASSERT_TRUE(image->seekPath(std::string("geos")));
@@ -378,7 +378,7 @@ void test_listing_size_is_the_compressed_span(void)
 {
     auto image = openImage(std::string(CORPUS_DIR) + "/G6441.WR3", g_src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/wr3");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/wr3");
 
     TEST_ASSERT_TRUE(image->readHeader());
 
@@ -507,7 +507,7 @@ void test_file_types_decode(void)
 {
     auto image = openImage(std::string(CORPUS_DIR) + "/G6441.WR3", g_src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/wr3");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/wr3");
 
     TEST_ASSERT_EQUAL_STRING("seq", image->decodeType(1).c_str());
     TEST_ASSERT_EQUAL_STRING("prg", image->decodeType(2).c_str());
@@ -570,7 +570,7 @@ void test_a_truncated_entry_fails_rather_than_truncating(void)
 
     auto source = openImage(std::string(CORPUS_DIR) + "/G6441.WR3", g_src);
     if (source == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/wr3");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/wr3");
 
     TEST_ASSERT_TRUE(source->readHeader());
     const uint32_t keep = source->entries[0].data_end - 32;
