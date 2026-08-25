@@ -148,8 +148,15 @@ direction), reusing the include guard `PS2_KEYBOARD_H` so it collides with
 `src/main.cpp:238` already installs it. Unreferenced.
 
 ### P3 — trim `REQUIRES` and the unused includes
-`esp_hid nvs_flash driver bt` → `driver esp_timer esp_rom`. No PS/2 source uses
-Bluetooth or NVS.
+`esp_hid nvs_flash driver bt` → `driver esp_timer esp_rom nvs_flash`.
+
+**Corrected 2026-08-25 during implementation: `nvs_flash` must STAY.** The
+original claim here — "no PS/2 source uses Bluetooth or NVS" — was wrong for
+NVS. `ps2_mouse.cpp:100` calls `nvs_flash_init()` and `ps2_mouse.h:92` declares
+an `nvs_handle` member; the dependency arrives transitively, so grepping the
+`.cpp` files' own `#include` lines missed it. `ps2_mouse.*` is unreferenced but
+still compiles, since it is in the component's source glob. `esp_hid` and `bt`
+are genuinely unused and are removed.
 
 **Coupled with P1's header cleanup — order matters.** `ps2_device.h` and
 `ps2_keyboard.h` both `#include <nvs_flash.h>`. `REQUIRES` is what supplies a
