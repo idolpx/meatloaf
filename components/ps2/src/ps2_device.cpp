@@ -308,14 +308,17 @@ namespace ps2dev
   QueueHandle_t PS2Device::get_packet_queue_handle() { return _queue_packet; }
   int PS2Device::send_packet(PS2Packet *packet)
   {
-    // A send racing a teardown must fail, not write to a deleted handle.
+    // A send racing PS2Device::end() must fail, not write to a deleted
+    // handle -- end() sets _queue_packet = nullptr after vQueueDelete().
+    // This guard is load-bearing; it is not about backpressure.
     if (!_queue_packet)
       return -1;
-    // 500 ms comfortably exceeds the ~20 ms a full 20-deep queue takes to
-    // drain, so this only expires if the wire is genuinely stuck.  With a 0
-    // timeout, `type()` of anything past ~10 characters silently dropped
-    // keystrokes: each character is two packets and the wire drains at
-    // roughly 1 ms per packet.
+    // The timeout is a stuck-wire backstop, not flow control: type()'s own
+    // vTaskDelay(pdMS_TO_TICKS(10)) between keydown and keyup already keeps
+    // the producer well under the consumer's drain rate, so ordinary typing
+    // never comes close to filling a 20-deep queue.  A 0 ms timeout would
+    // misreport transient scheduling jitter as failure; 500 ms lets it
+    // instead catch a genuinely wedged bus (host never toggling clock).
     return (xQueueSend(_queue_packet, packet, pdMS_TO_TICKS(500)) == pdTRUE) ? 0 : -1;
   }
 }
