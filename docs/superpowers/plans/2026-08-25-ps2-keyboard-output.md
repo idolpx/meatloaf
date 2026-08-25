@@ -2355,9 +2355,15 @@ byte is 11 bit cells at ~80 us each, roughly 900 us total.
 ps2 type "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
 ```
 
-Expected: all 200 characters arrive, taking roughly 400 ms. Before Task 6 this
-silently dropped everything past ~10 characters, so a truncated result means
-`send_packet`'s timeout did not land.
+Expected: all 200 characters arrive, taking **2-6 seconds** — 10 ms per unshifted
+character and 30 ms per shifted one, from `type()`'s own `vTaskDelay` between
+keydown and keyup. NOT the ~400 ms this step originally claimed: that came from
+queue-drain rate alone and was corrected during implementation (see spec P5).
+
+**This step does not test backpressure, and cannot.** The producer cannot outrun
+the consumer through `type()`, so the queue never fills. What it verifies is that
+a long string arrives complete and in order — treat a truncated result as a wire
+or encoding fault, not a queue-timeout fault.
 
 - [ ] **Step 6: Verify held keys and the safety release**
 
