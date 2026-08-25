@@ -13,20 +13,29 @@ namespace ps2dev
 void _taskfn_process_host_request(void *arg)
 {
   PS2Device *ps2dev = (PS2Device *)arg;
+  gpio_intr_enable(ps2dev->clkPin());
+
   while (ps2dev->running())
   {
+    // Blocks indefinitely.  NOTHING polls the PS/2 lines: the ISR fires only
+    // when the host actually pulls DATA low, and end() wakes this task with
+    // xTaskNotifyGive after clearing _running.
+    if (ulTaskNotifyTake(pdTRUE, portMAX_DELAY) == 0)
+      continue;
+
     xSemaphoreTake(ps2dev->get_bus_mutex_handle(), portMAX_DELAY);
     if (ps2dev->get_bus_state() == PS2Device::BusState::HOST_REQUEST_TO_SEND)
     {
       uint8_t host_cmd;
-      if (ps2dev->read(&host_cmd) == 0)
-      {
+      int r = ps2dev->read(&host_cmd);
+      if (r == 0)
         ps2dev->reply_to_host(host_cmd);
-      }
+      else if (r == -2)
+        ps2dev->write(0xFE);      // A5: parity error -- ask the host to resend
     }
     xSemaphoreGive(ps2dev->get_bus_mutex_handle());
-    vTaskDelay(pdMS_TO_TICKS(INTERVAL_CHECKING_HOST_SEND_REQUEST_MILLIS));
   }
+
   ps2dev->clearTaskHandle(ps2dev->hostRequestTaskSlot());
   vTaskDelete(NULL);
 }

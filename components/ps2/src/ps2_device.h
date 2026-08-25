@@ -32,8 +32,6 @@ namespace ps2dev
   //const BaseType_t DEFAULT_TASK_CORE = APP_CPU_NUM;
   const BaseType_t DEFAULT_TASK_CORE = 0;
   const BaseType_t DEFAULT_TASK_CORE_MOUSE = 1;
-  // The device should check for "HOST_REQUEST_TO_SEND" at a interval not exceeding 10 milliseconds.
-  const uint32_t INTERVAL_CHECKING_HOST_SEND_REQUEST_MILLIS = 9;
   const uint32_t MOUSE_CLICK_PRESSING_DURATION_MILLIS = 100;
 
   class PS2Packet
@@ -45,9 +43,6 @@ namespace ps2dev
 
   class PS2Device
   {
-    void ps2_isr_handler(void *arg);
-    void ps2_task(void *param);
-
   public:
     PS2Device(gpio_num_t clk, gpio_num_t data);
 
@@ -76,6 +71,8 @@ namespace ps2dev
     void clearTaskHandle(TaskHandle_t *slot) { *slot = nullptr; }
     TaskHandle_t *sendTaskSlot()        { return &_task_send_packet; }
     TaskHandle_t *hostRequestTaskSlot() { return &_task_process_host_request; }
+    gpio_num_t clkPin() const  { return _ps2clk; }
+    gpio_num_t dataPin() const { return _ps2data; }
 
   protected:
     gpio_num_t _ps2clk;
@@ -94,10 +91,6 @@ namespace ps2dev
     void golo(gpio_num_t pin);
     void gohi(gpio_num_t pin);
     void ack();
-
-  private:
-    QueueHandle_t ps2_queue;
-    TaskHandle_t ps2_task_handle = NULL;
   };
 } // namespace ps2dev
 

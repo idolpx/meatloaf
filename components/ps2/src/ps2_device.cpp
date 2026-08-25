@@ -4,31 +4,20 @@
 namespace ps2dev
 {
 
-  void IRAM_ATTR ps2_isr_handler(void *arg) {
-    static uint8_t bit_count = 0;
-    static uint8_t data_byte = 0;
-    static uint8_t parity = 0;
-    static bool start_bit = false;
-
-    // if (bit_count == 8) {
-    //     bit_count++; // Skip parity
-    // } else if (bit_count == 9) {
-    //     xQueueSendFromISR(_queue_packet, &data_byte, NULL);
-    //     start_bit = false;
-    // }
-  }
-
-  void PS2Device::ps2_task(void *param) {
-    PS2Device *device = static_cast<PS2Device *>(param);
-
-    while (true) {
-        // if (device->available()) {
-        //     uint8_t data = device->read();
-        //     ESP_LOGI(TAG, "Keycode: %02X", data);
-        // }
-        vTaskDelay(pdMS_TO_TICKS(10));
+  // A host request to send is CLK high && DATA low.  The host's sequence is
+  // CLK low (inhibit) -> DATA low (start bit) -> CLK released, so the edge
+  // that CREATES the condition is CLK rising.
+  static void IRAM_ATTR ps2_clk_isr(void *arg)
+  {
+    PS2Device *dev = static_cast<PS2Device *>(arg);
+    if (gpio_get_level(dev->clkPin()) == 1 && gpio_get_level(dev->dataPin()) == 0)
+    {
+      BaseType_t hpw = pdFALSE;
+      vTaskNotifyGiveFromISR(dev->hostRequestTask(), &hpw);
+      if (hpw)
+        portYIELD_FROM_ISR();
     }
-}
+  }
 
   PS2Device::PS2Device(gpio_num_t clk, gpio_num_t data)
   {
@@ -68,10 +57,12 @@ namespace ps2dev
     _mutex_bus = xSemaphoreCreateMutex();
     _queue_packet = xQueueCreate(PACKET_QUEUE_LENGTH, sizeof(PS2Packet));
 
-    // gpio_install_isr_service(0);
-    // gpio_isr_handler_add(_ps2clk, ps2_isr_handler, (void *)this);
-
-    // xTaskCreatePinnedToCore(ps2_task, "ps2_task", 4096, this, 10, &ps2_task_handle, 0);
+    // The service is installed once, globally, at src/main.cpp:238.  Calling
+    // gpio_install_isr_service() here returns ESP_ERR_INVALID_STATE and, worse,
+    // is what the deleted ps2keyboard.cpp used to do.
+    gpio_set_intr_type(_ps2clk, GPIO_INTR_POSEDGE);
+    gpio_isr_handler_add(_ps2clk, ps2_clk_isr, this);
+    gpio_intr_disable(_ps2clk);   // enabled by the task once it is running
 
     _running = true;
   }
@@ -99,7 +90,7 @@ namespace ps2dev
       return;
     }
 
-    gpio_isr_handler_remove(_ps2clk);   // no-op until Task 7 adds the handler
+    gpio_isr_handler_remove(_ps2clk);
     gohi(_ps2clk);
     gohi(_ps2data);
     gpio_reset_pin(_ps2clk);
@@ -136,6 +127,8 @@ namespace ps2dev
     {
       return -1;
     }
+
+    gpio_intr_disable(_ps2clk);
 
     portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
     taskENTER_CRITICAL(&mux);
@@ -192,6 +185,8 @@ namespace ps2dev
 
     taskEXIT_CRITICAL(&mux);
 
+    gpio_intr_enable(_ps2clk);
+
     return 0;
   }
   int PS2Device::write_wait_idle(uint8_t data, uint64_t timeout_micros)
@@ -222,6 +217,8 @@ namespace ps2dev
         return -1;
       esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     }
+
+    gpio_intr_disable(_ps2clk);
 
     portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
     taskENTER_CRITICAL(&mux);
@@ -277,6 +274,8 @@ namespace ps2dev
     gohi(_ps2data);
 
     taskEXIT_CRITICAL(&mux);
+
+    gpio_intr_enable(_ps2clk);
 
     *value = data & 0x00FF;
 
