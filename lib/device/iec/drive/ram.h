@@ -23,7 +23,6 @@
 #include <vector>
 #include <unordered_map>
 #include <memory>
-#include <esp_rom_crc.h>
 #include <esp_heap_caps.h>
 
 #include "../../meatloaf/meatloaf.h"
@@ -57,8 +56,6 @@ private:
 public:
     driveMemory(size_t ramSize = 2048) : _ramSize(ramSize) {}
     ~driveMemory() = default;
-
-    uint16_t mw_hash = 0xFFFF;
 
     bool setRAM(size_t ramSize) {
         _ramSize = ramSize;
@@ -163,8 +160,7 @@ public:
 
             if (addr + len > ram.size()) return;
             memcpy(&ram[addr], data, len);
-            mw_hash = esp_rom_crc16_be(mw_hash, data, len);
-            Debug_printv("RAM write %04X:%s [%d] crc[%04X]", addr, mstr::toHex(data, len).c_str(), len, mw_hash);
+            Debug_printv("RAM write %04X:%s [%d]", addr, mstr::toHex(data, len).c_str(), len);
         }
     }
 
@@ -175,7 +171,6 @@ public:
 
             if (!ram.empty()) {
                 Debug_printv("RAM execute %04X", addr);
-                mw_hash = 0xFFFF;
             }
         }
 
@@ -195,7 +190,6 @@ public:
 
     void reset() {
         if (!ram.empty()) ram.assign(ram.size(), 0x00);
-        mw_hash = 0xFFFF;
     }
 };
 

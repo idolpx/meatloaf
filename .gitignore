@@ -18,8 +18,8 @@ platformio.ini
 platformio-device-monitor-*.log
 
 # ESP-IDF SDK configuration file
-.archive
 .cache
+.data
 .reference
 
 **/*.log

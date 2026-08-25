@@ -14,9 +14,9 @@
 // pulse-to-GCR read logic, the bit-resolution sync search and the GCR nibble
 // decode all agree, end to end.
 //
-// The images are the real ones in .archive/p64 rather than synthesized: nothing
+// The images are the real ones in .data/media/p64 rather than synthesized: nothing
 // here can produce a P64, since writing one means implementing the range
-// ENCODER, which the read path neither has nor needs. .archive is gitignored,
+// ENCODER, which the read path neither has nor needs. .data/media is gitignored,
 // so every test skips cleanly without it.
 
 #include <unity.h>
@@ -30,7 +30,7 @@
 #include "../test_disk_write/file_container_stream.h"
 #include "media/disk/p64.h"
 
-static const char* CORPUS_DIR = ".archive/p64";
+static const char* CORPUS_DIR = ".data/media/p64";
 
 // A freshly formatted, empty 1541 disk - no disk name, no files. Every BAM
 // field in it is predictable from the geometry alone.
@@ -96,7 +96,7 @@ void test_chunk_walk_finds_half_tracks(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(BLANK, src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/p64");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/p64");
 
     TEST_ASSERT_TRUE(image->parseChunks());
     TEST_ASSERT_TRUE(image->half_tracks.size() >= 35);
@@ -120,7 +120,7 @@ void test_chunk_walk_is_idempotent(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(BLANK, src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/p64");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/p64");
 
     TEST_ASSERT_TRUE(image->parseChunks());
     size_t first = image->half_tracks.size();
@@ -170,7 +170,7 @@ void test_track_decodes_to_a_full_rotation(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(BLANK, src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/p64");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/p64");
 
     TEST_ASSERT_TRUE(image->parseChunks());
     TEST_ASSERT_TRUE(image->decodeTrack(18));
@@ -189,7 +189,7 @@ void test_blank_disk_bam_is_exactly_right(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(BLANK, src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/p64");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/p64");
 
     TEST_ASSERT_TRUE(image->parseChunks());
     TEST_ASSERT_TRUE(image->decodeTrack(18));
@@ -242,7 +242,7 @@ void test_every_sector_of_track18_is_readable(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(BLANK, src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/p64");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/p64");
 
     TEST_ASSERT_TRUE(image->parseChunks());
     TEST_ASSERT_TRUE(image->decodeTrack(18));
@@ -263,7 +263,7 @@ void test_seek_sector_positions_read_container(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(BLANK, src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/p64");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/p64");
 
     TEST_ASSERT_TRUE(image->parseChunks());
 
@@ -296,7 +296,7 @@ void test_missing_track_and_sector_fail(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(BLANK, src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/p64");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/p64");
 
     TEST_ASSERT_TRUE(image->parseChunks());
 
@@ -317,7 +317,7 @@ void test_read_header_yields_the_disk_name(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(WHEELS, src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/p64");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/p64");
 
     TEST_ASSERT_TRUE(image->readHeader());
 
@@ -344,7 +344,7 @@ void test_directory_entries_are_exact(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(WHEELS, src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/p64");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/p64");
 
     TEST_ASSERT_TRUE(image->parseChunks());
     TEST_ASSERT_TRUE(image->seekSector(18, 1, 0));
@@ -425,7 +425,7 @@ void test_file_block_chains_walk_to_their_directory_length(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(WHEELS, src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/p64");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/p64");
 
     TEST_ASSERT_TRUE(image->parseChunks());
 
@@ -497,7 +497,7 @@ void test_corpus_directory_tracks_decode(void)
     }
 
     if (checked == 0)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/p64");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/p64");
 }
 
 
@@ -522,7 +522,7 @@ void test_every_sector_of_every_track_decodes(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(WHEELS, src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/p64");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/p64");
 
     TEST_ASSERT_TRUE(image->parseChunks());
 

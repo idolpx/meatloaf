@@ -11,7 +11,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have receikved a copy of the GNU General Public License
+// You should have received a copy of the GNU General Public License
 // along with this program; if not, write to the Free Software Foundation,
 // Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 // -----------------------------------------------------------------------------
@@ -138,11 +138,37 @@ class IECDevice
   virtual uint8_t read(uint8_t *buffer, uint8_t bufferSize);
 #endif
 
-#if defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)
-  // these functions are experimental, they are called when the Epyx Cartridge uses
-  // sector read/write operations (disk editor, disk copy or file copy).
+#ifdef IEC_SUPPORT_SECTOROPS
+  // raw track/sector access. Called by any loader that addresses the disk by
+  // block rather than by file -- the Epyx cartridge (disk editor, disk copy,
+  // file copy) and Nippon so far. The names are historical; the hooks are not
+  // Epyx-specific.
   virtual bool epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer)  { return false; }
   virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer) { return false; }
+
+  // Geometry of whatever is mounted. Every loader that walks the disk itself
+  // rather than asking for a file needs these: where a track ends, and which
+  // drive type it is talking to (some refuse anything but a 1541 image).
+  // 0 sectors means "no image, or no such track"; IEC_IMG_NONE likewise.
+  //
+  // Gated on IEC_IMPL_SOFTLOAD rather than on IEC_SUPPORT_SECTOROPS: Epyx uses
+  // the sector hooks above but never these, so on a board that only detects
+  // they would be two vtable slots and a VDrive call nothing can reach.
+#ifdef IEC_IMPL_SOFTLOAD
+  virtual uint8_t sectorsPerTrack(uint8_t track) { return 0; }
+  virtual uint8_t imageType() { return IEC_IMG_NONE; }
+
+  // Counts how many times the medium behind this device has changed.
+  //
+  // Several loaders span more than one disk side and ask the user to swap:
+  // they read an id off the new disk, and if it is not the one they wanted
+  // they wait for the disk to change and look again. sd2iec answers that with
+  // a "dir_changed" flag set wherever the mounted directory moves; a counter
+  // is used here instead because it needs no clearing and cannot be lost
+  // between two readers -- a loader samples it once and waits for a different
+  // value.
+  virtual uint32_t mediaGeneration() { return 0; }
+#endif
 #endif
 
 #ifdef IEC_FP_DOLPHIN 
@@ -160,7 +186,7 @@ class IECDevice
  protected:
   bool       m_isActive;
   uint8_t    m_devnr;
-  uint8_t    m_flEnabled;  // bit-mask for which fast-loaders are enabled (IEC_FP_* in IECConfig.h)
+  uint32_t   m_flEnabled;  // bit-mask for which fast-loaders are enabled (IEC_FP_* in IECConfig.h)
   uint32_t   m_flFlags;    // internal fast-loader flags
   uint8_t    m_flProtocol; // currently active fast-load protocol
   IECBusHandler *m_handler;

@@ -25,7 +25,6 @@
 #include <cstring>
 #include <unordered_map>
 #include <vector>
-#include <esp_rom_crc.h>
 #include <esp_heap_caps.h>
 
 #include "../../bus/iec/IECFileDevice.h"
@@ -309,9 +308,31 @@ protected:
   // called on falling edge of RESET line
   virtual void reset();
 
-#if defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)
+#ifdef IEC_SUPPORT_SECTOROPS
   virtual bool epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer);
   virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer);
+
+  // Block access falls back to the working directory's own container when
+  // there is no VDrive behind it -- a media image reached through the MFile
+  // chain has none. Cached because a loader reads hundreds of blocks; dropped
+  // whenever the working directory moves, since the container may have.
+#ifdef IEC_IMPL_SOFTLOAD
+  std::shared_ptr<MStream> sectorStream();
+  void releaseSectorStream();
+#else
+  void releaseSectorStream() {}
+#endif
+#ifdef IEC_IMPL_SOFTLOAD
+  virtual uint8_t sectorsPerTrack(uint8_t track);
+  virtual uint8_t imageType();
+  virtual uint32_t mediaGeneration() { return m_mediaGeneration; }
+#endif
+#endif
+
+#ifdef IEC_SUPPORT_SOFTLOAD
+  // The switch point for a software fast loader identified from the code the
+  // host uploaded -- see IECFileDevice::startFastLoader.
+  virtual bool startFastLoader(uint8_t variant, uint8_t param, uint8_t rxtx, const uint8_t *cmd, uint8_t cmdLen, uint16_t crc);
 #endif
 
   // Point a channel at a disk block for B-R/B-W and U1/U2 -- see the comment
@@ -337,6 +358,14 @@ protected:
   uint64_t  m_timeStart;
 
   driveMemory m_memory;
+
+#if defined(IEC_SUPPORT_SECTOROPS) && defined(IEC_IMPL_SOFTLOAD)
+  std::shared_ptr<MStream> m_sectorStream;
+  std::string              m_sectorStreamUrl;
+  // Bumped whenever the medium behind this drive changes -- see
+  // IECDevice::mediaGeneration(). Never reset, so no reader can miss a change.
+  uint32_t                 m_mediaGeneration = 0;
+#endif
 };
 
 #endif // DRIVE_H

@@ -20,6 +20,7 @@
 #define IECFILEDEVICE_H
 
 #include "IECDevice.h"
+#include "fastload.h"
 
 
 class IECFileDevice : public IECDevice
@@ -115,9 +116,35 @@ class IECFileDevice : public IECDevice
   // transmitted or received data is begin logged (logging reduces performance)
   void setLogging(bool enable);
 
-#if defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)
+#ifdef IEC_SUPPORT_SECTOROPS
   virtual bool epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer);
   virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer);
+#ifdef IEC_IMPL_SOFTLOAD
+  virtual uint8_t sectorsPerTrack(uint8_t track);
+  virtual uint8_t imageType();
+  virtual uint32_t mediaGeneration();
+#endif
+#endif
+
+#ifdef IEC_SUPPORT_SOFTLOAD
+  // Called for every M-E that reaches the software fast loader dispatch --
+  // this is the single point where a detected loader is switched in.
+  //
+  // "variant" is IEC_FLV_* or IEC_FLV_NONE when the uploaded code matched no
+  // known loader, or matched one the user has disabled. It is called in that
+  // case too, on purpose: an unrecognised M-E is exactly what has to be
+  // reported to add support for a new loader, and "crc" (taken before the
+  // detector rolls its state) is the only evidence of which loader it was.
+  //
+  // Return true to consume the M-E: the loader has taken over and the drive
+  // must not also run its normal M-E handling. Return false to let the M-E
+  // through, which is what an identified-but-not-implemented loader does --
+  // the host then falls back to the standard protocol rather than hanging.
+  //
+  // "cmd"/"cmdLen" are the whole M-E command. Some loaders carry arguments
+  // after the address -- Turbodisk appends the name of the file to load -- so
+  // the address alone is not enough.
+  virtual bool startFastLoader(uint8_t variant, uint8_t param, uint8_t rxtx, const uint8_t *cmd, uint8_t cmdLen, uint16_t crc);
 #endif
 
  private:
@@ -143,6 +170,9 @@ class IECFileDevice : public IECDevice
 
   bool    m_opening, m_eoi, m_statusEoi, m_canServeATN;
   uint8_t m_channel, m_cmd, m_uploadCtr;
+#ifdef IEC_SUPPORT_SOFTLOAD
+  IECFastLoadDetect m_fastload;
+#endif
 #if defined(IEC_FP_AR6)
   uint8_t m_ar6detect;
 #endif

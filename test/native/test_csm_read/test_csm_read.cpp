@@ -11,7 +11,7 @@
 //      position, wrapping once. That is what makes a tape carrying the same
 //      name twice - a BASIC loader and its payload - resolve positionally.
 //
-// The images are synthesized rather than taken from .archive/csm because the
+// The images are synthesized rather than taken from .data/media/csm because the
 // interesting cases (a truncated tape, a header whose end address precedes its
 // start, a missing end-of-tape block) do not occur in the corpus. The layout
 // they encode was verified against all 12 of those samples first, and the last
@@ -684,10 +684,10 @@ void test_load_on_empty_tape_terminates(void)
 // against real tapes. Every corpus sample must walk to exactly its own length -
 // entries then either an end-of-tape block or EOF, with no slack and no
 // overrun. A single wrong field width or a missed terminator shows up here as
-// leftover bytes. The corpus lives in .archive/, which is gitignored, so this
+// leftover bytes. The corpus lives in .data/media/, which is gitignored, so this
 // skips cleanly when it is not present - the same arrangement test_hdd_read
 // uses.
-static const char* CORPUS_DIR = ".archive/csm";
+static const char* CORPUS_DIR = ".data/media/csm";
 
 static const char* CORPUS[] = {
     "3D Silicon Fish.csm", "Abductor.csm", "Alien Attack.csm", "Alien Soccer.csm",
@@ -727,7 +727,7 @@ void test_corpus_samples_walk_to_exactly_eof(void)
     }
 
     if (checked == 0)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/csm");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/csm");
 }
 
 int main(int argc, char** argv)

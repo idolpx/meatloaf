@@ -96,7 +96,7 @@ public:
 
     // Boot sector (sector 0). Offsets per the CFS 0.11 spec, whose table is
     // colspan-encoded: "Unused" spans $00-$02, DP is $03, and @Last disk
-    // sector spans $04-$07. Confirmed against every image in .archive/hdd/,
+    // sector spans $04-$07. Confirmed against every image in .data/media/hdd/,
     // where @Last disk sector is @Partition directory backup + 1.
     struct BootSector {
         uint8_t reserved0[3];       // $00-$02: unused

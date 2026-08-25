@@ -502,6 +502,14 @@ gitignored.
 
 ## Important Notes
 
+- **A software fast loader is identified by a CRC-16 with the REFLECTED polynomial `0xA001`, initial value `0xFFFF`** — AVR libc's `_crc16_update`, which sd2iec calls `crc16_update`. Ported as `iecCrc16Update()` in `lib/bus/iec/fastload.cpp`; verified against the published vectors (`0x4B37` for `"123456789"` from `0xFFFF`, `0xBB3D` from `0`). **No `esp_rom_crc16_*` variant can reproduce sd2iec's published constants** — they are all `0x1021` based — so a table of loader CRCs is worthless without this exact routine. The earlier `esp_rom_crc16_be` hash in `driveMemory` was never comparable with anything and has been removed.
+- **Four things about that CRC are load-bearing and each one silently breaks detection on its own.** (1) **Writes to address 119 and to `0x1C06`/`0x1C07` must not reach the CRC** — the first is a 1541-style device-address change, the others are the VIA timer, and neither carries loader code; a loader preceded by one of them hashes differently than every table says. (2) **The table is consulted after EVERY `M-W`, not only at `M-E`** — a loader is recognisable part way through its upload while later blocks keep adding to the CRC. (3) **`previous_loader` is required for multi-stage loaders**: FC3 and GEOS upload once and then send a second `M-E` with nothing in between, so that round detects nothing and must fall back to what the previous round found. (4) **GI Joe has no end-of-upload CRC at all** — it is uploaded in a dozen different chunkings — and is matched mid-stream on CRC `0x38A2` arriving together with a `0x60` byte.
+- **Detection must see an `M-E` even when something else consumes it.** `IECFileDevice::isFastLoaderRequest()` runs the CRC feed and `memExec()` BEFORE the `m_uploadCtr` signature matchers, because a matcher that claims the command would otherwise leave the detector's CRC accumulating into the next loader's upload. The two mechanisms are deliberately both alive: the signature matcher owns Epyx, AR6, FC3, Hypra-Load and SpeedDOS (it is hardware-proven and it also sets `m_channel`/`m_eoi`), the CRC path owns the rest.
+- **`IECFileDevice::startFastLoader()` is called for every `M-E` that reaches the dispatch, including the ones that matched nothing.** That is the point: an unrecognised `M-E` plus its CRC is the only evidence of a loader that is not in the table yet, and `iecDrive` logs both. A loader that is detected but not implemented returns false, which lets the `M-E` through so the computer falls back to the standard protocol instead of waiting for a transfer that never starts.
+- **`IECBusHandlerInternal.h`'s globals are one definition, not one per file.** `IECBusHandler.cpp` defines `IEC_BUSHANDLER_DEFINE_GLOBALS` before including it and so provides them; every other file gets `extern`. **Never turn them back into file-scope statics in that header** — every translation unit would get its own copy, so `timer_init()` in one file leaves another file's `timer_cycles_per_us_div2` at zero and every `timer_wait_until()` there returns IMMEDIATELY, and the `haveInterrupts` flag that `waitPinDATA`/`waitPinCLK` read to decide whether they may feed the watchdog goes out of step with the `noInterrupts()` that set it. The deleted `protocol/_protocol.h` had exactly this defect.
+- **The pin accessors are inline definitions in `IECBusHandlerInternal.h`, not declarations.** A loader's bit loop sets CLK and DATA at microsecond-resolution absolute times and cannot afford a call per edge. They were declared `inline` in `IECBusHandler.h` and defined once in the .cpp, which is why `isResetPinIdle()` still carries a comment about deliberately not being inline so that `IECHost.cpp` could link against it — that is the hazard moving them removed. Cost is ~432 bytes of RAM from per-translation-unit copies.
+- **Turbodisk's first block is a judgement call, not a fact.** sd2iec sends the two load-address bytes on their own and then still streams a full 254 bytes out of the same 254-byte sector buffer starting two bytes further in, so its last two bytes come from the next buffer in the array rather than from the file. Either the receiver wants 2 + 254 = 256 bytes of file on that block and sd2iec has a benign over-read, or it wants 2 + 252 and discards two. `transmitTurbodiskBlock()` takes the first reading and reads 256 bytes for the first block. **If a Turbodisk load is correct through byte 253 and corrupt from 254, the other reading is right** and the fix is the one constant.
+- **`IEC_FLV_*` (variant) and `IEC_FP_*` (family) are different id spaces and both are needed.** A family is a bit index in the enable mask — what a user turns on. A variant is one concrete uploaded routine; several share a family (FC3 has load/save/freezed, GEOS one per drive type and version). The variant numbering mirrors sd2iec's `FL_*` exactly so its tables transcribe without re-numbering, and `iecFastLoadFamily()` is the one place that maps between them.
 - **IEC timing is critical**: Code changes in bus handlers can break compatibility
 - **PSRAM availability**: Some boards have PSRAM (ESP32-WROVER), others don't (ESP32-WROOM32). Adjust memory allocation accordingly.
 - **Filesystem first**: Always upload filesystem before testing WebDAV or web features
@@ -536,7 +544,7 @@ gitignored.
 - **PIO lib builder skips `.c` under `lib/meatloaf`**: C sources there are silently not compiled (pre-existing example: `gcr/nibread.c`). Any C code the meatloaf lib needs must live in an ESP-IDF component (that is why the tapclean tape engine is `components/tapclean/`). Remember the CMakeCache delete trick after editing a component CMakeLists.
 - **CMD media images (DHD, D1M/D2M/D4M)**: `DHDImageRegistry` (lib/meatloaf/media/hd/dhd.h/cpp) keeps per-image partition tables + the "currently selected partition" (default partition on first use). `getFile()` (shared `DHDCreatePartitionFile()`, used by `dhdFS` and `dxmFS` in media/disk/dxm.h) returns a `D64MFile`/`D71MFile`/`D81MFile`/`DNPMFile`-based wrapper decoding through a `DHDOffsetStream` window at the partition offset — a D1M thus resolves to D81 or DNP by its partition type. HD images: system partition scanned on 64 KiB boundaries ("CMD HD" boot magic), table at sys+65536, **a maximum of 254 partitions**, numbered 1-254 (table entry 0 is the system partition, which supplies the disk label and holds the partition table; its type byte is `$FF` in every real image). **There is no entry 255** — `vdrive.c:1180` caps at 254 ("CMD HDs can access 254 partitions (255 is system)") and `vdrive.c:1201` remaps physical entry 0 onto *logical* slot 255, so VICE's "255" is that same system partition under a different numbering, not a 255th user partition. Reading entry 255 goes 32 bytes past the real table and can fabricate a phantom partition. **Entry 0 IS listed** — by `LOAD"$=P"` (extension `sys`) and by the `partition` console command (type `SYS`) — because it is a real table entry, but `DHDImageRegistry::select()` refuses partition 0 outright, so it can never be mounted by number, by name, or via `CP0`. Two consequences of listing it: `parts` is never empty, so "is there anything mountable" must count entries with `number != 0` (that is what the "No usable partitions" guard does), and the default-selection fallback must pick the first USER partition, never `parts[0]`. FD images: fixed system partition (0x640/0xC80/0x1900 blocks for D1M/D2M/D4M), "CMD FD SERIES" magic, table at sys+2048, 31 partitions. `CP<n>` (drive) and the `partition` console command are the ONLY ways to change partitions — matching the real CMD HD, which does not switch on LOAD or CD. `LOAD"$=P"` lists them. A partition name or number as the FIRST in-image path component binds THAT PATH to that partition (`DHDResolvePartition()`) so LOAD/SAVE/listing can cross partitions — but it never calls `select()`, so it does not change what the image has selected. Resolution order: in-range number, then `byName()`, else it is a file — **partition wins over a same-named file**, which stays reachable as `<image>/<number>/<file>`. **A partition NUMBER of 0 in a path means "the currently selected partition"** (`vdrive.c:1324`), NOT table entry 0, the system partition — never resolve 0 via `byNumber()`. **Three separate things are called "partition" here and must not be conflated:** `Image::selected` (which partition of the image is current), `Image::cached_part` (which partition the ImageBroker's cached stream decodes), and `D64MStream::partition` (the sub-partition WITHIN a decoded disk — a 1581 CBM / CMD native sub-partition, reached via `curPartition()`, and nothing to do with the CMD HD partition). Two mechanisms are BOTH required and neither works alone: `D64MFile::brokerUrl()` (overridden to append the partition number) makes `ImageBroker`'s rebuild resolve the right partition, and `normalizePath()` disposes a stream cached for a different one — the broker keys on the container and cannot tell partitions apart. Without them the five operations that read the cached stream (`rewindDirectory`, `getNextFileInDir`, `isDirectory`, `exists`, `getCreationTime`) silently answer for the selected partition. `entryUrlFor()` (the other overridable `D64MFile` virtual) names the partition BY NUMBER in emitted entry URLs — names may contain `/`, spaces and PETSCII. No slash-based partition syntax is possible: `util_get_canonical_path()` collapses runs of `/`. Selection changes dispose the ImageBroker entry (`DHDImageRegistry::disposeCachedStream()`, whose key must mirror `ImageBroker::obtain()`) so listings re-decode.
 - **IDE64 CFS images (.hdd) follow the same partition model as CMD images.** `HDDImageRegistry` (lib/meatloaf/media/hd/hdd.h/cpp) holds the per-image partition table and selection exactly as `DHDImageRegistry` does; `HDDResolvePartition()` binds a partition to a path without ever calling `select()`; `hdpart::` (media/hd/partition_select.h) is the one surface `CP<n>` and the `partition` console command both use. **Partition 0 means "the currently selected partition" in a path and is refused by `select()`, identical to DHD.** Two things are CFS-specific: (1) **there are two numbering spaces** — the raw table SLOT 0-15, which is how the 16-entry partition directory is laid out and what the boot sector's DP byte holds, and the partition NUMBER 1-N, which counts only VALID entries and is what paths, `CP<n>`, `$=P` and the `partition` command speak. `parse()` converts DP between them exactly once; nothing downstream sees a slot, and the numbering must match `HDDMStream::seekPartitionEntry()` entry for entry. (2) There is **no `cached_part`/`brokerUrl()` machinery and no dispose-on-select**, because `HDDMStream` re-derives its position from `seekDirectory(pathInStream)` on every operation, so a broker-cached stream carries no partition identity that can go stale. Only CFS-type partitions (`type == 1`) are selectable; unformatted, GEOS and reserved types are listed but refused.
-- **The CFS boot sector's default-partition byte is `$03`, not `$01`** (`HDDMStream::BootSector`). The spec's table is colspan-encoded — `Unused` spans `$00-$02`, `DP` is `$03`, `@Last disk sector` spans `$04-$07` — and the struct had both `default_partition` and `last_sector` off by two. It was latent because every sample image in `.archive/hdd/` has `$00-$03 = 00 00 00 00`. The corpus invariant that pins it: `@Last disk sector == @Partition directory backup + 1`, since the backup directory lives on the last sector of the disk.
+- **The CFS boot sector's default-partition byte is `$03`, not `$01`** (`HDDMStream::BootSector`). The spec's table is colspan-encoded — `Unused` spans `$00-$02`, `DP` is `$03`, `@Last disk sector` spans `$04-$07` — and the struct had both `default_partition` and `last_sector` off by two. It was latent because every sample image in `.data/media/hdd/` has `$00-$03 = 00 00 00 00`. The corpus invariant that pins it: `@Last disk sector == @Partition directory backup + 1`, since the backup directory lives on the last sector of the disk.
 - **`HDDMStream` must never call `HDDImageRegistry`.** The selection is written into `HDDMStream::selected_partition` by `HDDMFile` (`applyPartition()`), at all five sites that touch a stream: `getDecodedStream()`, `rewindDirectory()`, `getNextFileInDir()`, `isDirectory()`, and `exists()`. A registry lookup from inside the stream would need `MFSOwner::File()`, which `abort()`s under the native test stubs — and `FileContainerStream` sets `url` to a path ending in `.hdd`, so the lookup would fire. `selected_partition == 0` means "fall back to the boot sector's DP" — unambiguous precisely because partitions are numbered from 1 — and is what a directly constructed stream gets.
 - **CFS stores FILE DATA in a data sector as four interleaved 128-byte columns** — file byte `n` of a sector sits at sector offset `(n % 128) * 4 + (n / 128)`. `HDDMStream::readFile()` must therefore read the sector WHOLE (`loadDataSector()`) and de-interleave it; the requested range cannot be read straight out of the image, and a partial-sector read cannot be de-interleaved at all. **Only file data is stored this way** — boot, partition, directory and tree sectors are all linear, which is exactly why listings, partition parsing and the tree walk worked perfectly for months while every byte of every file came back transposed (a PRG loaded with the right length and LISTed as nothing). The published CFS 0.11 spec documents the tree geometry (8 next-tree + 128 data pointers, 64 KB at depth 1 — which the code already had right) but says nothing about byte order inside a data sector, so linear was the natural wrong guess. Established empirically, three ways: de-interleaving turns a PRG into a BASIC program whose line-link chain walks correctly across sector boundaries (`$0801 → $0828 → $084F → …`), turns the `man` association tables into ordered text, and holds on Soci/Singular's OWN IDE64 image as well as a C64 OS one — two independently authored images, so it is the format and not a quirk of one image. **Do not "simplify" `readFile()` back to a direct read.**
 - **A path component made only of `*`/`?` is not a partition reference** (`hddResolvePartitionIn()`, `DHDResolvePartition()`) — `byName()` honours wildcards, so a bare `*` matched the FIRST partition, `normalizePath()` stripped it from the path, and `LOAD"*"` became a listing of that partition's root instead of loading a file. A pattern carrying real name characters (`C64*`) still resolves a partition. Relatedly, `HDDMStream::seekEntry()` skips directories and separators when the pattern is all-wildcard, since the CBM "first entry" idiom means the first loadable FILE — a CFS partition root typically opens with the `%DELETED FILES%` directory. `D64MStream::seekEntry()` skips DEL entries for the same reason but does NOT skip subdirectories, so `LOAD"*"` in a DNP/DHD partition whose first entry is a directory still returns a listing (open).
@@ -596,7 +604,7 @@ gitignored.
 - **The Wraptor type byte does not mean what the format document implies, so never use it to detect a GEOS payload.** It tracks the C64 file type, not GEOS-ness: every type-4 entry in the corpus reports PRG in its info sector and every type-3 one reports USR, while BOTH carry the nine-byte GEOS header. So `.decodeType()` maps 4 to `prg`, and anything wanting to know whether a payload is GEOS must look at the payload.
 - **A Wraptor name's encoding is decided PER NAME, not per archive** (`WRAMStream::decodeName()`). Wraptor writes the name exactly as the CBM directory held it and flags nothing, and one archive can hold both kinds: a plain CBM name is PETSCII, a GEOS name is the ASCII GEOS itself uses (`ReadPaint`, `M.Randall`). PETSCII has no ASCII lowercase range — $61-$7A are graphics there — so a name carrying any of those bytes is GEOS ASCII and passes through untouched; anything else is read as PETSCII and `toUTF8()`d, which lowercases it (`GEOS` is held as `geos`) per the repository-wide convention. Running `toUTF8()` over a GEOS name instead maps its lowercase bytes to graphics characters. Both sides — the listing and the lookup — must call this one function.
 - **A Wraptor listing reports the COMPRESSED span, and the true size only exists after decoding.** Nothing in the container states the decompressed length, and the format document calls decode-to-list "very slow"; `seekPath()` sets the real `_size`. The 32 KB window is heap-allocated with `malloc` + placement new (`-fno-exceptions`, and a 32 KB stack frame is reserved on function ENTRY — the defect `ArcDecoder` shipped with), and decoding one entry needs the window plus the compressed span plus the whole output at once, so **WRA is effectively a PSRAM-board feature**. A stream that runs out of input before its own end marker FAILS rather than serving a short file that looks whole.
-- **The `.archive` corpus moved into `.archive/archive/<format>/` and five `test_container_entries` cases still pointed at the old paths**, so they had been silently `TEST_IGNORE`-skipping rather than testing anything — including `test_ark_real_archive_data_offsets`, which covers the same class of defect as the LNX one. Paths fixed; the suite now runs 19/19 with none skipped. **A skipped corpus test reads as a pass in the summary line** — check the skip count, not just the status, after any corpus reorganisation.
+- **The `.data/media` corpus moved into `.data/media/archive/<format>/` and five `test_container_entries` cases still pointed at the old paths**, so they had been silently `TEST_IGNORE`-skipping rather than testing anything — including `test_ark_real_archive_data_offsets`, which covers the same class of defect as the LNX one. Paths fixed; the suite now runs 19/19 with none skipped. **A skipped corpus test reads as a pass in the summary line** — check the skip count, not just the status, after any corpus reorganisation.
 - **A CBM `.sfx` is a PRG wrapped round an LHA archive, and libarchive will not find it without being told.** `archive_read_format_lha_bid()` enters its self-extracting scan only when the file starts with `MZ` — a DOS/PE executable — and a Commodore self-extractor starts with a two-byte load address (`01 1C` on the sample), so the bidder saw no header, bid 0, and **`raw` won with a single bogus entry spanning the whole file**: `Archive format: (null)`, `filter none`, one `d`-flagged entry the exact size of the container. New `lha:sfx` option sets `lha->opt_sfx`, and both gates — the bidder and `read_header`'s call to `lha_skip_sfx()` — now accept `MZ || opt_sfx`. `Archive::open()` sets it for `.sfx` and registers lha alone. **The scan is opt-in on purpose**: it reads up to 20 KB ahead, and the unknown-extension fallback registers lha speculatively for every file it cannot name, so making it unconditional would put a 20 KB probe in front of every `.gz`. `lha_skip_sfx()` itself was already MZ-agnostic and needed no change — it just scans for a header, and consumes 0 when the archive starts at offset 0, so a plain `.lha` renamed `.sfx` still works.
 - **A bidder CAN reach its own format data**: `choose_format()` sets `a->format` to the slot being bid before calling it ("Set up a->format for convenience of bidders"), even though `archive_read_open1()` only assigns `a->format` for real after the winner is chosen. That is what lets the bidder read `opt_sfx`.
 - **An ARC-based `.sfx` is still not handled.** `.sfx` now resolves to lha only, so a self-extracting ARC fails the open instead of producing raw garbage — which is the better failure, but it is not support. `arcFS` handles `.sda` (the ARC equivalent) by a completely separate path, keyed on its own extension, and its BASIC-loader skip is ARC-specific — the line-number arithmetic `(line - 6) * 254` gives 503936 for this LHA sample, so it does not transfer.
@@ -626,6 +634,241 @@ gitignored.
 - **FTP file reads STREAM; they are not cached first** (`lib/FileSystem/fnFileFTP.h/.cpp`). `FileHandlerFTP` reads straight off the live RETR connection through a 512-byte buffer, so the RAM cost is the same whatever the file's size. **The transfer starts LAZILY, on the first read** — that is what lets `FTPMStream::open()` keep its seek-to-end/tell/seek-to-start size probe with no network traffic, and is why that code needed no change. Backwards seeks (and forward seeks past 8 KB) restart the transfer at the new offset with `REST`; shorter forward seeks read and discard. `FileCache::open()` is still tried first, so `#cache=sd` is unaffected, and a server that will not answer `SIZE` falls back to the old caching path. **`REST` itself is not hardware-verified** — every read so far has been forward-only.
 - **`DISABLE_DIRCACHE` (undefined by default) makes `FileSystemFTP` stream its directory listing** instead of caching it. `DirCache` holds a `fsdir_entry` per entry — `char filename[256]` plus size and flags, **272 bytes** — from the internal heap on a board without PSRAM, which is the largest single cost of an `ls` over FTP. With the flag set, one entry is held at a time: no sorting (`FTPMFile` passes `DIR_OPTION_UNSORTED` anyway, so only a fuji host slot notices), no listing re-use, and `dir_seek()` re-lists and skips forward. Only `FileSystemFTP` honours the flag; SD, NFS, SMB, HTTP and TNFS still cache unconditionally.
 - **`FTPMFile::readEntry()`'s `dir_open` test was inverted** (`if (!fs->dir_open(...))`) — `dir_open` returns true on success, so the scan loop only ever ran on a listing that had FAILED to open, and an FTP wildcard could never match. Fixed; note the same call must `dir_close()` on both exits now that streaming leaves the data connection open.
+
+## Recent Changes (August 23, 2026)
+
+### Fast loader framework: detection, one file per loader, Turbodisk
+
+Groundwork for supporting the loaders sd2iec supports. Design and the full reasoning are in
+`docs/superpowers/specs/2026-08-23-fastloader-framework-design.md`; durable rules are in the
+Important Notes above.
+
+- **`IECConfig.h`'s include guard closed early and that is why `iec-nugget` and `fujiloaf-rev0` did
+  not build.** The `#endif` after the XRA1405 block closed `#ifndef IECCONFIG_H`, so everything
+  below it — `IEC_DEFAULT_FASTLOAD_BUFFER_SIZE` and `IEC_SUPPORT_PARALLEL` among them — fell outside
+  the guard, and there was no closing `#endif` at end of file. `iec-nugget` reported it directly; on
+  `fujiloaf-rev0` it surfaced one level on, as `IEC_SUPPORT_FASTLOAD` never being defined and
+  `m_buffer`/`m_bufferSize` being undeclared throughout `IECBusHandler.cpp`. Both boards build now.
+- **The loader enable mask is 32 bits.** `getSupportedFastLoaders()` returned `uint8_t`,
+  `isFastLoaderSupported()` tested `loader<=7`, and `IECDevice::m_flEnabled` was a byte, so any
+  loader id past 7 failed the guard silently. All three are `uint32_t` and the bound is 31.
+  `m_flProtocol` still packs `loader<<3 | protocol` in a byte, which survives to loader 31 unchanged.
+- **Software loader detection is ported from sd2iec** (`lib/bus/iec/fastload.h`/`.cpp`): a CRC-16
+  over every `M-W` data byte, a table mapping known CRCs to a loader variant, and a second table
+  mapping (variant, `M-E` address) to the handler. 57 CRC entries and 26 handler entries transcribed
+  from `doscmd.c`, gated per loader family. Re-derived from the sd2iec tree the user refreshed on
+  2026-08-24, which adds FC3 old-freezed (PAL and NTSC), Maniac Mansion / Zak McKracken, N0SDOS file
+  read and Sam's Journey, adds `0x1802` to the excluded addresses, gives GI Joe a CRC entry
+  (`0x0C92`) alongside its mid-stream rule, and splits `FL_GEOS_S1` into 64 and 128 variants with a
+  general `fl_capture_table` in place of the hard-coded key grab. **The capture table is not ported**
+  — it is GEOS-only and belongs with that phase.
+- **Two detection mechanisms now coexist and they do different jobs.** dhansel's `m_uploadCtr`
+  signature matcher still owns Epyx, AR6, FC3, Hypra-Load and SpeedDOS — it is hardware-proven and
+  it also sets up `m_channel`/`m_eoi`, which detection alone does not. The CRC path owns everything
+  sd2iec knows that the matcher does not.
+- **`IECFileDevice::startFastLoader()` is the single switch point** where a detected loader is
+  handed over, and `IECBusHandler::runFastLoader()` is where it is served. `iecDrive` overrides
+  `startFastLoader()` to log every `M-E` that reaches the dispatch — including the ones that matched
+  nothing, with their CRC, which is exactly what is needed to add a loader that is not in the table.
+- **Detection covers everything sd2iec knows (120 CRC entries, 102 handler entries, 65 variants,
+  20 rx/tx timings); the transfer code covers the classic set.** The tables are GENERATED from
+  `doscmd.c` by a throwaway script rather than transcribed, because at this size hand-copying is
+  where the errors would be. The 2026-08-24 sd2iec refresh added seven modern demoscene families --
+  Ultraboot, Krill (r58 to r192), Booze, Spindle, Bitfire, Sparkle and Transwarp -- which are
+  DETECTED, named, and implemented -- Ultraboot, Krill, Booze, Spindle 2.x and 3.x, Bitfire and
+  Sparkle all have transfer code. Hypra-Load is now CRC-detected upstream too and is routed to the
+  implementation the bus handler already has.
+- **Each of the modern loaders taught something worth keeping.** Booze picks
+  between two addressing schemes by whether track 18 holds a directory sector, and carries a table
+  of per-release block delays keyed on the CRC of the PREVIOUS file -- some titles cannot take a
+  block as fast as the drive can send it. Bitfire is thirteen revisions of one loader where what
+  changes is the LAYOUT, not the bit protocol: which line carries data and whether it is inverted,
+  how a directory entry is shaped, and which fields precede a block -- all three table-driven here,
+  and its payload goes out in REVERSE order within a block. Ultraboot is identified from the M-E
+  COMMAND rather than from a CRC of its upload, lives on an extended D41, and stores its extra
+  tracks in one of four "speedzones" whose sector counts must be remapped onto the image's flat 17
+  -- getting that wrong reads plausible wrong blocks, not errors. Spindle sends a three-byte BITMAP
+  of the sectors it wants and carries the next command inside the data, in the checksum byte and the
+  first two bytes of a block. Spindle 3.x shares only that bitmap with 2.x: it cuts a sector into
+  length-prefixed UNITS walked BACKWARDS from the end of the buffer, postpones some of them to the
+  end of a job via a "continuation record", and is asynchronous -- the computer can interrupt a
+  transfer to ask for a job by number, seven bits clocked on ATN, looked up in a table in sector 6
+  whose track entries are HALF-tracks. Sparkle sends bundles whose length is carried inside the
+  first block, obfuscates every byte from 2.x on with three different encodings, stores its
+  directory partially REVERSED, and needs four productions recognised by a production id in the BAM
+  because the format cannot express what they do. Krill is nine revisions where the differences are
+  not confined to a table -- which line requests, which carries data, what the two metadata bytes
+  mean and even which line means "ready" all move between them.
+- **Three things in Krill are deliberately unsupported, all needing 6502 code on a real drive**:
+  custom drive-code upload (r186 and r192, the latter announcing itself by sending a name longer
+  than 17 bytes), the save plugin, and fast serial burst on r184 and later, which needs a C128's
+  shift register -- those revisions fall back to the two-bit protocol they also speak. Its uploaded
+  drive code is consumed and discarded, because the CRC of that same upload has already decided the
+  revision.
+- **`clocked_write_byte` is shared by Booze, Bitfire and Spindle** (`protocol/clocked.cpp`): two bits
+  per ATN transition with the waits alternating high/low, least significant pair first, and it
+  deliberately returns with the last pair unacknowledged because its callers do different things
+  next. Spindle needs the same routine with the bits shuffled and the byte inverted, which is why it
+  has its own copy rather than a flag.
+- **Loaders that arrive through a CATCH-ALL row identify themselves from the M-E command.**
+  Ultraboot and Spindle both do, so the dispatch tries each in turn and the first that claims the
+  command wins. That is why `memExec()` reports whether a table ROW matched separately from which
+  variant it resolved -- those rows carry `IEC_FLV_NONE` on purpose.
+- **Bus-exclusive mode: one device holds the bus alone until RESET** (`IECBusHandler::setBusExclusive()`,
+  console `iec exclusive <id>`). Several loaders will not work while anything else can answer -- they
+  install an ATN responder, or time a transfer tightly enough that a second device acknowledging is
+  fatal. sd2iec handles this by putting the WHOLE drive to sleep when it sees a "bus silence" request
+  meant for another drive; one board here hosts multiple devices, so the equivalent is to
+  deactivate every device except the one being addressed. **The `*_SLEEP` CRC variants are exactly
+  that request** -- `FL_KRILL_SLEEP`, `FL_SPINDLE_SLEEP`, `FL_BITFIRE_SLEEP`, `FL_TRANSWARP_SLEEP`
+  are uploaded to every drive on the bus, and dispatch straight to `setBusExclusive()`. It is cleared
+  ONLY by a RESET, and cleared BEFORE the per-device `reset()` calls -- those are what reload each
+  device's persisted enabled flag, so clearing afterwards would leave the slept ones off.
+- **Disk changes are reported by a COUNTER, not a flag** (`IECDevice::mediaGeneration()`). sd2iec
+  sets a `dir_changed` flag wherever the mounted directory moves and every multi-disk loader zeroes
+  it and then spins on it; a counter needs no clearing and two waiters cannot steal the event from
+  each other. `iecDrive` bumps it in `releaseSectorStream()`, which every path that can change the
+  medium already calls -- `set_cwd()`, `mount()`, `unmount()`. `IECBusHandler::waitForDiskChange()`
+  samples it and waits, yielding with `delay()` rather than spinning, because the swap arrives from
+  another task entirely (console, web UI, SD card). **This is what makes the disk-flip paths work**:
+  Booze, Bitfire, Spindle 2.x and 3.x and Sparkle all used to end the session on a wrong disk.
+- **Block access falls back to the working directory's own container when there is no VDrive.**
+  VDrive is not always what holds the disk: an image reached through the MFile chain -- mounted over
+  the network, nested inside an archive, or in a format VDrive does not know -- has none, and a fast
+  loader asking for a block would otherwise get nothing. `iecDrive::sectorStream()` opens the
+  container once and every sector hook falls through to it. Three things about it are load-bearing:
+  it uses `m_cwd->url` and NOT `fullUrl()`, because for anything inside a container the url IS the
+  container and the position within it must not come along or `getSourceStream()` selects a FILE
+  instead of the whole medium; it is CACHED, because a loader reads hundreds of blocks and rebuilding
+  the MFile per sector is a path resolution -- a network round trip -- each time; and it is opened
+  `in|out`, never plain `out`, which would truncate the image. The cache is dropped in `set_cwd()`
+  and `unmount()`, since the container may have changed under it.
+- **`imageType()` has no field to read on that path, so it comes from the geometry** -- track count
+  plus sectors on track 1. Only the three shapes a loader branches on are reported; anything else
+  answers `IEC_IMG_NONE`, which is what makes Ultraboot decline a disk rather than address it wrongly.
+- **Those seven all need image GEOMETRY, which is why they were blocked and are not any more.** Each
+  walks the disk itself instead of asking for a file, so it needs to know where a track ends
+  (`d64_sectors_per_track` in sd2iec) and which drive type the image is -- Ultraboot refuses
+  anything but a D41, Krill and Bitfire branch on 1541/1571/1581. `IECDevice::sectorsPerTrack()` and
+  `IECDevice::imageType()` are the new hooks, answered by `iecDrive` from `VDrive::sectorsPerTrack()`
+  / `VDrive::imageFormat()`, which wrap VICE's `vdrive_get_max_sectors()` and `image_format`. The
+  `IEC_IMG_*` values match `VDRIVE_IMAGE_FORMAT_*` so no translation is needed. With those in place
+  the remaining ports are protocol work only.
+- **`IEC_FLV_NONE` is a VALID loadertype in the handler table.** sd2iec's newer `run_loader()` uses
+  such rows as catch-alls matched on the M-E address alone, and terminates on a NULL handler rather
+  than on FL_NONE. So the table here carries its length instead of a sentinel row, and `memExec()`
+  matches in two passes -- once for the loader the CRC identified, then again as IEC_FLV_NONE.
+  Terminating that table on FL_NONE silently truncates it at the first catch-all.
+- **The classic loaders are implemented, none hardware verified**: Turbodisk, GI Joe,
+  Nippon, ULoad Model 3, ELoad1, Maniac Mansion / Zak McKracken, N0SDOS file read, Sam's Journey,
+  the FC3 older-freezed loader, DreamLoad, and the GEOS and Wheels families -- each in its own file
+  under `lib/bus/iec/protocol/`. EpyxCart and the AR6 1581 pair are routed to protocols the bus
+  handler already speaks, see below. Turbodisk streams through
+  `handleFastLoadProtocols()`; the other four are session owners that keep the bus after their `M-E`
+  and return when the computer is done. GI Joe and Nippon are fully handshake-clocked and contain no
+  absolute timing at all; ULoad3's and ELoad1's shared bit timing came from sd2iec's AVR assembly
+  (`uload3_get_byte`/`uload3_send_byte`), where a `delay_cycles` unit of 8 at 8 MHz is 1 µs.
+- **The session loaders are gated on `EXTRA_FASTLOADERS`, and DETECTION is not.** Together they put
+  a plain ESP32 about 600 bytes over its `iram0_2_seg` flash-text window — the same budget that
+  gates `EXTRA_DISK_FORMATS`. A board without the flag still recognises every one of them, logs it,
+  and returns false from `startFastLoader()`, so the computer falls back to the standard protocol
+  instead of hanging. The flag is set for `esp32-s3-devkitc-1`. **`#pragma GCC optimize("Os")` makes
+  this WORSE, not better** — it took the overflow from 629 to 977 bytes, the same inversion the ARC
+  and `-lh1-` work hit; do not retry it.
+- **`IEC_SUPPORT_SECTOROPS` replaces the old Epyx-only guard on `epyxReadSector`/`epyxWriteSector`.**
+  Nippon and ULoad3 address the disk by block rather than by file and need the same hooks; the names
+  stay because Epyx was merely the first caller. The guard follows the IMPLEMENTATIONS, not the
+  detection, so a board without `EXTRA_FASTLOADERS` does not compile the hooks it cannot reach.
+- **A session loader must disable the ATN interrupt while it holds the bus** (`setATNInterruptEnabled`,
+  restored on exit) and call `atnRequest()` itself on the way out if ATN is asserted. For Nippon this
+  is not an optimisation but a correctness requirement: ATN is part of its bit protocol — the
+  computer asserts it to mean "resync" — so an `atnRequest()` would consume the very signal the
+  loader is reading. That also means **ATN cannot be Nippon's abort condition**; only RESET can.
+- **Every unbounded wait in a loader feeds the watchdog** with the `interrupts(); noInterrupts();`
+  pattern `transmitHypraLoadByte()` established. With interrupts disabled those loops are the one
+  place a computer that has been switched off mid-transfer can hold the IEC task forever.
+- **ULoad3's `$` (directory) command is deliberately refused with `0xFF`.** It asks for the chain
+  starting at the current directory's first block, which is only a fixed track and sector on a D64;
+  nothing here can supply it for the media Meatloaf mounts. A directory read under ULoad3 therefore
+  fails cleanly rather than serving the wrong blocks.
+- **Turbodisk is implemented but NOT hardware verified**
+  (`lib/bus/iec/protocol/turbodisk.cpp`). Bit timings are sd2iec's, converted from its 100 ns units:
+  pairs at 31/60/89/118 µs for the single-byte form, 43 µs to the first pair and 29/51 µs steps for
+  the block form. It serves one block per `handleFastLoadProtocols()` pass rather than blocking for
+  the whole file the way sd2iec does. **Its first block is a judgement call** — see the entry in
+  Important Notes and the comment on `transmitTurbodiskBlock()`.
+- **Every loader has its own source file now** under `lib/bus/iec/protocol/`, holding
+  `IECBusHandler` member definitions, with the shared machinery in the new
+  `lib/bus/iec/IECBusHandlerInternal.h`. `IECBusHandler.cpp` went from ~4500 lines to ~1900.
+  The eight legacy files that were in that directory (the pre-dhansel protocol layer, compiled but
+  included by nothing) were deleted.
+- **Builds**: `esp32-s3-devkitc-1` Flash 82.9% (every loader compiled), `lolin-d32-pro`,
+  `iec-nugget` and `fujiloaf-rev0` all 42.6% (detection only). The ~430 bytes of RAM against the
+  pre-split build is the inline pin accessors being emitted per translation unit.
+- **`fujiloaf-rev0`'s flash window is the constraint that shaped the whole layout, and it bit five
+  times.** In order, the things that recovered space, all of which are still in place and should not
+  be undone: `EXTRA_FASTLOADERS` gating the loader implementations; the GEOS key-capture window
+  gated on `IEC_IMPL_SOFTLOAD`; the 28-case loader-name switch and later the 54-case family switch
+  both replaced by tables; the handler table gated on `IEC_IMPL_SOFTLOAD`; and finally the dispatch
+  routing itself -- `runFastLoader()` and `startFastLoader()`'s switch -- compiled only where an
+  implementation exists. **`#pragma GCC optimize("Os")` makes this segment BIGGER**, measured at
+  629 -> 977 bytes over; that is now the third independent time this repository has seen it.
+- **What is in the CRC and name tables is NOT what costs flash text here.** `fastload.cpp.o` is
+  1818 bytes in total including every table; gating its 120 CRC rows saved exactly zero, because
+  they are rodata in a different segment. Measure with `xtensa-esp-elf-size -A` before trading a
+  feature away -- two rounds were spent gating the wrong thing on the assumption that the big
+  tables were the problem.
+- **Nothing here is hardware-tested.** No C64 has been attached. Detection has never seen a real
+  upload, so no table entry is confirmed, and no transfer has ever run. The next step is to load
+  something with a real loader and read the `M-E address[…] crc[…]` lines the drive logs.
+- **EpyxCart and the AR6 1581 pair are NOT separate loaders — they are protocols `IECBusHandler`
+  already speaks, at the very same `M-E` addresses the signature matchers watch.** sd2iec's
+  `load_epyxcart` receives a 256-byte stage 2 and then a file name, which is exactly what
+  `receiveEpyxHeader()` does; `load_ar6_1581`/`save_ar6_1581` sit at `0x0500`/`0x05F4`, which is
+  where the AR6 matcher already fires. `IECFileDevice::startFastLoader()` routes all three CRC
+  variants into the existing `fastLoadRequest()` path, so the CRC now acts as a BACKSTOP catching an
+  upload variation whose byte sequence the matcher does not recognise. They are handled there rather
+  than in `runFastLoader()` because they need `m_channel`/`m_eoi`, which the bus handler cannot reach.
+- **The GEOS/Wheels BYTE LAYER is ported; the session loops are not** (`protocol/geos.cpp`). All
+  seven `IEC_FLRX_*` variants are implemented from the AVR assembly as one table-driven pair of
+  routines. Two conventions differ between variants and both are in the original: whether a set bit
+  leaves its line asserted or released (GEOS 1 MHz and 2 MHz send their first four bits one way and
+  the last four the other; 1581-2.1 and Wheels 4.4 invert up front; plain Wheels never inverts), and
+  which bit rides CLK versus DATA at each of the four sample points. What remains is sd2iec's
+  `fl-geos.c` — stage 1 with its chain tables and decryption key, the stage 2/3 sector server,
+  Wheels native partitions and disk-change handling — plus porting the `fl_capture_table` key grab
+  into detection. Until that lands GEOS and Wheels still fall back cleanly.
+- **Dreamload is deliberately NOT implemented.** sd2iec refuses to build it without a CLK interrupt
+  (`#error "Sorry, DreamLoad is only supported on platforms with a CLK interrupt"`): the computer
+  sends job codes asynchronously and the drive must latch them while it is busy with disk I/O. This
+  layer has an ATN interrupt but no CLK one, and Dreamload also wants the first block of the current
+  directory, which is only a fixed track and sector on a D64. A polled approximation would compile
+  and could not work, so it stays detection-only and falls back.
+- **The rx/tx timing variant is plumbed from the CRC table to the loader**, because for FC3
+  old-freezed it is the ONLY thing that distinguishes PAL from NTSC: two separate uploads with two
+  CRCs (`0x0281` and `0xC196`), the same handler, and cadences of 14/22/30/38 with the busy signal
+  restored at 46 µs against 14/24/34/44 with 52. `startFastLoader()` and `runFastLoader()` both
+  carry it. GEOS and Wheels will need it for their seven variants too.
+- **FC3 old-freezed is NOT the FC3 loader the signature matcher handles.** It is what an older
+  cartridge uses to read a freezed file back, its file is already open on channel 0 when the `M-E`
+  arrives, and DATA doubles as its busy signal — asserted means "not ready", so it is released
+  before each byte and re-asserted after. Its byte is not inverted, so a set bit ASSERTS a line;
+  ULoad3's is inverted and does the opposite. Getting that backwards produces a clean-looking
+  transfer of complemented data.
+- **Three loaders clock on something other than CLK, and getting that wrong is silent.** Nippon reads
+  ATN as a protocol signal (assert = "resync"); Sam's Journey clocks its SEND on ATN transitions,
+  four of them per byte; MMZak and GI Joe clock on CLK like everything else. Every one of them needs
+  the ATN interrupt disabled for the duration, and ATN can only be the abort condition for the
+  loaders that do not use it.
+- **Sam's Journey reads the directory through `$`, not through disk structures.** sd2iec walks its
+  own directory entries; nothing at the bus-handler layer can, so the loader opens `"$"`, parses the
+  BASIC lines for a quoted name followed by `PRG`, and hex-decodes the two-character names the game
+  uses. Entries go out one behind — each new one with marker 0, the last with marker 1 — and an
+  empty directory still sends one placeholder entry, because the protocol has no way to say
+  "nothing here".
+- **N0SDOS never sends an end marker and must not stop on its own.** It streams 254-byte blocks and
+  re-sends the last block at end of file until the computer raises CLK; the computer is the side
+  that knows when the file is complete. A loop that stops at EOF hangs the load.
 
 ## Recent Changes (August 22, 2026)
 
@@ -883,7 +1126,7 @@ were wrong.
 `Unsupported lzh compression method -lh1-` while the listing was perfect — sizes and names come
 out of the entry headers, so only reading was affected. libarchive supports `-lh0-` (stored),
 `-lh5-`, `-lh6-` and `-lh7-`; `-lh1-` is LHarc 1.x's method and shares nothing with them above the
-LZSS layer. All three `.lzh` samples in `.archive/archive/lzh/` are `-lh1-`; the six `.lha` ones are
+LZSS layer. All three `.lzh` samples in `.data/media/archive/lzh/` are `-lh1-`; the six `.lha` ones are
 `-lh5-`/`-lh0-`.
 
 What `-lh1-` is, and what that cost: a 4 KiB LZSS window whose literal/length alphabet (314 symbols:
@@ -1108,7 +1351,7 @@ logical-to-physical mapping is deliberately kept out of it, since each container
 order.
 
 **Verification differs sharply between them, and the difference matters.** `test_p81_read` (10
-cases) runs against a REAL 1581 flux image, `.archive/disk/p81/td1581.p81` — exact disk header and
+cases) runs against a REAL 1581 flux image, `.data/media/disk/p81/td1581.p81` — exact disk header and
 name, both heads of the directory track, a sweep of all 80 cylinders x 40 blocks with the CRC
 checked on every one, and every file's block chain walked to exactly the block count its directory
 entry claims. `test_g71_read` (6) and `test_g81_read` (8) run against generated fixtures, since no
@@ -1130,7 +1373,7 @@ is not on the track, on the IEC task; and `readSector()` returned success when t
 wrong, serving the previous sector's bytes. The unconditional `printf`/`util_dump_bytes` on every
 sector read are gone, and the header checksum — computed and discarded before — is now checked.
 New `test/native/test_g64_read/` (6 cases) covers all of it against a fixture generated from a real
-`.d64` by its `host/make_g64.py`, since no `.g64` exists in `.archive`; reverting the first fix
+`.d64` by its `host/make_g64.py`, since no `.g64` exists in `.data/media`; reverting the first fix
 fails 4 of the 6. See `lib/meatloaf/AGENTS.md` for which test reaches which defect — most of them
 cannot reach the first one. `readHeader()` also read the container header from wherever the stream
 was left AFTER delegating to `D64MStream::readHeader()` rather than from offset 0, so the values it
@@ -1148,7 +1391,7 @@ GCR it produces is not byte-aligned, which is the one substantial difference fro
 rules are in the Important Notes entry below and, in full, in `lib/meatloaf/AGENTS.md`.
 
 Verified by `test/native/test_p64_read/` (13 cases, all passing) against the real images in
-`.archive/p64`: a blank disk's BAM free count and bitmap for all 35 tracks across all four speed
+`.data/media/p64`: a blank disk's BAM free count and bitmap for all 35 tracks across all four speed
 zones, Wheels 4.4a's exact disk name, id, eight directory entries and two file block chains, and a
 sweep of all 683 sectors of a full disk with header and data checksum checked on every one.
 Builds clean on `lolin-d32-pro` (Flash 42.4%) and `esp32-s3-devkitc-1` (Flash 81.6%).
@@ -1321,7 +1564,7 @@ genuine Meatloaf bugs found while chasing it follow.
 - **M2I support** (`lib/meatloaf/media/disk/m2i.h/cpp`, new; registered as `m2iFS` in meatloaf.cpp): MMC2IEC/sd2iec text index format — line 1 = 16-char disk title, then `T:DOSNAME.EXT :CBMNAME` lines (T = P/S/U file; D = DEL separator line — blank dosname, listed with size 0 but never loadable; '-' free slots dropped). Entry data lives in host files NEXT TO the .m2i; `M2IMStream::seekPath()` resolves the sibling URL (lowercase-filename fallback for case-sensitive filesystems — M2I comes from FAT) and `readFile()` delegates to that file's stream. The whole index is parsed once in `readHeader()` (files are a few hundred bytes): parsing is line-based at the ':' separators, NOT fixed-width — real-world files have unpadded CBM names, a UTF-8 BOM before the title, extension-less dosnames, and '/' inside CBM names (escaped as '\\' in listings like T64). Read-only. All 314 archive samples parse. `resolveEntry()` locates each entry's host file once (exact dosname, then lowercase — the case fallback applies to LISTING and load alike) and caches its URL + size in the entry; listings show real sizes and `seekPath()` reuses the cached URL. Candidates are validated with `MFile::exists()` (the filesystem's REAL check), NOT by opening a stream — network opens can be lazy (`fsp_fopen` succeeds for any name and only `fsp_stat` fails), which silently accepted wrong-case names.
 - **`FSPMFile::exists()` fix** (`lib/meatloaf/network/fsp.cpp`): it stat'd `pathInStream` — which is EMPTY for a plain FSP file (only set for paths inside containers) — so existence was never actually checked over FSP. Now stats `path`, matching `isDirectory()`. Affected anything relying on `exists()` over FSP (drive open checks, M2I sibling resolution, WebDAV).
 
-- **Tape engine replaced: wav2prg → TAPClean** (`components/tapclean/` new, `components/wav2prg/` removed, `lib/meatloaf/media/tape/tape_decoder.h/cpp` rewritten): TAPClean 0.39 (Final TAP 2.76 lineage, GPL v2+) vendored from `C:/Users/jjohn/source/tapclean` as an in-memory analysis library. Motivation: corpus test over `.archive/tap/` (35 real tapes) — TAPClean fully recognized ~20 commercial tapes (Cyberload, Visiload, US Gold, Novaload, Freeload, ...) where wav2prg only got the Kernal boot chunk or garbage; wav2prg was better only on the 6 Turbotape-64-fast tapes, so that loader was ported as a new TAPClean scanner (`src/scanners/turbotape_fast.c`, ft entries `TTFAST_HEAD/TTFAST_DATA`, tp/sp/lp = $0E/$0B/$12, accepts header type $61) — extraction verified byte-identical (md5) to wav2prg's.
+- **Tape engine replaced: wav2prg → TAPClean** (`components/tapclean/` new, `components/wav2prg/` removed, `lib/meatloaf/media/tape/tape_decoder.h/cpp` rewritten): TAPClean 0.39 (Final TAP 2.76 lineage, GPL v2+) vendored from `C:/Users/jjohn/source/tapclean` as an in-memory analysis library. Motivation: corpus test over `.data/media/tap/` (35 real tapes) — TAPClean fully recognized ~20 commercial tapes (Cyberload, Visiload, US Gold, Novaload, Freeload, ...) where wav2prg only got the Kernal boot chunk or garbage; wav2prg was better only on the 6 Turbotape-64-fast tapes, so that loader was ported as a new TAPClean scanner (`src/scanners/turbotape_fast.c`, ft entries `TTFAST_HEAD/TTFAST_DATA`, tp/sp/lp = $0E/$0B/$12, accepts header type $61) — extraction verified byte-identical (md5) to wav2prg's.
 - **Vendoring diffs** (all under `#ifdef TAPCLEAN_EMBEDDED`): CLI/report/clean/persistence/tap2audio code compiled out of `main.c`; 1.36 MB of static BSS heap-ified (`info` 1 MB→64 KB heap since it is reset per block in `describe_blocks()`, `lin`/`tmp`, `cbm_program`, `prg[]` all allocated PSRAM-first by `tapclean_init()`); `database_make_prg_db()`'s 8 KB stack array heap-ified; `prg_t` gained `blkidend` so the API can report where a united program ends on tape. Public API: `components/tapclean/include/tapclean_api.h` (`tapclean_load_buffer` takes ownership of a malloc'd image, DC2N auto-converted; `tapclean_analyze_tap(unite)`; block/prg accessors; `tapclean_duration_ms`/`offset_at_ms`). Engine is global-state — NOT thread-safe; `TapeDecoder` serializes with a static mutex.
 - **`TapeDecoder` rewrite**: whole image → PSRAM buffer (DMP/HTAP/TAP-v2 stream-converted to TAP v1 first, using the old proven pulse-walk; halfwave pairs summed), one TAPClean scan at `open()`, entries copied out (headers folded in for names — a `_DATA` name suffix is stripped; CBM/turbo repeat copies deduped by identical content), then `tapclean_unload()` frees the image before `open()` returns. `nextProgram(from_offset)` serves from the entry list; `offsetAtTime()` snaps to the program grid. Tape decode now effectively requires PSRAM. Corpus result: 27/33 real tapes produce checksum-verified programs (identical CRCs to wav2prg where both worked); failures are tapes neither engine handles (Defender of the Crown, 720 Degrees) or truncated/header-only images (Crystal Castles). NOT hardware-tested yet: the whole scan cost lands on the first directory request (PC times suggest roughly 5–60 s on ESP32 for 0.2–3 MB tapes, one-time per tape open).
 - **Payload-only tape listing**: a CBM (Kernal-loaded) entry that a non-CBM entry follows is a turbo-loader boot stub — dropped from the listing, its name (the game's name) transferred to the following payload (e.g. atari collection lists 12 named game payloads instead of 24 boot+payload pairs). Pure Kernal tapes (all entries CBM, e.g. Defender 64) keep every entry. Filter lives in `TapeDecoder::harvestEntries()`; `tapclean_prg_t.is_cbm_data` was added to the API for it. Unnamed entries list under the media file's name with NO load-address suffix (duplicates resolve positionally — loads search forward from the current tape position).

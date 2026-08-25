@@ -12,7 +12,7 @@
 // real CBM structures - a valid D81 header, a directory, and correct block
 // chains on both physical heads.
 //
-// The image is the real one in .archive/disk/p81 (gitignored, so these skip
+// The image is the real one in .data/media/disk/p81 (gitignored, so these skip
 // cleanly without it). Nothing here can synthesize a .p81: writing one means
 // implementing the range ENCODER and an MFM modulator, neither of which the
 // read path has or needs.
@@ -28,7 +28,7 @@
 #include "../test_disk_write/file_container_stream.h"
 #include "media/disk/p81.h"
 
-static const char* IMAGE = ".archive/disk/p81/td1581.p81";
+static const char* IMAGE = ".data/media/disk/p81/td1581.p81";
 
 class TestP81Stream : public P81MStream
 {
@@ -74,7 +74,7 @@ void test_chunk_walk_finds_both_sides(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/disk/p81");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/disk/p81");
 
     TEST_ASSERT_TRUE(image->parseChunks());
 
@@ -137,7 +137,7 @@ void test_disk_header_is_a_real_d81_header(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/disk/p81");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/disk/p81");
 
     TEST_ASSERT_TRUE(image->parseChunks());
     TEST_ASSERT_TRUE(image->loadSector(40, 0));
@@ -173,7 +173,7 @@ void test_read_header_yields_the_disk_name(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/disk/p81");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/disk/p81");
 
     TEST_ASSERT_TRUE(image->readHeader());
 
@@ -196,7 +196,7 @@ void test_two_blocks_share_one_physical_sector(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/disk/p81");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/disk/p81");
 
     TEST_ASSERT_TRUE(image->parseChunks());
 
@@ -222,7 +222,7 @@ void test_every_block_of_the_directory_track_reads(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/disk/p81");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/disk/p81");
 
     TEST_ASSERT_TRUE(image->parseChunks());
 
@@ -245,7 +245,7 @@ void test_every_block_of_every_track_reads(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/disk/p81");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/disk/p81");
 
     TEST_ASSERT_TRUE(image->parseChunks());
 
@@ -269,7 +269,7 @@ void test_seek_sector_positions_read_container(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/disk/p81");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/disk/p81");
 
     TEST_ASSERT_TRUE(image->parseChunks());
 
@@ -306,7 +306,7 @@ void test_directory_walk_finds_entries(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/disk/p81");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/disk/p81");
 
     TEST_ASSERT_TRUE(image->parseChunks());
 
@@ -360,7 +360,7 @@ void test_file_chains_match_their_directory_block_counts(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/disk/p81");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/disk/p81");
 
     TEST_ASSERT_TRUE(image->parseChunks());
 

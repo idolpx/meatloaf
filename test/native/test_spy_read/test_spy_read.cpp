@@ -13,8 +13,8 @@
 // bytes late, or that is one byte too long, fails it. Nothing weaker can tell
 // a right offset from a nearly-right one.
 //
-// The corpus is real - five .SPY files in .archive/archive/spy, none of them
-// written by this project. .archive is gitignored, so these skip cleanly
+// The corpus is real - five .SPY files in .data/media/archive/spy, none of them
+// written by this project. .data/media is gitignored, so these skip cleanly
 // without it.
 
 #include <unity.h>
@@ -29,7 +29,7 @@
 #include "media/archive/spy.h"
 #include "string_utils.h"
 
-static const char* CORPUS_DIR = ".archive/archive/spy";
+static const char* CORPUS_DIR = ".data/media/archive/spy";
 
 static const char* CORPUS[] = {
     "NTSC4K-2.SPY", "PARTY-97.SPY", "TURBO-MP.SPY", "WICKEDS1.SPY", "WICKEDS2.SPY",
@@ -118,7 +118,7 @@ void test_directory_lists_entries(void)
 {
     auto image = openImage(std::string(CORPUS_DIR) + "/" + CORPUS[0], g_src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/spy");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/spy");
 
     TEST_ASSERT_TRUE(image->readHeader());
     TEST_ASSERT_EQUAL_UINT32(27, (uint32_t)image->entries.size());
@@ -145,7 +145,7 @@ void test_ninth_entry_starts_at_the_next_directory_block(void)
 {
     auto image = openImage(std::string(CORPUS_DIR) + "/" + CORPUS[0], g_src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/spy");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/spy");
 
     TEST_ASSERT_TRUE(image->readHeader());
     TEST_ASSERT_TRUE(image->entries.size() > 8);
@@ -185,7 +185,7 @@ void test_entries_tile_the_container(void)
     {
         auto image = openImage(std::string(CORPUS_DIR) + "/" + CORPUS[c], g_src);
         if (image == nullptr)
-            TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/spy");
+            TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/spy");
 
         TEST_ASSERT_TRUE(image->readHeader());
         TEST_ASSERT_TRUE(image->entries.size() > 0);
@@ -222,7 +222,7 @@ void test_entries_are_found_by_name(void)
 {
     auto image = openImage(std::string(CORPUS_DIR) + "/" + CORPUS[0], g_src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/spy");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/spy");
 
     TEST_ASSERT_TRUE(image->readHeader());
 
@@ -246,7 +246,7 @@ void test_every_entry_matches_its_stored_checksum(void)
     {
         auto image = openImage(std::string(CORPUS_DIR) + "/" + CORPUS[c], g_src);
         if (image == nullptr)
-            TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/spy");
+            TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/spy");
 
         TEST_ASSERT_TRUE(image->readHeader());
 
@@ -282,7 +282,7 @@ void test_reading_an_entry_serves_exactly_its_bytes(void)
 {
     auto image = openImage(std::string(CORPUS_DIR) + "/" + CORPUS[1], g_src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/spy");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/spy");
 
     TEST_ASSERT_TRUE(image->readHeader());
 
@@ -309,7 +309,7 @@ void test_file_types_decode(void)
 {
     auto image = openImage(std::string(CORPUS_DIR) + "/" + CORPUS[0], g_src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/spy");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/spy");
 
     TEST_ASSERT_EQUAL_STRING("seq", image->decodeType(0x81).c_str());
     TEST_ASSERT_EQUAL_STRING("prg", image->decodeType(0x82).c_str());

@@ -93,7 +93,7 @@ Write and run this. It reads the partition table directly, independent of any fi
 python - <<'PY'
 import sys, glob
 # Point this at the image under test. Adjust the path if hdbackup.dhd lives elsewhere.
-cands = glob.glob('.archive/**/*.dhd', recursive=True) + glob.glob('.archive/**/*.d[124]m', recursive=True)
+cands = glob.glob('.data/media/**/*.dhd', recursive=True) + glob.glob('.data/media/**/*.d[124]m', recursive=True)
 print("candidate images:", cands)
 for path in cands:
     img = open(path, 'rb').read()
