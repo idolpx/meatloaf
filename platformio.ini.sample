@@ -223,6 +223,8 @@ build_flags =
     ; The library objects themselves are already linked - build_libarchive.py
     ; folds zlib into the single archive lib it prepends for every native suite.
     -I components/zlib/zlib
+    ; test_ps2_keys: scan_codes_set_2.h (stdint.h only, native-safe).
+    -I components/ps2/src
     -I test/native/test_archive_extract/host
     -include test/native/test_archive_extract/host/host_posix_compat.h
     ;-lgcov

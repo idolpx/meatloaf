@@ -22,6 +22,7 @@ set(INCLUDES
     ${CMAKE_SOURCE_DIR}/lib/console/ute
 
     ${CMAKE_SOURCE_DIR}/lib/device
+    ${CMAKE_SOURCE_DIR}/lib/device/ps2
     ${CMAKE_SOURCE_DIR}/lib/display
     ${CMAKE_SOURCE_DIR}/lib/encoding
     ${CMAKE_SOURCE_DIR}/lib/encrypt
@@ -84,6 +85,7 @@ FILE(GLOB_RECURSE SOURCES
 
     ${CMAKE_SOURCE_DIR}/lib/device/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/device/iec/*.cpp
+    ${CMAKE_SOURCE_DIR}/lib/device/ps2/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/display/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/encoding/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/encrypt/*.cpp

@@ -22,18 +22,21 @@
 
 #include "string_utils.h"
 
-namespace ESP32Console
+namespace
 {
-    std::string encodeDosCommand(const std::string &line)
+    // The 0xNN run-escape walk, shared by both encoders. `xform` is applied to
+    // each run of pending TEXT; hex escapes always pass through verbatim.
+    std::string encodeEscapes(const std::string &line,
+                              std::string (*xform)(const std::string &))
     {
         std::string out;
         std::string text;   // pending text, converted on the next flush
 
-        auto flushText = [&out, &text]()
+        auto flushText = [&out, &text, xform]()
         {
             if (text.empty())
                 return;
-            out += mstr::toPETSCII2(text);
+            out += xform(text);
             text.clear();
         };
 
@@ -64,5 +67,21 @@ namespace ESP32Console
         flushText();
 
         return out;
+    }
+
+    std::string xformPetscii(const std::string &s) { return mstr::toPETSCII2(s); }
+    std::string xformNone(const std::string &s)    { return s; }
+}
+
+namespace ESP32Console
+{
+    std::string encodeDosCommand(const std::string &line)
+    {
+        return encodeEscapes(line, xformPetscii);
+    }
+
+    std::string encodeAsciiCommand(const std::string &line)
+    {
+        return encodeEscapes(line, xformNone);
     }
 }
