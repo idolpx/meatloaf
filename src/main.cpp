@@ -59,10 +59,6 @@
 #include <c64b.h>
 #endif
 
-#ifdef ENABLE_PS2
-#include "ps2_keyboard.h"
-ps2dev::PS2Keyboard keyboard(PIN_KB_CLK, PIN_KB_DATA);
-#endif
 
 #include "device.h"
 #include "keys.h"

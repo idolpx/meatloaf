@@ -27,11 +27,6 @@
 #define RGB_LED_ORDER           GRB
 #define PIN_LED_RGB_PWR         GPIO_NUM_NC
 
-// PS/2 Keyboard
-#ifndef PIN_KB_CLK
-#define PIN_KB_CLK              GPIO_NUM_NC;
-#define PIN_KB_DATA             GPIO_NUM_NC;
-#endif
 
 // Zimodem
 #ifdef ENABLE_ZIMODEM
