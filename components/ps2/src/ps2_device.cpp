@@ -306,5 +306,16 @@ namespace ps2dev
   }
   SemaphoreHandle_t PS2Device::get_bus_mutex_handle() { return _mutex_bus; }
   QueueHandle_t PS2Device::get_packet_queue_handle() { return _queue_packet; }
-  int PS2Device::send_packet(PS2Packet *packet) { return (xQueueSend(_queue_packet, packet, 0) == pdTRUE) ? 0 : -1; }
+  int PS2Device::send_packet(PS2Packet *packet)
+  {
+    // A send racing a teardown must fail, not write to a deleted handle.
+    if (!_queue_packet)
+      return -1;
+    // 500 ms comfortably exceeds the ~20 ms a full 20-deep queue takes to
+    // drain, so this only expires if the wire is genuinely stuck.  With a 0
+    // timeout, `type()` of anything past ~10 characters silently dropped
+    // keystrokes: each character is two packets and the wire drains at
+    // roughly 1 ms per packet.
+    return (xQueueSend(_queue_packet, packet, pdMS_TO_TICKS(500)) == pdTRUE) ? 0 : -1;
+  }
 }

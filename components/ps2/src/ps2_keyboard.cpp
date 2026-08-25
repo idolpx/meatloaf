@@ -190,29 +190,29 @@ int PS2Keyboard::reply_to_host(uint8_t host_cmd)
 
   return 0;
 }
-void PS2Keyboard::keydown(scancodes::Key key)
+int PS2Keyboard::keydown(scancodes::Key key)
 {
   if (!_data_reporting_enabled)
-    return;
+    return 0;                 // host asked us to be quiet; not a failure
   PS2Packet packet;
   packet.len = scancodes::MAKE_CODES_LEN[key];
   for (uint8_t i = 0; i < packet.len; i++)
   {
     packet.data[i] = scancodes::MAKE_CODES[key][i];
   }
-  send_packet(&packet);
+  return send_packet(&packet);
 }
-void PS2Keyboard::keyup(scancodes::Key key)
+int PS2Keyboard::keyup(scancodes::Key key)
 {
   if (!_data_reporting_enabled)
-    return;
+    return 0;                 // host asked us to be quiet; not a failure
   PS2Packet packet;
   packet.len = scancodes::BREAK_CODES_LEN[key];
   for (uint8_t i = 0; i < packet.len; i++)
   {
     packet.data[i] = scancodes::BREAK_CODES[key][i];
   }
-  send_packet(&packet);
+  return send_packet(&packet);
 }
 void PS2Keyboard::type(scancodes::Key key)
 {
@@ -236,8 +236,9 @@ void PS2Keyboard::type(std::initializer_list<scancodes::Key> keys)
     vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
-void PS2Keyboard::type(const char *str)
+int PS2Keyboard::type(const char *str)
 {
+  int result = 0;
   size_t i = 0;
   while (str[i] != '\0')
   {
@@ -576,11 +577,11 @@ void PS2Keyboard::type(const char *str)
     }
     if (shift)
     {
-      keydown(scancodes::Key::K_LSHIFT);
+      if (keydown(scancodes::Key::K_LSHIFT) != 0) result = -1;
       vTaskDelay(pdMS_TO_TICKS(10));
       type(key);
       vTaskDelay(pdMS_TO_TICKS(10));
-      keyup(scancodes::Key::K_LSHIFT);
+      if (keyup(scancodes::Key::K_LSHIFT) != 0) result = -1;
     }
     else
     {
@@ -588,6 +589,7 @@ void PS2Keyboard::type(const char *str)
     }
     i++;
   }
+  return result;
 }
 
 void PS2Keyboard::keyHid_send(uint8_t btkey, bool keyDown)

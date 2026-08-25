@@ -44,11 +44,11 @@ namespace ps2dev
     bool is_scroll_lock_led_on();
     bool is_num_lock_led_on();
     bool is_caps_lock_led_on();
-    void keydown(scancodes::Key key);
-    void keyup(scancodes::Key key);
+    int keydown(scancodes::Key key);
+    int keyup(scancodes::Key key);
     void type(scancodes::Key key);
     void type(std::initializer_list<scancodes::Key> keys);
-    void type(const char *str);
+    int type(const char *str);
     void keyHid_send(uint8_t btkey, bool keyDown);
     void keyHid_send_CCONTROL(uint16_t btkey, bool keyDown);
 
