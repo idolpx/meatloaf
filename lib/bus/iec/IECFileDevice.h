@@ -122,6 +122,7 @@ class IECFileDevice : public IECDevice
 #ifdef IEC_IMPL_SOFTLOAD
   virtual uint8_t sectorsPerTrack(uint8_t track);
   virtual uint8_t imageType();
+  virtual uint32_t mediaGeneration();
 #endif
 #endif
 

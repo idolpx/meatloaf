@@ -316,11 +316,16 @@ protected:
   // there is no VDrive behind it -- a media image reached through the MFile
   // chain has none. Cached because a loader reads hundreds of blocks; dropped
   // whenever the working directory moves, since the container may have.
+#ifdef IEC_IMPL_SOFTLOAD
   std::shared_ptr<MStream> sectorStream();
   void releaseSectorStream();
+#else
+  void releaseSectorStream() {}
+#endif
 #ifdef IEC_IMPL_SOFTLOAD
   virtual uint8_t sectorsPerTrack(uint8_t track);
   virtual uint8_t imageType();
+  virtual uint32_t mediaGeneration() { return m_mediaGeneration; }
 #endif
 #endif
 
@@ -354,9 +359,12 @@ protected:
 
   driveMemory m_memory;
 
-#ifdef IEC_SUPPORT_SECTOROPS
+#if defined(IEC_SUPPORT_SECTOROPS) && defined(IEC_IMPL_SOFTLOAD)
   std::shared_ptr<MStream> m_sectorStream;
   std::string              m_sectorStreamUrl;
+  // Bumped whenever the medium behind this drive changes -- see
+  // IECDevice::mediaGeneration(). Never reset, so no reader can miss a change.
+  uint32_t                 m_mediaGeneration = 0;
 #endif
 };
 

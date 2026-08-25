@@ -157,6 +157,17 @@ class IECDevice
 #ifdef IEC_IMPL_SOFTLOAD
   virtual uint8_t sectorsPerTrack(uint8_t track) { return 0; }
   virtual uint8_t imageType() { return IEC_IMG_NONE; }
+
+  // Counts how many times the medium behind this device has changed.
+  //
+  // Several loaders span more than one disk side and ask the user to swap:
+  // they read an id off the new disk, and if it is not the one they wanted
+  // they wait for the disk to change and look again. sd2iec answers that with
+  // a "dir_changed" flag set wherever the mounted directory moves; a counter
+  // is used here instead because it needs no clearing and cannot be lost
+  // between two readers -- a loader samples it once and waits for a different
+  // value.
+  virtual uint32_t mediaGeneration() { return 0; }
 #endif
 #endif
 

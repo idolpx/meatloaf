@@ -303,15 +303,17 @@ bool IECBusHandler::sparkleInitDisk(SparkleSession &s, uint8_t *dirBuf, uint16_t
     }
   else
     {
-      // a flip: side and production ids both have to match, and sd2iec waits
-      // for a disk change when they do not. Nothing at this layer reports one,
-      // so a mismatch ends the session.
-      if( s.nextId != sparkleDecode(s.enc, sparkleParam(s, dirBuf, SPK_DISKID)) )
-        return false;
-
+      // A flip: side and production ids both have to match. If they do not,
+      // this is the wrong disk -- wait for the user to swap and look again.
       uint8_t pidOffs = s_spkParams[s.variant - IEC_FLV_SPARKLE_10][SPK_PRODID];
-      if( pidOffs!=0 && memcmp(s.prodId, dirBuf+pidOffs, SPK_PRODID_LEN)!=0 )
-        return false;
+
+      while( s.nextId != sparkleDecode(s.enc, sparkleParam(s, dirBuf, SPK_DISKID)) ||
+             (pidOffs!=0 && memcmp(s.prodId, dirBuf+pidOffs, SPK_PRODID_LEN)!=0) )
+        {
+          if( !waitForDiskChange() ) return false;
+          if( !m_currentDevice->epyxReadSector(SPK_INIT_TRACK, SPK_BAM_SECTOR, dirBuf) )
+            return false;
+        }
     }
 
   // interleaves are stored as two's complement

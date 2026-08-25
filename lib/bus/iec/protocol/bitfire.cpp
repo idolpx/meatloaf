@@ -451,10 +451,12 @@ bool IECBusHandler::runBitfireLoader(uint8_t rxtx, uint8_t variant, uint8_t prot
         {
           if( cmd==BF_RESET_CMD ) break;
 
-          // A disk change. sd2iec waits for a disk-change event; nothing at
-          // this layer reports one, so a request for a disk that is not
-          // mounted ends the session rather than waiting forever.
-          break;
+          // A disk change: wait for the swap, then reload the directory of
+          // whatever is now mounted.
+          if( !waitForDiskChange() ) break;
+          if( !bitfireLoadDir(dirBuf, 0) ) break;
+          s.dirSector = 0;
+          s.nextFile  = 0;
         }
     }
 

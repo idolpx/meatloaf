@@ -258,12 +258,12 @@ bool IECBusHandler::runSpindleLoader(const uint8_t *cmd, uint8_t cmdLen)
 
               if( initDone )
                 {
-                  // a disk flip: the new side has to carry the id we expect
+                  // a disk flip: the new side has to carry the id we expect,
+                  // and if it does not we wait for the user to swap again
                   if( memcmp(nextId, m_buffer+0xF7, SP_SIDE_ID_LEN)!=0 )
                     {
-                      // sd2iec waits here for a disk change; nothing at this
-                      // layer reports one, so the session ends instead
-                      leave = true; break;
+                      if( !waitForDiskChange() ) { leave = true; break; }
+                      continue;
                     }
 
                   m_buffer[0xFD] |= SP_CMD2_EOF1;

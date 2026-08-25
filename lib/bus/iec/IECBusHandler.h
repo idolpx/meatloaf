@@ -116,6 +116,24 @@ class IECBusHandler
 #endif
 #endif
 
+  // Give one device the bus to itself until the next RESET.
+  //
+  // Several fast loaders will not work while anything else can answer -- they
+  // install an ATN responder, or time their transfer tightly enough that a
+  // second device acknowledging is fatal. sd2iec handles this by putting the
+  // WHOLE drive to sleep when it sees a "bus silence" request meant for
+  // another drive; here one board hosts multiple devices, so the
+  // equivalent is to deactivate every device except the one being addressed.
+  //
+  // Deliberately cleared only by a RESET, and by nothing else: a loader that
+  // asked for the bus keeps it for its whole session, and the C64 resetting is
+  // exactly when the other devices should come back. Passing NULL clears it
+  // early. Devices are restored through their own reset(), which reloads the
+  // persisted enabled flag, so a device configured as disabled stays disabled.
+  void setBusExclusive(IECDevice *dev);
+  // 0 rather than NULL: this header only includes <stdint.h>
+  bool isBusExclusive() const { return m_exclusiveDevice!=0; }
+
   IECDevice *findDevice(uint8_t devnr, bool includeInactive = false);
   bool canServeATN();
   bool inTransaction();
@@ -177,6 +195,9 @@ class IECBusHandler
   // Dedicated enable/disable latch for end()/begin(), checked by task() before
   // touching anything else.
   volatile bool m_enabled;
+
+  // The device holding the bus alone, or NULL. See setBusExclusive().
+  IECDevice *m_exclusiveDevice;
 
 #ifdef IOREG_TYPE
   volatile IOREG_TYPE *m_regCLKwrite, *m_regCLKmode, *m_regDATAwrite, *m_regDATAmode;
@@ -424,6 +445,13 @@ class IECBusHandler
   // shared by Booze and Bitfire, which move bytes the same way
   bool fastWaitATN(bool state, uint32_t timeoutMs);
   bool clockedWriteByte(uint8_t b, uint32_t timeoutMs);
+#endif
+
+#ifdef IEC_IMPL_SOFTLOAD
+  // Block until the medium behind the current device changes, which is how
+  // every multi-disk loader handles "wrong side, please swap". Returns false
+  // if the computer gave up (ATN) or the device is being reset instead.
+  bool waitForDiskChange();
 #endif
 
 #if defined(IEC_FP_BOOZE) && defined(IEC_IMPL_SOFTLOAD)

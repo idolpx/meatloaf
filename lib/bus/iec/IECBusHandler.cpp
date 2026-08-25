@@ -331,6 +331,7 @@ IECBusHandler::IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinDATA, ui
 #endif // IEC_SUPPORT_PARALLEL
 {
   m_numDevices = 0;
+  m_exclusiveDevice = NULL;
   m_inTask     = false;
   m_hostMode   = false;
   m_atnInterruptEnabled = false;
@@ -572,6 +573,20 @@ bool IECBusHandler::detachDevice(IECDevice *dev)
       }
 
   return false;
+}
+
+
+void IECBusHandler::setBusExclusive(IECDevice *dev)
+{
+  m_exclusiveDevice = dev;
+
+  if( dev==NULL ) return;
+
+  // Everything else goes quiet. Not detached and not reset -- just made
+  // inactive, so it stops answering ATN; the next RESET puts it back.
+  for(uint8_t i=0; i<m_numDevices; i++)
+    if( m_devices[i]!=dev )
+      m_devices[i]->setActive(false);
 }
 
 
@@ -1638,6 +1653,11 @@ void IECBusHandler::task()
           m_enabled = true;
           attachATNInterrupt();
         }
+
+      // A RESET is what ends bus-exclusive mode. Clear it BEFORE the reset
+      // calls below, because those are what restore each device's persisted
+      // enabled flag -- clearing afterwards would leave the slept ones off.
+      m_exclusiveDevice = NULL;
 
       // call "reset" function for attached devices
       for(uint8_t i=0; i<m_numDevices; i++)

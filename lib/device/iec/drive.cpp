@@ -3188,6 +3188,12 @@ void iecDrive::set_cwd(std::string path, bool verified)
 mediatype_t iecDrive::mount(fnFile *f, const char *filename, uint32_t disksize, mediatype_t disk_type)
 {
     Debug_printv("filename[%s], disksize[%lu] disktype[%d]", filename, disksize, disk_type);
+
+#ifdef IEC_SUPPORT_SECTOROPS
+    // a different medium: drop the cached block stream and announce the change
+    releaseSectorStream();
+#endif
+
     std::string url;
 
     if ( !mstr::contains(filename, ":") )
@@ -3322,6 +3328,11 @@ void iecDrive::restoreActiveFromConfig()
 //     fresh MFile and stream per sector would re-resolve the whole path each
 //     time -- over a network mount that is a round trip per block.
 //   - It is opened in|out, never plain out, which would truncate the image.
+//
+// Compiled only where a software loader can reach it. Epyx's sector ops are on
+// every board, but they only ever ran against VDrive, and the tightest ESP32
+// has no flash left for a second path they do not need.
+#ifdef IEC_IMPL_SOFTLOAD
 std::shared_ptr<MStream> iecDrive::sectorStream()
 {
     if ( m_cwd == nullptr )
@@ -3347,11 +3358,17 @@ std::shared_ptr<MStream> iecDrive::sectorStream()
 }
 
 
+// Called wherever the medium behind this drive can change -- set_cwd(),
+// mount(), unmount(). Dropping the cached block stream and bumping the
+// generation counter are the same event, so they live together: a loader
+// waiting for a disk swap is waiting for exactly this.
 void iecDrive::releaseSectorStream()
 {
     m_sectorStream = nullptr;
     m_sectorStreamUrl.clear();
+    m_mediaGeneration++;
 }
+#endif
 
 
 bool iecDrive::epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer)
@@ -3359,6 +3376,9 @@ bool iecDrive::epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer)
     if ( m_vdrive != nullptr )
         return m_vdrive->readSector(track, sector, buffer);
 
+#ifndef IEC_IMPL_SOFTLOAD
+    return false;
+#else
     auto s = sectorStream();
     if ( s == nullptr || !s->seekSector(track, sector, 0) )
         return false;
@@ -3374,6 +3394,7 @@ bool iecDrive::epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer)
     }
 
     return got == 256;
+#endif
 }
 
 
@@ -3382,6 +3403,9 @@ bool iecDrive::epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer)
     if ( m_vdrive != nullptr )
         return m_vdrive->writeSector(track, sector, buffer);
 
+#ifndef IEC_IMPL_SOFTLOAD
+    return false;
+#else
     // No writability test beyond the attempt: isWritable is a property of
     // MFile, not of the stream, and a read-only medium answers with a short
     // write anyway.
@@ -3390,6 +3414,7 @@ bool iecDrive::epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer)
         return false;
 
     return s->write(buffer, 256) == 256;
+#endif
 }
 
 

@@ -282,10 +282,11 @@ bool IECBusHandler::runBoozeLoader()
             }
           else
             {
-              // A request for a different disk. sd2iec waits for a disk-change
-              // event here; nothing at this layer reports one, so rather than
-              // wait forever the session ends.
-              break;
+              // A request for a different disk: wait for the medium to change
+              // and then look again, which is what the swap prompt on screen
+              // is asking the user to do.
+              if( !waitForDiskChange() ) break;
+              continue;
             }
         }
       else
@@ -305,7 +306,8 @@ bool IECBusHandler::runBoozeLoader()
               if( !receiveBoozeByte(cmd) ) goto done;
               if( cmd!=0 ) break;   // happy: cmd is the track of the first file
 
-              break;                // wrong disk and no way to wait for a flip
+              // wrong disk: wait for the swap and check the id again
+              if( !waitForDiskChange() ) goto done;
             }
 
           if( cmd==0 ) break;

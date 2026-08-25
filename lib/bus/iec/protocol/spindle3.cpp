@@ -257,10 +257,14 @@ bool IECBusHandler::runSpindleV3Loader()
                 case SP3_INIT_SECTOR:
                   if( s.initDone )
                     {
-                      // A disk flip: the new side has to carry the expected id.
-                      // sd2iec waits for a disk-change event here; nothing at
-                      // this layer reports one, so the session ends instead.
-                      if( memcmp(s.nextId, m_buffer+0xF9, SP3_SIDE_ID_LEN)!=0 ) goto done;
+                      // A disk flip: the new side has to carry the expected
+                      // id, and if it does not we wait for another swap.
+                      if( memcmp(s.nextId, m_buffer+0xF9, SP3_SIDE_ID_LEN)!=0 )
+                        {
+                          if( !waitForDiskChange() ) goto done;
+                          restart = true;
+                          break;
+                        }
                       m_buffer[0xFF-2] |= SP3_CMD_NEWJOB;
                     }
                   else

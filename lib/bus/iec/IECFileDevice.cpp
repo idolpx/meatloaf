@@ -616,6 +616,12 @@ uint8_t IECFileDevice::imageType()
 {
   return IEC_IMG_NONE;
 }
+
+
+uint32_t IECFileDevice::mediaGeneration()
+{
+  return 0;
+}
 #endif
 #endif
 

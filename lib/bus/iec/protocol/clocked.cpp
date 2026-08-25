@@ -74,3 +74,31 @@ bool IECBusHandler::clockedWriteByte(uint8_t b, uint32_t timeoutMs)
 }
 
 #endif
+
+
+#ifdef IEC_IMPL_SOFTLOAD
+
+// sd2iec answers "wrong disk" by spinning on its dir_changed flag until the
+// user swaps the image. The equivalent here is the device's media generation
+// counter, which every path that can change the medium bumps -- mount(),
+// unmount() and set_cwd(). A counter rather than a flag means nothing has to
+// clear it and two waiters cannot steal the event from each other.
+bool IECBusHandler::waitForDiskChange()
+{
+  uint32_t gen = m_currentDevice->mediaGeneration();
+
+  while( m_currentDevice->mediaGeneration()==gen )
+    {
+      // the computer asserting ATN means it has given up waiting
+      if( !readPinATN() || !isResetPinIdle() ) return false;
+
+      // The swap comes from another task -- the console, the web UI, the SD
+      // card being changed -- so this has to yield rather than spin, and it
+      // must not hold interrupts off while it does.
+      delay(10);
+    }
+
+  return true;
+}
+
+#endif

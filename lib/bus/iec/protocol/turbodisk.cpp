@@ -284,6 +284,17 @@ bool IECBusHandler::runFastLoader(IECDevice *dev, uint8_t variant, uint8_t param
       return runFC3OldFreezeLoader(rxtx);
 #endif
 
+    // A "bus silence" request. The loader is uploading this to EVERY drive on
+    // the bus so that only the one it is talking to answers -- sd2iec puts the
+    // whole drive to sleep here, and the equivalent on a board hosting multiple
+    // virtual drives is to give this one the bus alone until RESET.
+    case IEC_FLV_KRILL_SLEEP:
+    case IEC_FLV_SPINDLE_SLEEP:
+    case IEC_FLV_BITFIRE_SLEEP:
+    case IEC_FLV_TRANSWARP_SLEEP:
+      setBusExclusive(dev);
+      return true;
+
 #if defined(IEC_FP_KRILL) && defined(IEC_IMPL_SOFTLOAD)
     case IEC_FLV_KRILL_R58PRE: case IEC_FLV_KRILL_R58:
     case IEC_FLV_KRILL_R146:   case IEC_FLV_KRILL_R159:

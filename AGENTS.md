@@ -714,6 +714,24 @@ Important Notes above.
   Ultraboot and Spindle both do, so the dispatch tries each in turn and the first that claims the
   command wins. That is why `memExec()` reports whether a table ROW matched separately from which
   variant it resolved -- those rows carry `IEC_FLV_NONE` on purpose.
+- **Bus-exclusive mode: one device holds the bus alone until RESET** (`IECBusHandler::setBusExclusive()`,
+  console `iec exclusive <id>`). Several loaders will not work while anything else can answer -- they
+  install an ATN responder, or time a transfer tightly enough that a second device acknowledging is
+  fatal. sd2iec handles this by putting the WHOLE drive to sleep when it sees a "bus silence" request
+  meant for another drive; one board here hosts multiple devices, so the equivalent is to
+  deactivate every device except the one being addressed. **The `*_SLEEP` CRC variants are exactly
+  that request** -- `FL_KRILL_SLEEP`, `FL_SPINDLE_SLEEP`, `FL_BITFIRE_SLEEP`, `FL_TRANSWARP_SLEEP`
+  are uploaded to every drive on the bus, and dispatch straight to `setBusExclusive()`. It is cleared
+  ONLY by a RESET, and cleared BEFORE the per-device `reset()` calls -- those are what reload each
+  device's persisted enabled flag, so clearing afterwards would leave the slept ones off.
+- **Disk changes are reported by a COUNTER, not a flag** (`IECDevice::mediaGeneration()`). sd2iec
+  sets a `dir_changed` flag wherever the mounted directory moves and every multi-disk loader zeroes
+  it and then spins on it; a counter needs no clearing and two waiters cannot steal the event from
+  each other. `iecDrive` bumps it in `releaseSectorStream()`, which every path that can change the
+  medium already calls -- `set_cwd()`, `mount()`, `unmount()`. `IECBusHandler::waitForDiskChange()`
+  samples it and waits, yielding with `delay()` rather than spinning, because the swap arrives from
+  another task entirely (console, web UI, SD card). **This is what makes the disk-flip paths work**:
+  Booze, Bitfire, Spindle 2.x and 3.x and Sparkle all used to end the session on a wrong disk.
 - **Block access falls back to the working directory's own container when there is no VDrive.**
   VDrive is not always what holds the disk: an image reached through the MFile chain -- mounted over
   the network, nested inside an archive, or in a format VDrive does not know -- has none, and a fast
