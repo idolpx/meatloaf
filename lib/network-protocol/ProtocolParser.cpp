@@ -9,7 +9,10 @@
 #include "TNFS.h"
 #include "FTP.h"
 #include "HTTP.h"
+#ifndef DISABLE_SSH   // MEATLOAF-GATE
 #include "SSH.h"
+#endif // !DISABLE_SSH
+
 #include "SMB.h"
 #include "SD.h"
 
@@ -49,9 +52,12 @@ NetworkProtocol* ProtocolParser::createProtocol(std::string scheme, std::string 
         case "HTTPS"_sh:
             protocol = new NetworkProtocolHTTP(receiveBuffer, transmitBuffer, specialBuffer);
             break;
+#ifndef DISABLE_SSH   // MEATLOAF-GATE
         case "SSH"_sh:
             protocol = new NetworkProtocolSSH(receiveBuffer, transmitBuffer, specialBuffer);
             break;
+#endif // !DISABLE_SSH
+
         case "SMB"_sh:
             protocol = new NetworkProtocolSMB(receiveBuffer, transmitBuffer, specialBuffer);
             break;

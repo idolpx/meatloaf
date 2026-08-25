@@ -273,6 +273,7 @@ static std::string compressedEntryNameFromUrl(const std::string &containerUrl)
     return filename;
 }
 
+
 bool Archive::open(std::ios_base::openmode mode, bool rawOnly, bool randomAccess) {
     // close the archive if it was already open
     close();
@@ -320,8 +321,10 @@ bool Archive::open(std::ios_base::openmode mode, bool rawOnly, bool randomAccess
         } else if (mstr::endsWith(u, ".tar") || mstr::endsWith(u, ".tgz") ||
                    mstr::contains(u, (char *)".tar.")) {
             archive_read_support_format_tar(m_archive);
+#ifndef DISABLE_ARCHIVE_7Z   // MEATLOAF-GATE
         } else if (mstr::endsWith(u, ".7z")) {
             archive_read_support_format_7zip(m_archive);
+#endif
         } else if (mstr::endsWith(u, ".rar")) {
             archive_read_support_format_rar(m_archive);
             archive_read_support_format_rar5(m_archive);
@@ -337,8 +340,10 @@ bool Archive::open(std::ios_base::openmode mode, bool rawOnly, bool randomAccess
             // bogus entry spanning the whole file.
             archive_read_support_format_lha(m_archive);
             archive_read_set_options(m_archive, "lha:sfx");
+#ifndef DISABLE_ARCHIVE_XAR   // MEATLOAF-GATE
         } else if (mstr::endsWith(u, ".xar")) {
             archive_read_support_format_xar(m_archive);
+#endif
         } else if (mstr::endsWith(u, ".iso")) {
             archive_read_support_format_iso9660(m_archive);
         } else if (mstr::endsWith(u, ".cpio") || mstr::endsWith(u, ".cpgz")) {
@@ -360,11 +365,15 @@ bool Archive::open(std::ios_base::openmode mode, bool rawOnly, bool randomAccess
             // recognizes any of them from content alone.
             archive_read_support_format_zip(m_archive);
             archive_read_support_format_tar(m_archive);
+#ifndef DISABLE_ARCHIVE_7Z   // MEATLOAF-GATE
             archive_read_support_format_7zip(m_archive);
+#endif
             archive_read_support_format_rar(m_archive);
             archive_read_support_format_rar5(m_archive);
             archive_read_support_format_lha(m_archive);
+#ifndef DISABLE_ARCHIVE_XAR   // MEATLOAF-GATE
             archive_read_support_format_xar(m_archive);
+#endif
             archive_read_support_format_iso9660(m_archive);
             archive_read_support_format_cpio(m_archive);
             // Keep `empty` as well: it is what gives a zero-byte file a clean

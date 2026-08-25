@@ -1,3 +1,4 @@
+#ifndef DISABLE_NFS   // MEATLOAF-GATE
 
 #include <errno.h>
 
@@ -139,3 +140,5 @@ int FileHandlerNFS::flush()
     }
     return 0;
 }
+
+#endif // !DISABLE_NFS  MEATLOAF-GATE

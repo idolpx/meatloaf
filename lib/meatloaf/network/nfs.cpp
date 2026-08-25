@@ -1,3 +1,4 @@
+#ifndef DISABLE_NFS   // MEATLOAF-GATE
 // Meatloaf - A Commodore 64/128 multi-device emulator
 // https://github.com/idolpx/meatloaf
 // Copyright(C) 2020 James Johnston
@@ -755,3 +756,5 @@ void NFSHandle::obtain(std::string m_path, int nfs_mode) {
 
     Debug_printv("Successfully opened NFS file: %s", m_path.c_str());
 }
+
+#endif // !DISABLE_NFS  MEATLOAF-GATE

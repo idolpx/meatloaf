@@ -1036,6 +1036,7 @@ static int df(int argc, char **argv)
 }
 
 #ifdef SD_CARD
+#ifndef DISABLE_LOCATEDB
 // ─── locate / updatedb ────────────────────────────────────────────────────────
 #include "sqlite3.h"
 #include "sqlite3_esp32.h"
@@ -1955,6 +1956,7 @@ int locate(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 // ─── end locate / updatedb ────────────────────────────────────────────────────
+#endif // !DISABLE_LOCATEDB
 
 static void format_sd_task(void *arg)
 {
@@ -2463,6 +2465,7 @@ namespace ESP32Console::Commands
         return ConsoleCommand("format_sd", &format_sd, "Format the SD card (use -y to confirm)");
     }
 
+#ifndef DISABLE_LOCATEDB
     const ConsoleCommand getUpdatedbCommand()
     {
         return ConsoleCommand("updatedb", &updatedb,
@@ -2473,5 +2476,6 @@ namespace ESP32Console::Commands
     {
         return ConsoleCommand("locate", &locate, "Search the locate database for files matching a pattern");
     }
+#endif // !DISABLE_LOCATEDB
 #endif
 }

@@ -634,6 +634,90 @@ gitignored.
 - **FTP file reads STREAM; they are not cached first** (`lib/FileSystem/fnFileFTP.h/.cpp`). `FileHandlerFTP` reads straight off the live RETR connection through a 512-byte buffer, so the RAM cost is the same whatever the file's size. **The transfer starts LAZILY, on the first read** — that is what lets `FTPMStream::open()` keep its seek-to-end/tell/seek-to-start size probe with no network traffic, and is why that code needed no change. Backwards seeks (and forward seeks past 8 KB) restart the transfer at the new offset with `REST`; shorter forward seeks read and discard. `FileCache::open()` is still tried first, so `#cache=sd` is unaffected, and a server that will not answer `SIZE` falls back to the old caching path. **`REST` itself is not hardware-verified** — every read so far has been forward-only.
 - **`DISABLE_DIRCACHE` (undefined by default) makes `FileSystemFTP` stream its directory listing** instead of caching it. `DirCache` holds a `fsdir_entry` per entry — `char filename[256]` plus size and flags, **272 bytes** — from the internal heap on a board without PSRAM, which is the largest single cost of an `ls` over FTP. With the flag set, one entry is held at a time: no sorting (`FTPMFile` passes `DIR_OPTION_UNSORTED` anyway, so only a fuji host slot notices), no listing re-use, and `dir_seek()` re-lists and skips forward. Only `FileSystemFTP` honours the flag; SD, NFS, SMB, HTTP and TNFS still cache unconditionally.
 - **`FTPMFile::readEntry()`'s `dir_open` test was inverted** (`if (!fs->dir_open(...))`) — `dir_open` returns true on success, so the scan loop only ever ran on a listing that had FAILED to open, and an FTP wildcard could never match. Fixed; note the same call must `dir_close()` on both exits now that streaming leaves the data connection open.
+- **There are TWO independent size limits and relieving one does nothing for the other.** `iram0_2_seg` is the flash-text window — 3,342,304 bytes (0x32ffe0) on every ESP32 (non-S3) board, which is what `.flash.text` has to fit. `iram0_0_seg` is real IRAM — 131,072 bytes, holding `.iram0.vectors` + `.iram0.text`, i.e. everything marked `IRAM_ATTR`/`RAMFUNC` plus the ISRs and newlib functions ESP-IDF places there. A fast loader costs BOTH: its detection tables and session code are flash, its bit-banging byte codecs are IRAM. Enabling `EXTRA_FASTLOADERS` on a WROVER board after freeing 375 KB of flash text still failed to link — `region 'iram0_0_seg' overflowed by 2164 bytes`. Read the region name in the error before assuming which budget you are out of.
+- **Everything under `lib/` is linked as a PLAIN OBJECT, not an archive member**, so the linker cannot drop it and gating its callers frees nothing. `lib/meatloaf/codec/retropixels.cpp` had no caller anywhere in the tree and still pulled in all 65 KB of `libretropixels.a`. A feature gate therefore has to wrap the whole translation unit (`#ifndef DISABLE_X` around the entire `.cpp`), and then separately gate the header include, the filesystem instance, and its entry in `MFSOwner`'s list. Components under `components/` are ordinary archives and DO drop when unreferenced — which is the only reason gating the caller works at all.
+- **`DISABLE_*` feature gates** (`platformio.ini`, marked `MEATLOAF-GATE` in the source) each drop one large library from the link. Measured on `fujiloaf-rev0` by diffing the linker map of an all-gates build against the baseline, so the figures include the gated library AND its caller code: `DISABLE_LOCATEDB` 406,890 (sqlite3), `DISABLE_SSH` 139,761 (libssh), `DISABLE_TAPE` 119,284 (tapclean), `DISABLE_NFS` 85,287, `DISABLE_WEBDAV_CLIENT` 78,796 (expat — the WebDAV *server* is unaffected), `DISABLE_RETROPIXELS` 75,494, `DISABLE_ISCSI` 52,633, `DISABLE_AFP` 48,810. All ten together free **1,067,152 bytes**. Set them per-board in the `[env:...]` section, never in the shared `build_flags`. Note `DISABLE_LOCATEDB` sits inside `#ifdef SD_CARD` and frees nothing on a board without an SD slot, and the tape/sftp/nfs/afp/iscsi filesystems are already inside `#ifndef MIN_CONFIG`, so those gates are no-ops on a `MIN_CONFIG` board.
+- **`CONFIG_SPI_MASTER_ISR_IN_IRAM` is the IRAM lever on a WROVER board, and it is the only safe one.** It is worth 3,542 bytes, which is what makes `EXTRA_FASTLOADERS` fit. The bigger blocks are not available: `libc.a` holds ~17.9 KB of IRAM but that is the `CONFIG_SPIRAM_CACHE_*_IN_IRAM` PSRAM cache-bug workaround, mandatory while `CONFIG_ESP32_REV_MIN=0`; `libesp_ringbuf.a` holds 5,030 but this IDF has no Kconfig to move it; and the WiFi IRAM optimisations are already off. Turning the SPI master ISR out of IRAM means an SPI transaction cannot be serviced while the flash cache is disabled — nothing here does that, SD and display both run from ordinary tasks — at the cost of a little ISR latency. **Not hardware-verified.**
+
+## Recent Changes (August 25, 2026)
+
+### Feature gates, and all fastloaders enabled on every board
+
+`EXTRA_FASTLOADERS` is now set in every `[env:...]` in `platformio.ini`. It did not fit on an
+ESP32-WROVER board before this: `fujiloaf-rev0` had **1,871 bytes** of `iram0_2_seg` left. Ten
+`DISABLE_*` gates were added to make room; the durable rules and the per-gate figures are in the
+Important Notes above.
+
+**Flash text (`.flash.text`, capacity 3,342,304 on ESP32):**
+
+| board | before | after | free after |
+|---|---|---|---|
+| fujiloaf-rev0 | 3,340,433 | 2,965,801 | 376,503 |
+| lolin-d32-pro | 3,340,541* | 2,964,477 | 377,827 |
+| iec-nugget | 3,339,813* | 2,964,209 | 378,095 |
+| esp32-s3-devkitc-1 | 3,253,514* | 3,252,230 | (S3 window is larger) |
+
+\* pre-existing figures; only `fujiloaf-rev0` was re-measured baseline-to-final in one sitting.
+
+**The shipped default is now global, not per-board** (changed 2026-08-25 after the per-board
+scheme above was measured). `platformio.ini.sample`'s `[env]` block sets `EXTRA_FASTLOADERS`,
+`EXTRA_DISK_FORMATS`, `DISABLE_RETROPIXELS` and `DISABLE_ISCSI` for every board, and no board
+carries a per-board gate. `DISABLE_RETROPIXELS` is the load-bearing one: it is the only gate
+outside both `#ifdef SD_CARD` and `#ifndef MIN_CONFIG`, so it is the only one that pays on every
+board. Verified: `fujiloaf-rev0` links at 3,255,033 (**87,271** free, IRAM 5,021 free), and
+`esp32-wroom32` — the first `MIN_CONFIG` board ever built with fastloaders — at 2,166,238
+(1,176,066 free, IRAM 28,533 free). `DISABLE_LOCATEDB` is no longer set anywhere, so `locate`
+works on every board.
+
+`DISABLE_ARCHIVE_XAR` is set globally too (a xar is an Apple installer container, so nothing a
+Commodore meets); `DISABLE_ARCHIVE_7Z` is listed but off. With XAR on, `fujiloaf-rev0` links at
+3,242,541 — **99,763** free, IRAM 5,021 free. Those two gates drop libarchive's own reader objects
+and nothing else: they do NOT free libzstd or liblzma, for the reason in the Important Notes above.
+
+- **All ten gates together free 1,067,152 bytes**, measured by diffing the linker map of an
+  all-gates build against the baseline, per archive and per object — not by summing archive sizes,
+  which would miss the gated caller code (`tap.cpp.o` 10,613, `retropixels.cpp.o` 9,898,
+  `afp.cpp.o` 9,595, `VFSCommands.cpp.o` 8,767, and so on) and would over-count anything a
+  non-gated caller keeps alive.
+- **Two of the ten do far less than the archive sizes suggested, and the reason is worth keeping.**
+  `libzstd` and `liblzma` never leave the image because libarchive's ZIP reader references both.
+  See the Important Notes entry; the first version of these gates claimed 62 KB and 18 KB and
+  actually freed 0 and 61 bytes.
+- **`lib/` sources are plain objects and are never dropped by the linker.** Found via
+  `retropixels.cpp`, which nothing in the tree calls and which was still pulling 65 KB of
+  `libretropixels.a` into every image. That is why each gate wraps the whole `.cpp` rather than
+  just its call sites.
+- **A second, independent limit then bit: `iram0_0_seg` overflowed by 2,164 bytes** once
+  `EXTRA_FASTLOADERS` was on. The ~30 new `RAMFUNC` byte codecs are IRAM, and freeing flash text
+  does nothing for that. Resolved with `CONFIG_SPI_MASTER_ISR_IN_IRAM=n` on the three WROVER
+  sdkconfigs (3,542 bytes); every larger IRAM block was checked and is unavailable — see the
+  Important Notes entry. IRAM after: fujiloaf 4,777 free, lolin 4,869, nugget 4,837, S3 24,393.
+- **Builds verified**: `fujiloaf-rev0`, `lolin-d32-pro`, `iec-nugget`, `esp32-s3-devkitc-1` all
+  link with all fastloaders enabled. `fujiloaf-rev0` and `iec-nugget` build again now that
+  `IECConfig.h`'s preprocessor chain is balanced. The other 22 environments have
+  `-D EXTRA_FASTLOADERS` added but were **not** built; `fujiapple-rev0` and `freenove-esp32-cam`
+  were already broken for unrelated reasons documented under August 22.
+- **IRAM is now the binding constraint on WROVER boards, at ~4.8 KB free, and the only lever has
+  been spent.** The next loader carrying a `RAMFUNC` codec, or an IDF bump that grows an IRAM ISR,
+  overflows `iram0_0_seg` again with nothing left to trade — the remaining large blocks are the
+  mandatory PSRAM cache workaround and a ringbuf placement this IDF cannot configure. The next
+  option would be demoting fastloader functions out of IRAM, which is a timing decision.
+- **NOT hardware-tested.** No fastloader has been driven from a real C64, and
+  `CONFIG_SPI_MASTER_ISR_IN_IRAM=n` has not been exercised against SD or display traffic. That
+  config is hit by SD and display SPI on every boot, so it — not the fastloaders — is the first
+  suspect if a WROVER board shows SD errors or display glitches after this change.
+- **Of the 22 unbuilt environments, six are the ones likely to fail.** `esp32-wroom32`,
+  `esp32-wroom32-pi1541`, `ttgo-t1`, `petdiskmaxv2` and `wic64` are `MIN_CONFIG` — several gates
+  are no-ops there, and their IRAM budget is untested with ~30 new `RAMFUNC` codecs — and
+  `lolin-s2-mini` (ESP32-S2) and `esp32-c3-super-mini` (ESP32-C3, RISC-V) have different IRAM
+  layouts entirely. The other S3 and P4 boards share the S3's large window and should be fine.
+- **What each gate costs when set**: `DISABLE_LOCATEDB` removes the `updatedb` and `locate`
+  commands (the shells' `updatedb stop` intercept becomes an inline no-op returning false);
+  `DISABLE_SSH` removes `sftp://`, the `N:` SSH protocol and mDNS `_sftp-ssh` discovery;
+  `DISABLE_TAPE` removes `.tap`/`.dmp`/`.htap` and the `T-C`/`T-I` drive commands; `DISABLE_NFS`,
+  `DISABLE_AFP` and `DISABLE_ISCSI` remove their URL schemes; `DISABLE_WEBDAV_CLIENT` stubs the
+  `WebDAV` class so an `N:` PROPFIND listing yields no entries — **the WebDAV server in `lib/www/`
+  is untouched**; `DISABLE_RETROPIXELS` removes the `retropixels:` encoder;
 
 ## Recent Changes (August 23, 2026)
 

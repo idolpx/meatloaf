@@ -1,3 +1,4 @@
+#ifndef DISABLE_SSH   // MEATLOAF-GATE
 /**
  * SSH protocol implementation
  */
@@ -287,3 +288,5 @@ unsigned short NetworkProtocolSSH::available()
 
     return receiveBuffer->length();
 }
+
+#endif // !DISABLE_SSH  MEATLOAF-GATE

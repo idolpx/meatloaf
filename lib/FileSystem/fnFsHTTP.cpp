@@ -3,8 +3,6 @@
 
 #include <ctime>
 #include <iostream>
-#include <iomanip>
-#include <sstream>
 
 #include "compat_string.h"
 
@@ -469,23 +467,28 @@ bool FileSystemHTTP::dir_open(const char  *path, const char *pattern, uint16_t d
             //file modification time
             fs_de->modified_time = 0;
             memset(&tm, 0, sizeof(struct tm));
-            // strptime is not available on Windows ... 
-            // if (strptime(dirEntryCursor->mTime.c_str(), "%d-%b-%Y %H:%M", &tm) != nullptr)
-            // use std::get_time instead
-            std::istringstream ss(dirEntryCursor->mTime);
-            ss >> std::get_time(&tm, "%d-%b-%Y %H:%M");
-            if (!ss.fail()) 
+
+            // strptime() rather than std::get_time(), and the difference is
+            // 151 KB of flash text -- almost 5% of the ESP32's iram0_2_seg
+            // window. std::get_time drags in std::locale, which drags in the
+            // whole libstdc++ locale/iostream facet machinery: locale-inst,
+            // wlocale-inst, the cxx11 and cow shims, moneypunct, numpunct and
+            // the wide-character copies of all of it. These two date parses
+            // were the ONLY thing in the firmware referencing std::locale.
+            //
+            // The comment this replaces said strptime was unavailable -- that
+            // is true of Windows, where the native test host builds, but not
+            // of newlib, which has had it all along.
+            const char *mtime = dirEntryCursor->mTime.c_str();
+            if (strptime(mtime, "%d-%b-%Y %H:%M", &tm) != nullptr)
             {
                 tm.tm_isdst = -1;
                 fs_de->modified_time = mktime(&tm);
             }
             else
             {
-                // Rewind the stringstream to the beginning
-                ss.clear(); // Clear any error flags
-                ss.seekg(0, std::ios::beg); // Rewind to the beginning
-                ss >> std::get_time(&tm, "%Y-%m-%d %H:%M");
-                if (!ss.fail()) 
+                memset(&tm, 0, sizeof(struct tm));
+                if (strptime(mtime, "%Y-%m-%d %H:%M", &tm) != nullptr)
                 {
                     tm.tm_isdst = -1;
                     fs_de->modified_time = mktime(&tm);

@@ -43,7 +43,9 @@
 
 #include "meat_media.h"
 #include "media/hd/partition_select.h"
+#ifndef DISABLE_TAPE   // MEATLOAF-GATE
 #include "media/tape/tap.h"
+#endif
 #include "qrmanager.h"
 #include "../../www/ws/activity.h"
 
@@ -2441,11 +2443,13 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                 // Tape image commands (current directory is a mounted tape):
                 // T-C <ms|MMM:SS> - set the tape counter (read position)
                 // T-I             - scan the tape and generate its .idx file
+#ifndef DISABLE_TAPE   // MEATLOAF-GATE
                 if (command[2] == 'C' || command[2] == 'I')
                 {
                     tapeCommand(command);
                     return;
                 }
+#endif
 
                 time_t tt = time(nullptr);
                 struct tm *tinfo = localtime(&tt);
@@ -2935,6 +2939,7 @@ void iecDrive::reset()
 }
 
 
+#ifndef DISABLE_TAPE   // MEATLOAF-GATE
 // Path of the ".tap"/".dmp"/".htap" container within 'path', or "" if none
 static std::string tape_container_of(const std::string &path)
 {
@@ -3000,6 +3005,7 @@ void iecDrive::tapeCommand(std::string command)
     TAPMFile *tf = static_cast<TAPMFile *>(f.get());
     setStatusCode(tf->buildIndex() ? ST_OK : ST_WRITE_VERIFY);
 }
+#endif // !DISABLE_TAPE
 
 // CMD "CP<n>" - change the selected partition of the mounted image. Works on
 // a CMD HD/FD image (DHD, D1M/D2M/D4M) and on an IDE64 CFS image (.hdd); the
