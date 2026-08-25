@@ -127,7 +127,7 @@ bool IECBusHandler::checkParallelPins()
           m_pinParallel[0]!=0xFF && m_pinParallel[1]!=0xFF &&
           m_pinParallel[2]!=0xFF && m_pinParallel[3]!=0xFF &&
           m_pinParallel[4]!=0xFF && m_pinParallel[5]!=0xFF &&
-          m_pinParallel[6]!=0xFF && m_pinParallel[6]!=0xFF &&
+          m_pinParallel[6]!=0xFF && m_pinParallel[7]!=0xFF &&
 #endif
           m_pinParallelHandshakeTransmit!=0xFF && m_pinParallelHandshakeReceive!=0xFF && 
           digitalPinToInterrupt(m_pinParallelHandshakeReceive)!=NOT_AN_INTERRUPT);
