@@ -90,12 +90,54 @@ opt-in flag — both boards now build it unconditionally, matching how a board w
 
 ## Component patches
 
-### P1 — `inline` the Arduino shims
-`ps2_device.h` defines `delay`, `millis`, `micros`, `delayMicroseconds` and
-`xTaskCreateUniversal` **non-`inline` in a header** included by three translation
-units. Duplicate symbols at link. This fires the moment the component is referenced
-and is why it has gone unnoticed: nothing references `ps2dev::` today, so archive
-semantics pull no object out of `libps2.a`.
+### P1 — eliminate the Arduino shims
+
+`ps2_device.h` carries a block of Arduino-compatibility functions defined
+**non-`inline` in a header** included by three translation units — duplicate
+symbols at link. (It has gone unnoticed because nothing references `ps2dev::`
+today, so archive semantics pull no object out of `libps2.a`.)
+
+They are **deleted**, not `inline`d, and replaced with the ESP-IDF calls they were
+imitating. This removes the link failure at the root and drops a class of 32-bit
+wraparound bug with it.
+
+| Shim | Replacement | Sites |
+|---|---|---|
+| `delayMicroseconds(us)` | `esp_rom_delay_us(us)` (`esp_rom_sys.h`) | 41 |
+| `delay(ms)` | `vTaskDelay(...)` — see the tick warning below | 21 |
+| `millis()` | `esp_timer_get_time() / 1000` | 2 |
+| `micros()` | `esp_timer_get_time()` — `int64_t` us | 2 |
+| `xTaskCreateUniversal(...)` | `xTaskCreatePinnedToCore(...)` | 3 |
+| `HIGH` / `LOW` | literal `1` / `0` | 6 |
+| `NOP()` | deleted — only the old `delayMicroseconds` used it | 1 |
+
+**`esp_rom_delay_us()` is strictly better than what it replaces.** The shim spins
+on `esp_timer_get_time()` cast to a 32-bit `unsigned long`, which wraps every
+~71.6 minutes; its `if (m > e)` overflow branch is a partial mitigation that still
+fails when the target crosses the wrap. `esp_rom_delay_us` is a calibrated
+cycle-count wait with no such failure, and it is IRAM-resident and safe inside a
+critical section — which matters because A3 keeps per-bit critical sections and
+every one of those 41 calls runs inside one.
+
+**Tick warning — a naive `delay(n)` → `vTaskDelay(pdMS_TO_TICKS(n))` substitution
+preserves the A1 bug.** At `CONFIG_FREERTOS_HZ=100`, `pdMS_TO_TICKS(9)` is
+`(9 * 100) / 1000` = **0**, exactly like the shim's integer division. The sub-tick
+problem belongs to the 10 ms tick, not to the shim. Therefore:
+
+- the 9 ms poll site is **deleted** by P7 (interrupt-driven detection);
+- the A8 retry loops use `vTaskDelay(1)` — one tick, 10 ms — written explicitly,
+  **never** `pdMS_TO_TICKS(1)`, which is 0;
+- `read()`'s internal wait loop switches to an `esp_timer_get_time()` microsecond
+  deadline with `esp_rom_delay_us`, since it is a sub-millisecond wait that a tick
+  delay cannot express.
+
+Using `int64_t` microseconds from `esp_timer_get_time()` throughout removes the
+wraparound class of bug entirely. `write_wait_idle(uint8_t, uint64_t
+timeout_micros)` already takes microseconds and needs no signature change.
+
+**Removing `HIGH`/`LOW` is a hygiene fix, not only style.** `#define HIGH 0x1` in
+a component header is a classic collision source for any other library defining
+the same names.
 
 ### P2 — delete `ps2keyboard.{h,cpp}`
 A rival host-side implementation (reads *from* a keyboard — the opposite
@@ -103,9 +145,16 @@ direction), reusing the include guard `PS2_KEYBOARD_H` so it collides with
 `ps2_keyboard.h`, and calling `gpio_install_isr_service(0)` a second time when
 `src/main.cpp:238` already installs it. Unreferenced.
 
-### P3 — trim `REQUIRES`
-`esp_hid nvs_flash driver bt` → `driver esp_timer`. No PS/2 source includes a
-Bluetooth or NVS header.
+### P3 — trim `REQUIRES` and the unused includes
+`esp_hid nvs_flash driver bt` → `driver esp_timer esp_rom`. No PS/2 source uses
+Bluetooth or NVS.
+
+**Coupled with P1's header cleanup — order matters.** `ps2_device.h` and
+`ps2_keyboard.h` both `#include <nvs_flash.h>`. `REQUIRES` is what supplies a
+component's include paths, so trimming it without first removing those includes
+fails the build with `nvs_flash.h: No such file or directory`. The unused
+`<stack>`, `<string>`, `<functional>` and `<initializer_list>` includes go at the
+same time; `esp_rom_sys.h` is added for `esp_rom_delay_us`.
 
 ### P4 — stop the send task busy-spinning
 `ps2_keyboard.cpp:38` reads the packet queue with a **zero timeout** inside
@@ -231,12 +280,12 @@ while (dev->running()) {
 
 | # | Finding | Fix |
 |---|---|---|
-| A1 | `delay(n)` is a no-op for n < 10. `CONFIG_FREERTOS_HZ=100` so `portTICK_PERIOD_MS` is 10 and `delay()` integer-divides. `delay(9)` and `delay(1)` are `vTaskDelay(0)`. `process_host_request` therefore busy-spins at priority 10. | Superseded by P7 for the host-request path; remaining `delay(n<10)` sites use `vTaskDelay(1)` |
+| A1 | `delay(n)` is a no-op for n < 10. `CONFIG_FREERTOS_HZ=100` so `portTICK_PERIOD_MS` is 10 and `delay()` integer-divides. `delay(9)` and `delay(1)` are `vTaskDelay(0)`. `process_host_request` therefore busy-spins at priority 10. | Superseded by P7 for the host-request path; remaining sub-tick sites handled per P1's tick warning |
 | A2 | `write()`/`read()` declare `portMUX_TYPE mux` as a **stack local**. A spinlock in a stack frame excludes nothing between tasks or cores — only the incidental interrupt-disable does the work. | File-scope `static portMUX_TYPE` |
 | A3 | ~900 us (`write`) / ~1.2 ms (`read`) with **interrupts disabled**, on the core running WiFi and lwIP. Unnecessary: in device-to-host transfers the device owns the clock, so preemption between bits merely stretches the clock, which hosts tolerate by design. | Per-bit critical sections — same total time, eight windows for interrupts to breathe |
 | A4 | `write()` checks for host inhibit once at entry and never again, so a host pulling CLK low mid-byte loses the byte silently. | Re-check CLK per bit; abort with `-1` for the caller to retry |
 | A5 | Parity errors silently swallowed. `read()` returns `-2` on mismatch; the caller tests `== 0` only. | Answer `0xFE` (Resend) — folded into P7's task |
-| A6 | `write_wait_idle()` tight-spins up to 1500 us with no yield. | Yield in the wait loop |
+| A6 | `write_wait_idle()` tight-spins up to 1500 us with no yield. | `esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS)` between polls against an `esp_timer_get_time()` deadline |
 | A7 | Send-path return values discarded end to end: `send_packet` -> `keydown`/`keyup` -> `type()`. A dropped packet is invisible to the caller. | Covered by P5; `typeText()` propagates failure to the command's exit code |
 | A8 | `while (write(...) != 0) delay(1);` at four sites in `reply_to_host` (RESET, GET_DEVICE_ID x2, SET_RESET_LEDS x2). `write()` returns `-1` whenever the bus is not IDLE and `delay(1)` is `vTaskDelay(0)`, so a host holding CLK low spins **forever at priority 10 with `_mutex_bus` held**, and `end()` can never complete. | Bounded retry with real `vTaskDelay(1)` and a failure return |
 
