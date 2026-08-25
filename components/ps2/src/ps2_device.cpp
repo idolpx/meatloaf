@@ -1,0 +1,272 @@
+#include "ps2_device.h"
+
+namespace ps2dev
+{
+
+  void IRAM_ATTR ps2_isr_handler(void *arg) {
+    static uint8_t bit_count = 0;
+    static uint8_t data_byte = 0;
+    static uint8_t parity = 0;
+    static bool start_bit = false;
+
+    // if (bit_count == 8) {
+    //     bit_count++; // Skip parity
+    // } else if (bit_count == 9) {
+    //     xQueueSendFromISR(_queue_packet, &data_byte, NULL);
+    //     start_bit = false;
+    // }
+  }
+
+  void PS2Device::ps2_task(void *param) {
+    PS2Device *device = static_cast<PS2Device *>(param);
+
+    while (true) {
+        // if (device->available()) {
+        //     uint8_t data = device->read();
+        //     ESP_LOGI(TAG, "Keycode: %02X", data);
+        // }
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+  PS2Device::PS2Device(gpio_num_t clk, gpio_num_t data)
+  {
+    _ps2clk = clk;
+    _ps2data = data;
+  }
+
+  void PS2Device::config(UBaseType_t task_priority, BaseType_t task_core)
+  {
+    if (task_priority < 1)
+    {
+      task_priority = 1;
+    }
+    else if (task_priority > configMAX_PRIORITIES)
+    {
+      task_priority = configMAX_PRIORITIES - 1;
+    }
+    _config_task_priority = task_priority;
+    _config_task_core = task_core;
+  }
+
+  void PS2Device::begin(BaseType_t core)
+  {
+    gpio_config_t io_conf; // PIN CONFIGURATION SECTION: CRITICAL
+
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.mode = GPIO_MODE_OUTPUT_OD;
+    io_conf.pin_bit_mask = (1ULL << _ps2data);
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    gpio_config(&io_conf);
+    io_conf.pin_bit_mask = (1ULL << _ps2clk);
+    gpio_config(&io_conf);
+
+    gohi(_ps2clk);
+    gohi(_ps2data);
+    _mutex_bus = xSemaphoreCreateMutex();
+    _queue_packet = xQueueCreate(PACKET_QUEUE_LENGTH, sizeof(PS2Packet));
+
+    // gpio_install_isr_service(0);
+    // gpio_isr_handler_add(_ps2clk, ps2_isr_handler, (void *)this);
+
+    // xTaskCreatePinnedToCore(ps2_task, "ps2_task", 4096, this, 10, &ps2_task_handle, 0);
+  }
+
+  void PS2Device::gohi(gpio_num_t pin)
+  {
+    gpio_set_level(pin, HIGH);
+    gpio_set_direction(pin, GPIO_MODE_INPUT);
+  }
+  void PS2Device::golo(gpio_num_t pin)
+  {
+    gpio_set_direction(pin, GPIO_MODE_OUTPUT_OD);
+    gpio_set_level(pin, LOW);
+  }
+  void PS2Device::ack()
+  {
+    delayMicroseconds(BYTE_INTERVAL_MICROS);
+    write(0xFA);
+    delayMicroseconds(BYTE_INTERVAL_MICROS);
+  }
+  int PS2Device::write(unsigned char data)
+  {
+    unsigned char i;
+    unsigned char parity = 1;
+
+    if (get_bus_state() != BusState::IDLE)
+    {
+      return -1;
+    }
+
+    portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+    taskENTER_CRITICAL(&mux);
+
+    golo(_ps2data);
+    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    // device sends on falling clock
+    golo(_ps2clk); // start bit
+    delayMicroseconds(CLK_HALF_PERIOD_MICROS);
+    gohi(_ps2clk);
+    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+
+    for (i = 0; i < 8; i++)
+    {
+      if (data & 0x01)
+      {
+        gohi(_ps2data);
+      }
+      else
+      {
+        golo(_ps2data);
+      }
+      delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+      golo(_ps2clk);
+      delayMicroseconds(CLK_HALF_PERIOD_MICROS);
+      gohi(_ps2clk);
+      delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+
+      parity = parity ^ (data & 0x01);
+      data = data >> 1;
+    }
+    // parity bit
+    if (parity)
+    {
+      gohi(_ps2data);
+    }
+    else
+    {
+      golo(_ps2data);
+    }
+    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    golo(_ps2clk);
+    delayMicroseconds(CLK_HALF_PERIOD_MICROS);
+    gohi(_ps2clk);
+    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+
+    // stop bit
+    gohi(_ps2data);
+    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    golo(_ps2clk);
+    delayMicroseconds(CLK_HALF_PERIOD_MICROS);
+    gohi(_ps2clk);
+    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+
+    taskEXIT_CRITICAL(&mux);
+
+    return 0;
+  }
+  int PS2Device::write_wait_idle(uint8_t data, uint64_t timeout_micros)
+  {
+    uint64_t start_time = micros();
+    while (get_bus_state() != BusState::IDLE)
+    {
+      if (micros() - start_time > timeout_micros)
+      {
+        return -1;
+      }
+    }
+    return write(data);
+  }
+  int PS2Device::read(unsigned char *value, uint64_t timeout_ms)
+  {
+    unsigned int data = 0x00;
+    unsigned int bit = 0x01;
+
+    unsigned char calculated_parity = 1;
+    unsigned char received_parity = 0;
+
+    // wait for data line to go low and clock line to go high (or timeout)
+    unsigned long waiting_since = millis();
+    while (get_bus_state() != BusState::HOST_REQUEST_TO_SEND)
+    {
+      if ((millis() - waiting_since) > timeout_ms)
+        return -1;
+      delay(1);
+    }
+
+    portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+    taskENTER_CRITICAL(&mux);
+
+    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    golo(_ps2clk);
+    delayMicroseconds(CLK_HALF_PERIOD_MICROS);
+    gohi(_ps2clk);
+    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+
+    while (bit < 0x0100)
+    {
+      if (gpio_get_level(_ps2data) == HIGH)
+      {
+        data = data | bit;
+        calculated_parity = calculated_parity ^ 1;
+      }
+      else
+      {
+        calculated_parity = calculated_parity ^ 0;
+      }
+
+      bit = bit << 1;
+
+      delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+      golo(_ps2clk);
+      delayMicroseconds(CLK_HALF_PERIOD_MICROS);
+      gohi(_ps2clk);
+      delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    }
+    // we do the delay at the end of the loop, so at this point we have
+    // already done the delay for the parity bit
+
+    // parity bit
+    if (gpio_get_level(_ps2data) == HIGH)
+    {
+      received_parity = 1;
+    }
+
+    // stop bit
+    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    golo(_ps2clk);
+    delayMicroseconds(CLK_HALF_PERIOD_MICROS);
+    gohi(_ps2clk);
+    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+
+    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    golo(_ps2data);
+    golo(_ps2clk);
+    delayMicroseconds(CLK_HALF_PERIOD_MICROS);
+    gohi(_ps2clk);
+    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    gohi(_ps2data);
+
+    taskEXIT_CRITICAL(&mux);
+
+    *value = data & 0x00FF;
+
+    if (received_parity == calculated_parity)
+    {
+      return 0;
+    }
+    else
+    {
+      return -2;
+    }
+  }
+  PS2Device::BusState PS2Device::get_bus_state()
+  {
+    if (gpio_get_level(_ps2clk) == LOW)
+    {
+      return BusState::COMMUNICATION_INHIBITED;
+    }
+    else if (gpio_get_level(_ps2data) == LOW)
+    {
+      return BusState::HOST_REQUEST_TO_SEND;
+    }
+    else
+    {
+      return BusState::IDLE;
+    }
+  }
+  SemaphoreHandle_t PS2Device::get_bus_mutex_handle() { return _mutex_bus; }
+  QueueHandle_t PS2Device::get_packet_queue_handle() { return _queue_packet; }
+  int PS2Device::send_packet(PS2Packet *packet) { return (xQueueSend(_queue_packet, packet, 0) == pdTRUE) ? 0 : -1; }
+}
