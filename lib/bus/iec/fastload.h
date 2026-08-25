@@ -161,9 +161,15 @@ class IECFastLoadDetect
   uint8_t memWrite(uint16_t address, const uint8_t *data, size_t len);
 
   // Resolve an M-E. Returns the variant to run and writes its handler
-  // parameter to *param, or IEC_FLV_NONE if this address belongs to no known
-  // loader. Rolls the detection state either way, so call it for every M-E.
-  uint8_t memExec(uint16_t address, uint8_t *param);
+  // parameter to *param. Rolls the detection state either way, so call it for
+  // every M-E.
+  //
+  // *matched says whether a table ROW matched, which is not the same question
+  // as whether the variant is IEC_FLV_NONE: the catch-all rows carry
+  // IEC_FLV_NONE deliberately and are matched on the address alone, for
+  // loaders that identify themselves from the M-E command rather than from a
+  // CRC of their upload. Dispatch on *matched, not on the variant.
+  uint8_t memExec(uint16_t address, uint8_t *param, bool *matched = 0);
 
   // Called when the drive is reset or initialised.
   void reset();

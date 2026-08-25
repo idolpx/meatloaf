@@ -119,6 +119,10 @@ class IECFileDevice : public IECDevice
 #ifdef IEC_SUPPORT_SECTOROPS
   virtual bool epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer);
   virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer);
+#ifdef IEC_IMPL_SOFTLOAD
+  virtual uint8_t sectorsPerTrack(uint8_t track);
+  virtual uint8_t imageType();
+#endif
 #endif
 
 #ifdef IEC_SUPPORT_SOFTLOAD

@@ -149,7 +149,7 @@ static const IECFastLoadCrcEntry s_crcTable[] =
   { 0xd2f2, IEC_FLV_HYPRALOAD,         IEC_FLRX_HYPRALOAD_10,     },
   { 0x5983, IEC_FLV_HYPRALOAD,         IEC_FLRX_HYPRALOAD_21,     },
 #endif
-#ifdef IEC_FP_KRILL
+#if defined(IEC_FP_KRILL) && defined(IEC_IMPL_SOFTLOAD)
   { 0x8667, IEC_FLV_KRILL_R146,        IEC_FLRX_NONE,             }, // r146 drvchkme
   { 0xe300, IEC_FLV_KRILL_R186,        IEC_FLRX_KRILL_CLOCK,      }, // second chunk
   { 0x19a4, IEC_FLV_KRILL_R184,        IEC_FLRX_KRILL_CLOCK,      }, // second chunk
@@ -192,20 +192,20 @@ static const IECFastLoadCrcEntry s_crcTable[] =
   { 0x40c3, IEC_FLV_KRILL_SLEEP,       IEC_FLRX_NONE,             }, // r184
   { 0x5088, IEC_FLV_KRILL_SLEEP,       IEC_FLRX_NONE,             }, // r164
 #endif
-#ifdef IEC_FP_SPINDLE
+#if defined(IEC_FP_SPINDLE) && defined(IEC_IMPL_SOFTLOAD)
   { 0x1fdc, IEC_FLV_SPINDLE_SLEEP,     IEC_FLRX_NONE,             },
 #endif
-#ifdef IEC_FP_BITFIRE
+#if defined(IEC_FP_BITFIRE) && defined(IEC_IMPL_SOFTLOAD)
   { 0x955d, IEC_FLV_BITFIRE_SLEEP,     IEC_FLRX_NONE,             },
 #endif
-#ifdef IEC_FP_TRANSWARP
+#if defined(IEC_FP_TRANSWARP) && defined(IEC_IMPL_SOFTLOAD)
   { 0xb20a, IEC_FLV_TRANSWARP_SLEEP,   IEC_FLRX_NONE,             },
 #endif
-#ifdef IEC_FP_BOOZE
+#if defined(IEC_FP_BOOZE) && defined(IEC_IMPL_SOFTLOAD)
   { 0x0c48, IEC_FLV_BOOZE,             IEC_FLRX_NONE,             },
   { 0x5f66, IEC_FLV_BOOZE,             IEC_FLRX_NONE,             },
 #endif
-#ifdef IEC_FP_BITFIRE
+#if defined(IEC_FP_BITFIRE) && defined(IEC_IMPL_SOFTLOAD)
   { 0x7cd6, IEC_FLV_BITFIRE_01,        IEC_FLRX_BITFIRE_CLOCK,    },
   { 0xf1ec, IEC_FLV_BITFIRE_01,        IEC_FLRX_BITFIRE_CLOCK,    },
   { 0x2b10, IEC_FLV_BITFIRE_03,        IEC_FLRX_BITFIRE_CLOCK,    },
@@ -264,6 +264,7 @@ struct IECFastLoadHandlerEntry
   uint8_t  param;
 };
 
+#ifdef IEC_IMPL_SOFTLOAD
 static const IECFastLoadHandlerEntry s_handlerTable[] =
 {
 #ifdef IEC_FP_TURBODISK
@@ -326,33 +327,33 @@ static const IECFastLoadHandlerEntry s_handlerTable[] =
 #endif
   { 0x0205, IEC_FLV_NONE,              0 },
   { 0x0417, IEC_FLV_NONE,              0 },
-#ifdef IEC_FP_ULTRABOOT
+#if defined(IEC_FP_ULTRABOOT) && defined(IEC_IMPL_SOFTLOAD)
   { 0x0424, IEC_FLV_ULTRABOOT,         0 },
 #endif
 #ifdef IEC_FP_HYPRALOAD
   { 0x0401, IEC_FLV_HYPRALOAD,         0 },
   { 0x048b, IEC_FLV_HYPRALOAD,         0 },
 #endif
-#ifdef IEC_FP_KRILL
+#if defined(IEC_FP_KRILL) && defined(IEC_IMPL_SOFTLOAD)
   { 0x0205, IEC_FLV_KRILL_SLEEP,       0 },
 #endif
   { 0x020b, IEC_FLV_NONE,              1 },
-#ifdef IEC_FP_SPINDLE
+#if defined(IEC_FP_SPINDLE) && defined(IEC_IMPL_SOFTLOAD)
   { 0x0403, IEC_FLV_SPINDLE_SLEEP,     0 },
 #endif
-#ifdef IEC_FP_BITFIRE
+#if defined(IEC_FP_BITFIRE) && defined(IEC_IMPL_SOFTLOAD)
   { 0x0205, IEC_FLV_BITFIRE_SLEEP,     0 },
 #endif
-#ifdef IEC_FP_TRANSWARP
+#if defined(IEC_FP_TRANSWARP) && defined(IEC_IMPL_SOFTLOAD)
   { 0x030d, IEC_FLV_TRANSWARP_SLEEP,   0 },
 #endif
   { 0x0205, IEC_FLV_NONE,              1 },
   { 0x020a, IEC_FLV_NONE,              2 },
-#ifdef IEC_FP_KRILL
+#if defined(IEC_FP_KRILL) && defined(IEC_IMPL_SOFTLOAD)
   { 0x0300, IEC_FLV_KRILL_R146,        0 },
 #endif
   { 0x0209, IEC_FLV_NONE,              0 },
-#ifdef IEC_FP_KRILL
+#if defined(IEC_FP_KRILL) && defined(IEC_IMPL_SOFTLOAD)
   { 0x0770, IEC_FLV_KRILL_R186,        0 },
   { 0x0758, IEC_FLV_KRILL_R184,        0 },
   { 0x0770, IEC_FLV_KRILL_R184,        0 },
@@ -391,7 +392,7 @@ static const IECFastLoadHandlerEntry s_handlerTable[] =
   { 0x05f4, IEC_FLV_KRILL_R58PRE,      0 },
   { 0x0600, IEC_FLV_KRILL_R58PRE,      0 },
 #endif
-#ifdef IEC_FP_BOOZE
+#if defined(IEC_FP_BOOZE) && defined(IEC_IMPL_SOFTLOAD)
   { 0x0373, IEC_FLV_BOOZE,             0 },
   { 0x04b8, IEC_FLV_BOOZE,             0 },
 #endif
@@ -400,7 +401,7 @@ static const IECFastLoadHandlerEntry s_handlerTable[] =
   { 0x020f, IEC_FLV_NONE,              0 },
   { 0x0211, IEC_FLV_NONE,              0 },
   { 0x0205, IEC_FLV_NONE,              0 },
-#ifdef IEC_FP_BITFIRE
+#if defined(IEC_FP_BITFIRE) && defined(IEC_IMPL_SOFTLOAD)
   { 0x0700, IEC_FLV_BITFIRE_01,        0 },
   { 0x0700, IEC_FLV_BITFIRE_03,        1 },
   { 0x0700, IEC_FLV_BITFIRE_04,        2 },
@@ -423,6 +424,7 @@ static const IECFastLoadHandlerEntry s_handlerTable[] =
 // identified anything. So the table cannot be terminated by a FL_NONE row and
 // carries its length instead.
 static const uint16_t s_handlerTableLen = sizeof(s_handlerTable)/sizeof(s_handlerTable[0]);
+#endif
 
 
 
@@ -430,122 +432,81 @@ static const uint16_t s_handlerTableLen = sizeof(s_handlerTable)/sizeof(s_handle
 // Variant -> family / name
 // -----------------------------------------------------------------------------
 
+// Indexed by IEC_FLV_*, for the same reason the name table is: a 54-case
+// switch cost the tightest ESP32 board its last bytes of iram0_2_seg. 0xFF
+// means the variant belongs to no family compiled into this build.
 uint8_t iecFastLoadFamily(uint8_t variant)
 {
-  switch( variant )
-    {
-#ifdef IEC_FP_DREAMLOAD
-    case IEC_FLV_DREAMLOAD:
-    case IEC_FLV_DREAMLOAD_OLD: return IEC_FP_DREAMLOAD;
-#endif
-#ifdef IEC_FP_TURBODISK
-    case IEC_FLV_TURBODISK: return IEC_FP_TURBODISK;
-#endif
-#ifdef IEC_FP_FC3
-    case IEC_FLV_FC3_LOAD:
-    case IEC_FLV_FC3_SAVE:
-    case IEC_FLV_FC3_FREEZED:
-    case IEC_FLV_FC3_OLDFREEZED: return IEC_FP_FC3;
-#endif
-#ifdef IEC_FP_ULOAD3
-    case IEC_FLV_ULOAD3: return IEC_FP_ULOAD3;
-#endif
-#ifdef IEC_FP_GIJOE
-    case IEC_FLV_GI_JOE: return IEC_FP_GIJOE;
-#endif
-#ifdef IEC_FP_EPYX
-    case IEC_FLV_EPYXCART: return IEC_FP_EPYX;
-#endif
-#ifdef IEC_FP_GEOS
-    case IEC_FLV_GEOS_S1_64:
-    case IEC_FLV_GEOS_S1_128:
-    case IEC_FLV_GEOS_S23_1541:
-    case IEC_FLV_GEOS_S23_1571:
-    case IEC_FLV_GEOS_S23_1581: return IEC_FP_GEOS;
-#endif
-#ifdef IEC_FP_WHEELS
-    case IEC_FLV_WHEELS_S1_64:
-    case IEC_FLV_WHEELS_S1_128:
-    case IEC_FLV_WHEELS_S2:
-    case IEC_FLV_WHEELS44_S2:
-    case IEC_FLV_WHEELS44_S2_1581: return IEC_FP_WHEELS;
-#endif
-#ifdef IEC_FP_NIPPON
-    case IEC_FLV_NIPPON: return IEC_FP_NIPPON;
-#endif
-#ifdef IEC_FP_AR6
-    case IEC_FLV_AR6_1581_LOAD:
-    case IEC_FLV_AR6_1581_SAVE: return IEC_FP_AR6;
-#endif
-#ifdef IEC_FP_ELOAD1
-    case IEC_FLV_ELOAD1: return IEC_FP_ELOAD1;
-#endif
-#ifdef IEC_FP_MMZAK
-    case IEC_FLV_MMZAK: return IEC_FP_MMZAK;
-#endif
-#ifdef IEC_FP_N0SDOS
-    case IEC_FLV_N0SDOS_FILEREAD: return IEC_FP_N0SDOS;
-#endif
-#ifdef IEC_FP_SAMSJOURNEY
-    case IEC_FLV_SAMSJOURNEY: return IEC_FP_SAMSJOURNEY;
-#endif
-#ifdef IEC_FP_ULTRABOOT
-    case IEC_FLV_ULTRABOOT: return IEC_FP_ULTRABOOT;
-#endif
-#ifdef IEC_FP_HYPRALOAD
-    case IEC_FLV_HYPRALOAD: return IEC_FP_HYPRALOAD;
-#endif
-#ifdef IEC_FP_KRILL
-    case IEC_FLV_KRILL_SLEEP:
-    case IEC_FLV_KRILL_R58PRE:
-    case IEC_FLV_KRILL_R58:
-    case IEC_FLV_KRILL_R146:
-    case IEC_FLV_KRILL_R159:
-    case IEC_FLV_KRILL_R164:
-    case IEC_FLV_KRILL_R184:
-    case IEC_FLV_KRILL_R186:
-    case IEC_FLV_KRILL_R192: return IEC_FP_KRILL;
-#endif
-#ifdef IEC_FP_BOOZE
-    case IEC_FLV_BOOZE: return IEC_FP_BOOZE;
-#endif
-#ifdef IEC_FP_SPINDLE
-    case IEC_FLV_SPINDLE_SLEEP:
-    case IEC_FLV_SPINDLE_21:
-    case IEC_FLV_SPINDLE_22:
-    case IEC_FLV_SPINDLE_23:
-    case IEC_FLV_SPINDLE_3: return IEC_FP_SPINDLE;
-#endif
-#ifdef IEC_FP_BITFIRE
-    case IEC_FLV_BITFIRE_SLEEP:
-    case IEC_FLV_BITFIRE_01:
-    case IEC_FLV_BITFIRE_03:
-    case IEC_FLV_BITFIRE_04:
-    case IEC_FLV_BITFIRE_06:
-    case IEC_FLV_BITFIRE_07PRE:
-    case IEC_FLV_BITFIRE_07DBG:
-    case IEC_FLV_BITFIRE_07:
-    case IEC_FLV_BITFIRE_10:
-    case IEC_FLV_BITFIRE_11:
-    case IEC_FLV_BITFIRE_12PR1:
-    case IEC_FLV_BITFIRE_12PR2:
-    case IEC_FLV_BITFIRE_12:
-    case IEC_FLV_BITFIRE_13: return IEC_FP_BITFIRE;
-#endif
-#ifdef IEC_FP_SPARKLE
-    case IEC_FLV_SPARKLE_10:
-    case IEC_FLV_SPARKLE_15:
-    case IEC_FLV_SPARKLE_20:
-    case IEC_FLV_SPARKLE_21:
-    case IEC_FLV_SPARKLE_32: return IEC_FP_SPARKLE;
-#endif
-#ifdef IEC_FP_TRANSWARP
-    case IEC_FLV_TRANSWARP_SLEEP: return IEC_FP_TRANSWARP;
-#endif
-    default: break;
-    }
+  static const uint8_t families[] = {
+  0xFF,
+  IEC_FP_DREAMLOAD,
+  IEC_FP_DREAMLOAD,
+  IEC_FP_TURBODISK,
+  IEC_FP_FC3,
+  IEC_FP_FC3,
+  IEC_FP_FC3,
+  IEC_FP_ULOAD3,
+  IEC_FP_GIJOE,
+  IEC_FP_EPYX,
+  IEC_FP_GEOS,
+  IEC_FP_GEOS,
+  IEC_FP_GEOS,
+  IEC_FP_GEOS,
+  IEC_FP_GEOS,
+  IEC_FP_WHEELS,
+  IEC_FP_WHEELS,
+  IEC_FP_WHEELS,
+  IEC_FP_WHEELS,
+  IEC_FP_WHEELS,
+  IEC_FP_NIPPON,
+  IEC_FP_AR6,
+  IEC_FP_AR6,
+  IEC_FP_ELOAD1,
+  IEC_FP_FC3,
+  IEC_FP_MMZAK,
+  IEC_FP_N0SDOS,
+  IEC_FP_SAMSJOURNEY,
+  IEC_FP_ULTRABOOT,
+  IEC_FP_HYPRALOAD,
+  IEC_FP_KRILL,
+  IEC_FP_KRILL,
+  IEC_FP_KRILL,
+  IEC_FP_KRILL,
+  IEC_FP_KRILL,
+  IEC_FP_KRILL,
+  IEC_FP_KRILL,
+  IEC_FP_KRILL,
+  IEC_FP_KRILL,
+  IEC_FP_BOOZE,
+  IEC_FP_SPINDLE,
+  IEC_FP_SPINDLE,
+  IEC_FP_SPINDLE,
+  IEC_FP_SPINDLE,
+  IEC_FP_SPINDLE,
+  IEC_FP_BITFIRE,
+  IEC_FP_BITFIRE,
+  IEC_FP_BITFIRE,
+  IEC_FP_BITFIRE,
+  IEC_FP_BITFIRE,
+  IEC_FP_BITFIRE,
+  IEC_FP_BITFIRE,
+  IEC_FP_BITFIRE,
+  IEC_FP_BITFIRE,
+  IEC_FP_BITFIRE,
+  IEC_FP_BITFIRE,
+  IEC_FP_BITFIRE,
+  IEC_FP_BITFIRE,
+  IEC_FP_BITFIRE,
+  IEC_FP_SPARKLE,
+  IEC_FP_SPARKLE,
+  IEC_FP_SPARKLE,
+  IEC_FP_SPARKLE,
+  IEC_FP_SPARKLE,
+  IEC_FP_TRANSWARP,
+  };
 
-  return 0xFF;
+  if( variant >= (sizeof(families)/sizeof(families[0])) ) return 0xFF;
+  return families[variant];
 }
 
 
@@ -726,7 +687,7 @@ uint8_t IECFastLoadDetect::memWrite(uint16_t address, const uint8_t *data, size_
 }
 
 
-uint8_t IECFastLoadDetect::memExec(uint16_t address, uint8_t *param)
+uint8_t IECFastLoadDetect::memExec(uint16_t address, uint8_t *param, bool *matched)
 {
   // A loader that uploads once and then starts twice (FC3, GEOS) sends the
   // second M-E with nothing in between, so this round detected nothing. Fall
@@ -734,18 +695,34 @@ uint8_t IECFastLoadDetect::memExec(uint16_t address, uint8_t *param)
   if( m_detected==IEC_FLV_NONE )
     m_detected = m_previous;
 
+#ifndef IEC_IMPL_SOFTLOAD
+  // No loader implementation is compiled on this board, so there is no handler
+  // table to consult. Report what the CRC identified anyway -- that is what
+  // names the loader in the log -- and leave "matched" false so the caller
+  // falls back to the standard protocol.
+  (void) address;
+  if( param ) *param = 0;
+  if( matched ) *matched = false;
+  uint8_t detected = m_detected;
+  m_crc = 0xFFFF;
+  m_previous = m_detected;
+  m_detected = IEC_FLV_NONE;
+  return detected;
+#else
   // Two passes, mirroring sd2iec's run_loader(): first for the loader the CRC
   // identified, then again as IEC_FLV_NONE so an M-E that matched nothing can
   // still reach the catch-all rows, which are keyed on the address alone.
   uint8_t variant = IEC_FLV_NONE;
   uint8_t want = m_detected;
-  for(uint8_t pass=0; pass<2 && variant==IEC_FLV_NONE; pass++)
+  bool    hit  = false;
+  for(uint8_t pass=0; pass<2 && !hit; pass++)
     {
       for(uint16_t i=0; i<s_handlerTableLen; i++)
         if( want==s_handlerTable[i].variant && address==s_handlerTable[i].address )
           {
             variant = s_handlerTable[i].variant;
             if( param ) *param = s_handlerTable[i].param;
+            hit = true;
             break;
           }
 
@@ -753,11 +730,14 @@ uint8_t IECFastLoadDetect::memExec(uint16_t address, uint8_t *param)
       want = IEC_FLV_NONE;
     }
 
+  if( matched ) *matched = hit;
+
   m_crc = 0xFFFF;
   m_previous = m_detected;
   m_detected = IEC_FLV_NONE;
 
   return variant;
+#endif
 }
 
 #else // !IEC_SUPPORT_SOFTLOAD

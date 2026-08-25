@@ -106,9 +106,11 @@ rather than return garbage.
 ## Plan
 
 Status as of 2026-08-24: all phases are done and building. Every loader sd2iec supports is
-implemented — Turbodisk, GI Joe, Nippon, ULoad Model 3, ELoad1, MMZak, N0SDOS, Sam's Journey, FC3
-older-freezed, DreamLoad, GEOS and Wheels — with EpyxCart and the AR6 1581 pair routed to protocols
-`IECBusHandler` already speaks. **None of it is hardware verified.**
+implemented. The classic set — Turbodisk, GI Joe, Nippon, ULoad Model 3, ELoad1, MMZak, N0SDOS,
+Sam's Journey, FC3 older-freezed, DreamLoad, GEOS and Wheels — plus the modern demoscene set the
+2026-08-24 refresh added: Ultraboot, Krill, Booze, Spindle 2.x and 3.x, Bitfire and Sparkle.
+EpyxCart, the AR6 1581 pair and Hypra-Load are routed to protocols `IECBusHandler` already speaks.
+**None of it is hardware verified.**
 
 The four session loaders are gated on `EXTRA_FASTLOADERS` because together they put a plain ESP32
 about 600 bytes past its `iram0_2_seg` flash-text window. Detection is not gated: a board without

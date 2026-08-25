@@ -95,6 +95,13 @@ class VDrive
   // "buf" must have a size of at least 256 bytes
   bool writeSector(uint32_t track, uint32_t sector, const uint8_t *buf);
 
+  // Geometry of the mounted image, for fast loaders that address the disk by
+  // track/sector: how many sectors that track holds (0 if there is no image
+  // or the track does not exist), and which drive type the image represents
+  // (VDRIVE_IMAGE_FORMAT_* from vdrive.h, VDRIVE_IMAGE_FORMAT_NONE if none).
+  uint8_t sectorsPerTrack(uint32_t track);
+  uint8_t imageFormat();
+
   // create and optionally format a new disk image. Parameters
   // - filename: name of the created image file on the host file system, required
   // - itype: image type ("d64", "g64", ...), if NULL use extension from filename parameter

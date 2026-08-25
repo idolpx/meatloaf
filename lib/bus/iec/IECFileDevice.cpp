@@ -602,6 +602,21 @@ bool IECFileDevice::epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buff
   return false;
 #endif
 }
+
+
+#ifdef IEC_IMPL_SOFTLOAD
+uint8_t IECFileDevice::sectorsPerTrack(uint8_t track)
+{
+  (void) track;
+  return 0;
+}
+
+
+uint8_t IECFileDevice::imageType()
+{
+  return IEC_IMG_NONE;
+}
+#endif
 #endif
 
 
@@ -774,6 +789,7 @@ bool IECFileDevice::isFastLoaderRequest(const char *cmd)
   // recognise: they are hardware-proven, and they also set up m_channel and
   // m_eoi, which detection alone does not.
   bool     flIsExec  = false;
+  bool     flMatched = false;
   uint8_t  flVariant = IEC_FLV_NONE;
   uint8_t  flParam   = 0;
   uint8_t  flRxtx    = IEC_FLRX_NONE;
@@ -795,11 +811,11 @@ bool IECFileDevice::isFastLoaderRequest(const char *cmd)
       flAddress = m_writeBuffer[3] | (m_writeBuffer[4]<<8);
       flCrc     = m_fastload.crc();
       flRxtx    = m_fastload.rxtx();
-      flVariant = m_fastload.memExec(flAddress, &flParam);
+      flVariant = m_fastload.memExec(flAddress, &flParam, &flMatched);
 
       // a loader the user has turned off is reported but not started
       if( flVariant!=IEC_FLV_NONE && !isFastLoaderEnabled(iecFastLoadFamily(flVariant)) )
-        flVariant = IEC_FLV_NONE;
+        { flVariant = IEC_FLV_NONE; flMatched = false; }
     }
 #endif
 
@@ -1071,7 +1087,8 @@ bool IECFileDevice::isFastLoaderRequest(const char *cmd)
   // Reached only when none of the signature matchers above claimed this
   // command, so an M-E here either belongs to a loader identified by CRC or
   // to no loader at all. Both are passed on -- see startFastLoader.
-  if( flIsExec && startFastLoader(flVariant, flParam, flRxtx, m_writeBuffer, m_writeBufferLen, flCrc) )
+  if( flIsExec && (flMatched || flVariant!=IEC_FLV_NONE)
+      && startFastLoader(flVariant, flParam, flRxtx, m_writeBuffer, m_writeBufferLen, flCrc) )
     {
       m_uploadCtr = 0;
       return true;
@@ -1087,7 +1104,7 @@ bool IECFileDevice::isFastLoaderRequest(const char *cmd)
 bool IECFileDevice::startFastLoader(uint8_t variant, uint8_t param, uint8_t rxtx, const uint8_t *cmd, uint8_t cmdLen, uint16_t crc)
 {
   (void) crc;
-  if( variant==IEC_FLV_NONE || m_handler==NULL ) return false;
+  if( m_handler==NULL ) return false;
 
   // Three of sd2iec's loaders are protocols IECBusHandler already speaks, at
   // the very same M-E addresses the signature matchers above watch for. Route

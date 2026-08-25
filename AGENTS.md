@@ -675,8 +675,53 @@ Important Notes above.
   `doscmd.c` by a throwaway script rather than transcribed, because at this size hand-copying is
   where the errors would be. The 2026-08-24 sd2iec refresh added seven modern demoscene families --
   Ultraboot, Krill (r58 to r192), Booze, Spindle, Bitfire, Sparkle and Transwarp -- which are
-  DETECTED and named but whose transfer code is not written; they fall back cleanly. Hypra-Load is
-  now CRC-detected upstream too and is routed to the implementation the bus handler already has.
+  DETECTED, named, and implemented -- Ultraboot, Krill, Booze, Spindle 2.x and 3.x, Bitfire and
+  Sparkle all have transfer code. Hypra-Load is now CRC-detected upstream too and is routed to the
+  implementation the bus handler already has.
+- **Each of the modern loaders taught something worth keeping.** Booze picks
+  between two addressing schemes by whether track 18 holds a directory sector, and carries a table
+  of per-release block delays keyed on the CRC of the PREVIOUS file -- some titles cannot take a
+  block as fast as the drive can send it. Bitfire is thirteen revisions of one loader where what
+  changes is the LAYOUT, not the bit protocol: which line carries data and whether it is inverted,
+  how a directory entry is shaped, and which fields precede a block -- all three table-driven here,
+  and its payload goes out in REVERSE order within a block. Ultraboot is identified from the M-E
+  COMMAND rather than from a CRC of its upload, lives on an extended D41, and stores its extra
+  tracks in one of four "speedzones" whose sector counts must be remapped onto the image's flat 17
+  -- getting that wrong reads plausible wrong blocks, not errors. Spindle sends a three-byte BITMAP
+  of the sectors it wants and carries the next command inside the data, in the checksum byte and the
+  first two bytes of a block. Spindle 3.x shares only that bitmap with 2.x: it cuts a sector into
+  length-prefixed UNITS walked BACKWARDS from the end of the buffer, postpones some of them to the
+  end of a job via a "continuation record", and is asynchronous -- the computer can interrupt a
+  transfer to ask for a job by number, seven bits clocked on ATN, looked up in a table in sector 6
+  whose track entries are HALF-tracks. Sparkle sends bundles whose length is carried inside the
+  first block, obfuscates every byte from 2.x on with three different encodings, stores its
+  directory partially REVERSED, and needs four productions recognised by a production id in the BAM
+  because the format cannot express what they do. Krill is nine revisions where the differences are
+  not confined to a table -- which line requests, which carries data, what the two metadata bytes
+  mean and even which line means "ready" all move between them.
+- **Three things in Krill are deliberately unsupported, all needing 6502 code on a real drive**:
+  custom drive-code upload (r186 and r192, the latter announcing itself by sending a name longer
+  than 17 bytes), the save plugin, and fast serial burst on r184 and later, which needs a C128's
+  shift register -- those revisions fall back to the two-bit protocol they also speak. Its uploaded
+  drive code is consumed and discarded, because the CRC of that same upload has already decided the
+  revision.
+- **`clocked_write_byte` is shared by Booze, Bitfire and Spindle** (`protocol/clocked.cpp`): two bits
+  per ATN transition with the waits alternating high/low, least significant pair first, and it
+  deliberately returns with the last pair unacknowledged because its callers do different things
+  next. Spindle needs the same routine with the bits shuffled and the byte inverted, which is why it
+  has its own copy rather than a flag.
+- **Loaders that arrive through a CATCH-ALL row identify themselves from the M-E command.**
+  Ultraboot and Spindle both do, so the dispatch tries each in turn and the first that claims the
+  command wins. That is why `memExec()` reports whether a table ROW matched separately from which
+  variant it resolved -- those rows carry `IEC_FLV_NONE` on purpose.
+- **Those seven all need image GEOMETRY, which is why they were blocked and are not any more.** Each
+  walks the disk itself instead of asking for a file, so it needs to know where a track ends
+  (`d64_sectors_per_track` in sd2iec) and which drive type the image is -- Ultraboot refuses
+  anything but a D41, Krill and Bitfire branch on 1541/1571/1581. `IECDevice::sectorsPerTrack()` and
+  `IECDevice::imageType()` are the new hooks, answered by `iecDrive` from `VDrive::sectorsPerTrack()`
+  / `VDrive::imageFormat()`, which wrap VICE's `vdrive_get_max_sectors()` and `image_format`. The
+  `IEC_IMG_*` values match `VDRIVE_IMAGE_FORMAT_*` so no translation is needed. With those in place
+  the remaining ports are protocol work only.
 - **`IEC_FLV_NONE` is a VALID loadertype in the handler table.** sd2iec's newer `run_loader()` uses
   such rows as catch-alls matched on the M-E address alone, and terminates on a NULL handler rather
   than on FL_NONE. So the table here carries its length instead of a sentinel row, and `memExec()`

@@ -3301,6 +3301,20 @@ bool iecDrive::epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer)
 {
     return m_vdrive==nullptr ? false : m_vdrive->writeSector(track, sector, buffer);
 }
+
+
+#ifdef IEC_IMPL_SOFTLOAD
+uint8_t iecDrive::sectorsPerTrack(uint8_t track)
+{
+    return m_vdrive==nullptr ? 0 : m_vdrive->sectorsPerTrack(track);
+}
+
+
+uint8_t iecDrive::imageType()
+{
+    return m_vdrive==nullptr ? IEC_IMG_NONE : m_vdrive->imageFormat();
+}
+#endif
 #endif
 
 

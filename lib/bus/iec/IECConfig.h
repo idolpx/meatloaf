@@ -131,9 +131,16 @@
 // asks the device for raw track/sector access rather than for a file. The
 // hooks are still called epyxReadSector/epyxWriteSector because Epyx was the
 // first loader to need them, but they are not Epyx-specific.
-#if (defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)) || (defined(IEC_IMPL_SOFTLOAD) && (defined(IEC_FP_NIPPON) || defined(IEC_FP_ULOAD3) || defined(IEC_FP_MMZAK) || defined(IEC_FP_GEOS) || defined(IEC_FP_DREAMLOAD)))
+#if (defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)) || (defined(IEC_IMPL_SOFTLOAD) && (defined(IEC_FP_NIPPON) || defined(IEC_FP_ULOAD3) || defined(IEC_FP_MMZAK) || defined(IEC_FP_GEOS) || defined(IEC_FP_DREAMLOAD) || defined(IEC_FP_BOOZE) || defined(IEC_FP_ULTRABOOT) || defined(IEC_FP_BITFIRE) || defined(IEC_FP_SPINDLE) || defined(IEC_FP_SPARKLE) || defined(IEC_FP_KRILL)))
 #define IEC_SUPPORT_SECTOROPS
 #endif
+
+// Drive types an image can represent, as reported by IECDevice::imageType().
+// A loader that walks the disk itself often refuses anything but a 1541.
+#define IEC_IMG_1541 0
+#define IEC_IMG_1571 1
+#define IEC_IMG_1581 2
+#define IEC_IMG_NONE 10
 
 // defines the maximum number of devices that the bus handler will be
 // able to support - set to 4 by default but can be increased to up to 30 devices

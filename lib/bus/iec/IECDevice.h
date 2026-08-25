@@ -145,6 +145,19 @@ class IECDevice
   // Epyx-specific.
   virtual bool epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer)  { return false; }
   virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer) { return false; }
+
+  // Geometry of whatever is mounted. Every loader that walks the disk itself
+  // rather than asking for a file needs these: where a track ends, and which
+  // drive type it is talking to (some refuse anything but a 1541 image).
+  // 0 sectors means "no image, or no such track"; IEC_IMG_NONE likewise.
+  //
+  // Gated on IEC_IMPL_SOFTLOAD rather than on IEC_SUPPORT_SECTOROPS: Epyx uses
+  // the sector hooks above but never these, so on a board that only detects
+  // they would be two vtable slots and a VDrive call nothing can reach.
+#ifdef IEC_IMPL_SOFTLOAD
+  virtual uint8_t sectorsPerTrack(uint8_t track) { return 0; }
+  virtual uint8_t imageType() { return IEC_IMG_NONE; }
+#endif
 #endif
 
 #ifdef IEC_FP_DOLPHIN 

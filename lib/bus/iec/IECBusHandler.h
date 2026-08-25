@@ -323,6 +323,118 @@ class IECBusHandler
   bool runMMZakLoader();
 #endif
 
+#if defined(IEC_FP_BITFIRE) && defined(IEC_IMPL_SOFTLOAD)
+  // Bitfire keeps its per-session state in one struct: thirteen revisions
+  // differ in directory layout and block header, not in the bit protocol.
+  struct BitfireSession {
+    uint8_t variant, dirSector, interleave, nextFile, track, sector, offset;
+    uint16_t fileCrc;
+    const uint8_t *hdr;
+  };
+
+  bool receiveBitfireByte(uint8_t rxtx, uint8_t &data);
+  bool bitfireLoadDrivecode(uint8_t variant);
+  bool bitfireLoadDir(uint8_t *dirBuf, uint8_t sector);
+  void bitfireIterateSector(BitfireSession &s);
+  void bitfireIterateFile(BitfireSession &s, const uint8_t *dirBuf, uint8_t file);
+  void bitfireDirEntry(BitfireSession &s, const uint8_t *dirBuf, uint8_t i,
+                       uint16_t &addr, uint16_t &length);
+  bool bitfireLoadFile(BitfireSession &s, uint8_t *dirBuf, uint8_t file);
+  bool runBitfireLoader(uint8_t rxtx, uint8_t variant, uint8_t proto);
+#endif
+
+#if defined(IEC_FP_ULTRABOOT) && defined(IEC_IMPL_SOFTLOAD)
+  void ultrabootMapSector(uint8_t &track, uint8_t &sector, uint8_t speedzone);
+  bool transmitUltrabootByte(uint8_t value);
+  bool ultrabootDetect(const uint8_t *cmd, uint8_t cmdLen,
+                       uint8_t &track, uint8_t &sector, uint8_t &speedzone);
+  bool runUltrabootLoader(const uint8_t *cmd, uint8_t cmdLen);
+#endif
+
+#if defined(IEC_FP_KRILL) && defined(IEC_IMPL_SOFTLOAD)
+  bool krillReadByte(uint8_t rxtx, uint8_t &data);
+  bool krillSendByte(uint8_t rxtx, uint8_t b);
+  bool krillLoadDrivecode(uint8_t rxtx);
+  int16_t krillReadFilename(uint8_t rxtx, uint8_t variant, char *name,
+                            uint8_t maxLen, bool firstFile);
+  void krillBlockHeader(uint8_t variant, uint8_t bi, uint8_t lastUsed,
+                        bool eoi, uint8_t hd[2]);
+  bool krillSendFile(uint8_t rxtx, uint8_t variant, const char *name,
+                     bool byTS, uint16_t &fileCrc);
+  bool runKrillLoader(uint8_t rxtx, uint8_t variant,
+                      const uint8_t *cmd, uint8_t cmdLen);
+#endif
+
+#if defined(IEC_FP_SPARKLE) && defined(IEC_IMPL_SOFTLOAD)
+  // Sparkle: almost nothing is fixed, so the session carries the disk's
+  // parameters, the byte encoding and the four production quirks.
+  enum { SPK_ENC_NONE, SPK_ENC_20, SPK_ENC_21, SPK_ENC_21FF };
+
+  struct SparkleSession {
+    uint8_t variant, enc;
+    uint8_t bundleLen, track, sector;
+    uint8_t currentIl, numSectors, used[3], remaining;
+    uint8_t interleave[4], prodId[3], nextId;
+    uint8_t currentDir;
+    bool    hasSaver, saveActive;
+    bool    hasSkew, hasNsreset, bundleInv, fullSubsct;
+    bool    dirReversed, dirLayoutKnown;
+  };
+
+  static uint8_t sparkleDecode(uint8_t enc, uint8_t v);
+  uint8_t sparkleParam(SparkleSession &s, const uint8_t *bam, uint8_t pm);
+  void sparkleDecodeBlock(SparkleSession &s, uint8_t *data);
+  bool sparkleLoadDir(SparkleSession &s, uint8_t *dirBuf, uint8_t dirIndex);
+  void sparkleAdvanceSector(SparkleSession &s, uint8_t ds);
+  uint8_t sparkleIterateSector(SparkleSession &s);
+  void sparkleTrackChanged(SparkleSession &s);
+  bool sparkleInitDisk(SparkleSession &s, uint8_t *dirBuf, uint16_t bootCrc);
+  bool sparkleFindDirEntry(SparkleSession &s, uint8_t *dirBuf, uint8_t bundle, uint8_t &bptr);
+  bool sparkleReadByte(uint8_t &data, uint32_t timeoutMs);
+  bool sparkleSendBundle(SparkleSession &s, uint8_t *dirBuf, uint8_t bundle);
+  bool sparkleHandleSave(SparkleSession &s);
+  bool runSparkleLoader(const uint8_t *cmd, uint8_t cmdLen);
+#endif
+
+#if defined(IEC_FP_SPINDLE) && defined(IEC_IMPL_SOFTLOAD)
+  bool spindleWriteByte(uint8_t b, uint32_t timeoutMs);
+  uint8_t spindleDetectVersion(const uint8_t *initSector);
+  bool spindleSendBlock(uint8_t variant, uint8_t *nextCmd);
+  bool runSpindleLoader(const uint8_t *cmd, uint8_t cmdLen);
+
+  // Spindle 3.x, in protocol/spindle3.cpp. It shares only the sector bitmap
+  // with 2.x; a sector is cut into length-prefixed UNITS walked backwards, and
+  // the computer can interrupt to request a job by number.
+  struct Spindle3Session {
+    uint8_t  cmd[3], nextCmd[3], nextId[3];
+    uint8_t  ppUnits[0x60];
+    uint8_t  track, blockDelay;
+    uint16_t jobCrc;
+    bool     initDone, async;
+  };
+
+  bool spindleV3WriteByte(uint8_t b, uint32_t timeoutMs);
+  uint8_t spindleReceiveJobNo();
+  uint8_t spindleCopyCR(Spindle3Session &s);
+  bool spindleSendUnits(Spindle3Session &s, uint8_t pos, bool pp);
+  bool runSpindleV3Loader();
+#endif
+
+#if (defined(IEC_FP_BOOZE) || defined(IEC_FP_BITFIRE) || defined(IEC_FP_SPINDLE) || defined(IEC_FP_SPARKLE) || defined(IEC_FP_KRILL)) && defined(IEC_IMPL_SOFTLOAD)
+  // shared by Booze and Bitfire, which move bytes the same way
+  bool fastWaitATN(bool state, uint32_t timeoutMs);
+  bool clockedWriteByte(uint8_t b, uint32_t timeoutMs);
+#endif
+
+#if defined(IEC_FP_BOOZE) && defined(IEC_IMPL_SOFTLOAD)
+  bool receiveBoozeByte(uint8_t &data);
+  bool boozeSendBlock(const uint8_t *data, uint8_t from, uint16_t *crc);
+  bool boozeSendFile(uint16_t &fileCrc);
+  void boozeBusLock();
+  bool boozeFindDir(uint8_t &dirSector, uint8_t *dirBuf);
+  bool runBoozeLoader();
+#endif
+
 #if defined(IEC_FP_DREAMLOAD) && defined(IEC_IMPL_SOFTLOAD)
   bool dreamloadWait(bool atnNotCLK, bool state);
   bool receiveDreamloadByte(uint8_t &data);

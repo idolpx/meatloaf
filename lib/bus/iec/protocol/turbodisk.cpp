@@ -284,6 +284,30 @@ bool IECBusHandler::runFastLoader(IECDevice *dev, uint8_t variant, uint8_t param
       return runFC3OldFreezeLoader(rxtx);
 #endif
 
+#if defined(IEC_FP_KRILL) && defined(IEC_IMPL_SOFTLOAD)
+    case IEC_FLV_KRILL_R58PRE: case IEC_FLV_KRILL_R58:
+    case IEC_FLV_KRILL_R146:   case IEC_FLV_KRILL_R159:
+    case IEC_FLV_KRILL_R164:   case IEC_FLV_KRILL_R184:
+    case IEC_FLV_KRILL_R186:   case IEC_FLV_KRILL_R192:
+      return runKrillLoader(rxtx, variant, cmd, cmdLen);
+#endif
+
+#if defined(IEC_FP_BITFIRE) && defined(IEC_IMPL_SOFTLOAD)
+    case IEC_FLV_BITFIRE_01:  case IEC_FLV_BITFIRE_03:  case IEC_FLV_BITFIRE_04:
+    case IEC_FLV_BITFIRE_06:  case IEC_FLV_BITFIRE_07PRE:
+    case IEC_FLV_BITFIRE_07DBG: case IEC_FLV_BITFIRE_07:
+    case IEC_FLV_BITFIRE_10:  case IEC_FLV_BITFIRE_11:
+    case IEC_FLV_BITFIRE_12PR1: case IEC_FLV_BITFIRE_12PR2:
+    case IEC_FLV_BITFIRE_12:  case IEC_FLV_BITFIRE_13:
+      // the handler table's parameter selects the block header layout
+      return runBitfireLoader(rxtx, variant, param);
+#endif
+
+#if defined(IEC_FP_BOOZE) && defined(IEC_IMPL_SOFTLOAD)
+    case IEC_FLV_BOOZE:
+      return runBoozeLoader();
+#endif
+
 #if defined(IEC_FP_DREAMLOAD) && defined(IEC_IMPL_SOFTLOAD)
     case IEC_FLV_DREAMLOAD:
     case IEC_FLV_DREAMLOAD_OLD:
@@ -311,6 +335,22 @@ bool IECBusHandler::runFastLoader(IECDevice *dev, uint8_t variant, uint8_t param
     case IEC_FLV_WHEELS44_S2:
     case IEC_FLV_WHEELS44_S2_1581:
       return runWheelsStage2Loader(rxtx, variant);
+#endif
+
+#if defined(IEC_FP_ULTRABOOT) && defined(IEC_IMPL_SOFTLOAD)
+    case IEC_FLV_NONE:
+      // A catch-all row: the M-E address matched but no CRC identified a
+      // loader, so whoever handles it identifies itself from the command.
+      // Each identifies itself from the command; the first one that claims
+      // it wins.
+      if( runUltrabootLoader(cmd, cmdLen) ) return true;
+#if defined(IEC_FP_SPINDLE) && defined(IEC_IMPL_SOFTLOAD)
+      if( runSpindleLoader(cmd, cmdLen) ) return true;
+#endif
+#if defined(IEC_FP_SPARKLE) && defined(IEC_IMPL_SOFTLOAD)
+      if( runSparkleLoader(cmd, cmdLen) ) return true;
+#endif
+      return false;
 #endif
 
     default:
