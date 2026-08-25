@@ -48,7 +48,9 @@ lib/device/ps2/ps2.{h,cpp}                 [new] PS2KeyboardDevice + global ps2K
 lib/device/ps2/ps2_keynames.{h,cpp}        [new] pure logic, natively testable
 lib/console/Commands/PS2Commands.{h,cpp}   [new] thin `ps2` command front-end
 
-include/pinmap_defaults.h         [fix] drop trailing `;` on PIN_KB_CLK/PIN_KB_DATA
+include/pinmap_defaults.h                  [fix] DELETE the PS/2 block entirely
+include/pinmap/adafruit_feather_esp32s3_tft.h  [fix] drop its GPIO_NUM_NC PS/2 lines
+platformio.ini.sample                      [fix] remove the ENABLE_PS2 flag
 src/main.cpp                      global `keyboard` object removed; ps2Keyboard.start()
 src/CMakeLists.txt                add lib/device/ps2 to INCLUDES and SOURCES
 lib/console/Console.cpp           registerPS2Commands()
@@ -58,27 +60,40 @@ test/native/test_ps2_keys/        [new] native suite for the pure logic
 
 ## Build guard
 
-The guard is **`ENABLE_PS2`**, not `PIN_KB_CLK`.
+The guard is **`PIN_KB_CLK`**. `ENABLE_PS2` is removed entirely — a board that
+wires the pins has the hardware, and that is the whole condition. This is exactly
+the `PIN_TFT_MOSI` pattern in `lib/display/lcd.h`.
 
-`include/pinmap_defaults.h` defines `PIN_KB_CLK` as `GPIO_NUM_NC` for every board,
-so `#ifdef PIN_KB_CLK` is universally true and guards nothing. The `lcd.h`
-pin-guard pattern does not transfer.
+Making it work requires removing the PS/2 fallback so the pin is defined only
+where the hardware exists — `PIN_TFT_MOSI` appears in no pinmap default, which is
+why its guard works:
 
-`lib/device/ps2/ps2.h` therefore puts the real class inside `#ifdef ENABLE_PS2`
-and a no-op class with identical signatures in the `#else`, so call sites compile
-on all boards with no `#ifdef` at the call site. Inside the `#ifdef`, an `#error`
-fires if the pins are still `GPIO_NUM_NC` — which only compiles once the trailing
-semicolon in `pinmap_defaults.h` is removed.
+- **`include/pinmap_defaults.h`: delete the PS/2 block.** It currently defines
+  `PIN_KB_CLK`/`PIN_KB_DATA` as `GPIO_NUM_NC` for every board, which would make
+  `#ifdef PIN_KB_CLK` universally true. Deleting it also removes the trailing-
+  semicolon bug (`#define PIN_KB_CLK GPIO_NUM_NC;`) rather than fixing it.
+- **`include/pinmap/adafruit_feather_esp32s3_tft.h`: drop its two
+  `PIN_KB_CLK`/`PIN_KB_DATA GPIO_NUM_NC` lines**, which would otherwise satisfy
+  the `#ifdef` on a board with no PS/2 hardware.
+- **`platformio.ini.sample`: remove the commented `-D ENABLE_PS2` flag.**
 
-`ENABLE_PS2` is currently commented out in `platformio.ini.sample`. Boards with
-the pins defined: `fujiloaf-rev0` (GPIO 16/17) and `esp32-s3-super-mini` (16/17).
+`lib/device/ps2/ps2.h` then puts the real class inside `#ifdef PIN_KB_CLK` and a
+no-op class with identical signatures in the `#else`, so call sites compile on all
+boards with no `#ifdef` at the call site. No `#error` guard is needed: after the
+above, defined implies wired.
+
+Boards that get PS/2 compiled in: `fujiloaf-rev0` (GPIO 16/17) and
+`esp32-s3-super-mini` (16/17). Note this is a semantic change from the previous
+opt-in flag — both boards now build it unconditionally, matching how a board with
+`PIN_TFT_MOSI` always builds HAGL. Runtime cost stays zero until
+`devices.ps2.enabled` is set, since `start()` allocates nothing.
 
 ## Component patches
 
 ### P1 — `inline` the Arduino shims
 `ps2_device.h` defines `delay`, `millis`, `micros`, `delayMicroseconds` and
 `xTaskCreateUniversal` **non-`inline` in a header** included by three translation
-units. Duplicate symbols at link. This fires the moment `ENABLE_PS2` is defined
+units. Duplicate symbols at link. This fires the moment the component is referenced
 and is why it has gone unnoticed: nothing references `ps2dev::` today, so archive
 semantics pull no object out of `libps2.a`.
 
@@ -235,7 +250,7 @@ unverified on hardware.
 
 ```cpp
 // lib/device/ps2/ps2.h
-#ifdef ENABLE_PS2
+#ifdef PIN_KB_CLK
 class PS2KeyboardDevice {
 public:
     void start();                 // boot: reads config only, touches no hardware
@@ -327,7 +342,7 @@ ps2 release              releaseAll()
 ps2 keys                 list recognised key names
 ```
 
-Registered by `registerPS2Commands()` in `Console.cpp` under `#ifdef ENABLE_PS2`,
+Registered by `registerPS2Commands()` in `Console.cpp` under `#ifdef PIN_KB_CLK`,
 matching `registerDisplayCommands()`. WebSocket comes free.
 
 All subcommands return non-zero on failure (disabled, unknown key name, not
@@ -394,8 +409,9 @@ in `lib/device/ps2/ps2_keynames.{h,cpp}` with no device includes — mirroring
 
 ### Hardware — `fujiloaf-rev0`, in order
 
-1. **Does it link?** `ENABLE_PS2` on. Proves P1 — the duplicate-symbol failure
-   fires the moment the flag is defined.
+1. **Does it link?** Build `fujiloaf-rev0`. Proves P1 — the duplicate-symbol
+   failure fires as soon as anything references the component, which the device
+   class now does unconditionally on a pinned board.
 2. **Does core 0 survive it?** `ps2 start`, then exercise the web server and
    console. Pre-fix prediction is that both stall; post-fix both unaffected. This
    is the P4/A1 check and the most load-bearing prediction in the design.
