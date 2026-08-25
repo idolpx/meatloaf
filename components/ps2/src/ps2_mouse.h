@@ -3,8 +3,6 @@
 
 #include "ps2_device.h"
 
-#include <initializer_list>
-#include <stack>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -15,8 +13,7 @@
 #include "esp_log.h"
 #include <stdint.h>
 #include "scan_codes_set_2.h"
-#include <nvs_flash.h>
-#include <string>
+#include <nvs_flash.h>   // nvs_handle member below
 
 
 namespace ps2dev

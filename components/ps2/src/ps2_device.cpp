@@ -75,19 +75,19 @@ namespace ps2dev
 
   void PS2Device::gohi(gpio_num_t pin)
   {
-    gpio_set_level(pin, HIGH);
+    gpio_set_level(pin, 1);
     gpio_set_direction(pin, GPIO_MODE_INPUT);
   }
   void PS2Device::golo(gpio_num_t pin)
   {
     gpio_set_direction(pin, GPIO_MODE_OUTPUT_OD);
-    gpio_set_level(pin, LOW);
+    gpio_set_level(pin, 0);
   }
   void PS2Device::ack()
   {
-    delayMicroseconds(BYTE_INTERVAL_MICROS);
+    esp_rom_delay_us(BYTE_INTERVAL_MICROS);
     write(0xFA);
-    delayMicroseconds(BYTE_INTERVAL_MICROS);
+    esp_rom_delay_us(BYTE_INTERVAL_MICROS);
   }
   int PS2Device::write(unsigned char data)
   {
@@ -103,12 +103,12 @@ namespace ps2dev
     taskENTER_CRITICAL(&mux);
 
     golo(_ps2data);
-    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     // device sends on falling clock
     golo(_ps2clk); // start bit
-    delayMicroseconds(CLK_HALF_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
     gohi(_ps2clk);
-    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
 
     for (i = 0; i < 8; i++)
     {
@@ -120,11 +120,11 @@ namespace ps2dev
       {
         golo(_ps2data);
       }
-      delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+      esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
       golo(_ps2clk);
-      delayMicroseconds(CLK_HALF_PERIOD_MICROS);
+      esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
       gohi(_ps2clk);
-      delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+      esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
 
       parity = parity ^ (data & 0x01);
       data = data >> 1;
@@ -138,19 +138,19 @@ namespace ps2dev
     {
       golo(_ps2data);
     }
-    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     golo(_ps2clk);
-    delayMicroseconds(CLK_HALF_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
     gohi(_ps2clk);
-    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
 
     // stop bit
     gohi(_ps2data);
-    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     golo(_ps2clk);
-    delayMicroseconds(CLK_HALF_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
     gohi(_ps2clk);
-    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
 
     taskEXIT_CRITICAL(&mux);
 
@@ -158,10 +158,10 @@ namespace ps2dev
   }
   int PS2Device::write_wait_idle(uint8_t data, uint64_t timeout_micros)
   {
-    uint64_t start_time = micros();
+    int64_t start_time = esp_timer_get_time();
     while (get_bus_state() != BusState::IDLE)
     {
-      if (micros() - start_time > timeout_micros)
+      if (esp_timer_get_time() - start_time > (int64_t)timeout_micros)
       {
         return -1;
       }
@@ -177,26 +177,26 @@ namespace ps2dev
     unsigned char received_parity = 0;
 
     // wait for data line to go low and clock line to go high (or timeout)
-    unsigned long waiting_since = millis();
+    int64_t waiting_since = esp_timer_get_time();
     while (get_bus_state() != BusState::HOST_REQUEST_TO_SEND)
     {
-      if ((millis() - waiting_since) > timeout_ms)
+      if ((esp_timer_get_time() - waiting_since) > (int64_t)timeout_ms * 1000)
         return -1;
-      delay(1);
+      esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     }
 
     portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
     taskENTER_CRITICAL(&mux);
 
-    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     golo(_ps2clk);
-    delayMicroseconds(CLK_HALF_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
     gohi(_ps2clk);
-    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
 
     while (bit < 0x0100)
     {
-      if (gpio_get_level(_ps2data) == HIGH)
+      if (gpio_get_level(_ps2data) == 1)
       {
         data = data | bit;
         calculated_parity = calculated_parity ^ 1;
@@ -208,34 +208,34 @@ namespace ps2dev
 
       bit = bit << 1;
 
-      delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+      esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
       golo(_ps2clk);
-      delayMicroseconds(CLK_HALF_PERIOD_MICROS);
+      esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
       gohi(_ps2clk);
-      delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+      esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     }
     // we do the delay at the end of the loop, so at this point we have
     // already done the delay for the parity bit
 
     // parity bit
-    if (gpio_get_level(_ps2data) == HIGH)
+    if (gpio_get_level(_ps2data) == 1)
     {
       received_parity = 1;
     }
 
     // stop bit
-    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     golo(_ps2clk);
-    delayMicroseconds(CLK_HALF_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
     gohi(_ps2clk);
-    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
 
-    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     golo(_ps2data);
     golo(_ps2clk);
-    delayMicroseconds(CLK_HALF_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
     gohi(_ps2clk);
-    delayMicroseconds(CLK_QUATER_PERIOD_MICROS);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     gohi(_ps2data);
 
     taskEXIT_CRITICAL(&mux);
@@ -253,11 +253,11 @@ namespace ps2dev
   }
   PS2Device::BusState PS2Device::get_bus_state()
   {
-    if (gpio_get_level(_ps2clk) == LOW)
+    if (gpio_get_level(_ps2clk) == 0)
     {
       return BusState::COMMUNICATION_INHIBITED;
     }
-    else if (gpio_get_level(_ps2data) == LOW)
+    else if (gpio_get_level(_ps2data) == 0)
     {
       return BusState::HOST_REQUEST_TO_SEND;
     }

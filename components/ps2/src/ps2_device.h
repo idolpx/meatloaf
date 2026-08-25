@@ -1,9 +1,6 @@
 #ifndef PS2_DEVICE_H
 #define PS2_DEVICE_H
 
-#include <initializer_list>
-#include <stack>
-
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -12,72 +9,15 @@
 #include "esp_timer.h"
 #include <stdint.h>
 
-#include <nvs_flash.h>
-#include <string>
-#include <functional>
 
-#define NOP() asm volatile("nop")
-#define HIGH 0x1
-#define LOW 0x0
+#include "esp_rom_sys.h"   // esp_rom_delay_us
+// esp_timer.h (above) supplies esp_timer_get_time()
 
 // Unomment following line to enable debug messages on the PS2DEV module
 //#define _ps2dev_DEBUG_
 
 namespace ps2dev
 {
-
-  // THIS SECTION DEFINES THE FUNCTIONS USED BELOW AS IMPLEMENTED IN THE ARDUINO CORE FOR ESP32
-  // THE CODE ON THIS FILE HAS BEEN PORTED FROM AN ARDUINO-IDE PROJECT SO THIS IS NECESSARY
-  // I KNOW IT'S NOT IDEAL BUT I DO NOT HAVE TIME TO MODIFY ALL NOR THE PATIENCE
-  // ALSO THIS IS VERY TIME SENSITIVE CODE SO BETTER LEFT ALONE
-
-  BaseType_t xTaskCreateUniversal(TaskFunction_t pxTaskCode,
-                                  const char *const pcName,
-                                  const uint32_t usStackDepth,
-                                  void *const pvParameters,
-                                  UBaseType_t uxPriority,
-                                  TaskHandle_t *const pxCreatedTask,
-                                  const BaseType_t xCoreID) {
-  #ifndef CONFIG_FREERTOS_UNICORE
-      if (xCoreID >= 0 && xCoreID < 2) {
-          return xTaskCreatePinnedToCore(pxTaskCode, pcName, usStackDepth,
-                                        pvParameters, uxPriority, pxCreatedTask,
-                                        xCoreID);
-      } else {
-  #endif
-          return xTaskCreate(pxTaskCode, pcName, usStackDepth, pvParameters,
-                            uxPriority, pxCreatedTask);
-  #ifndef CONFIG_FREERTOS_UNICORE
-      }
-  #endif
-  }
-
-  void delay(uint32_t ms) { vTaskDelay(ms / portTICK_PERIOD_MS); }
-
-  unsigned long IRAM_ATTR millis() {
-      return (unsigned long)(esp_timer_get_time() / 1000ULL);
-  }
-
-  unsigned long IRAM_ATTR micros() {
-      return (unsigned long)(esp_timer_get_time());
-  }
-
-  void IRAM_ATTR delayMicroseconds(uint32_t us) {
-      uint32_t m = micros();
-      if (us) {
-          uint32_t e = (m + us);
-          if (m > e) {  // overflow
-              while (micros() > e) {
-                  NOP();
-              }
-          }
-          while (micros() < e) {
-              NOP();
-          }
-      }
-  }
-
-  // END OF ARDUINO CORE ADAPTATION
 
   // Time per clock should be 60 to 100 microseconds according to PS/2 specifications.
   // Thus, half period should be 30 to 50 microseconds.
@@ -117,13 +57,6 @@ namespace ps2dev
       COMMUNICATION_INHIBITED,
       HOST_REQUEST_TO_SEND,
     };
-
-    typedef std::function<void(uint8_t data)> ps2_data_callback_t;
-    ps2_data_callback_t _ps2_data_callback;
-
-    void set_ps2_data_callback(ps2_data_callback_t callback) {
-        _ps2_data_callback = callback;
-    }
 
     void config(UBaseType_t task_priority, BaseType_t task_core);
     void begin(BaseType_t core = DEFAULT_TASK_CORE);

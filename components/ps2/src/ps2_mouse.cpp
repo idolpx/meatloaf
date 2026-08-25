@@ -1,6 +1,8 @@
 #include "ps2_device.h"
 #include "ps2_mouse.h"
 #include "esp_log.h"
+#include <nvs_flash.h>   // ps2_mouse.cpp calls nvs_flash_init()
+#include <string>
 
 namespace ps2dev
 {
@@ -17,7 +19,7 @@ void _taskfn_poll_mouse_count(void *arg)
     {
       ps2mouse->_report();
     }
-    delay(1000 / ps2mouse->get_sample_rate());
+    vTaskDelay(pdMS_TO_TICKS(1000 / ps2mouse->get_sample_rate()));
   }
   vTaskDelete(NULL);
 }
@@ -112,9 +114,9 @@ void PS2Mouse::begin(bool restore_internal_state = 1)
   if (!restore_internal_state)
   {
     xSemaphoreTake(_mutex_bus, portMAX_DELAY);
-    delay(200);
+    vTaskDelay(pdMS_TO_TICKS(200));
     write(0xAA);
-    delayMicroseconds(BYTE_INTERVAL_MICROS);
+    esp_rom_delay_us(BYTE_INTERVAL_MICROS);
     write(0x00);
     xSemaphoreGive(_mutex_bus);
   }
@@ -123,14 +125,14 @@ void PS2Mouse::begin(bool restore_internal_state = 1)
     _load_internal_state_from_nvs();
     ESP_LOGI(TAG, "Internal state for mouse loaded from NVS");
     xSemaphoreTake(_mutex_bus, portMAX_DELAY);
-    delay(200);
+    vTaskDelay(pdMS_TO_TICKS(200));
     write(0xAA);
-    delayMicroseconds(BYTE_INTERVAL_MICROS);
+    esp_rom_delay_us(BYTE_INTERVAL_MICROS);
     write(0x00);
     xSemaphoreGive(_mutex_bus);
   }
 
-  xTaskCreateUniversal(_taskfn_poll_mouse_count, "PS2Mouse", 4096, this, _config_task_priority - 1, &_task_poll_mouse_count, DEFAULT_TASK_CORE_MOUSE);
+  xTaskCreatePinnedToCore(_taskfn_poll_mouse_count, "PS2Mouse", 4096, this, _config_task_priority - 1, &_task_poll_mouse_count, DEFAULT_TASK_CORE_MOUSE);
 }
 int PS2Mouse::reply_to_host(uint8_t host_cmd)
 {
@@ -170,10 +172,10 @@ int PS2Mouse::reply_to_host(uint8_t host_cmd)
     ack();
     // the while loop lets us wait for the host to be ready
     while (write(0xAA) != 0)
-      delay(1);
-    delayMicroseconds(BYTE_INTERVAL_MICROS);
+      vTaskDelay(1);
+    esp_rom_delay_us(BYTE_INTERVAL_MICROS);
     while (write(0x00) != 0)
-      delay(1);
+      vTaskDelay(1);
     _has_wheel = false;
     _has_4th_and_5th_buttons = false;
     _sample_rate = 100;
@@ -294,10 +296,10 @@ int PS2Mouse::reply_to_host(uint8_t host_cmd)
     printf("PS2Mouse::reply_to_host: Set remote mode command received");
 #endif
     // ack();
-    delayMicroseconds(BYTE_INTERVAL_MICROS);
+    esp_rom_delay_us(BYTE_INTERVAL_MICROS);
     while (write(0xFA) != 0)
-      delay(1);
-    delayMicroseconds(BYTE_INTERVAL_MICROS);
+      vTaskDelay(1);
+    esp_rom_delay_us(BYTE_INTERVAL_MICROS);
     reset_counter();
     _mode = Mode::REMOTE_MODE;
     _save_internal_state_to_nvs();
@@ -372,9 +374,9 @@ int PS2Mouse::reply_to_host(uint8_t host_cmd)
     _save_internal_state_to_nvs();
     break;
   default:
-    delayMicroseconds(BYTE_INTERVAL_MICROS);
+    esp_rom_delay_us(BYTE_INTERVAL_MICROS);
     while ((write(0xFE) != 0))
-      delay(1);
+      vTaskDelay(1);
 #if defined(_ps2dev_DEBUG_)
     printf("PS2Mouse::reply_to_host: Unknown command receivedASD: %x", host_cmd);
     //_ps2dev_DEBUG_.println(host_cmd, HEX);
@@ -453,7 +455,7 @@ void PS2Mouse::release(Button button)
 void PS2Mouse::click(Button button)
 {
   press(button);
-  delay(MOUSE_CLICK_PRESSING_DURATION_MILLIS);
+  vTaskDelay(pdMS_TO_TICKS(MOUSE_CLICK_PRESSING_DURATION_MILLIS));
   release(button);
 }
 void PS2Mouse::_report()

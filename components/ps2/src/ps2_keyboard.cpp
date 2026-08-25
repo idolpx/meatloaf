@@ -1,6 +1,7 @@
 #include "ps2_device.h"
 #include "ps2_keyboard.h"
 #include "esp_log.h"
+#include <stack>
 
 namespace ps2dev
 {
@@ -24,7 +25,7 @@ void _taskfn_process_host_request(void *arg)
       }
     }
     xSemaphoreGive(ps2dev->get_bus_mutex_handle());
-    delay(INTERVAL_CHECKING_HOST_SEND_REQUEST_MILLIS);
+    vTaskDelay(pdMS_TO_TICKS(INTERVAL_CHECKING_HOST_SEND_REQUEST_MILLIS));
   }
   vTaskDelete(NULL);
 }
@@ -38,11 +39,11 @@ void _taskfn_send_packet(void *arg)
     if (xQueueReceive(ps2dev->get_packet_queue_handle(), &packet, 0) == pdTRUE)
     {
       xSemaphoreTake(ps2dev->get_bus_mutex_handle(), portMAX_DELAY);
-      delayMicroseconds(BYTE_INTERVAL_MICROS);
+      esp_rom_delay_us(BYTE_INTERVAL_MICROS);
       for (int i = 0; i < packet.len; i++)
       {
         ps2dev->write_wait_idle(packet.data[i]);
-        delayMicroseconds(BYTE_INTERVAL_MICROS);
+        esp_rom_delay_us(BYTE_INTERVAL_MICROS);
       }
       xSemaphoreGive(ps2dev->get_bus_mutex_handle());
     }
@@ -59,12 +60,12 @@ void PS2Keyboard::begin()
 {
   PS2Device::begin();
 
-  xTaskCreateUniversal(_taskfn_process_host_request, "process_host_request", 4096, this, _config_task_priority, &_task_process_host_request, DEFAULT_TASK_CORE);
-  xTaskCreateUniversal(_taskfn_send_packet, "send_packet", 4096, this, _config_task_priority - 1, &_task_send_packet, DEFAULT_TASK_CORE);
+  xTaskCreatePinnedToCore(_taskfn_process_host_request, "process_host_request", 4096, this, _config_task_priority, &_task_process_host_request, DEFAULT_TASK_CORE);
+  xTaskCreatePinnedToCore(_taskfn_send_packet, "send_packet", 4096, this, _config_task_priority - 1, &_task_send_packet, DEFAULT_TASK_CORE);
 
   xSemaphoreTake(_mutex_bus, portMAX_DELAY);
-  delayMicroseconds(BYTE_INTERVAL_MICROS);
-  delay(200);
+  esp_rom_delay_us(BYTE_INTERVAL_MICROS);
+  vTaskDelay(pdMS_TO_TICKS(200));
   write(0xAA);
   xSemaphoreGive(_mutex_bus);
 }
@@ -85,7 +86,7 @@ int PS2Keyboard::reply_to_host(uint8_t host_cmd)
     _data_reporting_enabled = false;
     ack(); // ack() provides delay, some systems need it
     while (write((uint8_t)Command::BAT_SUCCESS) != 0)
-      delay(1);
+      vTaskDelay(1);
     _data_reporting_enabled = true; // some systems don't enable data reporting after issuing a RESET command, so we do it by default
     break;
   case Command::RESEND: // resend
@@ -129,9 +130,9 @@ int PS2Keyboard::reply_to_host(uint8_t host_cmd)
 #endif // _ps2dev_DEBUG_
     ack();
     while (write(0xAB) != 0)
-      delay(1); // ensure ID gets writed, some hosts may be sensitive
+      vTaskDelay(1); // ensure ID gets writed, some hosts may be sensitive
     while (write(0x83) != 0)
-      delay(1); // this is critical for combined ports (they decide mouse/kb on this)
+      vTaskDelay(1); // this is critical for combined ports (they decide mouse/kb on this)
     break;
   case Command::SET_SCAN_CODE_SET: // set scan code set
 #if defined(_ps2dev_DEBUG_)
@@ -145,24 +146,24 @@ int PS2Keyboard::reply_to_host(uint8_t host_cmd)
 #if defined(_ps2dev_DEBUG_)
     printf("PS2Keyboard::reply_to_host: Echo command received");
 #endif // _ps2dev_DEBUG_
-    delayMicroseconds(BYTE_INTERVAL_MICROS);
+    esp_rom_delay_us(BYTE_INTERVAL_MICROS);
     write(0xEE);
-    delayMicroseconds(BYTE_INTERVAL_MICROS);
+    esp_rom_delay_us(BYTE_INTERVAL_MICROS);
     break;
   case Command::SET_RESET_LEDS: // set/reset LEDs
 #if defined(_ps2dev_DEBUG_)
     printf("PS2Keyboard::reply_to_host: Set/reset LEDs command received");
 #endif // _ps2dev_DEBUG_
-    delayMicroseconds(BYTE_INTERVAL_MICROS);
+    esp_rom_delay_us(BYTE_INTERVAL_MICROS);
     while (write(0xFA) != 0)
-      delay(1);
-    delayMicroseconds(BYTE_INTERVAL_MICROS);
+      vTaskDelay(1);
+    esp_rom_delay_us(BYTE_INTERVAL_MICROS);
     if (!read(&val, 10))
     {
-      delayMicroseconds(BYTE_INTERVAL_MICROS);
+      esp_rom_delay_us(BYTE_INTERVAL_MICROS);
       while (write(0xFA) != 0)
-        delay(1);
-      delayMicroseconds(BYTE_INTERVAL_MICROS);
+        vTaskDelay(1);
+      esp_rom_delay_us(BYTE_INTERVAL_MICROS);
       _led_scroll_lock = ((val & 1) != 0);
       _led_num_lock = ((val & 2) != 0);
       _led_caps_lock = ((val & 4) != 0);
@@ -207,7 +208,7 @@ void PS2Keyboard::keyup(scancodes::Key key)
 void PS2Keyboard::type(scancodes::Key key)
 {
   keydown(key);
-  delay(10);
+  vTaskDelay(pdMS_TO_TICKS(10));
   keyup(key);
 }
 void PS2Keyboard::type(std::initializer_list<scancodes::Key> keys)
@@ -217,13 +218,13 @@ void PS2Keyboard::type(std::initializer_list<scancodes::Key> keys)
   {
     keydown(key);
     stack.push(key);
-    delay(10);
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
   while (!stack.empty())
   {
     keyup(stack.top());
     stack.pop();
-    delay(10);
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
 void PS2Keyboard::type(const char *str)
@@ -567,9 +568,9 @@ void PS2Keyboard::type(const char *str)
     if (shift)
     {
       keydown(scancodes::Key::K_LSHIFT);
-      delay(10);
+      vTaskDelay(pdMS_TO_TICKS(10));
       type(key);
-      delay(10);
+      vTaskDelay(pdMS_TO_TICKS(10));
       keyup(scancodes::Key::K_LSHIFT);
     }
     else

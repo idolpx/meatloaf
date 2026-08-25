@@ -5,7 +5,7 @@ file(GLOB SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 idf_component_register( 
   INCLUDE_DIRS src
   SRCS ${SOURCES}
-  REQUIRES esp_hid nvs_flash driver bt
+  REQUIRES driver esp_timer esp_rom nvs_flash
 )
 
 component_compile_options(-Wno-error=format= -Wno-format)
