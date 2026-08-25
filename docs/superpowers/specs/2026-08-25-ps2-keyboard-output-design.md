@@ -178,10 +178,35 @@ bounded wait avoids a sentinel packet and its queue-full edge case. Four no-op
 wakeups a second, versus a continuous spin.
 
 ### P5 — `send_packet` applies backpressure
-`ps2_device.cpp:271` is `xQueueSend(_queue_packet, packet, 0)` against a 20-deep
-queue, and `keydown`/`keyup`/`type()` all discard the return value. Each character
-is two packets and the wire drains at roughly 1 ms per packet, so `ps2 type` of
-anything past ~10 characters **silently drops keystrokes**.
+`ps2_device.cpp` has `xQueueSend(_queue_packet, packet, 0)` against a 20-deep
+queue, and `keydown`/`keyup`/`type()` all discard the return value.
+
+**Corrected 2026-08-25 during implementation — the original justification here was
+WRONG and is retained struck through so the record is honest.** It claimed that
+"each character is two packets and the wire drains at roughly 1 ms per packet, so
+`ps2 type` of anything past ~10 characters silently drops keystrokes." Measured
+against the component's own constants, that is not reachable:
+
+- **Drain**: a byte is 11 bit-periods x 80 us ~= 880 us, plus `BYTE_INTERVAL_MICROS`
+  (500). Scan Set 2 MAKE codes are 1 byte, BREAK codes 2 (the `0xF0` prefix), so a
+  keydown+keyup pair costs ~5.14 ms — the "1 ms per packet" figure undercounts by
+  2-3x.
+- **Produce**: `type(scancodes::Key)` does `keydown(); vTaskDelay(pdMS_TO_TICKS(10));
+  keyup();`, so `type(const char *)` emits at most 2 packets per 10 ms (200/sec)
+  unshifted, 4 per 30 ms (133/sec) shifted.
+- Consumer 300-530 packets/sec against a producer of 133-200/sec, queue depth 20.
+  **The producer cannot outrun the consumer, so the queue never fills.**
+
+The change is still worth making, for two reasons that ARE real:
+
+1. **The null guard is load-bearing and unrelated to backpressure.** `end()` calls
+   `vQueueDelete()` and sets `_queue_packet = nullptr`; a send racing teardown would
+   otherwise write through a freed handle. Use-after-free.
+2. **A bounded timeout beats a zero one** so `keydown`/`keyup`/`type()` can
+   distinguish a genuinely stuck wire (host never toggling clock) from transient
+   scheduling jitter, which a 0 ms timeout reports as failure.
+
+So: a stuck-wire backstop plus a teardown guard, not flow control.
 
 Fix: `xQueueSend(..., pdMS_TO_TICKS(500))`, so the caller blocks until the wire
 catches up. 500 ms comfortably exceeds the ~20 ms a full 20-deep queue takes to
