@@ -67,10 +67,13 @@ namespace ps2dev
     bool running() const { return _running; }
     TaskHandle_t hostRequestTask() const { return _task_process_host_request; }
     // A task calls this on ITSELF, after releasing the bus mutex, immediately
-    // before vTaskDelete(NULL).  end() waits on these going NULL.
+    // before vTaskDelete(NULL).  end() waits on these going NULL.  Two
+    // overloads: _task_process_host_request is volatile (read from ISR
+    // context, see below), _task_send_packet is not.
     void clearTaskHandle(TaskHandle_t *slot) { *slot = nullptr; }
-    TaskHandle_t *sendTaskSlot()        { return &_task_send_packet; }
-    TaskHandle_t *hostRequestTaskSlot() { return &_task_process_host_request; }
+    void clearTaskHandle(volatile TaskHandle_t *slot) { *slot = nullptr; }
+    TaskHandle_t *sendTaskSlot()                 { return &_task_send_packet; }
+    volatile TaskHandle_t *hostRequestTaskSlot() { return &_task_process_host_request; }
     gpio_num_t clkPin() const  { return _ps2clk; }
     gpio_num_t dataPin() const { return _ps2data; }
 
@@ -79,7 +82,10 @@ namespace ps2dev
     gpio_num_t _ps2data;
     UBaseType_t _config_task_priority = DEFAULT_TASK_PRIORITY;
     BaseType_t _config_task_core = DEFAULT_TASK_CORE;
-    TaskHandle_t _task_process_host_request = nullptr;
+    // Read by ps2_clk_isr (ISR context) via hostRequestTask(); written by
+    // task creation/teardown (task context).  volatile for the same
+    // cross-context-visibility reason _running is, below.
+    volatile TaskHandle_t _task_process_host_request = nullptr;
     TaskHandle_t _task_send_packet = nullptr;
     QueueHandle_t _queue_packet;
     SemaphoreHandle_t _mutex_bus;
@@ -91,6 +97,12 @@ namespace ps2dev
     void golo(gpio_num_t pin);
     void gohi(gpio_num_t pin);
     void ack();
+    // Self-notify backstop for a host request whose triggering CLK edge
+    // landed while write()/read() had the interrupt disabled --
+    // gpio_hal_intr_enable_on_core() clears the latched pending-interrupt
+    // status bit before re-arming, so that edge is discarded rather than
+    // deferred.  Called only from write()/read(), right after re-enabling.
+    void notifyIfHostWaiting();
   };
 } // namespace ps2dev
 

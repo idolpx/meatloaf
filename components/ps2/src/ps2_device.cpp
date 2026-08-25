@@ -10,10 +10,21 @@ namespace ps2dev
   static void IRAM_ATTR ps2_clk_isr(void *arg)
   {
     PS2Device *dev = static_cast<PS2Device *>(arg);
+    // gpio_isr_handler_add() enables the interrupt as ITS OWN last action
+    // (gpio_hal_intr_enable_on_core()), regardless of what begin() does
+    // afterward -- so this can fire before the host-request task exists (a
+    // boot-time race), or, for a PS2Device with no such task at all
+    // (PS2Mouse shares PS2Device::begin() and never creates one), on every
+    // call for the object's entire lifetime.  vTaskNotifyGiveFromISR()
+    // asserts its handle is non-NULL and aborts the ISR otherwise, so this
+    // must be checked before touching anything else.
+    TaskHandle_t task = dev->hostRequestTask();
+    if (task == nullptr)
+      return;
     if (gpio_get_level(dev->clkPin()) == 1 && gpio_get_level(dev->dataPin()) == 0)
     {
       BaseType_t hpw = pdFALSE;
-      vTaskNotifyGiveFromISR(dev->hostRequestTask(), &hpw);
+      vTaskNotifyGiveFromISR(task, &hpw);
       if (hpw)
         portYIELD_FROM_ISR();
     }
@@ -57,12 +68,17 @@ namespace ps2dev
     _mutex_bus = xSemaphoreCreateMutex();
     _queue_packet = xQueueCreate(PACKET_QUEUE_LENGTH, sizeof(PS2Packet));
 
-    // The service is installed once, globally, at src/main.cpp:238.  Calling
-    // gpio_install_isr_service() here returns ESP_ERR_INVALID_STATE and, worse,
-    // is what the deleted ps2keyboard.cpp used to do.
+    // The service is installed once, globally, in the boot sequence's
+    // main_setup() (src/main.cpp).  Calling gpio_install_isr_service() here
+    // returns ESP_ERR_INVALID_STATE and, worse, is what the deleted
+    // ps2keyboard.cpp used to do.
     gpio_set_intr_type(_ps2clk, GPIO_INTR_POSEDGE);
     gpio_isr_handler_add(_ps2clk, ps2_clk_isr, this);
-    gpio_intr_disable(_ps2clk);   // enabled by the task once it is running
+    // NOT what keeps the ISR quiet -- gpio_isr_handler_add() above already
+    // enabled it.  This just returns to the disabled state expected before
+    // the host-request task starts; ps2_clk_isr's own NULL check is the
+    // real guard against firing too early.
+    gpio_intr_disable(_ps2clk);
 
     _running = true;
   }
@@ -82,6 +98,15 @@ namespace ps2dev
     for (int i = 0; i < 100 && (_task_send_packet || _task_process_host_request); i++)
       vTaskDelay(pdMS_TO_TICKS(10));   // bounded, <= 1 s
 
+    // Detaching the ISR is safe even if a task below failed to exit in
+    // time: it only stops future interrupts from reaching ps2_clk_isr and
+    // touches no FreeRTOS object a live task might still be using.  Do
+    // this unconditionally, ABOVE the leak-and-return below -- an object
+    // that may be destroyed or reused right after end() returns must not
+    // leave ps2_clk_isr installed against it holding a dangling `this`.
+    gpio_intr_disable(_ps2clk);
+    gpio_isr_handler_remove(_ps2clk);
+
     if (_task_send_packet || _task_process_host_request)
     {
       // Freeing a mutex a live task may still take is a guaranteed crash;
@@ -90,7 +115,6 @@ namespace ps2dev
       return;
     }
 
-    gpio_isr_handler_remove(_ps2clk);
     gohi(_ps2clk);
     gohi(_ps2data);
     gpio_reset_pin(_ps2clk);
@@ -118,6 +142,18 @@ namespace ps2dev
     write(0xFA);
     esp_rom_delay_us(BYTE_INTERVAL_MICROS);
   }
+  void PS2Device::notifyIfHostWaiting()
+  {
+    // Both call sites (write()/read()) release DATA high and run this
+    // while still holding _mutex_bus, right after re-enabling the
+    // interrupt -- so this can only be true if the HOST is holding DATA
+    // low right now; there is no false-positive path.  If the real ISR
+    // also caught the same edge, this is a harmless extra notify:
+    // _taskfn_process_host_request just wakes, finds the bus already
+    // IDLE, and no-ops.
+    if (_task_process_host_request && get_bus_state() == BusState::HOST_REQUEST_TO_SEND)
+      xTaskNotifyGive(_task_process_host_request);
+  }
   int PS2Device::write(unsigned char data)
   {
     unsigned char i;
@@ -128,6 +164,13 @@ namespace ps2dev
       return -1;
     }
 
+    // gpio_ll_intr_disable() leaves int_type (POSEDGE, set in begin())
+    // intact; only int_ena clears.  gpio_hal_intr_enable_on_core(), which
+    // gpio_intr_enable() below calls, clears the latched pending-interrupt
+    // status bit before setting int_ena again -- that's what makes our own
+    // clock edges below not queue up behind the disable, and it's also why
+    // a genuine host request arriving during this window is discarded
+    // rather than deferred (see notifyIfHostWaiting() below).
     gpio_intr_disable(_ps2clk);
 
     portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
@@ -186,6 +229,7 @@ namespace ps2dev
     taskEXIT_CRITICAL(&mux);
 
     gpio_intr_enable(_ps2clk);
+    notifyIfHostWaiting();
 
     return 0;
   }
@@ -218,6 +262,7 @@ namespace ps2dev
       esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     }
 
+    // Same disable/re-enable mechanism as write() above -- see its comment.
     gpio_intr_disable(_ps2clk);
 
     portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
@@ -276,6 +321,7 @@ namespace ps2dev
     taskEXIT_CRITICAL(&mux);
 
     gpio_intr_enable(_ps2clk);
+    notifyIfHostWaiting();
 
     *value = data & 0x00FF;
 

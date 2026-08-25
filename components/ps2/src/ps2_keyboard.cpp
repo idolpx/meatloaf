@@ -31,7 +31,12 @@ void _taskfn_process_host_request(void *arg)
       if (r == 0)
         ps2dev->reply_to_host(host_cmd);
       else if (r == -2)
-        ps2dev->write(0xFE);      // A5: parity error -- ask the host to resend
+        // A5: parity error -- ask the host to resend.  write_wait_idle(),
+        // not write(): a parity error is exactly when the bus is marginal,
+        // and plain write() silently drops the byte if it finds the bus
+        // not IDLE -- which would re-create the silent loss A5 exists to
+        // eliminate.
+        ps2dev->write_wait_idle(0xFE);
     }
     xSemaphoreGive(ps2dev->get_bus_mutex_handle());
   }
@@ -74,7 +79,12 @@ void PS2Keyboard::begin()
 {
   PS2Device::begin();
 
-  xTaskCreatePinnedToCore(_taskfn_process_host_request, "process_host_request", 4096, this, _config_task_priority, &_task_process_host_request, DEFAULT_TASK_CORE);
+  // _task_process_host_request is volatile (ps2_clk_isr reads it from ISR
+  // context); FreeRTOS's API takes a plain TaskHandle_t*, and this single
+  // store -- before the task exists to race with -- is otherwise an
+  // ordinary write, so stripping volatile here is safe.
+  xTaskCreatePinnedToCore(_taskfn_process_host_request, "process_host_request", 4096, this, _config_task_priority,
+                           const_cast<TaskHandle_t *>(&_task_process_host_request), DEFAULT_TASK_CORE);
   xTaskCreatePinnedToCore(_taskfn_send_packet, "send_packet", 4096, this, _config_task_priority - 1, &_task_send_packet, DEFAULT_TASK_CORE);
 
   xSemaphoreTake(_mutex_bus, portMAX_DELAY);
