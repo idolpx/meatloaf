@@ -1,4 +1,5 @@
 #include "ps2_device.h"
+#include "esp_log.h"
 
 namespace ps2dev
 {
@@ -71,6 +72,43 @@ namespace ps2dev
     // gpio_isr_handler_add(_ps2clk, ps2_isr_handler, (void *)this);
 
     // xTaskCreatePinnedToCore(ps2_task, "ps2_task", 4096, this, 10, &ps2_task_handle, 0);
+
+    _running = true;
+  }
+
+  void PS2Device::end()
+  {
+    if (!_running)
+      return;
+    _running = false;                  // both loops observe this at the top
+
+    // The host-request task blocks on a notification with no timeout, so it
+    // must be woken explicitly.  The send task's bounded queue receive wakes
+    // on its own within 250 ms.
+    if (_task_process_host_request)
+      xTaskNotifyGive(_task_process_host_request);
+
+    for (int i = 0; i < 100 && (_task_send_packet || _task_process_host_request); i++)
+      vTaskDelay(pdMS_TO_TICKS(10));   // bounded, <= 1 s
+
+    if (_task_send_packet || _task_process_host_request)
+    {
+      // Freeing a mutex a live task may still take is a guaranteed crash;
+      // leaking ~440 bytes is survivable and leaves this line behind.
+      ESP_LOGE("ps2", "tasks did not exit; leaking mutex/queue deliberately");
+      return;
+    }
+
+    gpio_isr_handler_remove(_ps2clk);   // no-op until Task 7 adds the handler
+    gohi(_ps2clk);
+    gohi(_ps2data);
+    gpio_reset_pin(_ps2clk);
+    gpio_reset_pin(_ps2data);
+
+    vQueueDelete(_queue_packet);
+    _queue_packet = nullptr;
+    vSemaphoreDelete(_mutex_bus);
+    _mutex_bus = nullptr;
   }
 
   void PS2Device::gohi(gpio_num_t pin)

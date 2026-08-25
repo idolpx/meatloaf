@@ -39,6 +39,7 @@ namespace ps2dev
       BAT_SUCCESS = 0xAA,
     };
     void begin();
+    void end();
     bool data_reporting_enabled();
     bool is_scroll_lock_led_on();
     bool is_num_lock_led_on();

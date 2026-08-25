@@ -13,7 +13,7 @@ namespace ps2dev
 void _taskfn_process_host_request(void *arg)
 {
   PS2Device *ps2dev = (PS2Device *)arg;
-  while (true)
+  while (ps2dev->running())
   {
     xSemaphoreTake(ps2dev->get_bus_mutex_handle(), portMAX_DELAY);
     if (ps2dev->get_bus_state() == PS2Device::BusState::HOST_REQUEST_TO_SEND)
@@ -27,16 +27,20 @@ void _taskfn_process_host_request(void *arg)
     xSemaphoreGive(ps2dev->get_bus_mutex_handle());
     vTaskDelay(pdMS_TO_TICKS(INTERVAL_CHECKING_HOST_SEND_REQUEST_MILLIS));
   }
+  ps2dev->clearTaskHandle(ps2dev->hostRequestTaskSlot());
   vTaskDelete(NULL);
 }
 void _taskfn_send_packet(void *arg)
 {
   PS2Device *ps2dev = (PS2Device *)arg;
-  while (true)
+  while (ps2dev->running())
   {
     PS2Packet packet;
-    //if (xQueueReceive(ps2dev->get_packet_queue_handle(), &packet, portMAX_DELAY) == pdTRUE)
-    if (xQueueReceive(ps2dev->get_packet_queue_handle(), &packet, 0) == pdTRUE)
+    // Blocking receive.  The 250 ms bound is ONLY so end() can retire this
+    // task without pushing a sentinel packet (which could find the queue
+    // full).  It is not a poll of the bus -- nothing here polls the bus.
+    if (xQueueReceive(ps2dev->get_packet_queue_handle(), &packet,
+                      pdMS_TO_TICKS(250)) == pdTRUE)
     {
       xSemaphoreTake(ps2dev->get_bus_mutex_handle(), portMAX_DELAY);
       esp_rom_delay_us(BYTE_INTERVAL_MICROS);
@@ -47,8 +51,9 @@ void _taskfn_send_packet(void *arg)
       }
       xSemaphoreGive(ps2dev->get_bus_mutex_handle());
     }
-    portYIELD();
   }
+  // Reached only outside the critical section, so the mutex is never orphaned.
+  ps2dev->clearTaskHandle(ps2dev->sendTaskSlot());
   vTaskDelete(NULL);
 }
 
@@ -68,6 +73,10 @@ void PS2Keyboard::begin()
   vTaskDelay(pdMS_TO_TICKS(200));
   write(0xAA);
   xSemaphoreGive(_mutex_bus);
+}
+void PS2Keyboard::end()
+{
+  PS2Device::end();
 }
 bool PS2Keyboard::data_reporting_enabled() { return _data_reporting_enabled; }
 bool PS2Keyboard::is_scroll_lock_led_on() { return _led_scroll_lock; }

@@ -68,6 +68,14 @@ namespace ps2dev
     SemaphoreHandle_t get_bus_mutex_handle();
     QueueHandle_t get_packet_queue_handle();
     int send_packet(PS2Packet *packet);
+    void end();
+    bool running() const { return _running; }
+    TaskHandle_t hostRequestTask() const { return _task_process_host_request; }
+    // A task calls this on ITSELF, after releasing the bus mutex, immediately
+    // before vTaskDelete(NULL).  end() waits on these going NULL.
+    void clearTaskHandle(TaskHandle_t *slot) { *slot = nullptr; }
+    TaskHandle_t *sendTaskSlot()        { return &_task_send_packet; }
+    TaskHandle_t *hostRequestTaskSlot() { return &_task_process_host_request; }
 
   protected:
     gpio_num_t _ps2clk;
@@ -78,10 +86,15 @@ namespace ps2dev
     TaskHandle_t _task_send_packet;
     QueueHandle_t _queue_packet;
     SemaphoreHandle_t _mutex_bus;
+    // Written ONLY by begin() (true, last statement) and end() (false, first
+    // statement).  Nothing else touches it -- the surrounding code does
+    // read-modify-write on its other state and would clobber a shared
+    // sentinel.  Same discipline as IECBusHandler::m_enabled.
+    volatile bool _running = false;
     void golo(gpio_num_t pin);
     void gohi(gpio_num_t pin);
     void ack();
-  
+
   private:
     QueueHandle_t ps2_queue;
     TaskHandle_t ps2_task_handle = NULL;
