@@ -345,7 +345,9 @@ protected:
 
   void set_cwd(std::string path, bool verified = false);
   void changePartition(int pnum);   // CMD "CP<n>" on a mounted DHD/D1M/D2M/D4M image
+#ifndef DISABLE_TAPE   // MEATLOAF-GATE
   void tapeCommand(std::string command);  // "T-C"/"T-I" on a mounted tape image
+#endif
 
   std::unique_ptr<MFile> m_cwd;   // current working directory
   iecChannelHandler *m_channels[16];

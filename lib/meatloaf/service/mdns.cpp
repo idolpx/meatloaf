@@ -17,10 +17,16 @@
 
 #include "service/mdns.h"
 
+#ifndef DISABLE_AFP   // MEATLOAF-GATE
 #include "network/afp.h"
+#endif
 #include "network/http.h"
+#ifndef DISABLE_NFS   // MEATLOAF-GATE
 #include "network/nfs.h"
+#endif
+#ifndef DISABLE_SSH   // MEATLOAF-GATE
 #include "network/sftp.h"
+#endif
 #include "network/smb.h"
 
 #include <esp_log.h>
@@ -77,12 +83,16 @@ MFile* MDNSMFileSystem::getFile(std::string path) {
                 std::string path;
                 if (host.empty()) {
                     Debug_printv("No host address for service: %s", service->getDisplayName().c_str());
+#ifndef DISABLE_NFS   // MEATLOAF-GATE
                 } else if (service->service_type == "_nfs") {
                     path = "nfs://" + host + "/";
                     file = new NFSMFile(path);
+#endif
+#ifndef DISABLE_SSH   // MEATLOAF-GATE
                 } else if (service->service_type == "_sftp-ssh") {
                     path = "sftp://" + host + "/";
                     file = new SFTPMFile(path);
+#endif
                 } else if (service->service_type == "_smb") {
                     path = "smb://" + host + "/";
                     file = new SMBMFile(path);

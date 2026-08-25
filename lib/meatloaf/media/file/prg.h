@@ -120,8 +120,7 @@ public:
     bool handles(std::string fileName) override {
         return byExtension(
             {
-                ".prg",
-                ".c64"
+                ".prg"
             }, 
             fileName, true
         );

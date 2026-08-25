@@ -1,3 +1,4 @@
+#ifndef DISABLE_ISCSI   // MEATLOAF-GATE
 // Meatloaf - A Commodore 64/128 multi-device emulator
 // https://github.com/idolpx/meatloaf
 // Copyright(C) 2020 James Johnston
@@ -619,3 +620,5 @@ bool ISCSIMStream::seek(uint32_t pos, int whence)
     }
     return seek(new_pos);
 }
+
+#endif // !DISABLE_ISCSI  MEATLOAF-GATE

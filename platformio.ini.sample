@@ -59,7 +59,8 @@ description = The internet is a massive floppy drive for your C64 with Meatloaf!
 
 ; EXPERIMENTAL
 ; ESP32-P4
-;environment = waveshare-p4-module-dev-kit   ; Waveshare ESP32-P4-Module-Dev-Kit           (ESP32-P4, 16M Flash, 32M PSRAM)
+;environment = waveshare-p4-module-dev-kit  ; Waveshare ESP32-P4-Module-Dev-Kit           (ESP32-P4, 16M Flash, 32M PSRAM)
+;environment = wt9932p4-tiny                ; Weijing WT9932P4 Tiny Board                 (ESP32-P4, 16M Flash, 32M PSRAM)
 
 ; NATIVE UNIT TESTING
 ;environment = native                       ; For running tests that don't require embedded hardware
@@ -115,11 +116,11 @@ extra_scripts =
 ; Common settings for all environments
 build_type = debug ;debug ;release
 lib_ldf_mode = off ; off chain deep chain+ deep+
-upload_speed = 2000000 ;460800 ;921600
+upload_speed = 2000000 ;460800 ;921600 ;2000000
 ;upload_port = COM1 ; Windows
 ;upload_port = /dev/ttyUSB0 ; Linux
 ;upload_port = /dev/cu.usbserial-144210 ; Mac
-monitor_speed = 2000000 ;460800 ;921600
+monitor_speed = 2000000 ;460800 ;921600 ;2000000
 ;monitor_port = COM1 ; Windows
 ;monitor_port = /dev/ttyUSB0 ; Linux
 ;monitor_port = /dev/cu.usbserial-144210 ; Mac
@@ -150,7 +151,20 @@ build_flags =
     ; Other Hardware Options
     ;-D NO_BUTTONS          ; if your hardware has no physical buttons
     ;-D SD_CARD             ; if your hardware has an sd card slot
+    ;-D CARD_DETECT_HIGH    ; SD card-detect line reads HIGH when a card is
+                            ;  present (the default assumes active LOW)
     ;-D PARALLEL_BUS        ; if your hardware has userport parallel interface
+    ;-D ENABLE_PARALLEL     ; parallel CABLE (not the userport bus). Defines the
+                            ;  PIN_PARALLEL_* pins in the board pinmap, which is
+                            ;  what makes IECConfig.h define IEC_SUPPORT_PARALLEL
+                            ;  and enables the DolphinDOS / SpeedDOS fast loaders.
+                            ;  Only some pinmaps define these pins - check yours.
+    ;-D PARALLEL_BUS_X      ; legacy userport parallelBus class (lib/bus/userport).
+                            ;  Superseded by PARALLEL_BUS; note parallel.cpp's own
+                            ;  guard is commented out, so only the header and the
+                            ;  main.cpp call site are actually gated.
+    ;-D NO3STATE            ; FujiApple only: force the Apple II bus tri-state
+                            ;  path on boards with no pull-down on IO21
     ;-D JTAG                ; enable use with JTAG debugger
     ;-D BLUETOOTH_SUPPORT   ; enable BlueTooth support
 
@@ -161,6 +175,24 @@ build_flags =
     ;-D ENABLE_CONSOLE_TCP  ; enable tcp server for console
     ;-D ENABLE_DISPLAY      ; enable display service
     ;-D ENABLE_AUDIO        ; enable audio service
+    ;-D ENABLE_PS2          ; enable PS/2 keyboard support
+
+    ; Feature Options
+    ; These cost flash text rather than saving it - the opposite of the gates
+    ; below. On an ESP32 (non-S3) board check the iram0_2_seg headroom before
+    ; adding one.
+    -D EXTRA_DISK_FORMATS  ; register the .arc/.sda, .g71, .g81 and .p81
+                            ;  filesystems. Compiled either way; this only
+                            ;  adds them to MFSOwner's list.
+    -D EXTRA_FASTLOADERS   ; compile the fast loader IMPLEMENTATIONS
+                            ;  (IEC_IMPL_SOFTLOAD). Detection is always built:
+                            ;  without this a recognised loader is logged and
+                            ;  declined, and the C64 falls back to the standard
+                            ;  protocol. Also costs IRAM (iram0_0_seg) for the
+                            ;  RAMFUNC byte codecs - a separate budget from
+                            ;  flash text, see the gate notes below.
+    ;-D USE_VDRIVE          ; device 30 (iecMeatloaf) starts with use_vdrive
+                            ;  true instead of false
 
     ; Memory Options
     ;-D MIN_CONFIG
@@ -169,10 +201,59 @@ build_flags =
                             ;  boards without PSRAM; loses sorting, listing
                             ;  re-use, and makes dir_seek() re-list)
 
+    ; Feature Gates - each drops one large library from the link.
+    ;
+    ; A gate set HERE applies to every board; set one in an [env:...] section
+    ; instead when only that board needs it. They exist to buy flash text: the
+    ; ESP32 (non-S3) window (iram0_2_seg) is 3,342,304 bytes and is the binding
+    ; constraint on those boards, while the S3 and P4 windows are large enough
+    ; that no gate is needed. Every gate costs a real feature.
+    ;
+    ; Figures are .flash.text bytes measured on fujiloaf-rev0 (2026-08-25) by
+    ; diffing the linker map of an all-gates build against the baseline, so
+    ; they include the gated library AND the caller code that goes with it.
+    ; The ten below free 1,067,152 bytes if all are set.
+    ;
+    ;-D DISABLE_LOCATEDB        ; 406,890 - sqlite3. Removes the 'updatedb' and
+    ;                             'locate' console commands. Sits inside
+    ;                             #ifdef SD_CARD, so frees nothing on a board
+    ;                             with no SD slot.
+    ;-D DISABLE_SSH             ; 139,761 - libssh. Removes sftp://, the N: SSH
+    ;                             protocol, and mDNS _sftp-ssh discovery.
+    ;-D DISABLE_TAPE            ; 119,284 - tapclean. Removes .tap/.dmp/.htap
+    ;                             and the T-C / T-I drive commands. Tape decode
+    ;                             effectively needs PSRAM anyway.
+    ;-D DISABLE_NFS             ;  85,287 - libnfs. Removes nfs://.
+    ;-D DISABLE_WEBDAV_CLIENT   ;  78,796 - expat. An N: HTTP PROPFIND listing
+    ;                             yields no entries. The WebDAV SERVER in
+    ;                             lib/www/ is untouched.
+    -D DISABLE_RETROPIXELS     ;  75,494 - removes the retropixels: encoder
+    ;                             (image conversion to C64 formats).
+    -D DISABLE_ISCSI           ;  52,633 - libiscsi. Removes iscsi://.
+    ;-D DISABLE_AFP             ;  48,810 - afpfs-ng. Removes afp://.
+    ;-D DISABLE_ARCHIVE_7Z      ;  15,779 - libarchive's .7z reader.
+    -D DISABLE_ARCHIVE_XAR      ;  12,071 - libarchive's .xar reader. A xar is
+    ;                             an Apple installer container; nothing a
+    ;                             Commodore meets, hence on by default.
+    ;
+    ; Gates already excluded by another flag are no-ops: the tape, sftp, nfs,
+    ; afp and iscsi filesystems are all inside #ifndef MIN_CONFIG, so those
+    ; five free nothing on a MIN_CONFIG board. DISABLE_LOCATEDB is inside
+    ; #ifdef SD_CARD and frees nothing without an SD slot. RETROPIXELS,
+    ; ARCHIVE_7Z and ARCHIVE_XAR are inside neither, so those three pay on
+    ; every board.
+    ;
+    ; The two ARCHIVE gates drop libarchive's own reader objects and nothing
+    ; else. They do NOT free libzstd (62 KB) or liblzma (18 KB), as was first
+    ; assumed: libarchive's ZIP reader references both, for zip's zstd and
+    ; xz/lzma compression methods, so those two archives are in every image
+    ; that can read a .zip. Measured on the linker map, not assumed.
+
     ; GPIO Expander Selection (select only one if available)
-    ;-D GPIOX_PCF8575
-    ;-D GPIOX_MCP23017
-    ;-D GPIOX_XRA1405
+    ;-D GPIOX_PCF8575           ; I2C - https://www.ti.com/product/PCF8575
+    ;-D GPIOX_MCP23017          ; I2C - https://www.microchipdirect.com/product/MCP23017-E/SP
+    ;-D GPIOX_MCP23S17          ; SPI - https://www.microchipdirect.com/product/MCP23S17-E/SP
+    ;-D GPIOX_XRA1405           ; SPI - https://www.maxlinear.com/ds/xra1405.pdf
 
     ; DEBUG Options
     -D DEBUG_SPEED=${env.monitor_speed}
@@ -186,6 +267,9 @@ build_flags =
     ;-D NO_VIRTUAL_KEYBOARD
     ;-D DBUG2 ; enable monitor messages for a release build
     ;-D RUN_TESTS
+    ;-D TOO_MUCH_DEBUG      ; per-accept logging in fnTcpServer
+    ;-D UNIT_TESTS          ; #undef DEBUG in include/debug.h, silencing every
+                            ;  Debug_print* macro
     ;-D CONFIG_MDNS_ENABLE_DEBUG_PRINTS
 
 build_unflags =
@@ -378,19 +462,6 @@ build_flags =
     -D ENABLE_DISPLAY
     -D ENABLE_CONSOLE
     -D ENABLE_CONSOLE_TCP
-    ; The newer disk and archive formats - .arc/.sda, .g71, .g81, .p81 - are
-    ; opt-in because they do not fit alongside everything else in the ESP32's
-    ; ~3.3 MB iram0_2_seg flash-text window. The S3 has room; a plain ESP32
-    ; board is roughly 5 KB short with them all registered, so it leaves them
-    ; out rather than failing to link. .p64, .nib/.nb2/.nbz and .g64 are always
-    ; built.
-    -D EXTRA_DISK_FORMATS
-    ; The session-owning software fast loaders - GI Joe, Nippon, ULoad3, ELoad1
-    ; - are opt-in for the same reason: each takes the bus and serves a whole
-    ; transfer itself, and together they put a plain ESP32 about 600 bytes over
-    ; that same window. Detection is always compiled, so a board without this
-    ; flag still recognises those loaders and falls back cleanly.
-    -D EXTRA_FASTLOADERS
 
 [env:esp32-s3-makemagazin]
 extends = esp32_base
@@ -503,7 +574,6 @@ build_flags =
     -D ENABLE_CONSOLE
     -D ENABLE_CONSOLE_TCP
 
-
 [env:esp32-s3-dev-kit-n8r8]
 extends = esp32_base
 board = esp32-s3-wroom-1-n8r8
@@ -532,6 +602,17 @@ board = esp32-p4nrw32
 build_flags =
     ${env.build_flags}
     -D PINMAP_WAVESHARE_P4_MODULE_DEV_KIT
+    -D SD_CARD
+    -D ENABLE_DISPLAY
+    -D ENABLE_CONSOLE
+    -D ENABLE_CONSOLE_TCP
+
+[env:wt9932p4-tiny]
+extends = esp32_base
+board = esp32-p4nrw32
+build_flags =
+    ${env.build_flags}
+    -D PINMAP_WT9932P4_TINY
     -D SD_CARD
     -D ENABLE_DISPLAY
     -D ENABLE_CONSOLE

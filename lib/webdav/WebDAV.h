@@ -5,9 +5,15 @@
 #ifndef WebDAV_H
 #define WebDAV_H
 
-#include <expat.h>
 #include <string>
 #include <vector>
+
+// DISABLE_WEBDAV_CLIENT drops the expat XML parser (~74 KB of flash text).
+// The class keeps its shape so NetworkProtocolHTTP needs no #ifdef; a PROPFIND
+// listing simply yields no entries.
+#ifndef DISABLE_WEBDAV_CLIENT   // MEATLOAF-GATE
+#include <expat.h>
+#endif
 
 // using namespace std;
 
@@ -36,6 +42,22 @@ public:
          */
         std::string fileSize;
     };
+
+#ifdef DISABLE_WEBDAV_CLIENT   // MEATLOAF-GATE
+    // NOTE the inverted convention: begin_parser() and parse() return TRUE on
+    // FAILURE (see NetworkProtocolHTTP::open_dir_handle, which treats a true
+    // return as an error and gives up). So the stubs return FALSE - "fine, carry
+    // on" - and the listing then walks an empty entries vector and reports
+    // end-of-directory. Returning true here would turn every N: PROPFIND into
+    // NETWORK_ERROR_GENERAL instead of an empty listing.
+    bool begin_parser() { return false; }
+    void end_parser(bool clear_entries = false) { if (clear_entries) clear(); }
+    bool parse(const char *, int, int) { return false; }
+    std::vector<DAVEntry>::iterator rewind() { return entries.begin(); }
+    void clear() { entries.clear(); }
+    std::vector<DAVEntry> entries;
+};
+#else
 
     /**
      * @brief Called to setup everything before processing XML
@@ -119,5 +141,6 @@ protected:
      */
     int entriesCounter;
 };
+#endif // !DISABLE_WEBDAV_CLIENT
 
 #endif /* WebDAV_H */

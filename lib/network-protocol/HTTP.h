@@ -1,7 +1,9 @@
 #ifndef NETWORKPROTOCOLHTTP_H
 #define NETWORKPROTOCOLHTTP_H
 
+#ifndef DISABLE_WEBDAV_CLIENT   // MEATLOAF-GATE
 #include <expat.h>
+#endif
 
 #include "WebDAV.h"
 #include "FS.h"
