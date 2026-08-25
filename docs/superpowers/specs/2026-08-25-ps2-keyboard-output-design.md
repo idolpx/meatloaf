@@ -45,7 +45,9 @@ components/ps2/                   [vendored, patched — see Patches]
   CMakeLists.txt                  P3
 
 lib/device/ps2/ps2.{h,cpp}                 [new] PS2KeyboardDevice + global ps2Keyboard
-lib/device/ps2/ps2_keynames.{h,cpp}        [new] pure logic, natively testable
+lib/device/ps2/ps2_keynames.{h,cpp}        [new] key-name table, natively testable
+lib/console/dos_encode.{h,cpp}             [mod] encodeAsciiCommand — shares the
+                                                 0xNN escape walk, no PETSCII
 lib/console/Commands/PS2Commands.{h,cpp}   [new] thin `ps2` command front-end
 
 include/pinmap_defaults.h                  [fix] DELETE the PS/2 block entirely
@@ -447,8 +449,12 @@ a different RESTORE key" into "edit a file" during discovery.
 ### Native — `test/native/test_ps2_keys/`
 
 `lib/console` and `lib/device` are not compiled natively, so the pure logic lives
-in `lib/device/ps2/ps2_keynames.{h,cpp}` with no device includes — mirroring
-`test/native/test_console_dos/`, which tests `encodeDosCommand` the same way.
+in units with no device includes — mirroring `test/native/test_console_dos/`,
+which tests `encodeDosCommand` the same way. The key-name table lives in
+`lib/device/ps2/ps2_keynames.{h,cpp}`; the escape decoder is **not cloned**
+there but shared with `encodeDosCommand` as a second entry point,
+`ESP32Console::encodeAsciiCommand()`, since that function already implements
+exactly these semantics and only the PETSCII transform differs.
 
 - `lookupKey()`: case-insensitivity, unknown-name rejection, keymap override
 - the `0xNN` run-escape decoder: run semantics, odd-digit-count rejection,
