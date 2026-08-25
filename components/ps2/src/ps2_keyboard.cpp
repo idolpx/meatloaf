@@ -214,27 +214,31 @@ int PS2Keyboard::keyup(scancodes::Key key)
   }
   return send_packet(&packet);
 }
-void PS2Keyboard::type(scancodes::Key key)
+int PS2Keyboard::type(scancodes::Key key)
 {
-  keydown(key);
+  int result = 0;
+  if (keydown(key) != 0) result = -1;
   vTaskDelay(pdMS_TO_TICKS(10));
-  keyup(key);
+  if (keyup(key) != 0) result = -1;
+  return result;
 }
-void PS2Keyboard::type(std::initializer_list<scancodes::Key> keys)
+int PS2Keyboard::type(std::initializer_list<scancodes::Key> keys)
 {
+  int result = 0;
   std::stack<scancodes::Key> stack;
   for (auto key : keys)
   {
-    keydown(key);
+    if (keydown(key) != 0) result = -1;
     stack.push(key);
     vTaskDelay(pdMS_TO_TICKS(10));
   }
   while (!stack.empty())
   {
-    keyup(stack.top());
+    if (keyup(stack.top()) != 0) result = -1;
     stack.pop();
     vTaskDelay(pdMS_TO_TICKS(10));
   }
+  return result;
 }
 int PS2Keyboard::type(const char *str)
 {
@@ -579,13 +583,13 @@ int PS2Keyboard::type(const char *str)
     {
       if (keydown(scancodes::Key::K_LSHIFT) != 0) result = -1;
       vTaskDelay(pdMS_TO_TICKS(10));
-      type(key);
+      if (type(key) != 0) result = -1;
       vTaskDelay(pdMS_TO_TICKS(10));
       if (keyup(scancodes::Key::K_LSHIFT) != 0) result = -1;
     }
     else
     {
-      type(key);
+      if (type(key) != 0) result = -1;
     }
     i++;
   }

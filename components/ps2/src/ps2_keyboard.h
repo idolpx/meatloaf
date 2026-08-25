@@ -46,8 +46,8 @@ namespace ps2dev
     bool is_caps_lock_led_on();
     int keydown(scancodes::Key key);
     int keyup(scancodes::Key key);
-    void type(scancodes::Key key);
-    void type(std::initializer_list<scancodes::Key> keys);
+    int type(scancodes::Key key);
+    int type(std::initializer_list<scancodes::Key> keys);
     int type(const char *str);
     void keyHid_send(uint8_t btkey, bool keyDown);
     void keyHid_send_CCONTROL(uint16_t btkey, bool keyDown);
