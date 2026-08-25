@@ -82,8 +82,8 @@ namespace ps2dev
     gpio_num_t _ps2data;
     UBaseType_t _config_task_priority = DEFAULT_TASK_PRIORITY;
     BaseType_t _config_task_core = DEFAULT_TASK_CORE;
-    TaskHandle_t _task_process_host_request;
-    TaskHandle_t _task_send_packet;
+    TaskHandle_t _task_process_host_request = nullptr;
+    TaskHandle_t _task_send_packet = nullptr;
     QueueHandle_t _queue_packet;
     SemaphoreHandle_t _mutex_bus;
     // Written ONLY by begin() (true, last statement) and end() (false, first
