@@ -228,7 +228,7 @@ bool IECBusHandler::startTurbodiskLoad(const uint8_t *cmd, uint8_t cmdLen)
 #endif
 
 
-#ifdef IEC_SUPPORT_SOFTLOAD
+#ifdef IEC_IMPL_SOFTLOAD
 
 bool IECBusHandler::runFastLoader(IECDevice *dev, uint8_t variant, uint8_t param, uint8_t rxtx, const uint8_t *cmd, uint8_t cmdLen, const uint8_t *captured)
 {

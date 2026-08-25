@@ -92,7 +92,7 @@ class IECBusHandler
   bool enableFastLoader(IECDevice *dev, uint8_t protocol, bool enable);
   void fastLoadRequest(IECDevice *dev, uint8_t loader, uint8_t request);
 
-#ifdef IEC_SUPPORT_SOFTLOAD
+#ifdef IEC_IMPL_SOFTLOAD
   // Switch in a software fast loader that has just been identified from the
   // code the computer uploaded -- called by IECFileDevice::startFastLoader.
   // "cmd"/"cmdLen" are the whole M-E command, which for some loaders carries

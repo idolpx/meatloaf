@@ -770,9 +770,22 @@ Important Notes above.
   `lib/bus/iec/IECBusHandlerInternal.h`. `IECBusHandler.cpp` went from ~4500 lines to ~1900.
   The eight legacy files that were in that directory (the pre-dhansel protocol layer, compiled but
   included by nothing) were deleted.
-- **Builds**: `lolin-d32-pro` Flash 42.6% RAM 32.7% (detection only), `esp32-s3-devkitc-1` Flash
-  82.2% RAM 31.0% (all five loaders compiled), plus `iec-nugget` and `fujiloaf-rev0`. The ~430 bytes
-  of RAM against the pre-split build is the inline pin accessors being emitted per translation unit.
+- **Builds**: `esp32-s3-devkitc-1` Flash 82.9% (every loader compiled), `lolin-d32-pro`,
+  `iec-nugget` and `fujiloaf-rev0` all 42.6% (detection only). The ~430 bytes of RAM against the
+  pre-split build is the inline pin accessors being emitted per translation unit.
+- **`fujiloaf-rev0`'s flash window is the constraint that shaped the whole layout, and it bit five
+  times.** In order, the things that recovered space, all of which are still in place and should not
+  be undone: `EXTRA_FASTLOADERS` gating the loader implementations; the GEOS key-capture window
+  gated on `IEC_IMPL_SOFTLOAD`; the 28-case loader-name switch and later the 54-case family switch
+  both replaced by tables; the handler table gated on `IEC_IMPL_SOFTLOAD`; and finally the dispatch
+  routing itself -- `runFastLoader()` and `startFastLoader()`'s switch -- compiled only where an
+  implementation exists. **`#pragma GCC optimize("Os")` makes this segment BIGGER**, measured at
+  629 -> 977 bytes over; that is now the third independent time this repository has seen it.
+- **What is in the CRC and name tables is NOT what costs flash text here.** `fastload.cpp.o` is
+  1818 bytes in total including every table; gating its 120 CRC rows saved exactly zero, because
+  they are rodata in a different segment. Measure with `xtensa-esp-elf-size -A` before trading a
+  feature away -- two rounds were spent gating the wrong thing on the assumption that the big
+  tables were the problem.
 - **Nothing here is hardware-tested.** No C64 has been attached. Detection has never seen a real
   upload, so no table entry is confirmed, and no transfer has ever run. The next step is to load
   something with a real loader and read the `M-E address[…] crc[…]` lines the drive logs.

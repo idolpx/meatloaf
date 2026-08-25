@@ -41,17 +41,19 @@
 // corresponding fast-load protocols (saves program memory in small devices)
 // Hardware fast loaders. These require specific hardware on the host and/or the drive.
 // Some upload 6502 code into the drive RAM like the software fast loaders.
-#define IEC_FP_JIFFY        0 // JiffyDos
-#define IEC_FP_EPYX         1 // EPYX FastLoad
-#define IEC_FP_FC3          2 // Final Cartridge 3
-#define IEC_FP_AR6          3 // Action Replay 6
+#define IEC_FP_FAST_SERIAL  0  // CBM Fast Serial
+#define IEC_FP_JIFFY        1  // JiffyDos
+#define IEC_FP_EPYX         2  // EPYX FastLoad
+#define IEC_FP_FC3          3  // Final Cartridge 3
+#define IEC_FP_AR6          4  // Action Replay 6
 
 // Parallel fast loaders.
 #if defined(PIN_PARALLEL_PC2) && defined(PIN_PARALLEL_FLAG2)
-#define IEC_FP_DOLPHIN      4 // Dolphin Dos
-#define IEC_FP_SPEEDDOS     5 // Speed Dos
+#define IEC_IEEE_488        5  // IEEE 488
+#define IEC_FP_DOLPHIN      6  // Dolphin Dos
+#define IEC_FP_SPEEDDOS     7  // Speed Dos
 #ifdef PIN_PARALLEL_PA2
-#define IEC_FP_WIC64        6 // WiC64 Protocol Available
+#define IEC_FP_WIC64        8  // WiC64 Protocol Available
 #endif
 #endif
 
@@ -59,25 +61,25 @@
 // then start it with M-E, so they need no extra wiring -- unlike the parallel
 // loaders above they are available on every board. Detection is by CRC of the
 // uploaded bytes, see fastload.h.
-#define IEC_FP_HYPRALOAD    7  // Hypra-Load (64er Magazin)
-#define IEC_FP_TURBODISK    8  // Turbodisk
-#define IEC_FP_DREAMLOAD    9  // Dreamload
-#define IEC_FP_ULOAD3       10  // ULoad Model 3
-#define IEC_FP_GIJOE        11  // GI Joe
-#define IEC_FP_GEOS         12  // GEOS
-#define IEC_FP_WHEELS       13  // Wheels (needs IEC_FP_GEOS)
-#define IEC_FP_NIPPON       14  // Nippon
-#define IEC_FP_ELOAD1       15  // ELoad version 1
-#define IEC_FP_MMZAK        16  // Maniac Mansion / Zak McKracken
-#define IEC_FP_N0SDOS       17  // N0SDOS file read
-#define IEC_FP_SAMSJOURNEY  18 // Sam's Journey
-#define IEC_FP_ULTRABOOT    19 // Ultraboot
-#define IEC_FP_KRILL        20 // Krill's loader (r58 through r192)
-#define IEC_FP_BOOZE        21 // Booze Design
-#define IEC_FP_SPINDLE      22 // Spindle 2.1 and later
-#define IEC_FP_BITFIRE      23 // Bitfire 0.1 through 1.3
-#define IEC_FP_SPARKLE      24 // Sparkle 1.0 through 3.2
-#define IEC_FP_TRANSWARP    25 // Transwarp
+#define IEC_FP_HYPRALOAD    9  // Hypra-Load (64er Magazin)
+#define IEC_FP_TURBODISK    10 // Turbodisk
+#define IEC_FP_DREAMLOAD    11 // Dreamload
+#define IEC_FP_ULOAD3       12 // ULoad Model 3
+#define IEC_FP_GIJOE        13 // GI Joe
+#define IEC_FP_GEOS         14 // GEOS
+#define IEC_FP_WHEELS       15 // Wheels (needs IEC_FP_GEOS)
+#define IEC_FP_NIPPON       16 // Nippon
+#define IEC_FP_ELOAD1       17 // ELoad version 1
+#define IEC_FP_MMZAK        18 // Maniac Mansion / Zak McKracken
+#define IEC_FP_N0SDOS       19 // N0SDOS file read
+#define IEC_FP_SAMSJOURNEY  20 // Sam's Journey
+#define IEC_FP_ULTRABOOT    21 // Ultraboot
+#define IEC_FP_KRILL        22 // Krill's loader (r58 through r192)
+#define IEC_FP_BOOZE        23 // Booze Design
+#define IEC_FP_SPINDLE      24 // Spindle 2.1 and later
+#define IEC_FP_BITFIRE      25 // Bitfire 0.1 through 1.3
+#define IEC_FP_SPARKLE      26 // Sparkle 1.0 through 3.2
+#define IEC_FP_TRANSWARP    27 // Transwarp
 
 // A session-owning software loader takes the bus after its M-E and serves the
 // whole transfer itself, so each one is a few KB of flash text. An ESP32 with

@@ -149,7 +149,7 @@ static const IECFastLoadCrcEntry s_crcTable[] =
   { 0xd2f2, IEC_FLV_HYPRALOAD,         IEC_FLRX_HYPRALOAD_10,     },
   { 0x5983, IEC_FLV_HYPRALOAD,         IEC_FLRX_HYPRALOAD_21,     },
 #endif
-#if defined(IEC_FP_KRILL) && defined(IEC_IMPL_SOFTLOAD)
+#ifdef IEC_FP_KRILL
   { 0x8667, IEC_FLV_KRILL_R146,        IEC_FLRX_NONE,             }, // r146 drvchkme
   { 0xe300, IEC_FLV_KRILL_R186,        IEC_FLRX_KRILL_CLOCK,      }, // second chunk
   { 0x19a4, IEC_FLV_KRILL_R184,        IEC_FLRX_KRILL_CLOCK,      }, // second chunk
@@ -192,20 +192,20 @@ static const IECFastLoadCrcEntry s_crcTable[] =
   { 0x40c3, IEC_FLV_KRILL_SLEEP,       IEC_FLRX_NONE,             }, // r184
   { 0x5088, IEC_FLV_KRILL_SLEEP,       IEC_FLRX_NONE,             }, // r164
 #endif
-#if defined(IEC_FP_SPINDLE) && defined(IEC_IMPL_SOFTLOAD)
+#ifdef IEC_FP_SPINDLE
   { 0x1fdc, IEC_FLV_SPINDLE_SLEEP,     IEC_FLRX_NONE,             },
 #endif
-#if defined(IEC_FP_BITFIRE) && defined(IEC_IMPL_SOFTLOAD)
+#ifdef IEC_FP_BITFIRE
   { 0x955d, IEC_FLV_BITFIRE_SLEEP,     IEC_FLRX_NONE,             },
 #endif
-#if defined(IEC_FP_TRANSWARP) && defined(IEC_IMPL_SOFTLOAD)
+#ifdef IEC_FP_TRANSWARP
   { 0xb20a, IEC_FLV_TRANSWARP_SLEEP,   IEC_FLRX_NONE,             },
 #endif
-#if defined(IEC_FP_BOOZE) && defined(IEC_IMPL_SOFTLOAD)
+#ifdef IEC_FP_BOOZE
   { 0x0c48, IEC_FLV_BOOZE,             IEC_FLRX_NONE,             },
   { 0x5f66, IEC_FLV_BOOZE,             IEC_FLRX_NONE,             },
 #endif
-#if defined(IEC_FP_BITFIRE) && defined(IEC_IMPL_SOFTLOAD)
+#ifdef IEC_FP_BITFIRE
   { 0x7cd6, IEC_FLV_BITFIRE_01,        IEC_FLRX_BITFIRE_CLOCK,    },
   { 0xf1ec, IEC_FLV_BITFIRE_01,        IEC_FLRX_BITFIRE_CLOCK,    },
   { 0x2b10, IEC_FLV_BITFIRE_03,        IEC_FLRX_BITFIRE_CLOCK,    },
@@ -327,33 +327,33 @@ static const IECFastLoadHandlerEntry s_handlerTable[] =
 #endif
   { 0x0205, IEC_FLV_NONE,              0 },
   { 0x0417, IEC_FLV_NONE,              0 },
-#if defined(IEC_FP_ULTRABOOT) && defined(IEC_IMPL_SOFTLOAD)
+#ifdef IEC_FP_ULTRABOOT
   { 0x0424, IEC_FLV_ULTRABOOT,         0 },
 #endif
 #ifdef IEC_FP_HYPRALOAD
   { 0x0401, IEC_FLV_HYPRALOAD,         0 },
   { 0x048b, IEC_FLV_HYPRALOAD,         0 },
 #endif
-#if defined(IEC_FP_KRILL) && defined(IEC_IMPL_SOFTLOAD)
+#ifdef IEC_FP_KRILL
   { 0x0205, IEC_FLV_KRILL_SLEEP,       0 },
 #endif
   { 0x020b, IEC_FLV_NONE,              1 },
-#if defined(IEC_FP_SPINDLE) && defined(IEC_IMPL_SOFTLOAD)
+#ifdef IEC_FP_SPINDLE
   { 0x0403, IEC_FLV_SPINDLE_SLEEP,     0 },
 #endif
-#if defined(IEC_FP_BITFIRE) && defined(IEC_IMPL_SOFTLOAD)
+#ifdef IEC_FP_BITFIRE
   { 0x0205, IEC_FLV_BITFIRE_SLEEP,     0 },
 #endif
-#if defined(IEC_FP_TRANSWARP) && defined(IEC_IMPL_SOFTLOAD)
+#ifdef IEC_FP_TRANSWARP
   { 0x030d, IEC_FLV_TRANSWARP_SLEEP,   0 },
 #endif
   { 0x0205, IEC_FLV_NONE,              1 },
   { 0x020a, IEC_FLV_NONE,              2 },
-#if defined(IEC_FP_KRILL) && defined(IEC_IMPL_SOFTLOAD)
+#ifdef IEC_FP_KRILL
   { 0x0300, IEC_FLV_KRILL_R146,        0 },
 #endif
   { 0x0209, IEC_FLV_NONE,              0 },
-#if defined(IEC_FP_KRILL) && defined(IEC_IMPL_SOFTLOAD)
+#ifdef IEC_FP_KRILL
   { 0x0770, IEC_FLV_KRILL_R186,        0 },
   { 0x0758, IEC_FLV_KRILL_R184,        0 },
   { 0x0770, IEC_FLV_KRILL_R184,        0 },
@@ -392,7 +392,7 @@ static const IECFastLoadHandlerEntry s_handlerTable[] =
   { 0x05f4, IEC_FLV_KRILL_R58PRE,      0 },
   { 0x0600, IEC_FLV_KRILL_R58PRE,      0 },
 #endif
-#if defined(IEC_FP_BOOZE) && defined(IEC_IMPL_SOFTLOAD)
+#ifdef IEC_FP_BOOZE
   { 0x0373, IEC_FLV_BOOZE,             0 },
   { 0x04b8, IEC_FLV_BOOZE,             0 },
 #endif
@@ -401,7 +401,7 @@ static const IECFastLoadHandlerEntry s_handlerTable[] =
   { 0x020f, IEC_FLV_NONE,              0 },
   { 0x0211, IEC_FLV_NONE,              0 },
   { 0x0205, IEC_FLV_NONE,              0 },
-#if defined(IEC_FP_BITFIRE) && defined(IEC_IMPL_SOFTLOAD)
+#ifdef IEC_FP_BITFIRE
   { 0x0700, IEC_FLV_BITFIRE_01,        0 },
   { 0x0700, IEC_FLV_BITFIRE_03,        1 },
   { 0x0700, IEC_FLV_BITFIRE_04,        2 },

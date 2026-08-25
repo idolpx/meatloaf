@@ -1106,6 +1106,15 @@ bool IECFileDevice::startFastLoader(uint8_t variant, uint8_t param, uint8_t rxtx
   (void) crc;
   if( m_handler==NULL ) return false;
 
+#ifndef IEC_IMPL_SOFTLOAD
+  // Detection only on this board: nothing can be dispatched to, so the routing
+  // below is not compiled. The M-E still reaches the drive's override, which
+  // logs the loader name and the CRC, and then falls through to the standard
+  // protocol.
+  (void) variant; (void) param; (void) rxtx; (void) cmd; (void) cmdLen;
+  return false;
+#else
+
   // Three of sd2iec's loaders are protocols IECBusHandler already speaks, at
   // the very same M-E addresses the signature matchers above watch for. Route
   // them to the existing request path rather than reimplementing them: the CRC
@@ -1157,6 +1166,7 @@ bool IECFileDevice::startFastLoader(uint8_t variant, uint8_t param, uint8_t rxtx
   // lets the M-E through so the host falls back to the standard protocol
   // instead of waiting for a transfer that will never start.
   return m_handler->runFastLoader(this, variant, param, rxtx, cmd, cmdLen, m_fastload.capturedData());
+#endif
 }
 #endif
 
