@@ -59,8 +59,8 @@ description = The internet is a massive floppy drive for your C64 with Meatloaf!
 
 ; EXPERIMENTAL
 ; ESP32-P4
-;environment = waveshare-p4-module-dev-kit   ; Waveshare ESP32-P4-Module-Dev-Kit           (ESP32-P4, 16M Flash, 32M PSRAM)
-;environment = wt9932p4-tiny                  ; Weijing WT9932P4 Tiny Board                 (ESP32-P4, 16M Flash, 32M PSRAM)
+;environment = waveshare-p4-module-dev-kit  ; Waveshare ESP32-P4-Module-Dev-Kit           (ESP32-P4, 16M Flash, 32M PSRAM)
+;environment = wt9932p4-tiny                ; Weijing WT9932P4 Tiny Board                 (ESP32-P4, 16M Flash, 32M PSRAM)
 
 ; NATIVE UNIT TESTING
 ;environment = native                       ; For running tests that don't require embedded hardware
