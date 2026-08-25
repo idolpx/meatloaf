@@ -311,6 +311,13 @@ protected:
 #ifdef IEC_SUPPORT_SECTOROPS
   virtual bool epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer);
   virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer);
+
+  // Block access falls back to the working directory's own container when
+  // there is no VDrive behind it -- a media image reached through the MFile
+  // chain has none. Cached because a loader reads hundreds of blocks; dropped
+  // whenever the working directory moves, since the container may have.
+  std::shared_ptr<MStream> sectorStream();
+  void releaseSectorStream();
 #ifdef IEC_IMPL_SOFTLOAD
   virtual uint8_t sectorsPerTrack(uint8_t track);
   virtual uint8_t imageType();
@@ -346,6 +353,11 @@ protected:
   uint64_t  m_timeStart;
 
   driveMemory m_memory;
+
+#ifdef IEC_SUPPORT_SECTOROPS
+  std::shared_ptr<MStream> m_sectorStream;
+  std::string              m_sectorStreamUrl;
+#endif
 };
 
 #endif // DRIVE_H

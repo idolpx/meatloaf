@@ -3076,6 +3076,12 @@ void iecDrive::set_cwd(std::string path, bool verified)
 
     std::string old_url = m_cwd->url;
 
+#ifdef IEC_SUPPORT_SECTOROPS
+    // The container may be about to change; a cached block stream on the old
+    // one would serve the wrong disk.
+    releaseSectorStream();
+#endif
+
     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Changing directory to [%s][%s]", m_cwd ? m_cwd->url.c_str() : "<null>", path.c_str());
     if ( m_cwd->url == path)
     {
@@ -3211,6 +3217,10 @@ mediatype_t iecDrive::mount(fnFile *f, const char *filename, uint32_t disksize, 
 // Unmount disk file
 void iecDrive::unmount()
 {
+#ifdef IEC_SUPPORT_SECTOROPS
+    releaseSectorStream();
+#endif
+
     Debug_printv("DRIVE[#%d] UNMOUNT\r\n", m_devnr);
 
     // if (m_cwd != nullptr)
@@ -3291,28 +3301,134 @@ void iecDrive::restoreActiveFromConfig()
 
 
 #ifdef IEC_SUPPORT_SECTOROPS
+
+// The container the working directory lives in, opened once and kept.
+//
+// VDrive is not always the thing holding the disk: a media image reached
+// through the MFile chain (mounted over the network, nested inside an archive,
+// a format VDrive does not know) has no VDrive behind it at all, and a fast
+// loader asking for a block would otherwise get nothing. The decoded stream
+// answers the same questions -- seekSector(), getSectorCount(), getTrackCount()
+// are all on MStream -- so it serves as the fallback.
+//
+// Three things about this are deliberate:
+//
+//   - `m_cwd->url` is used, not fullUrl(). For anything inside a container the
+//     url IS the container's path, which is exactly what is wanted here; the
+//     position within it belongs to pathInStream and must not come along, or
+//     getSourceStream() would select a FILE instead of handing back the whole
+//     medium.
+//   - The stream is CACHED. A loader reads hundreds of blocks, and building a
+//     fresh MFile and stream per sector would re-resolve the whole path each
+//     time -- over a network mount that is a round trip per block.
+//   - It is opened in|out, never plain out, which would truncate the image.
+std::shared_ptr<MStream> iecDrive::sectorStream()
+{
+    if ( m_cwd == nullptr )
+        return nullptr;
+
+    if ( m_sectorStream != nullptr && m_sectorStreamUrl == m_cwd->url )
+        return m_sectorStream;
+
+    m_sectorStream = nullptr;
+    m_sectorStreamUrl.clear();
+
+    std::unique_ptr<MFile> f( MFSOwner::File( m_cwd->url ) );
+    if ( f == nullptr )
+        return nullptr;
+
+    auto s = f->getSourceStream( std::ios_base::in | std::ios_base::out );
+    if ( s == nullptr || !s->isOpen() )
+        return nullptr;
+
+    m_sectorStream = s;
+    m_sectorStreamUrl = m_cwd->url;
+    return m_sectorStream;
+}
+
+
+void iecDrive::releaseSectorStream()
+{
+    m_sectorStream = nullptr;
+    m_sectorStreamUrl.clear();
+}
+
+
 bool iecDrive::epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer)
 {
-    return m_vdrive==nullptr ? false : m_vdrive->readSector(track, sector, buffer);
+    if ( m_vdrive != nullptr )
+        return m_vdrive->readSector(track, sector, buffer);
+
+    auto s = sectorStream();
+    if ( s == nullptr || !s->seekSector(track, sector, 0) )
+        return false;
+
+    // read() hands back at most one block, so a short return is normal and
+    // the loop is what makes 256 bytes arrive
+    uint32_t got = 0;
+    while ( got < 256 )
+    {
+        uint32_t n = s->read(buffer + got, 256 - got);
+        if ( n == 0 ) break;
+        got += n;
+    }
+
+    return got == 256;
 }
 
 
 bool iecDrive::epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer)
 {
-    return m_vdrive==nullptr ? false : m_vdrive->writeSector(track, sector, buffer);
+    if ( m_vdrive != nullptr )
+        return m_vdrive->writeSector(track, sector, buffer);
+
+    // No writability test beyond the attempt: isWritable is a property of
+    // MFile, not of the stream, and a read-only medium answers with a short
+    // write anyway.
+    auto s = sectorStream();
+    if ( s == nullptr || !s->seekSector(track, sector, 0) )
+        return false;
+
+    return s->write(buffer, 256) == 256;
 }
 
 
 #ifdef IEC_IMPL_SOFTLOAD
 uint8_t iecDrive::sectorsPerTrack(uint8_t track)
 {
-    return m_vdrive==nullptr ? 0 : m_vdrive->sectorsPerTrack(track);
+    if ( m_vdrive != nullptr )
+        return m_vdrive->sectorsPerTrack(track);
+
+    auto s = sectorStream();
+    if ( s == nullptr )
+        return 0;
+
+    uint16_t n = s->getSectorCount(track);
+    return (n > 0 && n < 256) ? (uint8_t) n : 0;
 }
 
 
 uint8_t iecDrive::imageType()
 {
-    return m_vdrive==nullptr ? IEC_IMG_NONE : m_vdrive->imageFormat();
+    if ( m_vdrive != nullptr )
+        return m_vdrive->imageFormat();
+
+    auto s = sectorStream();
+    if ( s == nullptr )
+        return IEC_IMG_NONE;
+
+    // There is no image-type field to read, so it comes from the geometry.
+    // Only the three shapes a loader actually branches on are reported; a
+    // medium that is not one of them answers IEC_IMG_NONE, which is what makes
+    // a loader like Ultraboot decline it rather than address it wrongly.
+    uint16_t tracks  = s->getTrackCount();
+    uint16_t sectors = s->getSectorCount(1);
+
+    if ( tracks >= 35 && tracks <= 42 && sectors == 21 ) return IEC_IMG_1541;
+    if ( tracks >= 70 && tracks <= 84 && sectors == 21 ) return IEC_IMG_1571;
+    if ( tracks == 80 && sectors == 40 )                 return IEC_IMG_1581;
+
+    return IEC_IMG_NONE;
 }
 #endif
 #endif

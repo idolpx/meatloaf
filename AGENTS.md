@@ -714,6 +714,20 @@ Important Notes above.
   Ultraboot and Spindle both do, so the dispatch tries each in turn and the first that claims the
   command wins. That is why `memExec()` reports whether a table ROW matched separately from which
   variant it resolved -- those rows carry `IEC_FLV_NONE` on purpose.
+- **Block access falls back to the working directory's own container when there is no VDrive.**
+  VDrive is not always what holds the disk: an image reached through the MFile chain -- mounted over
+  the network, nested inside an archive, or in a format VDrive does not know -- has none, and a fast
+  loader asking for a block would otherwise get nothing. `iecDrive::sectorStream()` opens the
+  container once and every sector hook falls through to it. Three things about it are load-bearing:
+  it uses `m_cwd->url` and NOT `fullUrl()`, because for anything inside a container the url IS the
+  container and the position within it must not come along or `getSourceStream()` selects a FILE
+  instead of the whole medium; it is CACHED, because a loader reads hundreds of blocks and rebuilding
+  the MFile per sector is a path resolution -- a network round trip -- each time; and it is opened
+  `in|out`, never plain `out`, which would truncate the image. The cache is dropped in `set_cwd()`
+  and `unmount()`, since the container may have changed under it.
+- **`imageType()` has no field to read on that path, so it comes from the geometry** -- track count
+  plus sectors on track 1. Only the three shapes a loader branches on are reported; anything else
+  answers `IEC_IMG_NONE`, which is what makes Ultraboot decline a disk rather than address it wrongly.
 - **Those seven all need image GEOMETRY, which is why they were blocked and are not any more.** Each
   walks the disk itself instead of asking for a file, so it needs to know where a track ends
   (`d64_sectors_per_track` in sd2iec) and which drive type the image is -- Ultraboot refuses
