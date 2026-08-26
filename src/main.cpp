@@ -191,6 +191,7 @@ void main_setup()
     // command set is available from the first prompt.
     console.registerSystemCommands();
     console.registerDisplayCommands();
+    console.registerPS2Commands();
     console.registerIECCommands();
     console.registerNetworkCommands();
     console.registerVFSCommands();

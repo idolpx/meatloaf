@@ -11,6 +11,7 @@
 
 #include "Commands/CoreCommands.h"
 #include "Commands/DisplayCommands.h"
+#include "Commands/PS2Commands.h"
 #include "Commands/SystemCommands.h"
 #include "Commands/IECCommands.h"
 #include "Commands/NetworkCommands.h"
@@ -190,6 +191,11 @@ namespace ESP32Console
         registerCommand(getLEDCommand());
         registerCommand(getShowCommand());
 #endif
+    }
+
+    void Console::registerPS2Commands()
+    {
+        registerCommand(getPS2Command());
     }
 
     void Console::registerIECCommands()
