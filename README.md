@@ -271,6 +271,34 @@ commands you would expect and several you would not:
 * `open` / `read` / `write` / `close` / `channels` — open a file channel on the drive by secondary
   address and move bytes through it, exactly as a C64 would.
 
+## Short codes — a whole URL in a few characters
+
+Nested URLs are powerful, but nobody wants to type
+
+```
+LOAD"HTTP://SERVER.COM/COLLECTIONS/DEMOS/1991/PARTY.ZIP/DISK.D64/START.PRG",8
+```
+
+on a C64 keyboard — let alone read it down the phone to a friend. **Meatloaf Short Codes** stand in
+for any URL, however long:
+
+```BASIC
+LOAD"ML:HERO",8
+```
+
+Create a profile at **[meatloaf.cc/sc](https://meatloaf.cc/sc)** and register your own. The `ML:`
+service looks the code up and redirects to the full URL, so a short code works anywhere a URL does. (HTTP/FTP/TNFS/etc)
+
+Anything you put after the code is passed straight through, so a code can name a container and you
+still walk into it the usual way:
+
+```BASIC
+LOAD"ML:DEMOS/DISK.D64/START.PRG",8
+```
+
+Short enough for a forum post, a tweet, a video caption, or a label on the disk box — and if the file
+ever moves, you repoint the code instead of reprinting the label.
+
 ## Select on your PC, load on your Commodore
 
 With the "Send to Meatloaf" browser extension you can send programs to your Meatloaf and then load
