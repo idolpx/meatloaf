@@ -93,15 +93,15 @@ int WiFiManager::start()
     if (_wifi_event_group == nullptr)
         _wifi_event_group = xEventGroupCreate();
 
-    // Make sure our network interface is initialized
-    ESP_ERROR_CHECK(esp_netif_init());
-    //log_wifi_heap_checkpoint("after esp_netif_init()");
-
     // Set custom MAC Address
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     mac[0]=0x00; mac[1]=0x80; mac[2]=0x10; // OUI 00:80:10 Commodore International
     esp_base_mac_addr_set(mac);
+
+    // Make sure our network interface is initialized
+    ESP_ERROR_CHECK(esp_netif_init());
+    //log_wifi_heap_checkpoint("after esp_netif_init()");
 
     // Assume we've already done these steps if _wifi_sta has a value
     if (_wifi_sta == nullptr)
