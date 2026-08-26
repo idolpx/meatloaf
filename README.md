@@ -279,7 +279,7 @@ Nested URLs are powerful, but nobody wants to type
 LOAD"HTTP://SERVER.COM/COLLECTIONS/DEMOS/1991/PARTY.ZIP/DISK.D64/START.PRG",8
 ```
 
-on a C64 keyboard — let alone read it down the phone to a friend. **Meatloaf Short Codes** stand in
+on a C64 keyboard — let alone read it on the phone to a friend. **Meatloaf Short Codes** stand in
 for any URL, however long:
 
 ```BASIC
