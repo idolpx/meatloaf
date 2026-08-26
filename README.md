@@ -210,7 +210,7 @@ A stock 1541 moves about 300 bytes per second. Meatloaf speaks the protocols tha
 **Hardware and cartridge loaders**, on every board: CBM Fast Serial (C128 burst), **JiffyDOS**, Epyx
 FastLoad, Final Cartridge 3, Action Replay 6.
 
-**Parallel loaders**, on boards wired for a parallel cable: DolphinDOS, SpeedDOS, IEEE-488, WiC64.
+**Parallel loaders**, on boards wired for a parallel cable: DolphinDOS, SpeedDOS, IEEE-488, WiC64. (Still in development)
 
 **Software loaders** — the ones a game uploads into the drive's RAM with `M-W` and starts with `M-E`.
 Meatloaf recognises **65 uploaded routines across 19 families** by CRC of the uploaded code, the same
