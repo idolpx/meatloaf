@@ -7,6 +7,12 @@ namespace ps2dev
   // A host request to send is CLK high && DATA low.  The host's sequence is
   // CLK low (inhibit) -> DATA low (start bit) -> CLK released, so the edge
   // that CREATES the condition is CLK rising.
+  // A2: ONE spinlock at file scope.  It was previously a stack local in each
+  // of write() and read(), which excludes nothing -- every call locked its
+  // own private copy, and what actually protected the byte was the
+  // incidental interrupt-disable that taskENTER_CRITICAL performs.
+  static portMUX_TYPE ps2_mux = portMUX_INITIALIZER_UNLOCKED;
+
   static void IRAM_ATTR ps2_clk_isr(void *arg)
   {
     PS2Device *dev = static_cast<PS2Device *>(arg);
@@ -173,19 +179,38 @@ namespace ps2dev
     // rather than deferred (see notifyIfHostWaiting() below).
     gpio_intr_disable(_ps2clk);
 
-    portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
-    taskENTER_CRITICAL(&mux);
+    // A3: the critical section is PER BIT, not per byte.  Holding interrupts
+    // off for a whole byte is ~900us on the core that runs WiFi and lwIP,
+    // and it is unnecessary: in device-to-host transfers the DEVICE owns the
+    // clock, so being preempted between bits merely stretches the clock,
+    // which hosts tolerate by design.  Same total time, eleven windows for
+    // interrupts to breathe.
 
+    // start bit
+    taskENTER_CRITICAL(&ps2_mux);
     golo(_ps2data);
     esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     // device sends on falling clock
-    golo(_ps2clk); // start bit
+    golo(_ps2clk);
     esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
     gohi(_ps2clk);
     esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    taskEXIT_CRITICAL(&ps2_mux);
 
     for (i = 0; i < 8; i++)
     {
+      // A4: the host pulls CLK low to inhibit.  Checked between bits, where
+      // the clock is high and we are not mid-edge.  Without this, write()
+      // tested for an idle bus once on entry and then clocked the whole byte
+      // into a host that had stopped listening -- losing it silently.
+      if (gpio_get_level(_ps2clk) == 0)
+      {
+        gohi(_ps2data);            // never leave the bus held
+        gpio_intr_enable(_ps2clk); // symmetric with the disable above
+        return -1;                 // caller may retry
+      }
+
+      taskENTER_CRITICAL(&ps2_mux);
       if (data & 0x01)
       {
         gohi(_ps2data);
@@ -199,11 +224,14 @@ namespace ps2dev
       esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
       gohi(_ps2clk);
       esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+      taskEXIT_CRITICAL(&ps2_mux);
 
       parity = parity ^ (data & 0x01);
       data = data >> 1;
     }
+
     // parity bit
+    taskENTER_CRITICAL(&ps2_mux);
     if (parity)
     {
       gohi(_ps2data);
@@ -217,22 +245,24 @@ namespace ps2dev
     esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
     gohi(_ps2clk);
     esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    taskEXIT_CRITICAL(&ps2_mux);
 
     // stop bit
+    taskENTER_CRITICAL(&ps2_mux);
     gohi(_ps2data);
     esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     golo(_ps2clk);
     esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
     gohi(_ps2clk);
     esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
-
-    taskEXIT_CRITICAL(&mux);
+    taskEXIT_CRITICAL(&ps2_mux);
 
     gpio_intr_enable(_ps2clk);
     notifyIfHostWaiting();
 
     return 0;
   }
+
   int PS2Device::write_wait_idle(uint8_t data, uint64_t timeout_micros)
   {
     int64_t start_time = esp_timer_get_time();
@@ -242,6 +272,11 @@ namespace ps2dev
       {
         return -1;
       }
+      // A6: this used to spin flat out for up to 1500us.  esp_rom_delay_us
+      // is still a busy wait, but a quarter clock period between polls is
+      // ample resolution for a bus that changes on a 40us half-period, and
+      // it stops the loop hammering the bus-state reads.
+      esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     }
     return write(data);
   }
@@ -265,17 +300,22 @@ namespace ps2dev
     // Same disable/re-enable mechanism as write() above -- see its comment.
     gpio_intr_disable(_ps2clk);
 
-    portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
-    taskENTER_CRITICAL(&mux);
+    // A3: per-bit critical sections, as in write().  Here the HOST drives
+    // DATA and we drive CLK, so each sample stays in the same section as the
+    // clock pulse that follows it -- splitting those two would let a
+    // preemption land between sampling a bit and clocking it.
 
+    taskENTER_CRITICAL(&ps2_mux);
     esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     golo(_ps2clk);
     esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
     gohi(_ps2clk);
     esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    taskEXIT_CRITICAL(&ps2_mux);
 
     while (bit < 0x0100)
     {
+      taskENTER_CRITICAL(&ps2_mux);
       if (gpio_get_level(_ps2data) == 1)
       {
         data = data | bit;
@@ -293,23 +333,27 @@ namespace ps2dev
       esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
       gohi(_ps2clk);
       esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+      taskEXIT_CRITICAL(&ps2_mux);
     }
     // we do the delay at the end of the loop, so at this point we have
     // already done the delay for the parity bit
 
-    // parity bit
+    // parity bit, then the stop bit's clock pulse
+    taskENTER_CRITICAL(&ps2_mux);
     if (gpio_get_level(_ps2data) == 1)
     {
       received_parity = 1;
     }
 
-    // stop bit
     esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     golo(_ps2clk);
     esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
     gohi(_ps2clk);
     esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    taskEXIT_CRITICAL(&ps2_mux);
 
+    // acknowledge bit -- we pull DATA low for one clock, then release it
+    taskENTER_CRITICAL(&ps2_mux);
     esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     golo(_ps2data);
     golo(_ps2clk);
@@ -317,8 +361,7 @@ namespace ps2dev
     gohi(_ps2clk);
     esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
     gohi(_ps2data);
-
-    taskEXIT_CRITICAL(&mux);
+    taskEXIT_CRITICAL(&ps2_mux);
 
     gpio_intr_enable(_ps2clk);
     notifyIfHostWaiting();
@@ -334,6 +377,7 @@ namespace ps2dev
       return -2;
     }
   }
+
   PS2Device::BusState PS2Device::get_bus_state()
   {
     if (gpio_get_level(_ps2clk) == 0)

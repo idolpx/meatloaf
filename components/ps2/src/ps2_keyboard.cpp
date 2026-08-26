@@ -10,6 +10,23 @@ namespace ps2dev
 //
 
 
+// A8: retry a byte for a BOUNDED time.  These were `while (write(x) != 0)
+// vTaskDelay(1);` -- and write() returns -1 whenever the bus is not IDLE, so
+// a host holding CLK low spun forever at priority 10 WITH THE BUS MUTEX HELD,
+// which also made end() unable to ever complete.  20 attempts x 1 tick is a
+// 200ms ceiling per byte.  vTaskDelay(1) is written literally: pdMS_TO_TICKS(1)
+// is 0 at CONFIG_FREERTOS_HZ=100, which is the very no-op this replaces.
+static int write_retry(PS2Device *dev, uint8_t value, int attempts = 20)
+{
+  for (int i = 0; i < attempts; i++)
+  {
+    if (dev->write(value) == 0)
+      return 0;
+    vTaskDelay(1);
+  }
+  return -1;
+}
+
 void _taskfn_process_host_request(void *arg)
 {
   PS2Device *ps2dev = (PS2Device *)arg;
@@ -113,8 +130,13 @@ int PS2Keyboard::reply_to_host(uint8_t host_cmd)
      // the while loop lets us wait for the host to be ready
     _data_reporting_enabled = false;
     ack(); // ack() provides delay, some systems need it
-    while (write((uint8_t)Command::BAT_SUCCESS) != 0)
-      vTaskDelay(1);
+    // Unlike the other four sites, a failed BAT does NOT return early: doing
+    // so would skip the line below and leave _data_reporting_enabled false,
+    // which makes keydown/keyup silently no-op (they return 0) -- a keyboard
+    // permanently mute until the host happens to send another RESET.  Better
+    // to report the failure and stay usable.
+    if (write_retry(this, (uint8_t)Command::BAT_SUCCESS) != 0)
+      ESP_LOGE("ps2", "BAT_SUCCESS not delivered; host may not see us as ready");
     _data_reporting_enabled = true; // some systems don't enable data reporting after issuing a RESET command, so we do it by default
     break;
   case Command::RESEND: // resend
@@ -157,10 +179,10 @@ int PS2Keyboard::reply_to_host(uint8_t host_cmd)
     printf("PS2Keyboard::reply_to_host: Get device id command received");
 #endif // _ps2dev_DEBUG_
     ack();
-    while (write(0xAB) != 0)
-      vTaskDelay(1); // ensure ID gets writed, some hosts may be sensitive
-    while (write(0x83) != 0)
-      vTaskDelay(1); // this is critical for combined ports (they decide mouse/kb on this)
+    if (write_retry(this, (uint8_t)(0xAB)) != 0)
+      return -1;
+    if (write_retry(this, (uint8_t)(0x83)) != 0)
+      return -1;
     break;
   case Command::SET_SCAN_CODE_SET: // set scan code set
 #if defined(_ps2dev_DEBUG_)
@@ -183,14 +205,14 @@ int PS2Keyboard::reply_to_host(uint8_t host_cmd)
     printf("PS2Keyboard::reply_to_host: Set/reset LEDs command received");
 #endif // _ps2dev_DEBUG_
     esp_rom_delay_us(BYTE_INTERVAL_MICROS);
-    while (write(0xFA) != 0)
-      vTaskDelay(1);
+    if (write_retry(this, (uint8_t)(0xFA)) != 0)
+      return -1;
     esp_rom_delay_us(BYTE_INTERVAL_MICROS);
     if (!read(&val, 10))
     {
       esp_rom_delay_us(BYTE_INTERVAL_MICROS);
-      while (write(0xFA) != 0)
-        vTaskDelay(1);
+      if (write_retry(this, (uint8_t)(0xFA)) != 0)
+        return -1;
       esp_rom_delay_us(BYTE_INTERVAL_MICROS);
       _led_scroll_lock = ((val & 1) != 0);
       _led_num_lock = ((val & 2) != 0);
