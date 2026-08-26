@@ -61,6 +61,7 @@
 
 
 #include "device.h"
+#include "ps2.h"
 #include "keys.h"
 #include "led.h"
 
@@ -333,6 +334,11 @@ void main_setup()
     PARALLEL.setup();
     printf( ANSI_GREEN_BOLD "Parallel Bus Initialized" ANSI_RESET "\r\n" );
 #endif
+
+    // Reads devices.ps2 only -- allocates nothing, touches no GPIO, does no
+    // network work, so it has none of the ordering hazards a drive's
+    // reloadConfig() has.  A no-op on boards without PIN_KB_CLK.
+    ps2Keyboard.start();
 
 #ifdef ENABLE_DISPLAY
     LEDS.start();

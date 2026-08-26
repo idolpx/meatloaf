@@ -23,6 +23,13 @@ namespace ps2dev
   public:
     PS2Keyboard(gpio_num_t clk, gpio_num_t data);
     int reply_to_host(uint8_t host_cmd);
+    // <sys/termios.h> defines ECHO as a macro, and this header now reaches
+    // translation units that include it (lib/device/ps2/ps2.h pulls it in via
+    // meatloaf.h).  Without this the enumerator below expands to
+    // `(1u << 0) = 0xEE` and the whole class fails to parse.  Scoped undef so
+    // termios still works for everyone else.
+#pragma push_macro("ECHO")
+#undef ECHO
     enum class Command
     {
       RESET = 0xFF,
@@ -38,6 +45,7 @@ namespace ps2dev
       SET_RESET_LEDS = 0xED,
       BAT_SUCCESS = 0xAA,
     };
+#pragma pop_macro("ECHO")
     void begin();
     void end();
     bool data_reporting_enabled();
