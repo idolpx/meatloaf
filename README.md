@@ -31,7 +31,7 @@ or on any server on the Internet.
 
 How is it even possible? Read more here: [Link](docs/howisitpossible.md)
 
-Some Meatloaf code is used for the Commodore [FujiNet](https://github.com/FujiNetWIFI/fujinet-firmware)
+Meatloaf code is used for the Commodore [FujiNet](https://github.com/FujiNetWIFI/fujinet-firmware)
 and some FujiNet code is also used in Meatloaf.<br/>
 Meatloaf will remain focused on Commodore but the features that make sense will be merged into FujiNet.
 
