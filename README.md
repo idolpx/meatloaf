@@ -6,7 +6,7 @@
 
 ```diff
 *** Be sure to use an ESP32-S3-WROOM-1-N16R8 dev module for all new builds!!!
-*** The wiring is a little bit different but otherwise Deadline's video below is still valid
+*** The wiring is a little bit different but otherwise Deadline's video below is still great.
 *** You can also flash using the web flasher instead of compiling the firmware yourself.
 ```
 
@@ -417,7 +417,7 @@ What that buys you in practice:
 * **Faster heavy decoding.** Tape scanning, `.p64`/`.p81` flux decoding and Wraptor extraction all
   work out of PSRAM and are bandwidth-bound — the octal bus at double the clock is where they get
   their speed.
-* **Twice the PSRAM.** 8 MB instead of 4, so bigger tapes, bigger archives and deeper nested URLs
+* **Twice the PSRAM.** 8 MB immediately available instead of 4 + 4 banked, so bigger tapes, bigger archives and deeper nested URLs
   before anything has to spill.
 * **Room to grow.** Meatloaf is close to the older chip's flash and IRAM limits. On the S3 there is
   margin for everything still to come.
