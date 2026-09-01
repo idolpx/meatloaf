@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <esp_wifi.h>
 #include <esp_crc.h>
+#include <esp_mac.h>
 
 //#include "../device/fuji.h"
 #include "fnWiFi.h"
@@ -217,9 +218,12 @@ static void ipconfig_wlan()
     Serial.printf("BSSID: %s\r\n", fnWiFi.get_current_bssid_str().c_str());
 
     Serial.printf("\r\n");
+    uint8_t mac[6];
+    esp_netif_get_mac(fnWiFi.get_adapter_handle(), mac);
     esp_netif_ip_info_t ip_info;
     esp_netif_get_ip_info(fnWiFi.get_adapter_handle(), &ip_info);
-    Serial.printf("IP: " IPSTR "\r\n", IP2STR(&ip_info.ip));
+    Serial.printf("MAC: " MACSTR "\r\n", MAC2STR(mac));
+    Serial.printf("IPv4: " IPSTR "\r\n", IP2STR(&ip_info.ip));
     Serial.printf("Subnet Mask: " IPSTR "\r\n", IP2STR(&ip_info.netmask));
     Serial.printf("Gateway: " IPSTR "\r\n", IP2STR(&ip_info.gw));
 
