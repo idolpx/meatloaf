@@ -1796,6 +1796,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
             snprintf(str, sizeof str, "bytes=%" PRIu32 "-", position);
             esp_http_client_set_header(_http, "Range", str);
             sentRange = true;
+            Debug_printv("seeking range[%s] url[%s]", str, url.c_str());
         }
         else
         {
@@ -1812,7 +1813,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
             snprintf(str, sizeof str, "bytes=%" PRIu32 "-%" PRIu32, position, rangeEnd);
             esp_http_client_set_header(_http, "Range", str);
             sentRange = true;
-            //Debug_printv("seeking range[%s] url[%s]", str, url.c_str());
+            Debug_printv("seeking range[%s] url[%s]", str, url.c_str());
         }
     }
 
