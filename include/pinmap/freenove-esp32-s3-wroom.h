@@ -40,13 +40,17 @@
 
 /* Audio Output */
 #define PIN_DAC1                GPIO_NUM_NC
-#define PIN_I2S                 GPIO_NUM_42
+#define PIN_I2S                 GPIO_NUM_NC
+
+/* PS/2 Keyboard Output */
+#define PIN_KB_CLK              GPIO_NUM_15
+#define PIN_KB_DATA             GPIO_NUM_16
 
 /* I2C GPIO Expander */
 #ifdef PARALLEL_BUS
-#define PIN_GPIOX_SDA           GPIO_NUM_9
-#define PIN_GPIOX_SCL           GPIO_NUM_10
-#define PIN_GPIOX_INT           GPIO_NUM_41
+#define PIN_GPIOX_SCL           GPIO_NUM_5
+#define PIN_GPIOX_SDA           GPIO_NUM_6
+#define PIN_GPIOX_INT           GPIO_NUM_42
 #define GPIOX_ADDRESS           0x20  // PCF8575
 //#define GPIOX_ADDRESS           0x24  // PCA9673
 #define GPIOX_SPEED             400   // PCF8575 - 400Khz
@@ -55,12 +59,19 @@
 
 /* Ethernet W5500 */
 // https://www.pusr.com/download/ES1/USR-ES1-EN%20V1.3.pdf
-#define PIN_ETHERNET_CS         GPIO_NUM_19
-#define PIN_ETHERNET_MISO       GPIO_NUM_20  // SD_DATA (MISO/DAT0/DATA OUT)
-#define PIN_ETHERNET_MOSI       GPIO_NUM_21  // SD_CMD (MOSI/CMD/DATA IN)
-#define PIN_ETHERNET_SCK        GPIO_NUM_47  // SD_CLK (SCK/CLK)
-#define PIN_ETHERNET_INT        GPIO_NUM_45
-#define PIN_ETHERNET_RESET      GPIO_NUM_14
+// https://mischianti.org/integrating-w5500-with-esp32-using-core-3-native-ethernet-protocol-support-with-ssl-and-other-features/
+// SPI3, not SPI2: the SD card holds SPI2 (SDSPI_DEFAULT_HOST) on its own pins
+// 41/40/38/39, and a bus binds its pins at initialize() time, so two devices on
+// different pins cannot share one host.  SPI3 is free because the RGB strip now
+// drives WS2812 over RMT instead of SPI.
+#define ETHERNET_SPI_HOST       SPI3_HOST
+#define ETHERNET_SPI_CLOCK_MHZ  40
+#define PIN_ETHERNET_CS         GPIO_NUM_10
+#define PIN_ETHERNET_MISO       GPIO_NUM_13
+#define PIN_ETHERNET_MOSI       GPIO_NUM_11
+#define PIN_ETHERNET_SCK        GPIO_NUM_12
+#define PIN_ETHERNET_INT        GPIO_NUM_9
+#define PIN_ETHERNET_RESET      GPIO_NUM_NC
 
 /* Commodore IEC Pins */
 // CLK & DATA lines in/out are split between two pins
@@ -72,7 +83,7 @@
 // Reset line is available
 #define IEC_HAS_RESET
                                                 //    WIRING
-                                                //  C64    DIN6
+//                              ESP32 S3        //  C64    DIN6
 #define PIN_IEC_ATN             GPIO_NUM_4      //  ATN    3
 #define PIN_IEC_CLK_IN          GPIO_NUM_5      //  CLK    4
 #define PIN_IEC_CLK_OUT         GPIO_NUM_5      //
@@ -84,8 +95,8 @@
 
 /* Modem/Parallel Switch */
 /* Unused with Nugget    */
-#define PIN_MODEM_ENABLE        GPIO_NUM_2  // High = Modem enabled
-#define PIN_MODEM_UP9600        GPIO_NUM_15 // High = UP9600 enabled
+#define PIN_MODEM_ENABLE        GPIO_NUM_17 // High = Modem enabled
+#define PIN_MODEM_UP9600        GPIO_NUM_18 // High = UP9600 enabled
 
 #endif // PINMAP_FREENOVE_ESP32S3
 #endif // PINMAP_FREENOVE_ESP32S3_H

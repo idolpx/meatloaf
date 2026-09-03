@@ -59,6 +59,9 @@
 #include <c64b.h>
 #endif
 
+#ifdef ENABLE_ETHERNET
+#include "ethernet.h"
+#endif
 
 #include "device.h"
 #include "ps2.h"
@@ -358,8 +361,18 @@ void main_setup()
 #endif // DEBUG
 
 
+
     // Set up the WiFi adapter
     fnWiFi.start();
+
+#ifdef ENABLE_ETHERNET
+    // MUST come after fnWiFi.start(): that is what calls esp_netif_init() and
+    // creates the default event loop.  Before it, esp_netif_new() returns NULL
+    // and the next call dereferences it -- a LoadProhibited with EXCVADDR 0.
+    // Same ordering rule the network-drive reload below documents.
+    ethernet.start();   // SPI host comes from ETHERNET_SPI_HOST in the pinmap
+    //log_heap_checkpoint("after ethernet.start()");
+#endif
     //log_heap_checkpoint("after fnWiFi.start()");
 
     // Start SessionBroker service task on CPU0

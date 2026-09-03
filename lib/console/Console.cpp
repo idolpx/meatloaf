@@ -217,6 +217,7 @@ namespace ESP32Console
         registerCommand(getNetstatCommand());
         registerCommand(getScanCommand());
         registerCommand(getConnectCommand());
+        registerCommand(getDisconnectCommand());
 #ifndef MIN_CONFIG
         registerCommand(getWsCommand());
 #endif
