@@ -125,11 +125,9 @@ int WiFiManager::start()
         ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
         //log_wifi_heap_checkpoint("after esp_wifi_set_storage()");
         Debug_printf("WiFiManager::start() complete\r\n");
-        printf("MAC Address: ");
-        for (int i = 0; i < 5; i++) {
-            printf("%02X:", mac[i]);
-        }
-        printf("%02X\r\n", mac[5]);
+
+        char macStr[18] = {0};
+        printf("MAC Address: %s\r\n", _mac_to_string(macStr, mac));
     }
 
     // TODO: Provide way to change WiFi region/country?
