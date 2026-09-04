@@ -19,6 +19,7 @@
 #if defined(BUILD_IEC)
 
 #include "drive.h"
+#include "drive_filename.h"
 
 #include <algorithm>
 #include <cstring>
@@ -1020,6 +1021,11 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                              channel, m_cwd->url.c_str(), (unsigned long) stream->block_size);
                 return true;
             }
+
+            // "0:" and "1:" select a drive inside a Commodore DOS device;
+            // they are not part of the directory pattern and must not be
+            // confused with CMD's alphanumeric filters.
+            iecNormalizeDirectoryDrivePrefix(name);
 
             // Handle CMD-style directory filters by preserving them in URL
             bool wasDirListing = false;
