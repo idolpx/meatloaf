@@ -30,6 +30,7 @@
 #include "make_unique.h"
 
 #include "meatloaf.h"
+#include "fnWiFi.h"      // fnWiFi.connected() -- tell "offline" from "not found"
 #include "meat_session.h"
 #include "network/http.h"
 #include "mlConfig.h"
@@ -1155,8 +1156,7 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                     // opening a file
                     if( (mode == std::ios_base::in) && !f->exists() )
                     {
-                        Debug_printv("Error: file doesn't exist [%s]", f->url.c_str());
-                        setStatusCode(ST_FILE_NOT_FOUND);
+                        setStatusFileError(f->url);
                     }
                     else if( (mode == std::ios_base::out) && f->media_image.size()>0 && (!f->isWritable || f->pathInStream.empty()) )
                     {
@@ -2786,6 +2786,25 @@ void iecDrive::consoleClose(uint8_t channel)
     close(channel);
 }
 
+void iecDrive::setStatusFileError(std::string &url)
+{
+    // An operation on a networked resource (scheme "://") that failed while
+    // WiFi is down means the drive is offline, not that the file/dir is
+    // missing. Report DRIVE NOT READY (74) so a client can tell "Meatloaf
+    // offline" from a genuinely absent target (62 FILE NOT FOUND). A real 404,
+    // or any local target, still reports FILE NOT FOUND.
+    if( mstr::contains(url, "://") && !fnWiFi.connected() )
+    {
+        Debug_printv("Error: network target, WiFi offline [%s]", url.c_str());
+        setStatusCode(ST_DRIVE_NOT_READY);
+    }
+    else
+    {
+        Debug_printv("Error: target doesn't exist [%s]", url.c_str());
+        setStatusCode(ST_FILE_NOT_FOUND);
+    }
+}
+
 
 bool iecDrive::hasError()
 {
@@ -3153,7 +3172,7 @@ void iecDrive::set_cwd(std::string path, bool verified)
             else
             {
                 Debug_printv("Could not create VDrive for URL %s", n->url.c_str());
-                setStatusCode(ST_FILE_NOT_FOUND);
+                setStatusFileError(n->url);
                 delete n;
             }
         }
@@ -3165,7 +3184,7 @@ void iecDrive::set_cwd(std::string path, bool verified)
         else
         {
             Debug_printv("invalid directory");
-            setStatusCode(ST_FILE_NOT_FOUND);
+            setStatusFileError(n->url);
             delete n;
         }
     }

@@ -266,6 +266,10 @@ public:
   // the host is down or its certificate was rejected, and only the message
   // field can tell the two apart on the command channel.
   void    setStatusCode(uint8_t code, const std::string &msg);
+  // Set the failure status for an operation on `url` that couldn't complete:
+  // a networked resource (scheme "://") while WiFi is down is DRIVE NOT READY
+  // (the drive is offline), not a genuinely missing FILE NOT FOUND.
+  void    setStatusFileError(std::string &url);
   bool    hasError();
   bool    hasMemExeError();
 
