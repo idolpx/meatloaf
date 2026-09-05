@@ -138,49 +138,131 @@ public:
             return it->second;
         }
         
-        // Create a new context for this export
+        // Create a new context for this export.
+        //
+        // Mount with libnfs's own version negotiation (nfs_mount() tries v3 and
+        // falls back to v4 when v3 fails), which covers a server that serves
+        // NFS on 2049 while mountd is unreachable -- firewalled off, or absent
+        // because the server is NFSv4-only and has no MOUNT protocol.
         Debug_printv("Creating new context for export: %s", export_path.c_str());
-        struct nfs_context* nfs = nfs_init_context();
-        if (!nfs) {
-            Debug_printv("Failed to initialize NFS context for export %s", export_path.c_str());
-            return nullptr;
-        }
 
-        // Disable directory caching to prevent memory leaks on ESP32
-        nfs_set_dircache(nfs, 0);
-        
-        // Reduce buffer sizes for ESP32 memory constraints
-        nfs_set_readmax(nfs, 255);   // Default is 65536
-        nfs_set_writemax(nfs, 255);  // Default is 65536
-
-        // Mount the specific export
         std::string mount_path = export_path;
-        if (!mount_path.empty() && mount_path[0] != '/') {
+        if (mount_path[0] != '/') {
             mount_path = "/" + mount_path;
         }
-        if (nfs_mount(nfs, host.c_str(), mount_path.c_str()) != 0) {
-            Debug_printv("Failed to mount export %s: %s", mount_path.c_str(), nfs_get_error(nfs));
-            nfs_destroy_context(nfs);
+
+        // Negotiation costs a doomed v3 mount against a v4-only server, so once
+        // this host is known to answer over v4, ask for it directly. If that
+        // stops working (a server that regained its MOUNT service), fall back
+        // to negotiating again rather than failing.
+        struct nfs_context* nfs = mountExport(mount_path, _use_v4 ? NFS_VERSION_4 : NFS_VERSION_AUTO);
+        if (!nfs && _use_v4) {
+            nfs = mountExport(mount_path, NFS_VERSION_AUTO);
+        }
+        if (!nfs) {
             return nullptr;
         }
-        
+        if (nfs_get_version(nfs) == NFS_VERSION_4) {
+            _use_v4 = true;
+        }
+
         // Cache the context for future use
         _export_contexts[export_path] = nfs;
-        Debug_printv("Cached context for export: %s", export_path.c_str());
+        Debug_printv("Cached context for export: %s over NFSv%d", export_path.c_str(),
+                     nfs_get_version(nfs));
         
         return nfs;
+    }
+
+    // Drop an export's cached context and mount it again.
+    //
+    // NFSv4 is stateful: the clientid holds a lease (90 s by default on Linux)
+    // that only state-bearing operations renew, so the first OPEN after an idle
+    // gap fails with NFS4ERR_EXPIRED. libnfs carries the RENEW encoding but no
+    // client-side renewal, so a fresh mount -- and with it a fresh SETCLIENTID
+    // -- is how the lease is regained. Refuses while any stream still holds a
+    // handle, since destroying the context would invalidate it.
+    struct nfs_context* remountExport(const std::string& export_path) {
+        if (export_path.empty() || export_path == "/") {
+            return _nfs;
+        }
+        if (isBusy()) {
+            Debug_printv("Not remounting %s: session has open handles", export_path.c_str());
+            return nullptr;
+        }
+
+        auto it = _export_contexts.find(export_path);
+        if (it != _export_contexts.end()) {
+            if (it->second) {
+                nfs_destroy_context(it->second);
+            }
+            _export_contexts.erase(it);
+        }
+
+        return getExportContext(export_path);
     }
 
     // Get list of exports on this server (cached after first enumeration)
     const std::vector<std::string>& getExports();
 
 private:
+    // libnfs keeps NFS_V3 / NFS_V4 in a private component header, so mirror the
+    // value nfs_set_version() accepts. NFS_VERSION_AUTO means "do not call
+    // nfs_set_version at all", which leaves libnfs free to negotiate: calling
+    // it clears default_version and so disables the v3 -> v4 fallback inside
+    // nfs_mount().
+    static constexpr int NFS_VERSION_AUTO = 0;
+    static constexpr int NFS_VERSION_4 = 4;
+
+    static constexpr int MOUNT_TIMEOUT_MS = 5000;
+    static constexpr int NFS_DEFAULT_TIMEOUT_MS = 60000;  // libnfs's own default
+
     void enumerateExports();
+    bool enumerateExportsV3();
+    bool enumerateExportsV4();
+
+    // Mount one path with the given NFS version. Returns nullptr on failure.
+    struct nfs_context* mountExport(const std::string& mount_path, int version) {
+        struct nfs_context* nfs = nfs_init_context();
+        if (!nfs) {
+            Debug_printv("Failed to initialize NFS context for %s", mount_path.c_str());
+            return nullptr;
+        }
+
+        // Disable directory caching to prevent memory leaks on ESP32
+        nfs_set_dircache(nfs, 0);
+
+        // Reduce buffer sizes for ESP32 memory constraints
+        nfs_set_readmax(nfs, 255);   // Default is 65536
+        nfs_set_writemax(nfs, 255);  // Default is 65536
+
+        if (version == NFS_VERSION_4 && nfs_set_version(nfs, NFS_VERSION_4) != 0) {
+            Debug_printv("NFSv4 unavailable in libnfs: %s", nfs_get_error(nfs));
+            nfs_destroy_context(nfs);
+            return nullptr;
+        }
+
+        // Bound the mount itself. libnfs's default is 60 s, and a v3 mount
+        // against a server whose mountd is unreachable spends all of it before
+        // the v4 fallback is even attempted. The default is restored once the
+        // mount succeeds, so ordinary reads keep their full allowance.
+        nfs_set_timeout(nfs, MOUNT_TIMEOUT_MS);
+
+        if (nfs_mount(nfs, host.c_str(), mount_path.c_str()) != 0) {
+            Debug_printv("Failed to mount %s: %s", mount_path.c_str(), nfs_get_error(nfs));
+            nfs_destroy_context(nfs);
+            return nullptr;
+        }
+
+        nfs_set_timeout(nfs, NFS_DEFAULT_TIMEOUT_MS);
+        return nfs;
+    }
 
     struct nfs_context* _nfs = nullptr;
     std::map<std::string, struct nfs_context*> _export_contexts;  // Per-export contexts
     std::vector<std::string> _exports_list;  // Cached list of exports
     bool _exports_enumerated = false;  // Flag to track if exports have been enumerated
+    bool _use_v4 = false;  // This host answers over NFSv4 and not over MOUNT
 };
 
 /********************************************************

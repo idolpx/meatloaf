@@ -33,6 +33,10 @@
 // Static members for export enumeration
 std::vector<std::string> NFSMFile::exports;
 
+// Bound the MOUNT export request. mount_getexports() passes -1, which is no
+// timeout at all, so a firewalled mountd stalls on the OS connect timeout.
+static constexpr int MOUNT_EXPORT_TIMEOUT_MS = 5000;
+
 /********************************************************
  * NFSMSession implementations
  ********************************************************/
@@ -46,27 +50,78 @@ const std::vector<std::string>& NFSMSession::getExports() {
 
 void NFSMSession::enumerateExports() {
     if (!_nfs) return;
-    
+
     _exports_list.clear();
     _exports_enumerated = true;
-    
-    struct exportnode *exports_ptr = NULL;
-    exports_ptr = mount_getexports(host.c_str());
-    
-    if (!exports_ptr) {
-        Debug_printv("Failed to get exports from %s", host.c_str());
+
+    if (!_use_v4 && enumerateExportsV3()) {
         return;
     }
-    
+
+    // MOUNT is not answering. Either mountd is firewalled off, or the server
+    // speaks only NFSv4, which has no MOUNT protocol. NFSv4 publishes the
+    // exports as the entries of its pseudo-root, so read them from there.
+    if (enumerateExportsV4()) {
+        _use_v4 = true;
+        return;
+    }
+
+    Debug_printv("Failed to get exports from %s over MOUNT or NFSv4", host.c_str());
+}
+
+bool NFSMSession::enumerateExportsV3() {
+    struct exportnode *exports_ptr = mount_getexports_timeout(host.c_str(), MOUNT_EXPORT_TIMEOUT_MS);
+
+    if (!exports_ptr) {
+        Debug_printv("MOUNT export list unavailable on %s", host.c_str());
+        return false;
+    }
+
     struct exportnode *export_iter = exports_ptr;
     while (export_iter != NULL) {
         Debug_printv("Found export: %s", export_iter->ex_dir);
         _exports_list.push_back(export_iter->ex_dir);
         export_iter = export_iter->ex_next;
     }
-    
+
     mount_free_export_list(exports_ptr);
     Debug_printv("Export enumeration complete: %lu exports cached", _exports_list.size());
+    return !_exports_list.empty();
+}
+
+bool NFSMSession::enumerateExportsV4() {
+    struct nfs_context* nfs = mountExport("/", NFS_VERSION_4);
+    if (!nfs) return false;
+
+    struct nfsdir* dir = nullptr;
+    if (nfs_opendir(nfs, "/", &dir) != 0) {
+        Debug_printv("NFSv4 pseudo-root listing failed: %s", nfs_get_error(nfs));
+        nfs_destroy_context(nfs);
+        return false;
+    }
+
+    struct nfsdirent* ent;
+    while ((ent = nfs_readdir(nfs, dir)) != nullptr) {
+        if (ent->name[0] == '.' && (ent->name[1] == '\0' || (ent->name[1] == '.' && ent->name[2] == '\0'))) {
+            continue;
+        }
+        // mode is 0 when the server returned no attributes with the entry, so
+        // only reject what is positively known not to be a directory.
+        if (ent->mode != 0 && !S_ISDIR(ent->mode)) {
+            continue;
+        }
+
+        // Report the same shape MOUNT does: an absolute export path.
+        std::string export_dir = std::string("/") + ent->name;
+        Debug_printv("Found export: %s", export_dir.c_str());
+        _exports_list.push_back(export_dir);
+    }
+
+    nfs_closedir(nfs, dir);
+    nfs_destroy_context(nfs);
+
+    Debug_printv("Export enumeration complete: %lu exports cached from the NFSv4 pseudo-root", _exports_list.size());
+    return !_exports_list.empty();
 }
 
 /********************************************************
@@ -375,16 +430,18 @@ MFile* NFSMFile::getNextFileInDir()
     if (!ent_name.empty()) {
         std::string entryUrl;
         entryUrl.reserve(url.size() + 1 + ent_name.size());
-        entryUrl = url; entryUrl += '/'; entryUrl += ent_name;
+        entryUrl = url;
+        // An export name is an absolute path ("/storage") while a directory
+        // entry is a bare name. Join either without doubling the separator.
+        if (!entryUrl.empty() && entryUrl.back() == '/') entryUrl.pop_back();
+        if (ent_name.front() != '/') entryUrl += '/';
+        entryUrl += ent_name;
         auto file = new NFSMFile(entryUrl);
 
-        // Set size and type information
-        if (file->is_dir) {
-            file->size = 0;
-        } else {
-            file->size = ent_size;
-        }
+        // Set type first: is_dir defaults to -1 ("unknown"), which is truthy,
+        // so testing it before it is assigned reported every entry as size 0.
         file->is_dir = S_ISDIR(ent_mode);
+        file->size = file->is_dir ? 0 : ent_size;
 
         return file;
     }
@@ -578,8 +635,20 @@ bool NFSMStream::open(std::ios_base::openmode mode) {
     }
 
     // Open the file with the file_path
-    if (nfs_open(nfs, file_path.c_str(), nfs_mode, &_handle) < 0) {
-        Debug_printv("Failed to open file: %s", nfs_get_error(nfs));
+    int rc = nfs_open(nfs, file_path.c_str(), nfs_mode, &_handle);
+    if (rc == -EAGAIN && !export_path.empty()) {
+        // NFSv4 answers a lapsed lease with NFS4ERR_EXPIRED (and a moved file
+        // handle with NFS4ERR_FHEXPIRED), both of which libnfs reports as
+        // -EAGAIN. Re-mounting the export renews the clientid; retry once.
+        Debug_printv("Retrying open after lease expiry: %s", nfs_get_error(nfs));
+        _export_context = _session->remountExport(export_path);
+        nfs = getNFS();
+        rc = (_export_context && nfs)
+                 ? nfs_open(nfs, file_path.c_str(), nfs_mode, &_handle)
+                 : -EACCES;
+    }
+    if (rc < 0) {
+        Debug_printv("Failed to open file: %s", nfs ? nfs_get_error(nfs) : "no NFS context");
         _error = EACCES;
         return false;
     }
