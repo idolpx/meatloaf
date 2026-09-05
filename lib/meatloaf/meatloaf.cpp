@@ -123,7 +123,10 @@
 #include "media/tape/tcrt.h"
 #ifndef MIN_CONFIG
 #include "media/tape/csm.h"
+#ifndef DISABLE_TAPE   // MEATLOAF-GATE
 #include "media/tape/tap.h"
+#endif // !DISABLE_TAPE
+
 #endif
 
 // Network
@@ -132,11 +135,23 @@
 #include "network/fsp.h"
 #include "network/tnfs.h"
 #ifndef MIN_CONFIG
+#ifndef DISABLE_SSH   // MEATLOAF-GATE
 #include "network/sftp.h"
+#endif // !DISABLE_SSH
+
 #include "network/smb.h"
+#ifndef DISABLE_NFS   // MEATLOAF-GATE
 #include "network/nfs.h"
+#endif // !DISABLE_NFS
+
+#ifndef DISABLE_AFP   // MEATLOAF-GATE
 #include "network/afp.h"
+#endif // !DISABLE_AFP
+
+#ifndef DISABLE_ISCSI   // MEATLOAF-GATE
 #include "network/iscsi.h"
+#endif // !DISABLE_ISCSI
+
 // #include "network/ipfs.h"
 // #include "network/ws.h"
 // #include "network/tcp.h"
@@ -156,7 +171,10 @@
 #ifndef MIN_CONFIG
 // Codec
 #include "codec/qr.h"
+#ifndef DISABLE_RETROPIXELS   // MEATLOAF-GATE
 #include "codec/retropixels.h"
+#endif // !DISABLE_RETROPIXELS
+
 
 // Data
 #include "data/json.h"
@@ -414,7 +432,10 @@ T64MFileSystem t64FS;
 TCRTMFileSystem tcrtFS;
 #ifndef MIN_CONFIG
 CSMMFileSystem csmFS;
+#ifndef DISABLE_TAPE   // MEATLOAF-GATE
 TAPMFileSystem tapFS;
+#endif // !DISABLE_TAPE
+
 #endif
 
 
@@ -424,11 +445,23 @@ FTPMFileSystem ftpFS;
 FSPMFileSystem fspFS;
 TNFSMFileSystem tnfsFS;
 #ifndef MIN_CONFIG
+#ifndef DISABLE_SSH   // MEATLOAF-GATE
 SFTPMFileSystem sftpFS;
+#endif // !DISABLE_SSH
+
 SMBMFileSystem smbFS;
+#ifndef DISABLE_NFS   // MEATLOAF-GATE
 NFSMFileSystem nfsFS;
+#endif // !DISABLE_NFS
+
+#ifndef DISABLE_AFP   // MEATLOAF-GATE
 AFPMFileSystem afpFS;
+#endif // !DISABLE_AFP
+
+#ifndef DISABLE_ISCSI   // MEATLOAF-GATE
 ISCSIMFileSystem iscsiFS;
+#endif // !DISABLE_ISCSI
+
 // IPFSMFileSystem ipfsFS;
 // WSMFileSystem wsFS;
 // TCPMFileSystem tcpFS;
@@ -448,7 +481,10 @@ CSIPMFileSystem csipFS;
 // Codec
 QRMFileSystem qrcEncoder;
 HashMFileSystem hashEncoder;
+#ifndef DISABLE_RETROPIXELS   // MEATLOAF-GATE
 RetroPixelsMFileSystem retroPixelsEncoder;
+#endif // !DISABLE_RETROPIXELS
+
 
 // Data
 JSONMFileSystem jsonFS;
@@ -507,7 +543,10 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     // Tape
     &t64FS, &tcrtFS,
 #ifndef MIN_CONFIG
-    &csmFS, &tapFS, 
+    &csmFS,
+#ifndef DISABLE_TAPE   // MEATLOAF-GATE
+    &tapFS,
+#endif
 #endif
 
     // File
@@ -517,7 +556,19 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     // Network
     &httpFS, &ftpFS, &fspFS, &tnfsFS,
 #ifndef MIN_CONFIG
-    &sftpFS, &smbFS, &nfsFS, &afpFS, &iscsiFS,
+    &smbFS,
+#ifndef DISABLE_SSH   // MEATLOAF-GATE
+    &sftpFS,
+#endif
+#ifndef DISABLE_NFS   // MEATLOAF-GATE
+    &nfsFS,
+#endif
+#ifndef DISABLE_AFP   // MEATLOAF-GATE
+    &afpFS,
+#endif
+#ifndef DISABLE_ISCSI   // MEATLOAF-GATE
+    &iscsiFS,
+#endif
     //&ipfsFS, &wsFS, &tcpFS,
 #endif
 
@@ -535,7 +586,10 @@ std::vector<MFileSystem*> MFSOwner::availableOther {
     &csipFS,
 
     // Codec
-    &qrcEncoder, &hashEncoder, &retroPixelsEncoder,
+    &qrcEncoder, &hashEncoder,
+#ifndef DISABLE_RETROPIXELS   // MEATLOAF-GATE
+    &retroPixelsEncoder,
+#endif
 
     // Data
     &jsonFS

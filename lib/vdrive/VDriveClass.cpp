@@ -96,6 +96,21 @@ void VDrive::closeDiskImage()
 }
 
 
+uint8_t VDrive::sectorsPerTrack(uint32_t track)
+{
+  if( m_drive==NULL ) return 0;
+  int n = vdrive_get_max_sectors((vdrive_t *) m_drive, track);
+  return (n>0 && n<256) ? (uint8_t) n : 0;
+}
+
+
+uint8_t VDrive::imageFormat()
+{
+  if( m_drive==NULL ) return VDRIVE_IMAGE_FORMAT_NONE;
+  return (uint8_t) ((vdrive_t *) m_drive)->image_format;
+}
+
+
 bool VDrive::createDiskImage(const char *filename, const char *itype, const char *name, bool convertNameToPETSCII)
 {
   char *command, *itypec = NULL;

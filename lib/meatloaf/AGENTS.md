@@ -552,7 +552,7 @@ Two read-only filesystems: `spyFS` (`media/archive/spy.h/.cpp`, `.spy`) and `wra
   class handles both, and the corpus's single `.wra` decodes with the same decoder as its six
   `.wr3`s.
 - **Host tests**: `test/native/test_spy_read/` (9 cases) and `test/native/test_wra_read/`
-  (12 cases), both against real corpora in `.archive/archive/spy` and `.archive/archive/wr3` and
+  (12 cases), both against real corpora in `.data/media/archive/spy` and `.data/media/archive/wr3` and
   both skipping cleanly without them. SPY checks all 67 entries against the checksum each directory
   entry stores. WRA has no usable checksum — the format gives no CRC algorithm — so it checks all 28
   entries against the GEOS header's own redundancy and block count, plus byte-identical decoding of
@@ -602,7 +602,7 @@ own documentation points at.
   decoder that dropped a final byte and an archiver with a bad size field would have got all
   of them wrong. cbmconvert stops on end-of-stream and reports a checksum error too.
 - **Host tests**: `test/native/test_arc_read/` — 6 cases over the real corpus in
-  `.archive/archive/arc` and `.archive/archive/sda`: 84 entries across 9 archives plus an
+  `.data/media/archive/arc` and `.data/media/archive/sda`: 84 entries across 9 archives plus an
   SDA. The checksum is what makes this worth anything - it is computed over the
   DECOMPRESSED bytes, so an entry that comes out the right length but subtly wrong fails it,
   which nothing else here could detect.
@@ -652,7 +652,7 @@ told them apart, so they were read as plain `.nib` and came out wrong.
   only the first pass is used. Verified with a 4-pass fixture that reads byte-identically to
   the 1-pass one.
 - **`.nbz` is a compressed NIB, and it is NOT gzip.** This was first guessed at and then
-  settled by measuring the corpus in `.archive/disk/nbz`: a real `.nbz` begins with a
+  settled by measuring the corpus in `.data/media/disk/nbz`: a real `.nbz` begins with a
   leading `$05`, then `MNIB-1541-RAW` **one byte in** - which is exactly what
   `MFileSystem::byContent()` has always claimed - then a version byte of 3, then a perfectly
   ordinary track table. What follows the table is compressed to variable lengths:
@@ -674,8 +674,8 @@ told them apart, so they were read as plain `.nib` and came out wrong.
   Every block is compared against that `.d64`. As with g64, **most of the suite would pass
   with the old `readContainer()`** — only `test_reading_a_file_through_the_stream` drives the
   path where `_position` advances. Verified by reverting the fix: 6 of the 12 fail.
-  Two further cases run against the REAL corpus that now sits in `.archive/disk/nib` (41
-  nibbler dumps of commercial disks) and `.archive/disk/nbz`: all 41 real images produce an
+  Two further cases run against the REAL corpus that now sits in `.data/media/disk/nib` (41
+  nibbler dumps of commercial disks) and `.data/media/disk/nbz`: all 41 real images produce an
   exact whole-track stride, four of five sampled protected originals still give up a CBM
   disk header on track 18 (the fifth is the media, not the reader), and a real `.nbz` is
   refused cleanly.
@@ -708,7 +708,7 @@ Two new read-only filesystems, `g71FS` (`media/disk/g71.h`) and `g81FS`
   bit is inverted, which is a P64 quirk and not a 1581 property. Keeping the mapping at each
   call site keeps those assumptions visible where they are made.
 - **G81's container layout is UNVERIFIED and must be described that way.** There is no
-  `.g81` in `.archive`, VICE has no MFM-1581 support at all, and the P64 reference
+  `.g81` in `.data/media`, VICE has no MFM-1581 support at all, and the P64 reference
   implementation does not know the format; the four-line note at the top of `g81.h` is the
   entire specification. Two of its claims cannot be checked — where the track data starts
   (which follows from "no speed zone table" but is not stated) and the four-byte prefix —
@@ -774,7 +774,7 @@ of the pulses is different**, and calling this a geometry override would be wron
   `emitDelta()` is the seam: one flux gap in, bits out — the 1541 read logic and "round the
   gap to a cell count" are the two implementations of exactly that.
 - **Host tests**: `test/native/test_p81_read/` — 10 cases against the real
-  `.archive/disk/p81/td1581.p81`. Two are load-bearing and neither can be dropped:
+  `.data/media/disk/p81/td1581.p81`. Two are load-bearing and neither can be dropped:
   `test_every_block_of_every_track_reads` sweeps all 80 cylinders × 40 blocks across both
   heads with the CRC checked on every one, and **`test_file_chains_match_their_directory_block_counts`
   is the only thing that constrains the sector ORDER** — the sweep would pass just as
@@ -815,7 +815,7 @@ of the pulses is different**, and calling this a geometry override would be wron
   where printing at all is the hazard — the same rule the `iecClock` entry documents.
   Removing the dump orphaned `#include "utils.h"`, which went with it.
 - **Host tests**: `test/native/test_g64_read/` — 6 cases. There is no `.g64` anywhere in
-  `.archive` and the firmware has a GCR decoder but no encoder, so the fixture is generated
+  `.data/media` and the firmware has a GCR decoder but no encoder, so the fixture is generated
   from a real `.d64` by `host/make_g64.py` (checked in; the tests skip cleanly when it has
   not been run). Every decoded block is compared byte for byte against the source `.d64`,
   which is an independent reference for the CONTENT even though the encoding is this
@@ -913,7 +913,7 @@ of the pulses is different**, and calling this a geometry override would be wron
   directory and copies out as 254 bytes of record pointers. Pre-existing and
   format-agnostic; do not chase it as a P64 defect.
 - **Host tests**: `test/native/test_p64_read/` — 13 cases over the real images in
-  `.archive/p64` (gitignored, so they skip cleanly without it). They assert on CBM
+  `.data/media/p64` (gitignored, so they skip cleanly without it). They assert on CBM
   structures rather than intermediate shapes, because each decode stage is silent about
   the next being wrong: a blank disk's BAM free count and bitmap for all 35 tracks across
   all four speed zones, and Wheels 4.4a's exact disk name, id and eight directory entries
@@ -1014,7 +1014,7 @@ of the pulses is different**, and calling this a geometry override would be wron
   fixed-width fields (CSM uses the latter). `test_space_padded_name_lookup` is
   `TEST_IGNORE_MESSAGE`'d with its body intact — lift the guard and re-run to verify a fix.
 - **Host tests**: `test/native/test_csm_read/` — 24 synthesized-image cases (the walk, the datasette
-  behaviour, reading, corrupt input) plus one that walks every sample in `.archive/csm` and asserts
+  behaviour, reading, corrupt input) plus one that walks every sample in `.data/media/csm` and asserts
   each consumes to exactly EOF, which is the invariant pinning the layout. Three gotchas that cost
   time: `compareFilename()` matches against `mstr::toUTF8()` of the entry name, so a test passing a
   bare ASCII literal asks a question the drive never asks; `MMediaStream::write()` only reaches
@@ -1057,7 +1057,7 @@ of the pulses is different**, and calling this a geometry override would be wron
 
 - **DHD switched partitions part-way through a directory listing** (`media/hd/dhd.h`, `normalizePath()`) — another instance of the `uint8_t` truncation class. Partition numbers are `uint8_t` and `byNumber()` takes one, but the lookup was `img->byNumber(atoi(comp.c_str()))`: `atoi` returns `int`, which was silently truncated at the call. Selecting a partition strips its name from `pathInStream`, so entry URLs built during a listing carry no partition component (`…/hdbackup.dhd/1571`) and `normalizePath()` re-reads the first component as a partition reference — a file named `1571` inside the BIBLE partition resolved to `1571 & 0xFF` = 35 and switched the image to partition 35 ("GW BOOT HD") mid-`ls`, with the rest of the listing coming from the wrong partition (the selection also disposes the ImageBroker entry, so the stream re-opened underneath the running listing). Now parsed with `strtol` + `*end == '\0'` + a `0 <= v <= 254` range check before the cast, per the existing rule against `atoi`/`std::stoi` on C64- or network-sourced input. `iecDrive::changePartition()` was already correct — it range-checks `1..254` before its `(uint8_t)` cast. **Resolved 2026-08-07** by removing path-based selection entirely (`partition` console command + `CP<n>` are now the only ways to switch), which eliminates the ambiguity by construction rather than by validating the parse. The `strtol` guard described above was deleted along with the branch it guarded.
 
-- **File sizes inside disk images are estimates — the directory has no byte-size field.** A CBM directory entry stores only a block count, so every byte figure is derived, and the two call sites intentionally differ: `D64MFile::getNextFileInDir()` sets `file->size = entry.blocks * block_size` (256/block — space occupied on disk, what `ls` shows) while `D64MStream::seekPath()` sets `_size = entry.blocks * (block_size - 2)` (254/block — data capacity). The TRUE size needs a walk to the chain's last block: `track == 0` marks it and the sector byte is the last-used byte index, so data = `sector - 1`. **Reads are correct regardless** — the chain-end marker fires before either over-estimate — so a `cat`/`hex` returning far fewer bytes than `ls` advertised is right, not truncated. Verified against `.archive/dnp/ned128test.dnp`: `vdcmania/settings.ihf` is 1 block, `ls` reports 256, the block's link bytes are `(0, 7)` and the real content is 6 bytes (`" 129 \r"`). `seekFileSize()` does the exact walk but stays commented out at the `seekPath()` call site (`d64.cpp`): it costs one read per block per file — hundreds of RPCs over the network, thousands of block reads for a single listing of a directory like this one.
+- **File sizes inside disk images are estimates — the directory has no byte-size field.** A CBM directory entry stores only a block count, so every byte figure is derived, and the two call sites intentionally differ: `D64MFile::getNextFileInDir()` sets `file->size = entry.blocks * block_size` (256/block — space occupied on disk, what `ls` shows) while `D64MStream::seekPath()` sets `_size = entry.blocks * (block_size - 2)` (254/block — data capacity). The TRUE size needs a walk to the chain's last block: `track == 0` marks it and the sector byte is the last-used byte index, so data = `sector - 1`. **Reads are correct regardless** — the chain-end marker fires before either over-estimate — so a `cat`/`hex` returning far fewer bytes than `ls` advertised is right, not truncated. Verified against `.data/media/dnp/ned128test.dnp`: `vdcmania/settings.ihf` is 1 block, `ls` reports 256, the block's link bytes are `(0, 7)` and the real content is 6 bytes (`" 129 \r"`). `seekFileSize()` does the exact walk but stays commented out at the `seekPath()` call site (`d64.cpp`): it costs one read per block per file — hundreds of RPCs over the network, thousands of block reads for a single listing of a directory like this one.
 - **`getNextFileInDir()` must honor `rewindDirectory()`'s return value** (`media/disk/d64.cpp`, `media/hd/hdd.cpp`): both now guard with `if (!dirIsOpen && !rewindDirectory()) return nullptr;`. A failed rewind has already called `resetEntryCounter()` on the shared ImageBroker stream while leaving `dirIsOpen` false, so continuing re-rewinds and re-serves entry 0 on every call — an ENDLESS listing rather than an empty one. Trigger: any `pathInStream` that names a file rather than a directory, e.g. `ls sett*`, where the wildcard resolves to a regular file so `enterDirectory()` correctly rejects it on the `file_type != 5 && != 6` check. Only these two implementations were affected — every other format (archive, m2i, t64, tcrt, ark, lbr, lnx) fails before the counter reset and cannot loop. Anything new that adds a post-reset failure path to `rewindDirectory()` must add the same guard.
 
 ## Recent Changes (August 5-6, 2026)

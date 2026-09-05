@@ -1,3 +1,4 @@
+#ifndef DISABLE_RETROPIXELS   // MEATLOAF-GATE
 // Meatloaf - A Commodore 64/128 multi-device emulator
 // https://github.com/idolpx/meatloaf
 // Copyright(C) 2020 James Johnston
@@ -675,3 +676,5 @@ std::shared_ptr<MStream> RetroPixelsMFile::getSourceStream(std::ios_base::openmo
     parseURL(pathInStream);
     return retroStream;
 }
+
+#endif // !DISABLE_RETROPIXELS  MEATLOAF-GATE

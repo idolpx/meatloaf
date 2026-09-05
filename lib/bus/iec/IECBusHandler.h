@@ -11,7 +11,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have receikved a copy of the GNU General Public License
+// You should have received a copy of the GNU General Public License
 // along with this program; if not, write to the Free Software Foundation,
 // Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 // -----------------------------------------------------------------------------
@@ -83,10 +83,24 @@ class IECBusHandler
   void setBuffer(uint8_t *buffer, uint8_t bufferSize);
 #endif
 
-  static uint8_t getSupportedFastLoaders();
+  // bit-mask of supported fast loaders. 32 bits wide because the loader ids
+  // (IEC_FP_* in IECConfig.h) go well past 8 once the software loaders are
+  // included -- a uint8_t mask made every id >7 fail isFastLoaderSupported()
+  // silently.
+  static uint32_t getSupportedFastLoaders();
   static bool isFastLoaderSupported(uint8_t loader);
   bool enableFastLoader(IECDevice *dev, uint8_t protocol, bool enable);
   void fastLoadRequest(IECDevice *dev, uint8_t loader, uint8_t request);
+
+#ifdef IEC_IMPL_SOFTLOAD
+  // Switch in a software fast loader that has just been identified from the
+  // code the computer uploaded -- called by IECFileDevice::startFastLoader.
+  // "cmd"/"cmdLen" are the whole M-E command, which for some loaders carries
+  // arguments after the address. Returns false for a loader that is detected
+  // but has no implementation here, which leaves the computer free to fall
+  // back to the standard protocol.
+  bool runFastLoader(IECDevice *dev, uint8_t variant, uint8_t param, uint8_t rxtx, const uint8_t *cmd, uint8_t cmdLen, const uint8_t *captured);
+#endif
 
 #ifdef IEC_FP_DOLPHIN
   void enableDolphinBurstMode(IECDevice *dev, bool enable);
@@ -101,6 +115,24 @@ class IECBusHandler
                          uint8_t pinD4, uint8_t pinD5, uint8_t pinD6, uint8_t pinD7);
 #endif
 #endif
+
+  // Give one device the bus to itself until the next RESET.
+  //
+  // Several fast loaders will not work while anything else can answer -- they
+  // install an ATN responder, or time their transfer tightly enough that a
+  // second device acknowledging is fatal. sd2iec handles this by putting the
+  // WHOLE drive to sleep when it sees a "bus silence" request meant for
+  // another drive; here one board hosts multiple devices, so the
+  // equivalent is to deactivate every device except the one being addressed.
+  //
+  // Deliberately cleared only by a RESET, and by nothing else: a loader that
+  // asked for the bus keeps it for its whole session, and the C64 resetting is
+  // exactly when the other devices should come back. Passing NULL clears it
+  // early. Devices are restored through their own reset(), which reloads the
+  // persisted enabled flag, so a device configured as disabled stays disabled.
+  void setBusExclusive(IECDevice *dev);
+  // 0 rather than NULL: this header only includes <stdint.h>
+  bool isBusExclusive() const { return m_exclusiveDevice!=0; }
 
   IECDevice *findDevice(uint8_t devnr, bool includeInactive = false);
   bool canServeATN();
@@ -133,12 +165,12 @@ class IECBusHandler
   friend class IECHost;
 
  private:
-  inline bool readPinATN();
-  inline bool readPinCLK();
-  inline bool readPinDATA();
-  inline bool readPinRESET();
-  inline void writePinCLK(bool v);
-  inline void writePinDATA(bool v);
+  bool readPinATN();
+  bool readPinCLK();
+  bool readPinDATA();
+  bool readPinRESET();
+  void writePinCLK(bool v);
+  void writePinDATA(bool v);
   void writePinCTRL(bool v);
   bool waitTimeout(uint16_t timeout, uint8_t cond = 0);
   bool waitPinDATA(bool state, uint16_t timeout = 1000);
@@ -163,6 +195,9 @@ class IECBusHandler
   // Dedicated enable/disable latch for end()/begin(), checked by task() before
   // touching anything else.
   volatile bool m_enabled;
+
+  // The device holding the bus alone, or NULL. See setBusExclusive().
+  IECDevice *m_exclusiveDevice;
 
 #ifdef IOREG_TYPE
   volatile IOREG_TYPE *m_regCLKwrite, *m_regCLKmode, *m_regDATAwrite, *m_regDATAmode;
@@ -274,12 +309,243 @@ class IECBusHandler
   bool transmitHypraLoadBlock();
 #endif
 
+#if (defined(IEC_FP_ULOAD3) || defined(IEC_FP_ELOAD1)) && defined(IEC_IMPL_SOFTLOAD)
+  // shared bit protocol -- ELoad1 sends and receives bytes exactly as ULoad3 does
+  bool uload3Handshake();
+  bool receiveULoad3Byte(uint8_t &data);
+  bool transmitULoad3Byte(uint8_t value);
+#endif
+
+#if defined(IEC_FP_ULOAD3) && defined(IEC_IMPL_SOFTLOAD)
+  bool uload3TransferChain(uint8_t track, uint8_t sector, bool saving);
+  bool runULoad3Loader();
+#endif
+
+#if defined(IEC_FP_ELOAD1) && defined(IEC_IMPL_SOFTLOAD)
+  bool runELoad1Loader();
+#endif
+
+#if defined(IEC_FP_NIPPON) && defined(IEC_IMPL_SOFTLOAD)
+  bool nipponAbort();
+  bool nipponWait(bool clkNotAtn, bool state);
+  bool nipponHandshake();
+  bool receiveNipponByte(uint8_t &data);
+  bool transmitNipponByte(uint8_t value);
+  bool runNipponLoader();
+#endif
+
+#if defined(IEC_FP_MMZAK) && defined(IEC_IMPL_SOFTLOAD)
+  bool mmzakWaitCLK(bool state);
+  bool transmitMMZakByte(uint8_t value);
+  bool receiveMMZakByte(uint8_t &data);
+  bool transmitMMZakError();
+  bool mmzakReadSector(uint8_t track, uint8_t sector);
+  bool mmzakWriteSector(uint8_t track, uint8_t sector);
+  bool runMMZakLoader();
+#endif
+
+#if defined(IEC_FP_BITFIRE) && defined(IEC_IMPL_SOFTLOAD)
+  // Bitfire keeps its per-session state in one struct: thirteen revisions
+  // differ in directory layout and block header, not in the bit protocol.
+  struct BitfireSession {
+    uint8_t variant, dirSector, interleave, nextFile, track, sector, offset;
+    uint16_t fileCrc;
+    const uint8_t *hdr;
+  };
+
+  bool receiveBitfireByte(uint8_t rxtx, uint8_t &data);
+  bool bitfireLoadDrivecode(uint8_t variant);
+  bool bitfireLoadDir(uint8_t *dirBuf, uint8_t sector);
+  void bitfireIterateSector(BitfireSession &s);
+  void bitfireIterateFile(BitfireSession &s, const uint8_t *dirBuf, uint8_t file);
+  void bitfireDirEntry(BitfireSession &s, const uint8_t *dirBuf, uint8_t i,
+                       uint16_t &addr, uint16_t &length);
+  bool bitfireLoadFile(BitfireSession &s, uint8_t *dirBuf, uint8_t file);
+  bool runBitfireLoader(uint8_t rxtx, uint8_t variant, uint8_t proto);
+#endif
+
+#if defined(IEC_FP_ULTRABOOT) && defined(IEC_IMPL_SOFTLOAD)
+  void ultrabootMapSector(uint8_t &track, uint8_t &sector, uint8_t speedzone);
+  bool transmitUltrabootByte(uint8_t value);
+  bool ultrabootDetect(const uint8_t *cmd, uint8_t cmdLen,
+                       uint8_t &track, uint8_t &sector, uint8_t &speedzone);
+  bool runUltrabootLoader(const uint8_t *cmd, uint8_t cmdLen);
+#endif
+
+#if defined(IEC_FP_KRILL) && defined(IEC_IMPL_SOFTLOAD)
+  bool krillReadByte(uint8_t rxtx, uint8_t &data);
+  bool krillSendByte(uint8_t rxtx, uint8_t b);
+  bool krillLoadDrivecode(uint8_t rxtx);
+  int16_t krillReadFilename(uint8_t rxtx, uint8_t variant, char *name,
+                            uint8_t maxLen, bool firstFile);
+  void krillBlockHeader(uint8_t variant, uint8_t bi, uint8_t lastUsed,
+                        bool eoi, uint8_t hd[2]);
+  bool krillSendFile(uint8_t rxtx, uint8_t variant, const char *name,
+                     bool byTS, uint16_t &fileCrc);
+  bool runKrillLoader(uint8_t rxtx, uint8_t variant,
+                      const uint8_t *cmd, uint8_t cmdLen);
+#endif
+
+#if defined(IEC_FP_SPARKLE) && defined(IEC_IMPL_SOFTLOAD)
+  // Sparkle: almost nothing is fixed, so the session carries the disk's
+  // parameters, the byte encoding and the four production quirks.
+  enum { SPK_ENC_NONE, SPK_ENC_20, SPK_ENC_21, SPK_ENC_21FF };
+
+  struct SparkleSession {
+    uint8_t variant, enc;
+    uint8_t bundleLen, track, sector;
+    uint8_t currentIl, numSectors, used[3], remaining;
+    uint8_t interleave[4], prodId[3], nextId;
+    uint8_t currentDir;
+    bool    hasSaver, saveActive;
+    bool    hasSkew, hasNsreset, bundleInv, fullSubsct;
+    bool    dirReversed, dirLayoutKnown;
+  };
+
+  static uint8_t sparkleDecode(uint8_t enc, uint8_t v);
+  uint8_t sparkleParam(SparkleSession &s, const uint8_t *bam, uint8_t pm);
+  void sparkleDecodeBlock(SparkleSession &s, uint8_t *data);
+  bool sparkleLoadDir(SparkleSession &s, uint8_t *dirBuf, uint8_t dirIndex);
+  void sparkleAdvanceSector(SparkleSession &s, uint8_t ds);
+  uint8_t sparkleIterateSector(SparkleSession &s);
+  void sparkleTrackChanged(SparkleSession &s);
+  bool sparkleInitDisk(SparkleSession &s, uint8_t *dirBuf, uint16_t bootCrc);
+  bool sparkleFindDirEntry(SparkleSession &s, uint8_t *dirBuf, uint8_t bundle, uint8_t &bptr);
+  bool sparkleReadByte(uint8_t &data, uint32_t timeoutMs);
+  bool sparkleSendBundle(SparkleSession &s, uint8_t *dirBuf, uint8_t bundle);
+  bool sparkleHandleSave(SparkleSession &s);
+  bool runSparkleLoader(const uint8_t *cmd, uint8_t cmdLen);
+#endif
+
+#if defined(IEC_FP_SPINDLE) && defined(IEC_IMPL_SOFTLOAD)
+  bool spindleWriteByte(uint8_t b, uint32_t timeoutMs);
+  uint8_t spindleDetectVersion(const uint8_t *initSector);
+  bool spindleSendBlock(uint8_t variant, uint8_t *nextCmd);
+  bool runSpindleLoader(const uint8_t *cmd, uint8_t cmdLen);
+
+  // Spindle 3.x, in protocol/spindle3.cpp. It shares only the sector bitmap
+  // with 2.x; a sector is cut into length-prefixed UNITS walked backwards, and
+  // the computer can interrupt to request a job by number.
+  struct Spindle3Session {
+    uint8_t  cmd[3], nextCmd[3], nextId[3];
+    uint8_t  ppUnits[0x60];
+    uint8_t  track, blockDelay;
+    uint16_t jobCrc;
+    bool     initDone, async;
+  };
+
+  bool spindleV3WriteByte(uint8_t b, uint32_t timeoutMs);
+  uint8_t spindleReceiveJobNo();
+  uint8_t spindleCopyCR(Spindle3Session &s);
+  bool spindleSendUnits(Spindle3Session &s, uint8_t pos, bool pp);
+  bool runSpindleV3Loader();
+#endif
+
+#if (defined(IEC_FP_BOOZE) || defined(IEC_FP_BITFIRE) || defined(IEC_FP_SPINDLE) || defined(IEC_FP_SPARKLE) || defined(IEC_FP_KRILL)) && defined(IEC_IMPL_SOFTLOAD)
+  // shared by Booze and Bitfire, which move bytes the same way
+  bool fastWaitATN(bool state, uint32_t timeoutMs);
+  bool clockedWriteByte(uint8_t b, uint32_t timeoutMs);
+#endif
+
+#ifdef IEC_IMPL_SOFTLOAD
+  // Block until the medium behind the current device changes, which is how
+  // every multi-disk loader handles "wrong side, please swap". Returns false
+  // if the computer gave up (ATN) or the device is being reset instead.
+  bool waitForDiskChange();
+#endif
+
+#if defined(IEC_FP_BOOZE) && defined(IEC_IMPL_SOFTLOAD)
+  bool receiveBoozeByte(uint8_t &data);
+  bool boozeSendBlock(const uint8_t *data, uint8_t from, uint16_t *crc);
+  bool boozeSendFile(uint16_t &fileCrc);
+  void boozeBusLock();
+  bool boozeFindDir(uint8_t &dirSector, uint8_t *dirBuf);
+  bool runBoozeLoader();
+#endif
+
+#if defined(IEC_FP_DREAMLOAD) && defined(IEC_IMPL_SOFTLOAD)
+  bool dreamloadWait(bool atnNotCLK, bool state);
+  bool receiveDreamloadByte(uint8_t &data);
+  bool transmitDreamloadByte(uint8_t value);
+  bool dreamloadSendBlock(const uint8_t *data);
+  bool runDreamloadLoader();
+#endif
+
+#if defined(IEC_FP_GEOS) && defined(IEC_IMPL_SOFTLOAD)
+  // GEOS/Wheels byte layer. The session loops are not ported yet -- see
+  // protocol/geos.cpp.
+  bool geosWaitByteStart();
+  bool geosSendByteCommon();
+  bool receiveGeosByte(uint8_t rxtx, uint8_t &data);
+  bool transmitGeosByte(uint8_t rxtx, uint8_t value);
+  // session layer, protocol/geos_session.cpp
+  bool geosWaitCLK(bool state);
+  bool geosTransmitByteWait(uint8_t rxtx, uint8_t byte);
+  bool geosTransmitBuffer(uint8_t rxtx, const uint8_t *data, uint16_t len);
+  bool geosReceiveBuffer(uint8_t rxtx, uint8_t *data, uint16_t len);
+  bool geosReceiveLenBlock(uint8_t rxtx, uint8_t *data);
+  bool geosTransmitStatus(uint8_t rxtx, bool ok);
+  bool geosSendChain(uint8_t rxtx, uint8_t track, uint8_t sector, const uint8_t *key);
+  bool runGeosLoader(uint8_t rxtx, uint8_t variant);
+  bool runGeosStage1Loader(uint8_t rxtx, uint8_t variant, const uint8_t *key);
+#ifdef IEC_FP_WHEELS
+  bool wheelsTransmitBuffer(uint8_t rxtx, uint8_t variant, const uint8_t *data, uint16_t len);
+  bool wheelsTransmitByteWait(uint8_t rxtx, uint8_t variant, uint8_t byte);
+  bool wheelsReceiveBuffer(uint8_t rxtx, uint8_t variant, uint8_t *data, uint16_t len);
+  bool runWheelsStage1Loader(uint8_t rxtx, uint8_t variant);
+  bool runWheelsStage2Loader(uint8_t rxtx, uint8_t variant);
+#endif
+#endif
+
+#if defined(IEC_FP_FC3) && defined(IEC_IMPL_SOFTLOAD)
+  bool transmitFC3OldFreezeByte(uint8_t value, bool ntsc);
+  bool runFC3OldFreezeLoader(uint8_t rxtx);
+#endif
+
+#if defined(IEC_FP_SAMSJOURNEY) && defined(IEC_IMPL_SOFTLOAD)
+  bool samsWaitATN(bool state);
+  bool receiveSamsByte(uint8_t &data);
+  bool transmitSamsByte(uint8_t value);
+  bool transmitSamsBlock(uint8_t marker, uint8_t length, const uint8_t *data);
+  bool samsOpenByName(uint8_t channel, uint8_t name, bool replace);
+  bool samsReadFile(uint8_t name);
+  bool samsWriteFile(uint8_t name, bool &aborted);
+  bool samsScanDirectory();
+  bool runSamsJourneyLoader();
+  static uint8_t samsNameFromTS(uint8_t track, uint8_t sector);
+  static uint8_t samsHexPairToByte(const char *s, uint8_t len);
+#endif
+
+#if defined(IEC_FP_N0SDOS) && defined(IEC_IMPL_SOFTLOAD)
+  bool receiveN0SDOSByte(uint8_t &data);
+  bool transmitN0SDOSByte(uint8_t value);
+  bool runN0SDOSLoader();
+#endif
+
+#if defined(IEC_FP_GIJOE) && defined(IEC_IMPL_SOFTLOAD)
+  bool gijoeAbort();
+  bool gijoeWaitCLK(bool state);
+  bool receiveGIJoeByte(uint8_t &data);
+  bool transmitGIJoeByte(uint8_t value);
+  bool transmitGIJoeData(uint8_t value);
+  bool transmitGIJoeError();
+  bool runGIJoeLoader();
+#endif
+
+#ifdef IEC_FP_TURBODISK
+  bool waitTurbodiskHandshake();
+  bool transmitTurbodiskByte(uint8_t data);
+  bool transmitTurbodiskBuffer(const uint8_t *data, uint8_t len);
+  bool transmitTurbodiskBlock();
+  bool startTurbodiskLoad(const uint8_t *cmd, uint8_t cmdLen);
+#endif
+
 #if defined(IEC_SUPPORT_FASTLOAD)
   uint8_t m_bufferSize;
 #if IEC_DEFAULT_FASTLOAD_BUFFER_SIZE>0
 #if defined(IEC_FP_FC3)
   uint8_t  m_buffer[260];
-#elif (defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)) || defined(IEC_FP_AR6) || defined(IEC_FP_HYPRALOAD)
+#elif (defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)) || defined(IEC_FP_AR6) || defined(IEC_FP_HYPRALOAD) || defined(IEC_FP_TURBODISK)
   uint8_t  m_buffer[256];
 #else
   uint8_t  m_buffer[IEC_DEFAULT_FASTLOAD_BUFFER_SIZE];

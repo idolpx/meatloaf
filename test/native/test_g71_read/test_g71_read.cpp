@@ -15,7 +15,7 @@
 //      that are not there.
 //
 // The fixture is generated from a synthesized .d71 by
-// test/native/test_g64_read/host/make_g64.py, since no .g71 exists in .archive
+// test/native/test_g64_read/host/make_g64.py, since no .g71 exists in .data/media
 // and the firmware has a GCR decoder but no encoder. Every block of that .d71
 // carries a pattern derived from its own track and sector number, so a block
 // served from the wrong place is caught by its CONTENT rather than by a
@@ -32,9 +32,9 @@
 #include "../test_disk_write/file_container_stream.h"
 #include "media/disk/g71.h"
 
-static const char* IMAGE = ".archive/disk/g71/synth.g71";
-static const char* SOURCE = ".archive/disk/g71/synth.d71";
-static const char* G64_IMAGE = ".archive/disk/g64/wolf64.g64";
+static const char* IMAGE = ".data/media/disk/g71/synth.g71";
+static const char* SOURCE = ".data/media/disk/g71/synth.d71";
+static const char* G64_IMAGE = ".data/media/disk/g64/wolf64.g64";
 
 // 70 tracks: the 1541 progression, twice.
 static uint8_t sectorsOnTrack(uint8_t track)

@@ -93,15 +93,15 @@ int WiFiManager::start()
     if (_wifi_event_group == nullptr)
         _wifi_event_group = xEventGroupCreate();
 
-    // Make sure our network interface is initialized
-    ESP_ERROR_CHECK(esp_netif_init());
-    //log_wifi_heap_checkpoint("after esp_netif_init()");
-
     // Set custom MAC Address
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     mac[0]=0x00; mac[1]=0x80; mac[2]=0x10; // OUI 00:80:10 Commodore International
     esp_base_mac_addr_set(mac);
+
+    // Make sure our network interface is initialized
+    ESP_ERROR_CHECK(esp_netif_init());
+    //log_wifi_heap_checkpoint("after esp_netif_init()");
 
     // Assume we've already done these steps if _wifi_sta has a value
     if (_wifi_sta == nullptr)
@@ -125,11 +125,9 @@ int WiFiManager::start()
         ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
         //log_wifi_heap_checkpoint("after esp_wifi_set_storage()");
         Debug_printf("WiFiManager::start() complete\r\n");
-        printf("MAC Address: ");
-        for (int i = 0; i < 5; i++) {
-            printf("%02X:", mac[i]);
-        }
-        printf("%02X\r\n", mac[5]);
+
+        char macStr[18] = {0};
+        printf("MAC Address: %s\r\n", _mac_to_string(macStr, mac));
     }
 
     // TODO: Provide way to change WiFi region/country?

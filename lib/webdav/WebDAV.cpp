@@ -1,3 +1,4 @@
+#ifndef DISABLE_WEBDAV_CLIENT   // MEATLOAF-GATE
 /** 
  * WebDAV parsing class for directory output
  */
@@ -189,3 +190,5 @@ void WebDAV::Char(const XML_Char *s, int len)
         }
     }
 }
+
+#endif // !DISABLE_WEBDAV_CLIENT  MEATLOAF-GATE

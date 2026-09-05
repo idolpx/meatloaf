@@ -1,3 +1,4 @@
+#ifndef DISABLE_NFS   // MEATLOAF-GATE
 
 #include "fnFsNFS.h"
 
@@ -274,3 +275,5 @@ bool FileSystemNFS::dir_seek(uint16_t pos)
 {
     return _dircache.seek(pos);
 }
+
+#endif // !DISABLE_NFS  MEATLOAF-GATE

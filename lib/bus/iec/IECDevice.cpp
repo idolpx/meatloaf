@@ -11,7 +11,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have receikved a copy of the GNU General Public License
+// You should have received a copy of the GNU General Public License
 // along with this program; if not, write to the Free Software Foundation,
 // Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 // -----------------------------------------------------------------------------
@@ -55,25 +55,25 @@ bool IECDevice::enableFastLoader(uint8_t loader, bool enable)
   // cancel any current fast-load activities
   m_flProtocol = IEC_FL_PROT_NONE;
 
-  if( loader<=7 && m_handler!=NULL )
+  if( loader<=31 && m_handler!=NULL )
     {
       // must set the bit BEFORE calling IECBusHandler::enableFastLoader, otherwise
       // "enableParallelPins()" will not be called for parallel loaders.
       if( enable )
-        m_flEnabled |= bit(loader);
-      else 
-        m_flEnabled &= ~bit(loader);
+        m_flEnabled |= (1UL<<loader);
+      else
+        m_flEnabled &= ~(1UL<<loader);
 
-      if( !m_handler->enableFastLoader(this, loader, enable) ) 
-        m_flEnabled &= ~bit(loader);
+      if( !m_handler->enableFastLoader(this, loader, enable) )
+        m_flEnabled &= ~(1UL<<loader);
     }
 
-  return (m_flEnabled & bit(loader))!=0;
+  return isFastLoaderEnabled(loader);
 }
 
 bool IECDevice::isFastLoaderEnabled(uint8_t loader)
 {
-  return loader<=7 && (m_flEnabled & bit(loader))!=0;
+  return loader<=31 && (m_flEnabled & (1UL<<loader))!=0;
 }
 
 bool IECDevice::fastLoadRequest(uint8_t loader, uint8_t request)

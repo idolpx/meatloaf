@@ -1,0 +1,413 @@
+#include "ps2_device.h"
+#include "esp_log.h"
+
+namespace ps2dev
+{
+
+  // A host request to send is CLK high && DATA low.  The host's sequence is
+  // CLK low (inhibit) -> DATA low (start bit) -> CLK released, so the edge
+  // that CREATES the condition is CLK rising.
+  // A2: ONE spinlock at file scope.  It was previously a stack local in each
+  // of write() and read(), which excludes nothing -- every call locked its
+  // own private copy, and what actually protected the byte was the
+  // incidental interrupt-disable that taskENTER_CRITICAL performs.
+  static portMUX_TYPE ps2_mux = portMUX_INITIALIZER_UNLOCKED;
+
+  static void IRAM_ATTR ps2_clk_isr(void *arg)
+  {
+    PS2Device *dev = static_cast<PS2Device *>(arg);
+    // gpio_isr_handler_add() enables the interrupt as ITS OWN last action
+    // (gpio_hal_intr_enable_on_core()), regardless of what begin() does
+    // afterward -- so this can fire before the host-request task exists (a
+    // boot-time race), or, for a PS2Device with no such task at all
+    // (PS2Mouse shares PS2Device::begin() and never creates one), on every
+    // call for the object's entire lifetime.  vTaskNotifyGiveFromISR()
+    // asserts its handle is non-NULL and aborts the ISR otherwise, so this
+    // must be checked before touching anything else.
+    TaskHandle_t task = dev->hostRequestTask();
+    if (task == nullptr)
+      return;
+    if (gpio_get_level(dev->clkPin()) == 1 && gpio_get_level(dev->dataPin()) == 0)
+    {
+      BaseType_t hpw = pdFALSE;
+      vTaskNotifyGiveFromISR(task, &hpw);
+      if (hpw)
+        portYIELD_FROM_ISR();
+    }
+  }
+
+  PS2Device::PS2Device(gpio_num_t clk, gpio_num_t data)
+  {
+    _ps2clk = clk;
+    _ps2data = data;
+  }
+
+  void PS2Device::config(UBaseType_t task_priority, BaseType_t task_core)
+  {
+    if (task_priority < 1)
+    {
+      task_priority = 1;
+    }
+    else if (task_priority > configMAX_PRIORITIES)
+    {
+      task_priority = configMAX_PRIORITIES - 1;
+    }
+    _config_task_priority = task_priority;
+    _config_task_core = task_core;
+  }
+
+  void PS2Device::begin(BaseType_t core)
+  {
+    gpio_config_t io_conf; // PIN CONFIGURATION SECTION: CRITICAL
+
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.mode = GPIO_MODE_OUTPUT_OD;
+    io_conf.pin_bit_mask = (1ULL << _ps2data);
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    gpio_config(&io_conf);
+    io_conf.pin_bit_mask = (1ULL << _ps2clk);
+    gpio_config(&io_conf);
+
+    gohi(_ps2clk);
+    gohi(_ps2data);
+    _mutex_bus = xSemaphoreCreateMutex();
+    _queue_packet = xQueueCreate(PACKET_QUEUE_LENGTH, sizeof(PS2Packet));
+
+    // The service is installed once, globally, in the boot sequence's
+    // main_setup() (src/main.cpp).  Calling gpio_install_isr_service() here
+    // returns ESP_ERR_INVALID_STATE and, worse, is what the deleted
+    // ps2keyboard.cpp used to do.
+    gpio_set_intr_type(_ps2clk, GPIO_INTR_POSEDGE);
+    gpio_isr_handler_add(_ps2clk, ps2_clk_isr, this);
+    // NOT what keeps the ISR quiet -- gpio_isr_handler_add() above already
+    // enabled it.  This just returns to the disabled state expected before
+    // the host-request task starts; ps2_clk_isr's own NULL check is the
+    // real guard against firing too early.
+    gpio_intr_disable(_ps2clk);
+
+    _running = true;
+  }
+
+  void PS2Device::end()
+  {
+    if (!_running)
+      return;
+    _running = false;                  // both loops observe this at the top
+
+    // The host-request task blocks on a notification with no timeout, so it
+    // must be woken explicitly.  The send task's bounded queue receive wakes
+    // on its own within 250 ms.
+    if (_task_process_host_request)
+      xTaskNotifyGive(_task_process_host_request);
+
+    for (int i = 0; i < 100 && (_task_send_packet || _task_process_host_request); i++)
+      vTaskDelay(pdMS_TO_TICKS(10));   // bounded, <= 1 s
+
+    // Detaching the ISR is safe even if a task below failed to exit in
+    // time: it only stops future interrupts from reaching ps2_clk_isr and
+    // touches no FreeRTOS object a live task might still be using.  Do
+    // this unconditionally, ABOVE the leak-and-return below -- an object
+    // that may be destroyed or reused right after end() returns must not
+    // leave ps2_clk_isr installed against it holding a dangling `this`.
+    gpio_intr_disable(_ps2clk);
+    gpio_isr_handler_remove(_ps2clk);
+
+    if (_task_send_packet || _task_process_host_request)
+    {
+      // Freeing a mutex a live task may still take is a guaranteed crash;
+      // leaking ~440 bytes is survivable and leaves this line behind.
+      ESP_LOGE("ps2", "tasks did not exit; leaking mutex/queue deliberately");
+      return;
+    }
+
+    gohi(_ps2clk);
+    gohi(_ps2data);
+    gpio_reset_pin(_ps2clk);
+    gpio_reset_pin(_ps2data);
+
+    vQueueDelete(_queue_packet);
+    _queue_packet = nullptr;
+    vSemaphoreDelete(_mutex_bus);
+    _mutex_bus = nullptr;
+  }
+
+  void PS2Device::gohi(gpio_num_t pin)
+  {
+    gpio_set_level(pin, 1);
+    gpio_set_direction(pin, GPIO_MODE_INPUT);
+  }
+  void PS2Device::golo(gpio_num_t pin)
+  {
+    gpio_set_direction(pin, GPIO_MODE_OUTPUT_OD);
+    gpio_set_level(pin, 0);
+  }
+  void PS2Device::ack()
+  {
+    esp_rom_delay_us(BYTE_INTERVAL_MICROS);
+    write(0xFA);
+    esp_rom_delay_us(BYTE_INTERVAL_MICROS);
+  }
+  void PS2Device::notifyIfHostWaiting()
+  {
+    // Both call sites (write()/read()) release DATA high and run this
+    // while still holding _mutex_bus, right after re-enabling the
+    // interrupt -- so this can only be true if the HOST is holding DATA
+    // low right now; there is no false-positive path.  If the real ISR
+    // also caught the same edge, this is a harmless extra notify:
+    // _taskfn_process_host_request just wakes, finds the bus already
+    // IDLE, and no-ops.
+    if (_task_process_host_request && get_bus_state() == BusState::HOST_REQUEST_TO_SEND)
+      xTaskNotifyGive(_task_process_host_request);
+  }
+  int PS2Device::write(unsigned char data)
+  {
+    unsigned char i;
+    unsigned char parity = 1;
+
+    if (get_bus_state() != BusState::IDLE)
+    {
+      return -1;
+    }
+
+    // gpio_ll_intr_disable() leaves int_type (POSEDGE, set in begin())
+    // intact; only int_ena clears.  gpio_hal_intr_enable_on_core(), which
+    // gpio_intr_enable() below calls, clears the latched pending-interrupt
+    // status bit before setting int_ena again -- that's what makes our own
+    // clock edges below not queue up behind the disable, and it's also why
+    // a genuine host request arriving during this window is discarded
+    // rather than deferred (see notifyIfHostWaiting() below).
+    gpio_intr_disable(_ps2clk);
+
+    // A3: the critical section is PER BIT, not per byte.  Holding interrupts
+    // off for a whole byte is ~900us on the core that runs WiFi and lwIP,
+    // and it is unnecessary: in device-to-host transfers the DEVICE owns the
+    // clock, so being preempted between bits merely stretches the clock,
+    // which hosts tolerate by design.  Same total time, eleven windows for
+    // interrupts to breathe.
+
+    // start bit
+    taskENTER_CRITICAL(&ps2_mux);
+    golo(_ps2data);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    // device sends on falling clock
+    golo(_ps2clk);
+    esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
+    gohi(_ps2clk);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    taskEXIT_CRITICAL(&ps2_mux);
+
+    for (i = 0; i < 8; i++)
+    {
+      // A4: the host pulls CLK low to inhibit.  Checked between bits, where
+      // the clock is high and we are not mid-edge.  Without this, write()
+      // tested for an idle bus once on entry and then clocked the whole byte
+      // into a host that had stopped listening -- losing it silently.
+      if (gpio_get_level(_ps2clk) == 0)
+      {
+        gohi(_ps2data);            // never leave the bus held
+        gpio_intr_enable(_ps2clk); // symmetric with the disable above
+        return -1;                 // caller may retry
+      }
+
+      taskENTER_CRITICAL(&ps2_mux);
+      if (data & 0x01)
+      {
+        gohi(_ps2data);
+      }
+      else
+      {
+        golo(_ps2data);
+      }
+      esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+      golo(_ps2clk);
+      esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
+      gohi(_ps2clk);
+      esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+      taskEXIT_CRITICAL(&ps2_mux);
+
+      parity = parity ^ (data & 0x01);
+      data = data >> 1;
+    }
+
+    // parity bit
+    taskENTER_CRITICAL(&ps2_mux);
+    if (parity)
+    {
+      gohi(_ps2data);
+    }
+    else
+    {
+      golo(_ps2data);
+    }
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    golo(_ps2clk);
+    esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
+    gohi(_ps2clk);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    taskEXIT_CRITICAL(&ps2_mux);
+
+    // stop bit
+    taskENTER_CRITICAL(&ps2_mux);
+    gohi(_ps2data);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    golo(_ps2clk);
+    esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
+    gohi(_ps2clk);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    taskEXIT_CRITICAL(&ps2_mux);
+
+    gpio_intr_enable(_ps2clk);
+    notifyIfHostWaiting();
+
+    return 0;
+  }
+
+  int PS2Device::write_wait_idle(uint8_t data, uint64_t timeout_micros)
+  {
+    int64_t start_time = esp_timer_get_time();
+    while (get_bus_state() != BusState::IDLE)
+    {
+      if (esp_timer_get_time() - start_time > (int64_t)timeout_micros)
+      {
+        return -1;
+      }
+      // A6: this used to spin flat out for up to 1500us.  esp_rom_delay_us
+      // is still a busy wait, but a quarter clock period between polls is
+      // ample resolution for a bus that changes on a 40us half-period, and
+      // it stops the loop hammering the bus-state reads.
+      esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    }
+    return write(data);
+  }
+  int PS2Device::read(unsigned char *value, uint64_t timeout_ms)
+  {
+    unsigned int data = 0x00;
+    unsigned int bit = 0x01;
+
+    unsigned char calculated_parity = 1;
+    unsigned char received_parity = 0;
+
+    // wait for data line to go low and clock line to go high (or timeout)
+    int64_t waiting_since = esp_timer_get_time();
+    while (get_bus_state() != BusState::HOST_REQUEST_TO_SEND)
+    {
+      if ((esp_timer_get_time() - waiting_since) > (int64_t)timeout_ms * 1000)
+        return -1;
+      esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    }
+
+    // Same disable/re-enable mechanism as write() above -- see its comment.
+    gpio_intr_disable(_ps2clk);
+
+    // A3: per-bit critical sections, as in write().  Here the HOST drives
+    // DATA and we drive CLK, so each sample stays in the same section as the
+    // clock pulse that follows it -- splitting those two would let a
+    // preemption land between sampling a bit and clocking it.
+
+    taskENTER_CRITICAL(&ps2_mux);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    golo(_ps2clk);
+    esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
+    gohi(_ps2clk);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    taskEXIT_CRITICAL(&ps2_mux);
+
+    while (bit < 0x0100)
+    {
+      taskENTER_CRITICAL(&ps2_mux);
+      if (gpio_get_level(_ps2data) == 1)
+      {
+        data = data | bit;
+        calculated_parity = calculated_parity ^ 1;
+      }
+      else
+      {
+        calculated_parity = calculated_parity ^ 0;
+      }
+
+      bit = bit << 1;
+
+      esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+      golo(_ps2clk);
+      esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
+      gohi(_ps2clk);
+      esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+      taskEXIT_CRITICAL(&ps2_mux);
+    }
+    // we do the delay at the end of the loop, so at this point we have
+    // already done the delay for the parity bit
+
+    // parity bit, then the stop bit's clock pulse
+    taskENTER_CRITICAL(&ps2_mux);
+    if (gpio_get_level(_ps2data) == 1)
+    {
+      received_parity = 1;
+    }
+
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    golo(_ps2clk);
+    esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
+    gohi(_ps2clk);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    taskEXIT_CRITICAL(&ps2_mux);
+
+    // acknowledge bit -- we pull DATA low for one clock, then release it
+    taskENTER_CRITICAL(&ps2_mux);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    golo(_ps2data);
+    golo(_ps2clk);
+    esp_rom_delay_us(CLK_HALF_PERIOD_MICROS);
+    gohi(_ps2clk);
+    esp_rom_delay_us(CLK_QUATER_PERIOD_MICROS);
+    gohi(_ps2data);
+    taskEXIT_CRITICAL(&ps2_mux);
+
+    gpio_intr_enable(_ps2clk);
+    notifyIfHostWaiting();
+
+    *value = data & 0x00FF;
+
+    if (received_parity == calculated_parity)
+    {
+      return 0;
+    }
+    else
+    {
+      return -2;
+    }
+  }
+
+  PS2Device::BusState PS2Device::get_bus_state()
+  {
+    if (gpio_get_level(_ps2clk) == 0)
+    {
+      return BusState::COMMUNICATION_INHIBITED;
+    }
+    else if (gpio_get_level(_ps2data) == 0)
+    {
+      return BusState::HOST_REQUEST_TO_SEND;
+    }
+    else
+    {
+      return BusState::IDLE;
+    }
+  }
+  SemaphoreHandle_t PS2Device::get_bus_mutex_handle() { return _mutex_bus; }
+  QueueHandle_t PS2Device::get_packet_queue_handle() { return _queue_packet; }
+  int PS2Device::send_packet(PS2Packet *packet)
+  {
+    // A send racing PS2Device::end() must fail, not write to a deleted
+    // handle -- end() sets _queue_packet = nullptr after vQueueDelete().
+    // This guard is load-bearing; it is not about backpressure.
+    if (!_queue_packet)
+      return -1;
+    // The timeout is a stuck-wire backstop, not flow control: type()'s own
+    // vTaskDelay(pdMS_TO_TICKS(10)) between keydown and keyup already keeps
+    // the producer well under the consumer's drain rate, so ordinary typing
+    // never comes close to filling a 20-deep queue.  A 0 ms timeout would
+    // misreport transient scheduling jitter as failure; 500 ms lets it
+    // instead catch a genuinely wedged bus (host never toggling clock).
+    return (xQueueSend(_queue_packet, packet, pdMS_TO_TICKS(500)) == pdTRUE) ? 0 : -1;
+  }
+}

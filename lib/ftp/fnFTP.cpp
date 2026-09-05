@@ -1487,7 +1487,7 @@ bool fnFTP::read_directory(string &name, long &filesize, bool &is_dir)
 
 bool fnFTP::read_file(uint8_t *buf, unsigned short len, unsigned long range_begin, unsigned long range_end)
 {
-    // Debug_printv("fnFTP::read_file(%p, %u, %lu, %lu)", buf, len, range_begin, range_end);
+    Debug_printv("(%p, %u, %lu, %lu)", buf, len, range_begin, range_end);
 
     // If range parameters are provided and different from current, send RANG command
     if ((range_begin > 0 || range_end > 0) && (range_begin != _range_begin || range_end != _range_end))

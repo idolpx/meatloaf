@@ -127,6 +127,7 @@ namespace ESP32Console
         void registerSystemCommands();
 
         void registerDisplayCommands();
+        void registerPS2Commands();
 
         void registerIECCommands();
 

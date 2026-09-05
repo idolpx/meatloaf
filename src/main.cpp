@@ -59,12 +59,12 @@
 #include <c64b.h>
 #endif
 
-#ifdef ENABLE_PS2
-#include "ps2_keyboard.h"
-ps2dev::PS2Keyboard keyboard(PIN_KB_CLK, PIN_KB_DATA);
+#ifdef ENABLE_ETHERNET
+#include "ethernet.h"
 #endif
 
 #include "device.h"
+#include "ps2.h"
 #include "keys.h"
 #include "led.h"
 
@@ -194,6 +194,7 @@ void main_setup()
     // command set is available from the first prompt.
     console.registerSystemCommands();
     console.registerDisplayCommands();
+    console.registerPS2Commands();
     console.registerIECCommands();
     console.registerNetworkCommands();
     console.registerVFSCommands();
@@ -338,6 +339,11 @@ void main_setup()
     printf( ANSI_GREEN_BOLD "Parallel Bus Initialized" ANSI_RESET "\r\n" );
 #endif
 
+    // Reads devices.ps2 only -- allocates nothing, touches no GPIO, does no
+    // network work, so it has none of the ordering hazards a drive's
+    // reloadConfig() has.  A no-op on boards without PIN_KB_CLK.
+    ps2Keyboard.start();
+
 #ifdef ENABLE_DISPLAY
     LEDS.start();
     LCD.show_image( (char *)WWW_ROOT "/assets/logo.160x80.jpg" );
@@ -355,8 +361,18 @@ void main_setup()
 #endif // DEBUG
 
 
+
     // Set up the WiFi adapter
     fnWiFi.start();
+
+#ifdef ENABLE_ETHERNET
+    // MUST come after fnWiFi.start(): that is what calls esp_netif_init() and
+    // creates the default event loop.  Before it, esp_netif_new() returns NULL
+    // and the next call dereferences it -- a LoadProhibited with EXCVADDR 0.
+    // Same ordering rule the network-drive reload below documents.
+    ethernet.start();   // SPI host comes from ETHERNET_SPI_HOST in the pinmap
+    //log_heap_checkpoint("after ethernet.start()");
+#endif
     //log_heap_checkpoint("after fnWiFi.start()");
 
     // Start SessionBroker service task on CPU0

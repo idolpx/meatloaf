@@ -14,6 +14,8 @@ namespace ESP32Console::Commands
 
     const ConsoleCommand getConnectCommand();
 
+    const ConsoleCommand getDisconnectCommand();
+
 #ifndef MIN_CONFIG
     const ConsoleCommand getWsCommand();
 #endif

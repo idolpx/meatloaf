@@ -2,7 +2,7 @@
 """Encode a .d64 into a .g64, or a .d71 into a .g71, so the GCR read paths have
 something to test against.
 
-There is no .g64 in .archive and no way for the firmware to produce one - it has
+There is no .g64 in .data/media and no way for the firmware to produce one - it has
 a GCR decoder, not an encoder - so the fixture is generated here. Layout per the
 G64 spec: an 8-byte signature, version, track count and track size, then a table
 of 32-bit track offsets and one of speed zones, then each track as a 16-bit

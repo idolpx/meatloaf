@@ -43,10 +43,6 @@
 #define PIN_DAC1                GPIO_NUM_NC  // samlib.h
 #define PIN_I2S                 GPIO_NUM_NC
 
-/* PS/2 Keyboard Output */
-#define PIN_KB_CLK              GPIO_NUM_NC
-#define PIN_KB_DATA             GPIO_NUM_NC
-
 /* I2C GPIO Expander */
 #define PIN_GPIOX_SDA           GPIO_NUM_NC
 #define PIN_GPIOX_SCL           GPIO_NUM_NC

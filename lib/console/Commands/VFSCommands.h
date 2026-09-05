@@ -50,8 +50,10 @@ namespace ESP32Console::Commands
 
 #ifdef SD_CARD
     const ConsoleCommand getFormatSDCommand();
+#ifndef DISABLE_LOCATEDB
     const ConsoleCommand getUpdatedbCommand();
     const ConsoleCommand getLocateCommand();
+#endif
 #endif
 }
 
@@ -63,5 +65,11 @@ namespace ESP32Console::Commands
 // and call this directly, the same way they intercept "exit" and "reboot".
 // Returns false if no scan is in progress. Safe from any task: it only sets a
 // volatile flag the scan polls once per directory.
+#ifndef DISABLE_LOCATEDB
 bool updatedb_request_stop();
+#else
+// No locate database compiled in: nothing can be running, so nothing to stop.
+// Kept as an inline no-op so the shells' intercept sites need no #ifdef.
+static inline bool updatedb_request_stop() { return false; }
+#endif
 #endif

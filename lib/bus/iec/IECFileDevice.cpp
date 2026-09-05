@@ -178,6 +178,44 @@ void IECFileDevice::begin()
 #endif
 #endif
 
+  // Software fast loaders. These are detected from the code the host uploads
+  // (see fastload.h) rather than from a wiring signature, so there is nothing
+  // to check for -- enabling them only decides whether a detected loader is
+  // allowed to run.
+#ifdef IEC_FP_TURBODISK
+  IECDevice::enableFastLoader(IEC_FP_TURBODISK, true);
+#endif
+#ifdef IEC_FP_DREAMLOAD
+  IECDevice::enableFastLoader(IEC_FP_DREAMLOAD, true);
+#endif
+#ifdef IEC_FP_ULOAD3
+  IECDevice::enableFastLoader(IEC_FP_ULOAD3, true);
+#endif
+#ifdef IEC_FP_GIJOE
+  IECDevice::enableFastLoader(IEC_FP_GIJOE, true);
+#endif
+#ifdef IEC_FP_GEOS
+  IECDevice::enableFastLoader(IEC_FP_GEOS, true);
+#endif
+#ifdef IEC_FP_WHEELS
+  IECDevice::enableFastLoader(IEC_FP_WHEELS, true);
+#endif
+#ifdef IEC_FP_NIPPON
+  IECDevice::enableFastLoader(IEC_FP_NIPPON, true);
+#endif
+#ifdef IEC_FP_ELOAD1
+  IECDevice::enableFastLoader(IEC_FP_ELOAD1, true);
+#endif
+#ifdef IEC_FP_MMZAK
+  IECDevice::enableFastLoader(IEC_FP_MMZAK, true);
+#endif
+#ifdef IEC_FP_N0SDOS
+  IECDevice::enableFastLoader(IEC_FP_N0SDOS, true);
+#endif
+#ifdef IEC_FP_SAMSJOURNEY
+  IECDevice::enableFastLoader(IEC_FP_SAMSJOURNEY, true);
+#endif
+
   m_statusBufferPtr = 0;
   m_statusBufferLen = 0;
   m_writeBufferLen = 0;
@@ -188,6 +226,9 @@ void IECFileDevice::begin()
   m_eoi = true;
   m_statusEoi = true;
   m_uploadCtr = 0;
+#ifdef IEC_SUPPORT_SOFTLOAD
+  m_fastload.reset();
+#endif
 
   // calling fileTask() may result in significant time spent accessing the
   // disk during which we can not respond to ATN requests within the required
@@ -533,7 +574,7 @@ void IECFileDevice::unlisten()
 }
 
 
-#if defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)
+#ifdef IEC_SUPPORT_SECTOROPS
 bool IECFileDevice::epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer)
 {
 #if DEBUG>0
@@ -561,6 +602,27 @@ bool IECFileDevice::epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buff
   return false;
 #endif
 }
+
+
+#ifdef IEC_IMPL_SOFTLOAD
+uint8_t IECFileDevice::sectorsPerTrack(uint8_t track)
+{
+  (void) track;
+  return 0;
+}
+
+
+uint8_t IECFileDevice::imageType()
+{
+  return IEC_IMG_NONE;
+}
+
+
+uint32_t IECFileDevice::mediaGeneration()
+{
+  return 0;
+}
+#endif
 #endif
 
 
@@ -720,6 +782,49 @@ void IECFileDevice::fileTask()
 
 bool IECFileDevice::isFastLoaderRequest(const char *cmd)
 {
+#ifdef IEC_SUPPORT_SOFTLOAD
+  // ------------------- software fast loader detection --------------------
+  //
+  // Both halves run BEFORE the signature matchers below get a chance to
+  // consume the command. For M-W that is so a loader they do not know still
+  // accumulates a usable CRC; for M-E it is so the detector's state is rolled
+  // even when a matcher claims the command -- otherwise the CRC of a loader
+  // they handled keeps accumulating into the next one's upload.
+  //
+  // The signature matchers stay in charge of the loaders they already
+  // recognise: they are hardware-proven, and they also set up m_channel and
+  // m_eoi, which detection alone does not.
+  bool     flIsExec  = false;
+  bool     flMatched = false;
+  uint8_t  flVariant = IEC_FLV_NONE;
+  uint8_t  flParam   = 0;
+  uint8_t  flRxtx    = IEC_FLRX_NONE;
+  uint16_t flAddress = 0;
+  uint16_t flCrc     = 0;
+
+  if( m_writeBufferLen>=6 && strncmp_P(cmd, PSTR("M-W"), 3)==0 )
+    {
+      uint8_t len = m_writeBuffer[5];
+      if( len > m_writeBufferLen-6 ) len = m_writeBufferLen-6;
+      m_fastload.memWrite(m_writeBuffer[3] | (m_writeBuffer[4]<<8), m_writeBuffer+6, len);
+    }
+  else if( m_writeBufferLen>=5 && strncmp_P(cmd, PSTR("M-E"), 3)==0 )
+    {
+      // read the CRC before memExec() rolls the state -- an M-E that resolves
+      // to no loader is the interesting case for adding a new one, and its CRC
+      // is the only evidence of which loader it was
+      flIsExec  = true;
+      flAddress = m_writeBuffer[3] | (m_writeBuffer[4]<<8);
+      flCrc     = m_fastload.crc();
+      flRxtx    = m_fastload.rxtx();
+      flVariant = m_fastload.memExec(flAddress, &flParam, &flMatched);
+
+      // a loader the user has turned off is reported but not started
+      if( flVariant!=IEC_FLV_NONE && !isFastLoaderEnabled(iecFastLoadFamily(flVariant)) )
+        { flVariant = IEC_FLV_NONE; flMatched = false; }
+    }
+#endif
+
   // --------------------------- EPYX FastLoad ----------------------------
 
 #ifdef IEC_FP_EPYX
@@ -982,9 +1087,94 @@ bool IECFileDevice::isFastLoaderRequest(const char *cmd)
     }
 #endif
 
+#ifdef IEC_SUPPORT_SOFTLOAD
+  // ------------------- software fast loader dispatch ---------------------
+  //
+  // Reached only when none of the signature matchers above claimed this
+  // command, so an M-E here either belongs to a loader identified by CRC or
+  // to no loader at all. Both are passed on -- see startFastLoader.
+  if( flIsExec && (flMatched || flVariant!=IEC_FLV_NONE)
+      && startFastLoader(flVariant, flParam, flRxtx, m_writeBuffer, m_writeBufferLen, flCrc) )
+    {
+      m_uploadCtr = 0;
+      return true;
+    }
+#endif
+
   m_uploadCtr = 0;
   return false;
 }
+
+
+#ifdef IEC_SUPPORT_SOFTLOAD
+bool IECFileDevice::startFastLoader(uint8_t variant, uint8_t param, uint8_t rxtx, const uint8_t *cmd, uint8_t cmdLen, uint16_t crc)
+{
+  (void) crc;
+  if( m_handler==NULL ) return false;
+
+#ifndef IEC_IMPL_SOFTLOAD
+  // Detection only on this board: nothing can be dispatched to, so the routing
+  // below is not compiled. The M-E still reaches the drive's override, which
+  // logs the loader name and the CRC, and then falls through to the standard
+  // protocol.
+  (void) variant; (void) param; (void) rxtx; (void) cmd; (void) cmdLen;
+  return false;
+#else
+
+  // Three of sd2iec's loaders are protocols IECBusHandler already speaks, at
+  // the very same M-E addresses the signature matchers above watch for. Route
+  // them to the existing request path rather than reimplementing them: the CRC
+  // then acts as a backstop, catching an upload variation whose byte sequence
+  // the matcher does not recognise.
+  //
+  // These are handled HERE rather than in runFastLoader() because they need
+  // m_channel and m_eoi set up, which the bus handler cannot reach.
+  switch( variant )
+    {
+#ifdef IEC_FP_EPYX
+    case IEC_FLV_EPYXCART:
+      // sd2iec's load_epyxcart receives a 256-byte stage 2 and then a file
+      // name, which is exactly what receiveEpyxHeader() does.
+      fastLoadRequest(IEC_FP_EPYX, IEC_FL_PROT_HEADER);
+      return true;
+#endif
+
+#ifdef IEC_FP_HYPRALOAD
+    case IEC_FLV_HYPRALOAD:
+      // The signature matcher above already recognises Hypra-Load; this is the
+      // CRC catching an upload variation whose byte sequence it does not know.
+      m_eoi = false;
+      m_channel = 0;
+      fastLoadRequest(IEC_FP_HYPRALOAD, IEC_FL_PROT_LOAD);
+      return true;
+#endif
+
+#ifdef IEC_FP_AR6
+    case IEC_FLV_AR6_1581_LOAD:
+      m_eoi = false;
+      m_channel = 0;
+      fastLoadRequest(IEC_FP_AR6, IEC_FL_PROT_LOAD);
+      return true;
+
+    case IEC_FLV_AR6_1581_SAVE:
+      m_eoi = false;
+      m_channel = 1;
+      fastLoadRequest(IEC_FP_AR6, IEC_FL_PROT_SAVE);
+      return true;
+#endif
+
+    default:
+      break;
+    }
+
+  // Everything else goes to the bus handler, which owns the pin timing every
+  // transfer needs. A loader with no implementation there returns false, which
+  // lets the M-E through so the host falls back to the standard protocol
+  // instead of waiting for a transfer that will never start.
+  return m_handler->runFastLoader(this, variant, param, rxtx, cmd, cmdLen, m_fastload.capturedData());
+#endif
+}
+#endif
 
 
 bool IECFileDevice::checkMWcmds(const struct MWSignature *sig, uint8_t sigLen, uint8_t offset)

@@ -12,8 +12,8 @@
 // the wrong content fails it. Nothing else here can tell a subtly wrong
 // Huffman table or LZW string table from a right one.
 //
-// The corpus is real: nine .arc files and an .sda in .archive/archive, none of
-// them written by this project. .archive is gitignored, so these skip cleanly
+// The corpus is real: nine .arc files and an .sda in .data/media/archive, none of
+// them written by this project. .data/media is gitignored, so these skip cleanly
 // without it.
 
 #include <unity.h>
@@ -28,8 +28,8 @@
 #include "media/archive/arc.h"
 #include "string_utils.h"
 
-static const char* CORPUS_DIR = ".archive/archive/arc";
-static const char* SDA_DIR = ".archive/archive/sda";
+static const char* CORPUS_DIR = ".data/media/archive/arc";
+static const char* SDA_DIR = ".data/media/archive/sda";
 
 static const char* CORPUS[] = {
     "fwriter2.arc", "graphic-aids.arc", "macto64-1525.arc", "pacificwar.arc",
@@ -78,7 +78,7 @@ void test_directory_lists_entries(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(std::string(CORPUS_DIR) + "/" + CORPUS[0], src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/arc");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/arc");
 
     TEST_ASSERT_TRUE(image->readHeader());
     TEST_ASSERT_TRUE(image->entries.size() > 0);
@@ -100,7 +100,7 @@ void test_entries_are_found_by_name(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(std::string(CORPUS_DIR) + "/" + CORPUS[0], src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/arc");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/arc");
 
     TEST_ASSERT_TRUE(image->readHeader());
     TEST_ASSERT_TRUE(image->entries.size() > 0);
@@ -175,7 +175,7 @@ void test_every_entry_decompresses_with_a_valid_checksum(void)
 
             bool expected_bad = false;
             for (size_t k = 0; k < sizeof(KNOWN_BAD) / sizeof(KNOWN_BAD[0]); k++)
-                if (std::string(KNOWN_BAD[k].archive) == CORPUS[i] &&
+                if (std::string(KNOWN_BAD[k].data/media) == CORPUS[i] &&
                     std::string(KNOWN_BAD[k].entry) == stored)
                     expected_bad = true;
 
@@ -201,7 +201,7 @@ void test_every_entry_decompresses_with_a_valid_checksum(void)
     }
 
     if (archives == 0)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/arc");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/arc");
 
     TEST_ASSERT_TRUE_MESSAGE(checked > 0, "no entries were checked");
 
@@ -227,7 +227,7 @@ void test_reading_an_entry_serves_exactly_its_bytes(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(std::string(CORPUS_DIR) + "/" + CORPUS[0], src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/arc");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/arc");
 
     TEST_ASSERT_TRUE(image->readHeader());
     std::string wanted = mstr::toUTF8(image->entries[0].filename);
@@ -258,7 +258,7 @@ void test_sda_skips_its_basic_loader(void)
     std::shared_ptr<FileContainerStream> src;
     auto image = openImage(std::string(SDA_DIR) + "/Bash.sda", src);
     if (image == nullptr)
-        TEST_IGNORE_MESSAGE("corpus not present in .archive/archive/sda");
+        TEST_IGNORE_MESSAGE("corpus not present in .data/media/archive/sda");
 
     TEST_ASSERT_TRUE(image->readHeader());
 

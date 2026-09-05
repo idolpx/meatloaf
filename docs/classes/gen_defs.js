@@ -33,7 +33,7 @@ const areas = [
 ];
 
 const roots = ['lib'];
-const skipDirs = /[\\\/](\.git|\.pio|node_modules|\.archive)[\\\/]/;
+const skipDirs = /[\\\/](\.git|\.pio|node_modules|\.data)[\\\/]/;
 
 function* headers(dir) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

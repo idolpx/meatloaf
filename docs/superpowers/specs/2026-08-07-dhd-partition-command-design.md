@@ -212,5 +212,5 @@ On hardware, against `/sd/content/disk/dhd/hdbackup.dhd`:
 Partition 255 needs an image that actually has one. If `hdbackup.dhd` does not, build the check
 against the raw image instead: confirm `parse()` now reads table entry 255 (offset
 `table_base + 255*32`) and that `CP255` no longer returns a syntax error. The
-`.archive/dnp/ned128test.dnp` style of direct image inspection with a short script is the cheapest
+`.data/media/dnp/ned128test.dnp` style of direct image inspection with a short script is the cheapest
 way to establish what the test image contains before trusting a hardware result.

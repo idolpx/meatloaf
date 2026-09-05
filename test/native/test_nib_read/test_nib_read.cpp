@@ -21,7 +21,7 @@
 // The track is now pulled into RAM once and scanned there.
 //
 // Fixtures are generated from a real .d64 by host/make_nib.py, since no .nib
-// exists in .archive. Every decoded block is compared against that .d64, which
+// exists in .data/media. Every decoded block is compared against that .d64, which
 // is an independent reference for the CONTENT even though the GCR encoding is
 // this project's own round trip.
 
@@ -37,10 +37,10 @@
 #include "media/disk/nib.h"
 #include "string_utils.h"
 
-static const char* NIB_IMAGE = ".archive/disk/nib/wolf64.nib";
-static const char* NB2_IMAGE = ".archive/disk/nib/wolf64.nb2";
-static const char* NBZ_IMAGE = ".archive/disk/nib/wolf64.nbz";
-static const char* SOURCE = ".archive/disk/d64/wolf64.d64";
+static const char* NIB_IMAGE = ".data/media/disk/nib/wolf64.nib";
+static const char* NB2_IMAGE = ".data/media/disk/nib/wolf64.nb2";
+static const char* NBZ_IMAGE = ".data/media/disk/nib/wolf64.nbz";
+static const char* SOURCE = ".data/media/disk/d64/wolf64.d64";
 
 static const uint8_t SECTORS_PER_TRACK[36] = {
     0,
@@ -396,8 +396,8 @@ void test_nbz_gzip_reads_identically(void)
 void test_real_nbz_is_recognised_and_refused(void)
 {
     static const char* NBZ_CORPUS[] = {
-        ".archive/disk/nbz/ghostbusters[activision_1984](aa)(ntsc)(!).nbz",
-        ".archive/disk/nbz/altered_beast[sega_1987](ntsc)(!).nbz",
+        ".data/media/disk/nbz/ghostbusters[activision_1984](aa)(ntsc)(!).nbz",
+        ".data/media/disk/nbz/altered_beast[sega_1987](ntsc)(!).nbz",
     };
 
     int checked = 0;
@@ -414,7 +414,7 @@ void test_real_nbz_is_recognised_and_refused(void)
     }
 
     if (checked == 0)
-        TEST_IGNORE_MESSAGE("no .nbz in .archive/disk/nbz");
+        TEST_IGNORE_MESSAGE("no .nbz in .data/media/disk/nbz");
 }
 
 // The real corpus: 41 nibbler dumps of commercial disks, none of them made by
@@ -428,11 +428,11 @@ void test_real_nbz_is_recognised_and_refused(void)
 void test_real_nib_corpus_parses_and_reads_its_directory(void)
 {
     static const char* REAL[] = {
-        ".archive/disk/nib/bubble_bobble[firebird_1987]-1fb126.nib",
-        ".archive/disk/nib/california_games_s1[epyx_1987]-2e35fe.nib",
-        ".archive/disk/nib/impossible_mission[epyx_1984]-c00eb9.nib",
-        ".archive/disk/nib/maniac_mansion_s1[lucasfilm_1989](ntsc)-fca0c7.nib",
-        ".archive/disk/nib/vipterm.nib",
+        ".data/media/disk/nib/bubble_bobble[firebird_1987]-1fb126.nib",
+        ".data/media/disk/nib/california_games_s1[epyx_1987]-2e35fe.nib",
+        ".data/media/disk/nib/impossible_mission[epyx_1984]-c00eb9.nib",
+        ".data/media/disk/nib/maniac_mansion_s1[lucasfilm_1989](ntsc)-fca0c7.nib",
+        ".data/media/disk/nib/vipterm.nib",
     };
 
     int checked = 0;
@@ -457,7 +457,7 @@ void test_real_nib_corpus_parses_and_reads_its_directory(void)
     }
 
     if (checked == 0)
-        TEST_IGNORE_MESSAGE("no real .nib images in .archive/disk/nib");
+        TEST_IGNORE_MESSAGE("no real .nib images in .data/media/disk/nib");
 
     printf("real nib corpus: %d parsed, %d with a readable CBM directory track\n",
            checked, with_directory);

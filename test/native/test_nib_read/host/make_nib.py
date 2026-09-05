@@ -2,7 +2,7 @@
 """Encode a .d64 into a .nib, or a multi-pass .nb2, so the NIB read path has
 something to test against.
 
-There is no .nib, .nb2 or .nbz anywhere in .archive and the firmware has a GCR
+There is no .nib, .nb2 or .nbz anywhere in .data/media and the firmware has a GCR
 decoder but no encoder, so the fixture is generated here. Layout per the header
 comment in lib/meatloaf/media/disk/nib.h:
 

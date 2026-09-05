@@ -1,3 +1,4 @@
+#ifndef DISABLE_TAPE   // MEATLOAF-GATE
 // Meatloaf - A Commodore 64/128 multi-device emulator
 // https://github.com/idolpx/meatloaf
 // Copyright(C) 2020 James Johnston
@@ -719,3 +720,5 @@ bool TAPMFile::exists()
 
     return true;
 }
+
+#endif // !DISABLE_TAPE  MEATLOAF-GATE

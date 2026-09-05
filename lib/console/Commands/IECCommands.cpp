@@ -725,7 +725,7 @@ namespace ESP32Console::Commands
     const ConsoleCommand getIECCommand()
     {
         return ConsoleCommand("iec", &iec,
-            "Show/control the IEC bus. Usage: iec [sleep|wake|scan [start] [end]]");
+            "Show/control the IEC bus. Usage: iec [sleep|wake|exclusive [id]|scan [start] [end]]");
     }
     const ConsoleCommand getEnableCommand()
     {

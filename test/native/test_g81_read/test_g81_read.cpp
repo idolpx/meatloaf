@@ -2,7 +2,7 @@
 //
 // ** WHAT THESE DO AND DO NOT PROVE. **
 //
-// No .g81 exists in .archive, VICE has no MFM-1581 support, and the P64
+// No .g81 exists in .data/media, VICE has no MFM-1581 support, and the P64
 // reference implementation does not know the format. The entire specification
 // is the four-line note at the top of g81.h, and the fixture generator
 // (host/make_g81.py) encodes the SAME reading of that note that g81.cpp
@@ -34,8 +34,8 @@
 #include "../test_disk_write/file_container_stream.h"
 #include "media/disk/g81.h"
 
-static const char* IMAGE = ".archive/disk/g81/synth.g81";
-static const char* SOURCE = ".archive/disk/g81/synth.d81";
+static const char* IMAGE = ".data/media/disk/g81/synth.g81";
+static const char* SOURCE = ".data/media/disk/g81/synth.d81";
 
 class TestG81Stream : public G81MStream
 {

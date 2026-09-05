@@ -5,7 +5,7 @@
 
 ## Problem
 
-Meatloaf cannot read `.csm` cassette images. Samples live in `.archive/csm` (12 VIC-20
+Meatloaf cannot read `.csm` cassette images. Samples live in `.data/media/csm` (12 VIC-20
 tapes, 2002-2003). A decoder exists in the jsvic20 reference bundle
 (`.reference/jsvic20-csm/index-Ci1vc3_z.js`, minified line 1303, classes `Kbe`/`Xbe`).
 
@@ -123,7 +123,7 @@ Cases in four groups: the walk (multi-entry, `$05` termination, padding trims), 
 datasette behaviour (sequential listing, wrap, positional duplicate resolution, forward
 search with one wrap, shared tape position across streams), reading (synthesized
 load-address prefix, later-entry offsets, write refusal), and the corrupt-input guards.
-Plus one case walking every sample in `.archive/csm`, asserting each consumes to exactly
+Plus one case walking every sample in `.data/media/csm`, asserting each consumes to exactly
 EOF.
 
 Three constraints the tests must respect:

@@ -23,6 +23,7 @@
 
 #ifdef ENABLE_DISPLAY
 #include "led_strip.h"
+#include "ps2.h"
 #endif
 
 class iecMeatloaf : public iecDrive, public iecFuji
@@ -130,6 +131,9 @@ public:
 #ifdef ENABLE_DISPLAY
         LEDS.reloadConfig();
 #endif
+        // No #ifdef: the stub class on boards without PIN_KB_CLK has the
+        // same signature and does nothing.
+        ps2Keyboard.reloadConfig();
         return deferred;
     }
 };

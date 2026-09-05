@@ -59,6 +59,12 @@ namespace ESP32Console
     //
     // A trailing odd hex digit is left as text rather than guessed at.
     std::string encodeDosCommand(const std::string &line);
+
+    // Same 0xNN run-escape as encodeDosCommand, but text passes through as raw
+    // ASCII with NO PETSCII conversion.  For destinations that are not the IEC
+    // bus -- specifically the PS/2 keyboard, which talks to a keyboard
+    // controller and would receive garbage from the PETSCII map.
+    std::string encodeAsciiCommand(const std::string &line);
 }
 
 #endif // CONSOLE_DOS_ENCODE_H

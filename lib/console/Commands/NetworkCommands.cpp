@@ -16,6 +16,9 @@
 
 //#include "../device/fuji.h"
 #include "fnWiFi.h"
+#ifdef ENABLE_ETHERNET
+#include "ethernet.h"
+#endif
 
 #include "string_utils.h"
 
@@ -204,6 +207,7 @@ static void ipconfig_wlan()
 {
     wifi_mode_t mode = WIFI_MODE_NULL;
     esp_wifi_get_mode(&mode);
+    Serial.printf("WLAN\r\n");
     Serial.printf("Mode: %s\r\n", wlmode2string(mode));
 
     bool is_connected = fnWiFi.connected();
@@ -246,8 +250,49 @@ static void ipconfig_wlan()
     }
 }
 
+#ifdef ENABLE_ETHERNET
+static void ipconfig_eth()
+{
+    esp_netif_ip_info_t ip_info;
+    esp_netif_get_ip_info(ethernet.get_adapter_handle(), &ip_info);
+    Serial.printf("ETHERNET\r\n");
+
+    bool is_connected = ethernet.connected();
+    Serial.printf("Status: %s\r\n", is_connected ? "Connected" : "Disconnected");
+
+    if (!is_connected) {
+        return;
+    }
+
+    Serial.printf("IP: " IPSTR "\r\n", IP2STR(&ip_info.ip));
+    Serial.printf("Subnet Mask: " IPSTR "\r\n", IP2STR(&ip_info.netmask));
+    Serial.printf("Gateway: " IPSTR "\r\n", IP2STR(&ip_info.gw));
+
+    esp_ip6_addr_t ip6;
+    if (esp_netif_get_ip6_linklocal(ethernet.get_adapter_handle(), &ip6) == ESP_OK) {
+        Serial.printf("IPv6: " IPV6STR "\r\n", IPV62STR(ip6));
+    }
+
+    Serial.printf("\r\n");
+    const char *hostname = nullptr;
+    esp_netif_get_hostname(ethernet.get_adapter_handle(), &hostname);
+    Serial.printf("Hostname: %s\r\n", hostname ? hostname : "");
+
+    esp_netif_dns_info_t dns;
+    if (esp_netif_get_dns_info(ethernet.get_adapter_handle(), ESP_NETIF_DNS_MAIN, &dns) == ESP_OK) {
+        Serial.printf("DNS1: " IPSTR "\r\n", IP2STR(&dns.ip.u_addr.ip4));
+    }
+    if (esp_netif_get_dns_info(ethernet.get_adapter_handle(), ESP_NETIF_DNS_BACKUP, &dns) == ESP_OK) {
+        Serial.printf("DNS2: " IPSTR "\r\n", IP2STR(&dns.ip.u_addr.ip4));
+    }
+}
+#endif
+
 static int ifconfig(int argc, char **argv)
 {
+#ifdef ENABLE_ETHERNET
+    ipconfig_eth();
+#endif
     ipconfig_wlan();
     return EXIT_SUCCESS;
 }
@@ -353,6 +398,11 @@ static int connect(int argc, char **argv)
     return fnWiFi.connect();
 }
 
+static int disconnect(int argc, char **argv)
+{
+    fnWiFi.stop();
+    return EXIT_SUCCESS;
+}
 
 
 namespace ESP32Console::Commands
@@ -380,6 +430,11 @@ namespace ESP32Console::Commands
     const ConsoleCommand getConnectCommand()
     {
         return ConsoleCommand("connect", &connect, "Connect to wifi");
+    }
+
+    const ConsoleCommand getDisconnectCommand()
+    {
+        return ConsoleCommand("disconnect", &disconnect, "Disconnect from wifi");
     }
 
 #ifndef MIN_CONFIG

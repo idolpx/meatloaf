@@ -1,7 +1,7 @@
 // Read-path tests for the G64 GCR bitstream format.
 //
 // These exist because three defects were fixed in g64.cpp and none of them was
-// reachable by any existing test - there is no .g64 anywhere in .archive, and
+// reachable by any existing test - there is no .g64 anywhere in .data/media, and
 // the firmware has a GCR decoder but no encoder, so it cannot produce one
 // either. The fixture is therefore generated from a real .d64 by
 // host/make_g64.py; the tests skip cleanly when it has not been run.
@@ -35,8 +35,8 @@
 #include "media/disk/g64.h"
 #include "string_utils.h"
 
-static const char* IMAGE = ".archive/disk/g64/wolf64.g64";
-static const char* SOURCE = ".archive/disk/d64/wolf64.d64";
+static const char* IMAGE = ".data/media/disk/g64/wolf64.g64";
+static const char* SOURCE = ".data/media/disk/d64/wolf64.d64";
 
 static const uint8_t SECTORS_PER_TRACK[36] = {
     0,

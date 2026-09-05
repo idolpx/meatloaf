@@ -42,7 +42,7 @@ static const char* NAME_2 = "LOADER";
  * Fixture builders
  ********************************************************/
 
-// Samples under .archive/ are gitignored, so tests that use them skip when
+// Samples under .data/media/ are gitignored, so tests that use them skip when
 // they aren't present.
 static bool haveFile(const char* path)
 {
@@ -350,9 +350,9 @@ void test_lnx_entry_offsets_and_sizes_use_254_byte_blocks(void)
 // overshoots by two bytes per block and the last entry runs past the end.
 void test_lnx_real_archive_entries_tile_the_file(void)
 {
-    static const char* PATH = ".archive/archive/lnx/Acid_Rain.lnx";
+    static const char* PATH = ".data/media/archive/lnx/Acid_Rain.lnx";
     if (!haveFile(PATH))
-        TEST_IGNORE_MESSAGE("sample .archive/archive/lnx/Acid_Rain.lnx not present");
+        TEST_IGNORE_MESSAGE("sample .data/media/archive/lnx/Acid_Rain.lnx not present");
 
     auto image = openImage<TestLNXStream>(PATH);
     TEST_ASSERT_NOT_NULL(image.get());
@@ -378,9 +378,9 @@ void test_lnx_real_archive_entries_tile_the_file(void)
 
 void test_lnx_real_archive_keeps_trailing_spaces(void)
 {
-    static const char* PATH = ".archive/archive/lnx/Cloud King.lnx";
+    static const char* PATH = ".data/media/archive/lnx/Cloud King.lnx";
     if (!haveFile(PATH))
-        TEST_IGNORE_MESSAGE("sample .archive/archive/lnx/Cloud King.lnx not present");
+        TEST_IGNORE_MESSAGE("sample .data/media/archive/lnx/Cloud King.lnx not present");
 
     auto image = openImage<TestLNXStream>(PATH);
     TEST_ASSERT_NOT_NULL(image.get());
@@ -461,18 +461,18 @@ void test_t64_wildcard_without_listing(void)
  * derived expression for ARK. Both were checked against the whole-file
  * arithmetic - see the comments on each.
  *
- * .archive/ is gitignored, so these skip when the samples aren't present.
+ * .data/media/ is gitignored, so these skip when the samples aren't present.
  ********************************************************/
 
-static const char* REAL_LBR = ".archive/archive/lbr/zbbs-files!.lbr";
-static const char* REAL_ARK = ".archive/archive/ark/Turbo_Assembler5t.ark";
+static const char* REAL_LBR = ".data/media/archive/lbr/zbbs-files!.lbr";
+static const char* REAL_ARK = ".data/media/archive/ark/Turbo_Assembler5t.ark";
 
 // LBR stores byte counts directly. Directory ends at 344 and the sizes sum
 // to 4774; 344 + 4774 = 5118 of the archive's 5120 bytes.
 void test_lbr_real_archive_sizes(void)
 {
     if (!haveFile(REAL_LBR))
-        TEST_IGNORE_MESSAGE("sample .archive/archive/lbr/zbbs-files!.lbr not present");
+        TEST_IGNORE_MESSAGE("sample .data/media/archive/lbr/zbbs-files!.lbr not present");
 
     auto image = openImage<TestLBRStream>(REAL_LBR);
     TEST_ASSERT_NOT_NULL(image.get());
@@ -497,7 +497,7 @@ void test_lbr_real_archive_sizes(void)
 void test_ark_real_archive_sizes(void)
 {
     if (!haveFile(REAL_ARK))
-        TEST_IGNORE_MESSAGE("sample .archive/archive/ark/Turbo_Assembler5t.ark not present");
+        TEST_IGNORE_MESSAGE("sample .data/media/archive/ark/Turbo_Assembler5t.ark not present");
 
     auto image = openImage<TestARKStream>(REAL_ARK);
     TEST_ASSERT_NOT_NULL(image.get());
@@ -535,7 +535,7 @@ void test_ark_real_archive_sizes(void)
 void test_ark_real_archive_data_offsets(void)
 {
     if (!haveFile(REAL_ARK))
-        TEST_IGNORE_MESSAGE("sample .archive/archive/ark/Turbo_Assembler5t.ark not present");
+        TEST_IGNORE_MESSAGE("sample .data/media/archive/ark/Turbo_Assembler5t.ark not present");
 
     // Directory is 3*29+1 bytes, so data starts on the 254 boundary at 254;
     // then each file occupies blocks*254 (3 and 64 blocks).
@@ -588,9 +588,9 @@ void test_ark_real_archive_data_offsets(void)
 // the backslash as its own escape character and drops "\T" entirely.
 void test_ark_backslash_name_round_trip(void)
 {
-    static const char* PATH = ".archive/archive/ark/Tpztools.ark";
+    static const char* PATH = ".data/media/archive/ark/Tpztools.ark";
     if (!haveFile(PATH))
-        TEST_IGNORE_MESSAGE("sample .archive/archive/ark/Tpztools.ark not present");
+        TEST_IGNORE_MESSAGE("sample .data/media/archive/ark/Tpztools.ark not present");
 
     auto image = openImage<TestARKStream>(PATH);
     TEST_ASSERT_NOT_NULL(image.get());
@@ -620,9 +620,9 @@ void test_ark_backslash_name_round_trip(void)
 // the invariant that made the mismatch visible.
 void test_ark_lookup_domain_is_utf8_not_raw(void)
 {
-    static const char* PATH = ".archive/archive/ark/Tpztools.ark";
+    static const char* PATH = ".data/media/archive/ark/Tpztools.ark";
     if (!haveFile(PATH))
-        TEST_IGNORE_MESSAGE("sample .archive/archive/ark/Tpztools.ark not present");
+        TEST_IGNORE_MESSAGE("sample .data/media/archive/ark/Tpztools.ark not present");
 
     // The conversion is not a no-op for these names.
     TEST_ASSERT_EQUAL_STRING("w.bazaar  /topaz", mstr::toUTF8("W.BAZAAR  /TOPAZ").c_str());

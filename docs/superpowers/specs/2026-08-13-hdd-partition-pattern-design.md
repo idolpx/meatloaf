@@ -45,7 +45,7 @@ colspan-encoded in the HTML:
 ```
 
 `Unused` spans `$00-$02`, **`DP` is `$03`**, `@Last disk sector` spans
-`$04-$07`. Every image in `.archive/hdd/` confirms it: all four carry the
+`$04-$07`. Every image in `.data/media/hdd/` confirms it: all four carry the
 `0x40` LBA-flagged pointer at `$04`, and its value is consistently one more
 than the `@Partition directory backup` pointer at `$1C`.
 
@@ -305,7 +305,7 @@ Named so a later reader does not treat their absence as an oversight:
 
 ## Verification
 
-**Corpus.** `.archive/hdd/` holds four real images: `ide20201227.hdd` and
+**Corpus.** `.data/media/hdd/` holds four real images: `ide20201227.hdd` and
 `ide320101231.hdd` (8 MB, Soci/Singular), `c64os v1.09-clean.hdd` (32 MB) and
 `ide64CF1GB.hdd` (1 GB CF card). All four have DP = 0, so the corpus cannot by
 itself prove the boot-sector fix — that rests on the spec's colspan encoding and

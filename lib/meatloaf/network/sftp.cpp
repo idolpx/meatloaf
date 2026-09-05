@@ -1,3 +1,4 @@
+#ifndef DISABLE_SSH   // MEATLOAF-GATE
 // Meatloaf - A Commodore 64/128 multi-device emulator
 // https://github.com/idolpx/meatloaf
 // Copyright(C) 2020 James Johnston
@@ -887,3 +888,5 @@ bool SFTPMStream::seek(uint32_t pos, int mode) {
     return true;
 }
 
+
+#endif // !DISABLE_SSH  MEATLOAF-GATE

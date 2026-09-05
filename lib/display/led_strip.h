@@ -19,7 +19,6 @@
 #define LED_STRIP_H
 
 #include "driver/gpio.h"
-#include "driver/spi_master.h"
 #include <stdio.h>
 #include <string.h>
 #include <vector>
@@ -54,13 +53,6 @@ typedef struct {
     };
 } CRGB;
 
-typedef struct {
-    spi_host_device_t host;
-    spi_device_handle_t spi;
-    int dma_chan;
-    spi_device_interface_config_t devcfg;
-    spi_bus_config_t buscfg;
-} spi_settings_t;
 
 typedef enum {
     WS2812B = 0,
@@ -79,7 +71,9 @@ private:
 
     //BaseType_t m_task_handle;
     uint8_t m_statusCode = 0;
-    SemaphoreHandle_t spi_mutex = nullptr;
+    // Guards the pixel buffers against a concurrent resize(); the RMT
+    // transport is synchronous so it needs no bus lock of its own.
+    SemaphoreHandle_t strip_mutex = nullptr;
     volatile int m_pending_count = -1;
     esp_err_t init(int pin, led_strip_model_t model, int num_of_leds);
     bool resize(int num_of_leds);

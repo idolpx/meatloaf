@@ -13,7 +13,10 @@
 #include "Protocol.h"
 #include "FTP.h"
 #include "HTTP.h"
+#ifndef DISABLE_SSH   // MEATLOAF-GATE
 #include "SSH.h"
+#endif // !DISABLE_SSH
+
 #include "SMB.h"
 #include "TCP.h"
 #include "Telnet.h"
@@ -31,7 +34,10 @@ public:
 			{"FTP",    [](NetworkData &d) -> std::unique_ptr<NetworkProtocol> { return std::make_unique<NetworkProtocolFTP>(&d.receiveBuffer, &d.transmitBuffer, &d.specialBuffer); }},
 			{"HTTP",   [](NetworkData &d) -> std::unique_ptr<NetworkProtocol> { return std::make_unique<NetworkProtocolHTTP>(&d.receiveBuffer, &d.transmitBuffer, &d.specialBuffer); }},
 			{"HTTPS",  [](NetworkData &d) -> std::unique_ptr<NetworkProtocol> { return std::make_unique<NetworkProtocolHTTP>(&d.receiveBuffer, &d.transmitBuffer, &d.specialBuffer); }},
+#ifndef DISABLE_SSH   // MEATLOAF-GATE
 			{"SSH",    [](NetworkData &d) -> std::unique_ptr<NetworkProtocol> { return std::make_unique<NetworkProtocolSSH>(&d.receiveBuffer, &d.transmitBuffer, &d.specialBuffer); }},
+#endif // !DISABLE_SSH
+
 			{"SMB",    [](NetworkData &d) -> std::unique_ptr<NetworkProtocol> { return std::make_unique<NetworkProtocolSMB>(&d.receiveBuffer, &d.transmitBuffer, &d.specialBuffer); }},
 			{"TCP",    [](NetworkData &d) -> std::unique_ptr<NetworkProtocol> { return std::make_unique<NetworkProtocolTCP>(&d.receiveBuffer, &d.transmitBuffer, &d.specialBuffer); }},
 			{"TELNET", [](NetworkData &d) -> std::unique_ptr<NetworkProtocol> { return std::make_unique<NetworkProtocolTELNET>(&d.receiveBuffer, &d.transmitBuffer, &d.specialBuffer); }},

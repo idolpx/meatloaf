@@ -121,7 +121,8 @@ public:
             {
                 ".p00",
                 ".s00",
-                ".r00"
+                ".r00",
+                ".c64"      // CCS64 freeze file format uses the .c64 extension too
             }, 
             fileName, true
         );

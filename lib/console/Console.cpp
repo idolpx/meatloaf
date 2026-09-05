@@ -11,6 +11,7 @@
 
 #include "Commands/CoreCommands.h"
 #include "Commands/DisplayCommands.h"
+#include "Commands/PS2Commands.h"
 #include "Commands/SystemCommands.h"
 #include "Commands/IECCommands.h"
 #include "Commands/NetworkCommands.h"
@@ -192,6 +193,11 @@ namespace ESP32Console
 #endif
     }
 
+    void Console::registerPS2Commands()
+    {
+        registerCommand(getPS2Command());
+    }
+
     void Console::registerIECCommands()
     {
         registerCommand(getIECCommand());
@@ -211,6 +217,7 @@ namespace ESP32Console
         registerCommand(getNetstatCommand());
         registerCommand(getScanCommand());
         registerCommand(getConnectCommand());
+        registerCommand(getDisconnectCommand());
 #ifndef MIN_CONFIG
         registerCommand(getWsCommand());
 #endif
@@ -243,8 +250,10 @@ namespace ESP32Console
 #endif
 #ifdef SD_CARD
         registerCommand(getFormatSDCommand());
+#ifndef DISABLE_LOCATEDB
         registerCommand(getUpdatedbCommand());
         registerCommand(getLocateCommand());
+#endif
 #endif
     }
 

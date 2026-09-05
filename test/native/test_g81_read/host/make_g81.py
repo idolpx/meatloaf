@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Encode a .d81 into a .g81 so the G81 read path has something to test against.
 
-READ THIS BEFORE TRUSTING A PASSING TEST. There is no .g81 in .archive, VICE has
+READ THIS BEFORE TRUSTING A PASSING TEST. There is no .g81 in .data/media, VICE has
 no MFM-1581 support, and the P64 reference implementation does not know the
 format either. The only specification is the four-line note at the top of
 lib/meatloaf/media/disk/g81.h, and this script encodes the SAME reading of it
