@@ -48,6 +48,10 @@
 #include "meatloaf.h"
 #include "device/flash.h"
 
+#ifdef ENABLE_ETHERNET
+#include "ethernet.h"
+#endif
+
 // Prefer PSRAM for large I/O buffers to keep internal RAM free.
 // Falls back to internal heap if PSRAM is unavailable or exhausted.
 static inline void *psram_malloc(size_t sz)
@@ -172,7 +176,11 @@ static esp_err_t httpd_open_fn(httpd_handle_t hd, int sockfd)
 
 httpd_handle_t HttpServer::start_server(serverstate &state)
 {
+#ifdef ENABLE_ETHERNET
+    if (!ethernet.connected() || !fnWiFi.connected())
+#else
     if (!fnWiFi.connected())
+#endif
     {
         Debug_println("WiFi not connected - aborting web server startup");
         return nullptr;
