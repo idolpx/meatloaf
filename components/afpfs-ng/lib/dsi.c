@@ -833,6 +833,14 @@ process_packet:
 			pthread_attr_t attr;
 			pthread_attr_init(&attr);
 			pthread_attr_setstacksize(&attr, 8192);
+			/* DETACHED, or this leaks ~9 KB of internal DRAM per
+			 * attention packet: a joinable pthread keeps its stack
+			 * and TCB until someone joins it, and nothing here ever
+			 * does.  dsi_incoming_attention() only ever returns
+			 * NULL, so there is no result to collect. */
+			pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+			log_for_client(NULL,AFPFSD,LOG_NOTICE,
+				"DSI attention packet, spawning handler\n");
 			memcpy( server->attention_buffer,
 				server->incoming_buffer,
 				server->data_read);
