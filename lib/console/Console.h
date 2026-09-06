@@ -58,7 +58,19 @@ namespace ESP32Console
         // guaranteed — task stacks cannot live in PSRAM). The REPL and TCP
         // session tasks are thin I/O shells that submit lines here and can
         // therefore use small stacks.
+        // Executor stack sizes.  Measured high-water marks on the executor:
+        // task entry 1.7 KB, help/ls on flash 2.5 KB, cd+ls on SD 3.2 KB, a
+        // d64 image 3.8 KB, an HTTPS GET including the TLS handshake 4.4 KB
+        // (mbedTLS buffers live in PSRAM), and AFP 9.3 KB -- afpfs-ng nests
+        // three 768-byte AFP_MAX_PATH buffers per call and is the only path
+        // that needs the big stack.  SMALL covers everything else with room
+        // to spare, and an 8 KB block is far easier to find than a 16 KB one
+        // on a fragmented internal heap.
+        static constexpr uint32_t EXEC_STACK_SMALL = 8192;
+        static constexpr uint32_t EXEC_STACK_DEEP  = 16384;
+
         TaskHandle_t exec_task_ = nullptr;
+        uint32_t exec_stack_ = 0;                 // stack size of exec_task_, 0 if none
         SemaphoreHandle_t exec_mutex_ = nullptr;   // serializes submitters
         SemaphoreHandle_t exec_start_ = nullptr;   // command handed to worker
         SemaphoreHandle_t exec_done_  = nullptr;   // worker finished command
@@ -70,6 +82,18 @@ namespace ESP32Console
         esp_err_t exec_err_ = ESP_OK;
         volatile Origin exec_origin_ = ORIGIN_NONE;
         static void exec_task_fn(void *args);
+
+        // Creates the executor task, or grows it, so its stack is at least
+        // `need` bytes. Returns false if that could not be arranged, in which
+        // case any smaller task that already existed is left running so the
+        // console stays usable.
+        bool ensureExecTask(uint32_t need);
+
+        // How much stack the given command line needs: DEEP when it or the
+        // current working path names a URL scheme, SMALL otherwise. The
+        // TARGET decides, not the command -- `ls` is 2.4 KB on flash and
+        // 9.3 KB inside an AFP volume.
+        uint32_t execStackFor(const char *line) const;
 
         // Find-or-register the SessionBroker session that idle-frees the
         // executor task; returns it with its activity timestamp refreshed.

@@ -639,6 +639,98 @@ gitignored.
 - **`DISABLE_*` feature gates** (`platformio.ini`, marked `MEATLOAF-GATE` in the source) each drop one large library from the link. Measured on `fujiloaf-rev0` by diffing the linker map of an all-gates build against the baseline, so the figures include the gated library AND its caller code: `DISABLE_LOCATEDB` 406,890 (sqlite3), `DISABLE_SSH` 139,761 (libssh), `DISABLE_TAPE` 119,284 (tapclean), `DISABLE_NFS` 85,287, `DISABLE_WEBDAV_CLIENT` 78,796 (expat — the WebDAV *server* is unaffected), `DISABLE_RETROPIXELS` 75,494, `DISABLE_ISCSI` 52,633, `DISABLE_AFP` 48,810. All ten together free **1,067,152 bytes**. Set them per-board in the `[env:...]` section, never in the shared `build_flags`. Note `DISABLE_LOCATEDB` sits inside `#ifdef SD_CARD` and frees nothing on a board without an SD slot, and the tape/sftp/nfs/afp/iscsi filesystems are already inside `#ifndef MIN_CONFIG`, so those gates are no-ops on a `MIN_CONFIG` board.
 - **`CONFIG_SPI_MASTER_ISR_IN_IRAM` is the IRAM lever on a WROVER board, and it is the only safe one.** It is worth 3,542 bytes, which is what makes `EXTRA_FASTLOADERS` fit. The bigger blocks are not available: `libc.a` holds ~17.9 KB of IRAM but that is the `CONFIG_SPIRAM_CACHE_*_IN_IRAM` PSRAM cache-bug workaround, mandatory while `CONFIG_ESP32_REV_MIN=0`; `libesp_ringbuf.a` holds 5,030 but this IDF has no Kconfig to move it; and the WiFi IRAM optimisations are already off. Turning the SPI master ISR out of IRAM means an SPI transaction cannot be serviced while the flash cache is disabled — nothing here does that, SD and display both run from ordinary tasks — at the cost of a little ISR latency. **Not hardware-verified.**
 
+- **A cipher that round-trips is not a cipher that interoperates.** The vendored CAST5 in `components/afpfs-ng/esp32/cast5.c` shipped with four of its eight S-boxes fabricated (S3 held Blowfish constants; S4, S7 and S8 were invented). Encrypt/decrypt agreed with each other perfectly, so every round-trip test passed while every AFP server disagreed — surfacing only as `Login error: Authentication failed` with a DHX2 nonce mismatch, three layers away from the cause. **Any block cipher, hash or codec vendored into this tree must be checked against its specification's published vectors, not against itself.** For CAST5 that is RFC 2144, and **B.1 is not sufficient**: one 16-round encryption touches ~6% of S1-S4 and one key schedule ~31% of S5-S8, so a table wrong further down passes it and then fails intermittently in the field, because DHX2's random `Ra` selects different entries every login. **B.2, the full maintenance test, is the gate** — a million iterations that saturate all 2048 constants. `test/native/test_cast5/` runs both.
+- **AFP's DSI event loop is a THREAD, and three separate bugs came from forgetting that.** It is started once per boot by `afp_main_quick_startup()` and walks the global server list on its own. (1) `AFPMSession::disconnect()` called `afp_free_server()`, which frees the server and its `incoming_buffer` **while still linked into that list** — the loop then reads into freed memory, surfacing later as `CORRUPT HEAP: Bad head ... got <a pointer>` inside an unrelated `free()`. `afp_server_remove()` is the correct entry point: it unlinks first. (2) The list had no lock at all; it now has one (`afp_server_list_lock()`), and the loop publishes the server it is about to read from (`afp_server_loop_set()`) so `afp_server_remove()` waits rather than freeing underneath it. (3) **The lock must NOT be held across `dsi_recv()`** — nothing in afpfs-ng sets `O_NONBLOCK`, so a server that goes quiet mid-message parks the loop inside `read()` indefinitely, and holding the lock there stalls every other AFP caller including the console. That was tried, flashed, and produced a completely dead device. `afp_server_remove()` calls `shutdown()` on the socket before waiting, which is what makes the wait bounded.
+- **`afp_unmount_volume()` tears the whole server down when it unmounts the LAST mounted volume** — it logs out and calls `afp_server_remove()` itself, then returns -1, which `afp_unmount_all_volumes()` reports as failure rather than as "already gone". So the obvious teardown sequence (unmount all, then log out, then remove) is a use-after-free on essentially every disconnect. Guard the tail with `server_still_valid()`.
+- **A joinable pthread on ESP-IDF keeps its stack and TCB until someone joins it.** `dsi.c`'s `DSI_DSIAttention` branch spawned an 8192-byte handler thread that nothing ever joined, leaking ~9 KB of INTERNAL DRAM per attention packet an AFP server sent. It presents as a one-time step in the heap, not a drip, which is what identifies it: measured 16864 → 7736 bytes free the moment one arrived, then flat. `pthread_attr_setdetachstate(PTHREAD_CREATE_DETACHED)`. **Audit every `pthread_create` in vendored code for this** — it is free on glibc and permanent here.
+- **`pthread_kill()` is a no-op stub on this platform, so any upstream code that relies on a signal to cut a `select`/`pselect` short is now a polling loop that never polls.** `afp_main_loop()` waited 30 s and expected `signal_main_thread()` to wake it when a socket was added; `esp32_compat.c` documents the stub but the 30 s it invalidates was never adjusted. A connect adds its socket *after* the loop copied its fd set, so the reply to `DSIOpenSession` sat unread for the full period — twice, counting the retry — making an AFP connect take **~60 s**. Polling at 100 ms on `ESP_PLATFORM` takes it to **1.3 s**. Only fds added mid-select are affected; traffic on an already-registered socket wakes the loop immediately, which is why listings and reads were always fast. The stale `I have no idea what this is a reply to` line went away with it — that was a reply arriving after its request had been dropped during the stall.
+- **A one-line stub can invalidate a constant somewhere else entirely, and nothing links the two.** Both the 30 s `pselect` above and the leaked attention thread are that shape: correct-looking upstream code whose assumption a compatibility shim quietly removed. When adding a stub to `esp32_compat.c`, grep for what depends on the behaviour being stubbed out.
+- **`server_still_valid()` is the "did the library already free this" test** and it takes the list lock, so it must not be called while holding it, and never across `afp_logout()` with `DSI_DO_WAIT` — that waits for the event-loop thread, which needs the same lock.
+
+- **The console executor's stack is sized per command, and the TARGET decides, not the command.** Measured high-water marks on `console_exec`: task entry 1720, `help` 2016, `ls` on flash 2480, `cd /sd` + `ls` 3188, a d64 image 3828, an HTTPS GET including the TLS handshake 4360 (mbedTLS buffers are in PSRAM, so TLS is cheap here), and **AFP 9332** — afpfs-ng nests three 768-byte `AFP_MAX_PATH` buffers per call and is the only path that needs a big stack. `ls` is 2480 on flash and 9332 inside an AFP volume, so a per-command list would be the wrong axis: `Console::execStackFor()` returns DEEP (16384) when the command line **or the current working path** carries a `://`, and SMALL (8192) otherwise. The cost of that conservatism is that a trivial command typed while standing in a network path still asks for 16 KB — which is what EVERY command did everywhere before, so it is strictly better than the old behaviour.
+- **`ensureExecTask()` deletes before it creates, yields, and falls back.** Deleting first matters because holding 8 KB while asking for 16 KB is how the allocation fails on a tight internal heap; the `vTaskDelay(20)` after `vTaskDelete()` matters because the stack is reclaimed by the idle task, so an immediate re-create can fail on memory that is already free in all but bookkeeping. And when the DEEP creation fails it re-creates a SMALL executor, so the console stays usable — `meminfo`, `reboot` and all local commands still run, and only the command that wanted the deep stack is refused. **Before this, a failed re-creation left no executor at all and the console was dead until reboot.**
+- **The executor grows but never shrinks until the idle timeout.** One AFP command leaves it at 16 KB for as long as commands keep arriving; `ConsoleExecMSession`'s 3-minute idle free is what returns it. Deliberate — shrinking on every transition would mean a delete/create pair per command, which is the churn that causes the fragmentation in the first place.
+
+## Recent Changes (September 5-6, 2026)
+
+### Console executor: 16 KB only for what actually needs it
+
+`console_exec` was a fixed 16 KB task, freed after 3 minutes idle and re-created on the next
+command. That re-creation was a real failure point: with an AFP session mounted the largest free
+internal block is ~15 KB, so re-creation could only succeed by reusing the executor's own freed
+hole, and anything that took even 12 bytes of it during the idle window bricked the console until
+reboot — observed as `Could not start console exec task! free_internal=38404
+largest_internal_block=16372`. Fragmentation, not exhaustion.
+
+Now two-tier, sized per command from the measurements in the Important Notes above.
+
+| | before | after |
+|---|---|---|
+| internal free, local work | 25384 | **33488** |
+| largest free block, local work | 23540 | **32756** |
+| internal free, AFP mounted | 16876 | 16876 (unchanged, correctly) |
+| DEEP allocation fails | console dead until reboot | that one command refused |
+
+- **Verified on hardware**: local commands run on 8 KB (`stack_free` 6460 → 5692 of 8192); `cd afp://…`
+  grows the task to 16384 in place and AFP work then peaks at 9328 used; the idle-free → re-create
+  cycle with an AFP session mounted completes with a fresh 16384 task; zero creation failures and
+  zero refusals across the run.
+- **`execAcquire()` no longer creates the task** — attaching a console is not a reason to claim a big
+  internal-DRAM stack. It counts the session; the first command creates the executor at the size that
+  command needs. `runOnExecutor()` always asks for DEEP (its callers are the boot-time network-drive
+  restore, already known to need the full stack) and keeps its original `exec_users_ > 0` gate, so a
+  board with no console attached still never creates it.
+- **Not done**: a shallow-command allowlist, which would let `meminfo`/`help`/`reboot` run on 8 KB
+  even while standing in a network path. It needs the command registry enumerated to be safe — a
+  misclassified filesystem command would overflow an 8 KB stack, and a stack overflow here is a
+  reboot, not an error.
+
+### AFP brought up end to end: six defects, five of them memory or lifetime
+
+Reported as `cd afp://…` failing to authenticate. The auth bug was real and one line of data; everything
+after it was found by testing the path the fix opened up. Durable rules are in the Important Notes above.
+
+- **Authentication: the CAST5 S-boxes were fabricated.** Four of eight. See the Important Notes entry
+  for why a round-trip test cannot see this and why RFC 2144 B.2 is the gate rather than B.1. All eight
+  tables were regenerated from the RFC rather than patching the four bad ones, on the principle that a
+  partially-correct table is the expected failure mode of the way they were produced.
+  New `test/native/test_cast5/` (3 cases: B.1 encrypt, B.1 decrypt, B.2 maintenance).
+- **`ROL32(x, 0)` was a shift by 32.** `Kr` is masked to five bits so a rotate of zero is reachable; it
+  happens to compute the identity on xtensa and need not anywhere else.
+- **Every `isDirectory()` and `exists()` failed with `-EIO`** while directory listing worked perfectly —
+  `cd` into any subdirectory answered `not a directory`. `afp_connect_volume()` never called
+  `afp_detect_mapping()`, so `volume->mapping` stayed `AFP_MAPPING_UNKNOWN` and
+  `translate_uidgid_to_client()` refused every path. Upstream does that call from its fuse mount path,
+  which this library-only build does not have. Listing never translates uid/gid, which is exactly why it
+  was unaffected and why the symptom looked like a path bug.
+- **~11 KB of internal DRAM leaked per AFP login**: `dsi_send()` creates a `pthread_cond_t` and
+  `pthread_mutex_t` per request and nothing destroyed them. Harmless on glibc, permanent here. Fixed in
+  `dsi_remove_from_request_queue()` and in `afp_free_server()`'s queue drain. Login cost 11 KB → 8 KB and
+  is now fully returned on teardown.
+- **Heap corruption at session teardown**, **~9 KB per attention packet**, and **a ~60 s connect** —
+  all three in the Important Notes above.
+- **`dsi_send()`'s EPIPE path returned while still holding `send_mutex`**, deadlocking every later
+  request, and leaked its queued request. Found by reading around the fix, not by the failure.
+- **Measured, all on lolin-d32-pro against a real AFP server:**
+
+  | | before | after |
+  |---|---|---|
+  | connect | ~60-80 s | 1.3 s |
+  | login cost (internal DRAM) | 11 KB | 8 KB, fully returned |
+  | idle with a session held | −9128 B on the first attention | flat |
+  | teardown | intermittent `CORRUPT HEAP` | 8 clean cycles |
+
+- **What is verified**: auth, volume enumeration, volume listing, subdirectory navigation two levels
+  deep, file reads byte-exact against the source, eight connect/browse/read/teardown cycles with no
+  corruption or hang, and a 4-minute idle with an attention packet arriving and the heap flat.
+  **What is not**: nothing has been driven from a real C64 over IEC — every check here is the device
+  console. Writes are untested. `lib/console` and `components/afpfs-ng` are not compiled in the native
+  environment, so only the CAST5 fix has a regression test; the rest is hardware-verified only.
+- **The diagnostic that paid for itself twice was a control run.** "AFP leaks memory" and "AFP is slow"
+  were both stated as AFP facts, and neither was safe to act on until an identical idle run at `/` with
+  no AFP session showed a perfectly flat heap. Same for the ~18.6 s that preceded a connect in one
+  trace — it did not reproduce, and was the console executor being re-created, not AFP.
+
 ## Recent Changes (August 25, 2026)
 
 ### Feature gates, and all fastloaders enabled on every board

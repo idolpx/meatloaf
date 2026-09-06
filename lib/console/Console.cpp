@@ -428,26 +428,84 @@ namespace ESP32Console
                       (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
     }
 
-    void Console::execAcquire()
+    uint32_t Console::execStackFor(const char *line) const
     {
+        // A URL scheme in the command line, e.g. `cd afp://host/vol`.
+        if (line != nullptr && strstr(line, "://") != nullptr)
+            return EXEC_STACK_DEEP;
+
+        // ...or already standing in one, e.g. a bare `ls` inside an AFP
+        // volume, which is the same command at four times the depth.
+        std::string cwd = getCurrentPathUrl();
+        if (cwd.find("://") != std::string::npos)
+            return EXEC_STACK_DEEP;
+
+        return EXEC_STACK_SMALL;
+    }
+
+    bool Console::ensureExecTask(uint32_t need)
+    {
+        // Caller must NOT hold exec_mutex_; this takes it to wait out any
+        // in-flight command before swapping the task out from under it.
         xSemaphoreTake(exec_users_mutex_, portMAX_DELAY);
-        exec_users_++;
-        if (exec_task_ == nullptr)
+
+        if (exec_task_ != nullptr && exec_stack_ >= need)
         {
-            // All commands (serial, TCP, WS) run on this one executor task
-            // so the console I/O shells only need small stacks. It exists
-            // only while a console session is active; its 16 KB internal
-            // stack is released when the last session goes dormant.
-            if (xTaskCreatePinnedToCore(&Console::exec_task_fn, "console_exec", 16384, this, 5, &exec_task_, 0) != pdTRUE)
-            {
-                log_exec_task_create_failure();
-                exec_task_ = nullptr;
-            }
+            xSemaphoreGive(exec_users_mutex_);
+            return true;
         }
-        xSemaphoreGive(exec_users_mutex_);
 
         if (exec_task_ != nullptr)
-            execSessionTouch();
+        {
+            // Too small for what is about to run. Delete before creating, so
+            // the two stacks are never allocated at once -- holding 8 KB
+            // while asking for 16 KB is how this fails on a tight heap.
+            xSemaphoreTake(exec_mutex_, portMAX_DELAY);
+            vTaskDelete(exec_task_);
+            exec_task_ = nullptr;
+            exec_stack_ = 0;
+            xSemaphoreGive(exec_mutex_);
+            // vTaskDelete() hands the stack to the idle task to reclaim; without
+            // yielding, the very next create can fail on memory that is already
+            // free in all but bookkeeping.
+            vTaskDelay(pdMS_TO_TICKS(20));
+        }
+
+        if (xTaskCreatePinnedToCore(&Console::exec_task_fn, "console_exec", need, this, 5, &exec_task_, 0) == pdTRUE)
+        {
+            exec_stack_ = need;
+            xSemaphoreGive(exec_users_mutex_);
+            return true;
+        }
+
+        exec_task_ = nullptr;
+        log_exec_task_create_failure();
+
+        // Fall back to a small executor so the console keeps working: `meminfo`,
+        // `reboot` and everything local still run, and only the command that
+        // wanted the deep stack is refused.
+        if (need > EXEC_STACK_SMALL &&
+            xTaskCreatePinnedToCore(&Console::exec_task_fn, "console_exec", EXEC_STACK_SMALL, this, 5, &exec_task_, 0) == pdTRUE)
+        {
+            exec_stack_ = EXEC_STACK_SMALL;
+        }
+        else
+        {
+            exec_task_ = nullptr;
+        }
+
+        xSemaphoreGive(exec_users_mutex_);
+        return false;
+    }
+
+    void Console::execAcquire()
+    {
+        // Only counts the session. The task itself is created by the first
+        // command, at the size that command needs -- attaching a console is
+        // not a reason to claim a big internal-DRAM stack.
+        xSemaphoreTake(exec_users_mutex_, portMAX_DELAY);
+        exec_users_++;
+        xSemaphoreGive(exec_users_mutex_);
     }
 
     void Console::execRelease()
@@ -461,6 +519,7 @@ namespace ESP32Console
             xSemaphoreTake(exec_mutex_, portMAX_DELAY);
             vTaskDelete(exec_task_);
             exec_task_ = nullptr;
+            exec_stack_ = 0;
             xSemaphoreGive(exec_mutex_);
         }
         xSemaphoreGive(exec_users_mutex_);
@@ -477,6 +536,7 @@ namespace ESP32Console
             xSemaphoreTake(exec_mutex_, portMAX_DELAY);
             vTaskDelete(exec_task_);
             exec_task_ = nullptr;
+            exec_stack_ = 0;
             xSemaphoreGive(exec_mutex_);
             //Debug_printv("console exec task freed after idle timeout");
         }
@@ -538,18 +598,22 @@ namespace ESP32Console
 
     esp_err_t Console::runCommand(const char *line, int *ret, Origin origin)
     {
-        // Late creation retry: if execAcquire() failed at session start,
-        // memory may have freed since (e.g. a web transfer finished).
-        if (exec_task_ == nullptr)
+        // Create the executor, or grow it, for what this command is about to
+        // touch. Most commands need only EXEC_STACK_SMALL; a deep allocation
+        // that fails leaves the small executor running, so the console stays
+        // usable and only this command is refused.
+        uint32_t need = execStackFor(line);
+        if (exec_users_ > 0 && !ensureExecTask(need))
         {
-            xSemaphoreTake(exec_users_mutex_, portMAX_DELAY);
-            if (exec_users_ > 0 && exec_task_ == nullptr &&
-                xTaskCreatePinnedToCore(&Console::exec_task_fn, "console_exec", 16384, this, 5, &exec_task_, 0) != pdTRUE)
+            if (exec_task_ != nullptr)
             {
-                log_exec_task_create_failure();
-                exec_task_ = nullptr;
+                ::printf("Not enough memory to run this command (needs %u bytes of stack)\r\n",
+                         (unsigned)need);
+                if (ret)
+                    *ret = EXIT_FAILURE;
+                return ESP_ERR_NO_MEM;
             }
-            xSemaphoreGive(exec_users_mutex_);
+            // No executor at all — fall through to the shared refusal below.
         }
 
         // Refresh the idle-timeout session and mark it busy for the duration
@@ -599,18 +663,13 @@ namespace ESP32Console
     {
         // Mirrors runCommand()'s submission choreography, but runs an
         // arbitrary function on the executor task instead of a parsed
-        // command line.
-        if (exec_task_ == nullptr)
-        {
-            xSemaphoreTake(exec_users_mutex_, portMAX_DELAY);
-            if (exec_users_ > 0 && exec_task_ == nullptr &&
-                xTaskCreatePinnedToCore(&Console::exec_task_fn, "console_exec", 16384, this, 5, &exec_task_, 0) != pdTRUE)
-            {
-                log_exec_task_create_failure();
-                exec_task_ = nullptr;
-            }
-            xSemaphoreGive(exec_users_mutex_);
-        }
+        // command line. Always DEEP: the callers are system code doing
+        // network MFile work (the boot-time network-drive restore), which is
+        // the one path already known to need the full stack. Gated on
+        // exec_users_ exactly as before, so a board with no console attached
+        // still never creates the task.
+        if (exec_users_ > 0)
+            ensureExecTask(EXEC_STACK_DEEP);
 
         auto session = execSessionTouch();
         if (session)
