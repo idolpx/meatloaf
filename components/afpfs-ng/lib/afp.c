@@ -618,6 +618,14 @@ int afp_connect_volume(struct afp_volume * volume, struct afp_server * server,
 
 	}
 	
+	/* Decide how the server's uid/gid map onto ours.  Upstream afpfs-ng
+	 * does this from its fuse mount path, which this library-only build
+	 * does not have, so volume->mapping stayed AFP_MAPPING_UNKNOWN and
+	 * translate_uidgid_to_client() failed for every path -- ll_getattr()
+	 * then returned -EIO, so isDirectory()/exists() failed on everything
+	 * while directory listing (which never translates) worked fine. */
+	afp_detect_mapping(volume);
+
 	volume->mounted=AFP_VOLUME_MOUNTED;
 
 	return 0;

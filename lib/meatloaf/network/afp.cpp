@@ -258,8 +258,12 @@ bool AFPMFile::isDirectory()
     if (!vol) return false;
 
     struct stat st;
-    if (ml_getattr(vol, file_path.c_str(), &st) != 0)
+    int rc = ml_getattr(vol, file_path.c_str(), &st);
+    if (rc != 0) {
+        Debug_printv("AFP getattr failed vol[%s] path[%s] rc[%d]",
+                     volume_name.c_str(), file_path.c_str(), rc);
         return false;
+    }
 
     is_dir = S_ISDIR(st.st_mode) ? 1 : 0;
     return (bool)is_dir;
