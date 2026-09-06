@@ -1792,7 +1792,7 @@ uint32_t MeatHttpClient::write(const uint8_t* buf, uint32_t size) {
 
 int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_t position, uint32_t size) {
 
-    Debug_printv("openAndFetchHeaders: method=%d, position=%u, size=%u, url=%s", method, position, size, url.c_str());
+    //Debug_printv("openAndFetchHeaders: method=%d, position=%u, size=%u, url=%s", method, position, size, url.c_str());
 
     if ( url.size() < 5)
         return 0;
@@ -1886,7 +1886,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
             esp_http_client_set_header(_http, "Range", str);
             _rangeEnd = rangeEnd;
             sentRange = true;
-            Debug_printv("seeking range[%s] url[%s]", str, url.c_str());
+            //Debug_printv("seeking range[%s] url[%s]", str, url.c_str());
         }
     }
 
