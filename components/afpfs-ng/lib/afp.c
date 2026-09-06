@@ -320,6 +320,11 @@ void afp_free_server(struct afp_server ** sp)
 	for (p=server->command_requests;p;) {
 		log_for_client(NULL,AFPFSD,LOG_NOTICE,"FSLeft in queue: %p, id: %d command: %d\n",                p,p->requestid,p->subcommand);
 		next=p->next;
+		/* Same rule as dsi_remove_from_request_queue(): on ESP-IDF these
+		 * two are heap objects in internal DRAM, and freeing the struct
+		 * alone leaks them. */
+		pthread_cond_destroy(&p->waiting_cond);
+		pthread_mutex_destroy(&p->waiting_mutex);
 		free(p);
 		p=next;
 	}

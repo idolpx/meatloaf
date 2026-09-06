@@ -164,8 +164,16 @@ void AFPMSession::disconnect()
     _mounted_volumes.clear();
 
     // Log out and free server resources.
+    //
+    // afp_server_remove(), NOT afp_free_server(): the DSI event-loop thread
+    // walks the global server list (process_server_fds() -> dsi_recv()) with
+    // no lock, and afp_free_server() frees the server and its incoming_buffer
+    // while still LINKED into that list.  The loop thread then reads into
+    // freed memory, which surfaces as a heap-poisoning abort in an unrelated
+    // free ("CORRUPT HEAP: Bad head ... got <a pointer>") seconds later.
+    // afp_server_remove() unlinks first, then frees.
     afp_logout(_server, 1 /*wait*/);
-    afp_free_server(&_server);
+    afp_server_remove(_server);
     _server = nullptr;
 
     connected = false;
