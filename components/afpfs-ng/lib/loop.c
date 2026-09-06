@@ -135,20 +135,41 @@ static int process_server_fds(fd_set * set, int max_fd, int ** onfd)
 
 	struct afp_server * s;
 	int ret;
-	s  = get_server_base();
+	int rc=0;
+
+	/* Pick the server under the list lock and publish it, then let go of the
+	 * lock before touching the network.  Another thread tearing a session
+	 * down calls afp_server_remove(), which frees the server AND the
+	 * incoming_buffer dsi_recv() reads into; the published mark makes it
+	 * wait rather than free underneath us.
+	 *
+	 * The lock is deliberately NOT held across dsi_recv(): the AFP socket is
+	 * blocking, so a server that goes quiet mid-message parks this thread in
+	 * read() for as long as it likes, and holding the lock there stalls every
+	 * other AFP caller (observed as a completely unresponsive device). */
+	afp_server_list_lock();
+	s = get_server_base();
 	for (;s;s=s->next) {
 		if (s->next==s) printf("Danger, recursive loop\n");
-		if (FD_ISSET(s->fd,set)) {
-			ret=dsi_recv(s);
-			*onfd=&s->fd;
-			if (ret==-1) {
-				loop_disconnect(s);
-				return -1;
-			}
-			return 1;
-		}
+		if (FD_ISSET(s->fd,set)) break;
 	}
-	return 0;
+	if (s) afp_server_loop_set(s);
+	afp_server_list_unlock();
+
+	if (!s) return 0;
+
+	ret=dsi_recv(s);
+	*onfd=&s->fd;
+	if (ret==-1) {
+		loop_disconnect(s);
+		rc=-1;
+	} else {
+		rc=1;
+	}
+
+	/* Only now may the server be freed. */
+	afp_server_loop_clear();
+	return rc;
 }
 
 static void deal_with_server_signals(fd_set *set, int * max_fd) 

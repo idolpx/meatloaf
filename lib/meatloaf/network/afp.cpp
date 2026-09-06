@@ -159,22 +159,33 @@ void AFPMSession::disconnect()
         return;
     }
 
-    // Unmount all mounted volumes.
-    afp_unmount_all_volumes(_server);
+    // Drop our handle before doing anything that can free the server, so no
+    // later path here or in another thread can reach it through the member.
+    struct afp_server* server = _server;
+    _server = nullptr;
+
+    // Unmount all mounted volumes.  Note this CAN tear the server down:
+    // afp_unmount_volume() logs out and calls afp_server_remove() itself once
+    // it unmounts the last mounted volume, and then returns -1, which
+    // afp_unmount_all_volumes() reports as a failure rather than as "already
+    // gone".  Logging out again afterwards is a use-after-free -- it was the
+    // original source of the "CORRUPT HEAP: Bad head" abort at teardown.
+    afp_unmount_all_volumes(server);
     _mounted_volumes.clear();
 
-    // Log out and free server resources.
-    //
-    // afp_server_remove(), NOT afp_free_server(): the DSI event-loop thread
-    // walks the global server list (process_server_fds() -> dsi_recv()) with
-    // no lock, and afp_free_server() frees the server and its incoming_buffer
-    // while still LINKED into that list.  The loop thread then reads into
-    // freed memory, which surfaces as a heap-poisoning abort in an unrelated
-    // free ("CORRUPT HEAP: Bad head ... got <a pointer>") seconds later.
-    // afp_server_remove() unlinks first, then frees.
-    afp_logout(_server, 1 /*wait*/);
-    afp_server_remove(_server);
-    _server = nullptr;
+    // Only if the library has not already removed it.  server_still_valid()
+    // takes the server-list lock, and afp_logout() must NOT be called with
+    // that lock held -- it waits for the event-loop thread to deliver the
+    // reply, and that thread needs the same lock.
+    if (server_still_valid(server)) {
+        // afp_server_remove(), NOT afp_free_server(): the latter frees the
+        // server and its incoming_buffer while it is still LINKED into the
+        // list the event-loop thread walks.  afp_server_remove() unlinks and
+        // frees under the list lock, so the loop can never be inside
+        // dsi_recv() on a server that is being freed.
+        afp_logout(server, 1 /*wait*/);
+        afp_server_remove(server);
+    }
 
     connected = false;
     Debug_printv("AFP: disconnected from %s:%d", host.c_str(), (int)port);
