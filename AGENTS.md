@@ -651,12 +651,51 @@ gitignored.
 - **`ensureExecTask()` deletes before it creates, yields, and falls back.** Deleting first matters because holding 8 KB while asking for 16 KB is how the allocation fails on a tight internal heap; the `vTaskDelay(20)` after `vTaskDelete()` matters because the stack is reclaimed by the idle task, so an immediate re-create can fail on memory that is already free in all but bookkeeping. And when the DEEP creation fails it re-creates a SMALL executor, so the console stays usable — `meminfo`, `reboot` and all local commands still run, and only the command that wanted the deep stack is refused. **Before this, a failed re-creation left no executor at all and the console was dead until reboot.**
 - **The executor grows but never shrinks until the idle timeout.** One AFP command leaves it at 16 KB for as long as commands keep arriving; `ConsoleExecMSession`'s 3-minute idle free is what returns it. Deliberate — shrinking on every transition would mean a delete/create pair per command, which is the churn that causes the fragmentation in the first place.
 
+- **A GCR decoder must read its track into RAM once — `G64MStream` now caches the whole half-track (`track_data`, keyed on `cached_track`).** `findSync()` walks GCR ONE BYTE AT A TIME and `readSectorHeader()`/`readSector()` take it five bytes at a time (65 reads per sector for the data alone), so a listing is tens of thousands of container reads. That is merely slow on SD and ruinous over a network filesystem, where each read is a round trip: an `ls` inside a `.g64` on an AFP volume took **61 seconds**, and 2.2 s with the cache. `.nib` already had this fix (`loadTrack()`); `.g64` did not, and `.g71` inherits it from `G64MStream`. The three helpers (`trackPos()`/`trackSeek()`/`trackRead()`) take ABSOLUTE container offsets so the call sites read exactly as the `containerStream->` ones did. **The same shape is worth checking in any decoder that scans a container byte-wise** — it is invisible until the container is remote.
+- **AFP byte-range locking is disabled per volume (`VOLUME_EXTRA_FLAGS_NO_LOCKING`), and it must stay that way.** `ll_read()` takes a byte-range lock, reads, then unlocks around EVERY read, and **a failed UNLOCK is reported as `-EIO` even when the read itself succeeded** (`ll_read`'s `ll_handle_unlocking()` branch). That surfaced as a 5-byte read at a mid-file offset failing forever — `ml_read error -5 size[5] pos[135625] fsize[333744]` repeating every ~10 s, the 10 s being the DSI wait — while every earlier read of the same file was fine. Meatloaf is a single reader of these volumes, so the locks buy nothing and cost two extra DSI round trips per read. Set in `AFPMSession::getVolume()` right after `afp_connect_volume()`.
+- **`ll_read()` must request `bufsize`, not `size`.** `buffer.maxsize` is clamped to the server's `rx_quantum` but the request was not, so any read larger than the quantum told the server to send more than the reply buffer could hold. Not what caused the `-EIO` above (the quantum here is 131072 and the failing read was 5 bytes), but wrong all the same, and it would bite the moment a caller asked for more than the quantum. A short read is the correct outcome — callers loop, `MMediaStream::readContainer()` among them.
+- **The size/offset detail on `AFPMStream::read()`'s error line is what makes this class of bug findable.** `ml_read error -5` alone says nothing; `size[5] pos[135625] fsize[333744] quantum[131072]` immediately ruled out the quantum, ruled out EOF, and pointed at the lock path. Keep it.
 - **A bounded HTTP range response is not "the file at that offset" — `MeatHttpClient::seek()`'s "already at pos" fast path is only valid for an OPEN-ENDED range.** With `bytes=N-` (the `_sequentialAccess` form) the response runs to real EOF, so `pos == _position` genuinely means the next byte is `pos`. With a bounded `bytes=A-B` it does not: the response carries only `[A..B]`, and any drift in the paging arithmetic serves the wrong part of the file with no error anywhere. A D81 directory read took that path at offset 400128 against a response ending at 400143 and was handed the BAM instead — recognisable in the entry hex as `FF FF FF FF 28 FF FF FF FF FF 28 …`, the D81 BAM pattern of `0x28` (40 sectors free) followed by five bitmap bytes. Entry 0 of a sector is also where `next_track`/`next_sector` come from, so the link read `FF FF` and the listing stopped after exactly one directory sector (8 entries). **That guard was itself a workaround for esp-idf#18359** — re-requesting on a reused handle returned unwritten buffers — so it is safe to drop only because `patch_framework.py` now fixes that. The two are coupled; do not restore one without the other.
 - **Never request more from an open range than it can serve.** `MeatHttpClient::read()` caps `size` to `_rangeEnd - _position + 1`, which turns an over-long request into a SHORT read that re-pages, instead of a full count whose tail the response never carried and whose bytes the caller therefore never wrote. **The re-page test must compare against the CALLER's original size, not the capped one** — capped, a full read looks complete and never re-pages.
 - **A Range request must ask for exactly what is wanted.** `rangeEnd` was `position + size + 5`, over-fetching 6 bytes on every request. That existed only to guarantee a short read, because the re-page test was `bytesRead > 0 && bytesRead < size` and a range consumed EXACTLY returns 0 next time, which was indistinguishable from real EOF. The margin left 6 unconsumed bytes in every response, so a caller that seeks rather than reading straight through slid 6 bytes further out of alignment per request. Fixed at the cause: a 0-byte read now means "range exhausted" whenever the total size is known and `_position` has not reached it, and it re-reads from the newly opened range rather than reporting EOF.
 - **`patch_framework.py` must be enabled in `platformio.ini`, and it is gitignored so nothing warns when it is not.** It was commented out locally while `platformio.ini.sample` had it on, so esp-idf#18359 was unpatched on framework-espidf@3.50503.0 and a D64 over HTTP aborted with `assert failed: http_on_body esp_http_client.c:318 (res_buffer->orig_raw_data == res_buffer->raw_data)` — body bytes arriving during `fetch_headers` on a handle whose previous response was left partly consumed. Still required at this version: 3.50503.0 is IDF 5.5.3 and upstream's own fix (`esp_http_client_clear_response_buffer()`, which `openAndFetchHeaders()` already has an `ESP_IDF_VERSION`-guarded call waiting for) lands in 5.5.5. **Check for the `MEATLOAF-PATCH` marker in the framework's `esp_http_client.c` before debugging any stale-buffer HTTP symptom.**
 
 ## Recent Changes (September 5-6, 2026)
+
+### G64 over a network filesystem: 61 s to list, now 2.2 s
+
+`ls` inside a `.g64` on an AFP volume took 61 seconds before the first entry appeared. The GCR scan
+read the track a byte (and five bytes) at a time — thousands of container reads, each a network round
+trip. `G64MStream` now reads the half-track into RAM once and scans it there; see the Important Notes
+rule above.
+
+| | before | after |
+|---|---|---|
+| `ls` in `smashtv.g64` over AFP | 61 s | **2.18 s**, 1.88 s on a repeat |
+| same image on SD | — | 1.54 s, unchanged behaviour |
+
+- **Verified**: 10 entries with correct names (`smash tv, loader, m1, i1, i2, s1, m2, m3, f, fc`) over
+  both AFP and SD, `hex loader` returns its 254 bytes, zero read errors.
+- **`.g71` gets this for free** — `G71MStream` derives from `G64MStream` and overrides only geometry.
+  Not separately tested; there is no `.g71` anywhere in the corpus (see the 2026-08-17 entry).
+
+### AFP: reading a disk image failed part-way through
+
+`ls` inside a `.g64` on an AFP volume produced `ml_read error -5` every ~10 s, forever. Two fixes,
+both in `ll_read()`'s surroundings; durable rules above.
+
+- **Cause: per-read byte-range locking.** A failed unlock is reported as `-EIO` even when the read
+  succeeded. Disabled per volume — Meatloaf is a single reader, and it also removes two DSI round
+  trips per read.
+- **Also fixed: `ll_read()` requested `size` while its reply buffer was clamped to `rx_quantum`.**
+  Unrelated to this failure (5-byte read, 131072 quantum) but wrong, and latent for any read larger
+  than the quantum.
+- **The diagnosis turned entirely on one log line.** `ml_read error -5` had been reproduced twice with
+  no progress; adding `size`/`pos`/`fsize`/`quantum` to it eliminated the two leading theories (read
+  too large, EOF) in a single run and left only the lock path.
+- **Verified**: `smashtv.g64` over AFP lists 10 entries (`smash tv, loader, m1, i1, i2, s1, m2, m3,
+  f, fc`), 811 bytes, zero errors; AFP directory listing and a plain 96-byte file read unchanged;
+  internal heap 17 KB. **Not verified**: writes over AFP, and nothing driven from a real C64.
 
 ### D64/D81 over HTTP: a listing truncated at one directory sector
 

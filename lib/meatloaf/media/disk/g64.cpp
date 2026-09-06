@@ -64,20 +64,46 @@ bool G64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
     track--;
 
     uint8_t gcr_track = (track * 2);
-    uint32_t gcr_track_offset = TRACK_TABLE_OFFSET + (gcr_track * 4);
-    containerStream->seek(gcr_track_offset);
-    containerStream->read((uint8_t *)&gcr_track_offset, sizeof(gcr_track_offset));
 
-    uint16_t gcr_track_size = 0x00;
-    containerStream->seek(gcr_track_offset);
-    containerStream->read((uint8_t *)&gcr_track_size, sizeof(gcr_track_size));
-    gcr_track_offset += 2;
-    uint32_t gcr_track_end = gcr_track_offset + gcr_track_size;
+    // Read the track ONCE into RAM. Everything below walks GCR a byte or five
+    // at a time, which is thousands of container reads per sector -- tolerable
+    // on SD, but over a network filesystem each is a round trip (an `ls` inside
+    // a .g64 on AFP took 61 seconds). The cache is keyed on the half-track, so
+    // scanning several sectors of one track costs one read.
+    if ((int32_t)gcr_track != cached_track)
+    {
+        uint32_t table_offset = TRACK_TABLE_OFFSET + (gcr_track * 4);
+        uint32_t data_offset = 0;
+        containerStream->seek(table_offset);
+        containerStream->read((uint8_t *)&data_offset, sizeof(data_offset));
+
+        uint16_t gcr_size = 0x00;
+        containerStream->seek(data_offset);
+        containerStream->read((uint8_t *)&gcr_size, sizeof(gcr_size));
+        data_offset += 2;
+
+        track_data.assign(gcr_size, 0);
+        containerStream->seek(data_offset);
+        uint32_t got = 0;
+        while (got < gcr_size)
+        {
+            uint32_t n = containerStream->read(track_data.data() + got, gcr_size - got);
+            if (n == 0)
+                break;
+            got += n;
+        }
+        track_data.resize(got);
+        track_start = data_offset;
+        cached_track = (int32_t)gcr_track;
+    }
+
+    uint32_t gcr_track_offset = track_start;
+    uint32_t gcr_track_end = track_start + (uint32_t)track_data.size();
 
     track++;
 
     sectorOffset = gcr_track_offset + (sector * 360);
-    containerStream->seek( sectorOffset );
+    trackSeek( sectorOffset );
 
     // This loop used to be a do/while that ignored findSync()'s result and
     // spun until the header matched. When the sector is not on the track that
@@ -159,14 +185,14 @@ bool G64MStream::readSectorHeader()
     uint8_t buf[5] = { 0x00 };
     uint8_t data[4] = { 0x00 };
 
-    containerStream->read(buf, sizeof(buf));
+    if (!trackRead(buf, sizeof(buf))) return false;
     convert4BytesFromGCR(buf, data);
     gcr_sector_header.code = data[0];
     gcr_sector_header.checksum = data[1];
     gcr_sector_header.sector = data[2];
     gcr_sector_header.track = data[3];
 
-    containerStream->read(buf, sizeof(buf));
+    if (!trackRead(buf, sizeof(buf))) return false;
     convert4BytesFromGCR(buf, data);
     gcr_sector_header.id1 = data[0];
     gcr_sector_header.id0 = data[1];
@@ -195,7 +221,7 @@ bool G64MStream::readSector()
     uint8_t data[4] = { 0x00 };
     uint8_t *d = sector_buffer;
 
-    containerStream->read(buf, sizeof(buf));
+    if (!trackRead(buf, sizeof(buf))) return false;
     convert4BytesFromGCR(buf, data);
 
     // Data Header 0x07. Anything else means the sync led somewhere that is not
@@ -213,7 +239,7 @@ bool G64MStream::readSector()
 
     for ( int i = 0; i< 64; i++ )
     {
-        containerStream->read(buf, sizeof(buf));
+        if (!trackRead(buf, sizeof(buf))) return false;
         convert4BytesFromGCR(buf, data);
         std::memcpy(d, &data, 4);
         d += 4;
@@ -226,28 +252,47 @@ bool G64MStream::readSector()
 }
 
 
+void G64MStream::trackSeek(uint32_t abs)
+{
+    if (abs < track_start)
+        track_cursor = 0;
+    else if (abs - track_start > track_data.size())
+        track_cursor = (uint32_t)track_data.size();
+    else
+        track_cursor = abs - track_start;
+}
+
+bool G64MStream::trackRead(uint8_t *buf, uint32_t n)
+{
+    if (track_cursor + n > track_data.size())
+        return false;
+    std::memcpy(buf, track_data.data() + track_cursor, n);
+    track_cursor += n;
+    return true;
+}
+
 bool G64MStream::findSync(uint32_t track_end)
 {
     uint8_t gcr_byte0 = 0x00;
     uint8_t gcr_byte1 = 0x00;
 
-    //Debug_printv( "start[%04X]", containerStream->position() );
+    //Debug_printv( "start[%04X]", trackPos() );
 	while (1)
 	{
-		if (containerStream->position() + 1 >= track_end)
+		if (trackPos() + 1 >= track_end)
 		{
-			containerStream->position(track_end);
+			trackSeek(track_end);
             //Debug_printv("sync not found");
 			return false;	/* not found */
 		}
 
-        containerStream->read((uint8_t *)&gcr_byte1, sizeof(gcr_byte1));
-        //Debug_printf("%02X ", gcr_byte1);
+        if (!trackRead(&gcr_byte1, 1))
+            return false;
 
 		// sync flag goes up after the 10th bit
 		if ((gcr_byte0 & 0x03) == 0x03 && (gcr_byte1 == 0xff))
 			break;
-        
+
         gcr_byte0 = gcr_byte1;
 	}
 
@@ -255,10 +300,10 @@ bool G64MStream::findSync(uint32_t track_end)
 
     do
     {
-        //Debug_printf("%02X ", gcr_byte1);
-	    containerStream->read((uint8_t *)&gcr_byte1, sizeof(gcr_byte1));
-    } while (containerStream->position() < track_end && gcr_byte1 == 0xff);
-    containerStream->seek(containerStream->position() - 1);
+	    if (!trackRead(&gcr_byte1, 1))
+            return false;
+    } while (trackPos() < track_end && gcr_byte1 == 0xff);
+    trackSeek(trackPos() - 1);
 
     //Debug_printf("\r\n");
 

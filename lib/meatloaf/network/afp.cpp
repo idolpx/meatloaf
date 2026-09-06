@@ -222,6 +222,14 @@ struct afp_volume* AFPMSession::getVolume(const std::string& volume_name)
         return nullptr;
     }
 
+    // Turn OFF per-read byte-range locking. ll_read() takes a lock, reads, then
+    // unlocks around EVERY read, and a failed unlock is reported as -EIO even
+    // when the read itself succeeded -- which is how a 5-byte read at a mid-file
+    // offset failed repeatedly while the same file's earlier reads were fine.
+    // The locks buy nothing here: Meatloaf is a single reader of these volumes,
+    // and dropping them also removes two DSI round trips per read.
+    vol->extra_flags |= VOLUME_EXTRA_FLAGS_NO_LOCKING;
+
     _mounted_volumes[volume_name] = vol;
     Debug_printv("AFP: mounted volume '%s'", volume_name.c_str());
     return vol;
@@ -635,7 +643,9 @@ uint32_t AFPMStream::read(uint8_t* buf, uint32_t size)
     int rc = ml_read(_volume, _file_path.c_str(), cbuf, size, (off_t)_position, _fp, &_eof);
 
     if (rc < 0) {
-        Debug_printv("AFP: ml_read error %d", rc);
+        Debug_printv("AFP: ml_read error %d size[%lu] pos[%lu] fsize[%lu] quantum[%lu]",
+                     rc, (unsigned long)size, (unsigned long)_position, (unsigned long)_size,
+                     (unsigned long)(_volume && _volume->server ? _volume->server->rx_quantum : 0));
         _error = EIO;
         return 0;
     }

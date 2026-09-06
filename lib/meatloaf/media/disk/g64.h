@@ -173,6 +173,23 @@ public:
     bool readSectorHeader();
     bool readSector();
     bool findSync(uint32_t gcr_end);
+
+    // Whole-track cache. findSync() walks the track ONE BYTE AT A TIME and
+    // readSectorHeader()/readSector() take it five bytes at a time, so a
+    // listing was tens of thousands of container reads -- fine on SD, but over
+    // a network filesystem each one is a round trip and an `ls` inside a .g64
+    // on an AFP volume took 61 seconds. The track is read once and the scan
+    // runs in RAM. Same fix .nib already carries (loadTrack()).
+    std::vector<uint8_t> track_data;   // the track's GCR bytes
+    uint32_t track_start = 0;          // absolute container offset of track_data[0]
+    uint32_t track_cursor = 0;         // read cursor within track_data
+    int32_t  cached_track = -1;        // half-track index held, -1 = none
+
+    // Position/seek/read against the cached track, in ABSOLUTE container
+    // offsets so the call sites read the same as the containerStream ones did.
+    uint32_t trackPos() const { return track_start + track_cursor; }
+    void trackSeek(uint32_t abs);
+    bool trackRead(uint8_t *buf, uint32_t n);
     int convert4BytesFromGCR(uint8_t * gcr, uint8_t * plain);
 
 protected:
