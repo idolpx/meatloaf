@@ -245,8 +245,28 @@ int afp_main_loop(int command_fd) {
 		ords=rds;
 		oeds=rds;
 		if (loop_started) {
+#ifdef ESP_PLATFORM
+			/* Upstream waits 30 s here and relies on
+			 * signal_main_thread() -> pthread_kill() to cut the wait
+			 * short when a new fd is added.  ESP32 has no POSIX
+			 * signals, so that call is a no-op stub and the wait runs
+			 * to completion: a connect adds its socket AFTER this
+			 * copy of rds was taken, so the reply to DSIOpenSession
+			 * could not be read for a full 30 s.  Two of those -- the
+			 * first attempt and the retry -- is what made an AFP
+			 * connect take about a minute.
+			 *
+			 * Poll instead.  This only affects fds added while the
+			 * select is already running; traffic on an fd already in
+			 * the set still wakes it immediately.  So the cost is one
+			 * cheap select per interval and the benefit is bounded
+			 * connect latency. */
+			tv.tv_sec=0;
+			tv.tv_nsec=100L*1000L*1000L;	/* 100 ms */
+#else
 			tv.tv_sec=30;
 			tv.tv_nsec=0;
+#endif
 		} else {
 			tv.tv_sec=0;
 			tv.tv_nsec=0;
