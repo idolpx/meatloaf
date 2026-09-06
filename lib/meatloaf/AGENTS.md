@@ -1656,6 +1656,30 @@ Servers that don't send `Content-Length` use chunked encoding (`Transfer-Encodin
 - **Range-request regression fix — restore the position-0 Range probe** (`network/http.cpp`, `MeatHttpClient::openAndFetchHeaders`): a July-17 change (commit `1b8b16e3`) had narrowed the Range header condition from `method == HTTP_METHOD_GET` to `method == HTTP_METHOD_GET && position > 0`, which broke range-support DETECTION for seek-heavy media over HTTP (D64/D81 directory listing and file loads). The FIRST GET of a container happens at position 0, and it is the `Range: bytes=0-…` on THAT request whose `206` + `Content-Range` response sets `isFriendlySkipper` and `_range_size` (full file size). Without it a range-capable server answers `200` with the whole body, range support is never detected, and every subsequent `seek()` degrades to restart-and-flush (forward-only; a backward seek reopens the GET while the prior full-body response is still draining on the reused handle, desyncing the connection). Fix: send the Range header on EVERY GET including position 0 again (restores the exact pre-regression code from `061cdb07`), and add a one-shot retry-without-Range if the position-0 probe returns `416` (empty file / range-hostile server — the case `1b8b16e3` was trying to guard). Status is read BEFORE the `_size` assignment so a 416 error body's length can't pollute `_size`. Note: on a 206 the client's `_size` holds only the partial chunk length; `HTTPMStream::open()` already uses `_range_size` (the full size) when it is set. Verified working on hardware against `https://c64.meatloaf.cc/test/m.u.l.e.d64`.
 - **`MFile::getDownloadFilename()`** (`meatloaf.h`, `network/http.cpp`): new virtual (default returns `name`) overridden by `HTTPMFile` to return the server's `Content-Disposition` filename when present, WITHOUT reassigning `name` (which must stay in sync with `path`). Used by the `wget` console command. `Content-Disposition` is captured only in `contentDispositionFilename`, never applied to `client.url` (only a real `Location` redirect updates the URL), so a server-supplied filename is only recoverable via this accessor.
 
+### Recent Changes (September 6, 2026)
+
+**Range paging: three defects that all present as "the data is wrong, somewhere"**
+
+- **`seek()`'s "already at pos" fast path now requires an OPEN-ENDED range.** `pos == _position` on a
+  bounded `bytes=A-B` response says only that the counter matches — the response carries `[A..B]` and
+  nothing checks that those are the bytes at `pos`. A D81 directory read at offset 400128 against a
+  response ending at 400143 was served the BAM. Only `bytes=N-` (`_sequentialAccess`) runs to real EOF
+  and can be trusted this way. The guard existed to avoid a re-request that returned unwritten buffers,
+  which was esp-idf#18359; `patch_framework.py` fixes that, so the two changes are coupled.
+- **`read()` caps its request to `_rangeEnd - _position + 1`** (new `_rangeEnd` member, set wherever the
+  Range header is built; `UINT32_MAX` for open-ended). Asking past the end of an open range returned a
+  full count whose tail the response never carried, leaving the caller's struct untouched — the same
+  failure `readContainer()`'s loop was added for, one layer down. **The re-page test compares against
+  the caller's ORIGINAL size, not the capped one**, or a capped-but-full read never re-pages.
+- **Ranges are requested exactly** (`position + size - 1`, was `position + size + 5`). The +5 existed
+  only to force a short read, because a range consumed exactly returns 0 next time and 0 was read as
+  EOF. Now a 0-byte read means "range exhausted" when the total size is known and `_position` has not
+  reached it, and it re-reads from the fresh range.
+
+Symptom to recognise: a CBM directory listing that stops after exactly 8 entries (one sector) with the
+first entry reading `FF` and the sector link `FF FF`. Check the entry hex — `28 FF FF FF FF FF`
+repeating is a D81 BAM record, i.e. the read is at the wrong OFFSET, not corrupted.
+
 ### Recent Changes (March 12, 2026)
 
 - **Chunked transfer encoding support** (`network/http.h`, `network/http.cpp`):

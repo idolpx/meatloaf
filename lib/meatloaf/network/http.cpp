@@ -1484,7 +1484,21 @@ bool MeatHttpClient::seek(uint32_t pos) {
     // (processRedirectsAndOpen() sets it to the requested position, read()
     // advances it), so pos == _position means the caller's target is exactly
     // what a read would return next.
-    if ( _is_open && pos == _position && !complete() )
+    // Restricted to OPEN-ENDED responses (_sequentialAccess, "bytes=N-"), which
+    // run to the real EOF so being at pos means the next byte really is pos.
+    //
+    // For a BOUNDED range it is not safe: the response carries only
+    // [reqPos.._rangeEnd], and matching _position says nothing about whether
+    // those are the bytes at pos -- any drift in the paging arithmetic serves
+    // the wrong part of the file with no error anywhere. That is what handed a
+    // D81 directory read the BAM instead of the directory sector (entry bytes
+    // FF FF FF FF 28 FF..., the 40-free-sectors BAM pattern), so the
+    // next-sector link read FF FF and the listing stopped at one sector.
+    //
+    // The fast path was originally added because re-requesting on a reused
+    // handle came back with unwritten buffers -- that was esp-idf#18359, which
+    // patch_framework.py now fixes, so the re-request this skips is safe again.
+    if ( _is_open && pos == _position && !complete() && _rangeEnd == UINT32_MAX )
         return true;
 
     if(isFriendlySkipper) {
@@ -1651,6 +1665,27 @@ uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
     if (_is_open) {
         //Debug_printv("Reading HTTP Stream!");
 
+        // Never ask for more than the OPEN RANGE can serve. A bounded range
+        // response holds bytes _position.._rangeEnd; asking past that returns
+        // a full count made up partly of bytes the response never carried, so
+        // the caller's buffer tail is left as it was. That is how a directory
+        // sector read whose start landed near the end of a range came back
+        // with its second half untouched (0xFF), which made the next-sector
+        // link read FF FF and truncated a D64/D81 listing at exactly one
+        // directory sector. Capping makes it a SHORT read instead, which the
+        // re-page below turns into a fresh range, and readContainer()'s loop
+        // then fills the remainder correctly.
+        // The re-page test below must compare against what the CALLER asked
+        // for, not the capped amount -- capped to the range, a full read looks
+        // complete and never re-pages.
+        uint32_t askedFor = size;
+        if (_rangeEnd != UINT32_MAX && _rangeEnd >= _position)
+        {
+            uint32_t inRange = _rangeEnd - _position + 1;
+            if (size > inRange)
+                size = inRange;
+        }
+
         auto bytesRead = esp_http_client_read(_http, (char *)buf, size);
 
         // If read returns negative (error), try to recover by reopening the stream
@@ -1685,8 +1720,14 @@ uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
             //   once _range_size is known. _size is only the right fallback
             //   for a server that answers with a plain 200 (full body, no
             //   Content-Range) and never sends a 206 at all.
-            if (bytesRead > 0 && bytesRead < size && !esp_http_client_is_chunked_response(_http)) {
-                uint32_t totalSize = (_range_size > 0) ? _range_size : ((_size > 0) ? _size : 0);
+            // A 0-byte read counts as "range exhausted" too, but ONLY when the
+            // total size is known and _position has not reached it -- without
+            // that guard a genuine EOF would re-page forever. When the size is
+            // unknown, 0 is still treated as EOF exactly as before.
+            uint32_t totalSize = (_range_size > 0) ? _range_size : ((_size > 0) ? _size : 0);
+            bool rangeExhausted = (bytesRead > 0 && bytesRead < askedFor) ||
+                                  (bytesRead == 0 && totalSize > 0 && _position < totalSize);
+            if (rangeExhausted && !esp_http_client_is_chunked_response(_http)) {
                 if (totalSize == 0 || _position < totalSize)
                     // Re-page with the caller's requested size, NOT the default
                     // HTTP_BLOCK_SIZE. Bulk sequential readers (archive
@@ -1699,7 +1740,24 @@ uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
                     // unless the range is exhausted, so a partial read here
                     // always means "range end" and re-paging at _position
                     // continues the byte stream seamlessly.
+                {
                     openAndFetchHeaders(lastMethod, _position, size);
+
+                    // A partial read has data to hand back and the caller will
+                    // come round again, but a 0-byte read has nothing -- return
+                    // it and the caller sees EOF, which is the very thing the
+                    // old +5 lookahead margin existed to avoid. Read once from
+                    // the range just opened instead.
+                    if (bytesRead == 0 && _is_open)
+                    {
+                        int retry = esp_http_client_read(_http, (char *)buf, size);
+                        if (retry > 0)
+                        {
+                            bytesRead = retry;
+                            _position += (uint32_t)retry;
+                        }
+                    }
+                }
             }
         }
 
@@ -1795,12 +1853,26 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
             // real EOF), so it's both fast and reliable.
             snprintf(str, sizeof str, "bytes=%" PRIu32 "-", position);
             esp_http_client_set_header(_http, "Range", str);
+            _rangeEnd = UINT32_MAX;   // open-ended: runs to the real EOF
             sentRange = true;
             Debug_printv("seeking range[%s] url[%s]", str, url.c_str());
         }
         else
         {
-            uint32_t rangeEnd = position + size + 5;
+            // Request EXACTLY the bytes asked for. This used to add a +5
+            // lookahead margin so that a follow-up read on the same connection
+            // returned a short count, which is what the re-page test below
+            // keyed on -- a range consumed exactly returns 0 next time, and 0
+            // was indistinguishable from real EOF. The margin made every
+            // request fetch size+6 bytes, and a caller that seeks rather than
+            // reading straight through leaves those 6 behind, so successive
+            // requests slide 6 bytes further out of alignment each time. That
+            // is what truncated a D81 directory listing over HTTP: the sector
+            // link came back as FF FF and the walk stopped after 8 entries.
+            // read() now treats a 0-byte read as "range exhausted" whenever the
+            // total size is known and _position has not reached it, so the
+            // margin is no longer needed to keep paging alive.
+            uint32_t rangeEnd = (size > 0) ? (position + size - 1) : position;
             // _range_size (from a prior 206's Content-Range ".../TOTAL") is the
             // authoritative total once any ranged response has occurred — on a
             // 206, _size (Content-Length) is only that partial chunk's length,
@@ -1812,6 +1884,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
                 rangeEnd = knownSize - 1;
             snprintf(str, sizeof str, "bytes=%" PRIu32 "-%" PRIu32, position, rangeEnd);
             esp_http_client_set_header(_http, "Range", str);
+            _rangeEnd = rangeEnd;
             sentRange = true;
             Debug_printv("seeking range[%s] url[%s]", str, url.c_str());
         }

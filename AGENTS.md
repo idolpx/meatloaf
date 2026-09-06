@@ -651,7 +651,35 @@ gitignored.
 - **`ensureExecTask()` deletes before it creates, yields, and falls back.** Deleting first matters because holding 8 KB while asking for 16 KB is how the allocation fails on a tight internal heap; the `vTaskDelay(20)` after `vTaskDelete()` matters because the stack is reclaimed by the idle task, so an immediate re-create can fail on memory that is already free in all but bookkeeping. And when the DEEP creation fails it re-creates a SMALL executor, so the console stays usable — `meminfo`, `reboot` and all local commands still run, and only the command that wanted the deep stack is refused. **Before this, a failed re-creation left no executor at all and the console was dead until reboot.**
 - **The executor grows but never shrinks until the idle timeout.** One AFP command leaves it at 16 KB for as long as commands keep arriving; `ConsoleExecMSession`'s 3-minute idle free is what returns it. Deliberate — shrinking on every transition would mean a delete/create pair per command, which is the churn that causes the fragmentation in the first place.
 
+- **A bounded HTTP range response is not "the file at that offset" — `MeatHttpClient::seek()`'s "already at pos" fast path is only valid for an OPEN-ENDED range.** With `bytes=N-` (the `_sequentialAccess` form) the response runs to real EOF, so `pos == _position` genuinely means the next byte is `pos`. With a bounded `bytes=A-B` it does not: the response carries only `[A..B]`, and any drift in the paging arithmetic serves the wrong part of the file with no error anywhere. A D81 directory read took that path at offset 400128 against a response ending at 400143 and was handed the BAM instead — recognisable in the entry hex as `FF FF FF FF 28 FF FF FF FF FF 28 …`, the D81 BAM pattern of `0x28` (40 sectors free) followed by five bitmap bytes. Entry 0 of a sector is also where `next_track`/`next_sector` come from, so the link read `FF FF` and the listing stopped after exactly one directory sector (8 entries). **That guard was itself a workaround for esp-idf#18359** — re-requesting on a reused handle returned unwritten buffers — so it is safe to drop only because `patch_framework.py` now fixes that. The two are coupled; do not restore one without the other.
+- **Never request more from an open range than it can serve.** `MeatHttpClient::read()` caps `size` to `_rangeEnd - _position + 1`, which turns an over-long request into a SHORT read that re-pages, instead of a full count whose tail the response never carried and whose bytes the caller therefore never wrote. **The re-page test must compare against the CALLER's original size, not the capped one** — capped, a full read looks complete and never re-pages.
+- **A Range request must ask for exactly what is wanted.** `rangeEnd` was `position + size + 5`, over-fetching 6 bytes on every request. That existed only to guarantee a short read, because the re-page test was `bytesRead > 0 && bytesRead < size` and a range consumed EXACTLY returns 0 next time, which was indistinguishable from real EOF. The margin left 6 unconsumed bytes in every response, so a caller that seeks rather than reading straight through slid 6 bytes further out of alignment per request. Fixed at the cause: a 0-byte read now means "range exhausted" whenever the total size is known and `_position` has not reached it, and it re-reads from the newly opened range rather than reporting EOF.
+- **`patch_framework.py` must be enabled in `platformio.ini`, and it is gitignored so nothing warns when it is not.** It was commented out locally while `platformio.ini.sample` had it on, so esp-idf#18359 was unpatched on framework-espidf@3.50503.0 and a D64 over HTTP aborted with `assert failed: http_on_body esp_http_client.c:318 (res_buffer->orig_raw_data == res_buffer->raw_data)` — body bytes arriving during `fetch_headers` on a handle whose previous response was left partly consumed. Still required at this version: 3.50503.0 is IDF 5.5.3 and upstream's own fix (`esp_http_client_clear_response_buffer()`, which `openAndFetchHeaders()` already has an `ESP_IDF_VERSION`-guarded call waiting for) lands in 5.5.5. **Check for the `MEATLOAF-PATCH` marker in the framework's `esp_http_client.c` before debugging any stale-buffer HTTP symptom.**
+
 ## Recent Changes (September 5-6, 2026)
+
+### D64/D81 over HTTP: a listing truncated at one directory sector
+
+`open`ing a D81 over HTTP listed 8 entries and stopped; the same path on a D64 asserted inside
+`esp_http_client`. Four fixes, three of them in the range-paging arithmetic. Durable rules above.
+
+| | before | after |
+|---|---|---|
+| `mars saga.d81` over HTTP | 536 bytes, 8 entries, `FF FF` link | **3132 bytes, 96 entries** |
+| `m.u.l.e.d64` over HTTP | assert / reboot | 380 bytes, 8 entries |
+| `goonies.d64` on SD | 573 bytes, 16 entries | unchanged |
+
+- **The measurement that redirected the search**: the D64 also returned "only" 8 entries, which looked
+  like the same truncation and was not — its walk always ended cleanly (`Invalid Track: 0`, no `FF`
+  entry). That disk simply has 8 files. Two symptoms that look identical are worth separating by their
+  FAILURE MODE, not by their size.
+- **What the entry hex gave away**: `FF FF FF FF 28 FF FF FF FF FF 28 …` is not corruption, it is the
+  D81 BAM. Recognising it turned "the read is broken" into "the read is at the wrong offset", which is
+  a different bug with a different fix.
+- **Verified**: all three cases above, no asserts, no short container reads, on a clean build with the
+  diagnostic probes removed. **Not verified**: nothing driven from a real C64 over IEC, and no native
+  regression test — `MeatHttpClient` needs `esp_http_client`, so this whole area remains
+  hardware-verified only, exactly as the 2026-08-12 HTTP entries note.
 
 ### Console executor: 16 KB only for what actually needs it
 

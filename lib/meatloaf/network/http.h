@@ -176,6 +176,12 @@ public:
 
     uint32_t _size = 0;
     uint32_t _range_size = 0;
+
+    // Last byte offset the currently open response can serve (inclusive), from
+    // the Range header just sent. UINT32_MAX for an open-ended range. seek()'s
+    // "already at pos" fast path needs it: being at the right offset says
+    // nothing about how many bytes the current bounded range still holds.
+    uint32_t _rangeEnd = 0;
     uint32_t _position = 0;
     size_t _error = 0;
 
