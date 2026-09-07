@@ -26,14 +26,35 @@ void PS2KeyboardDevice::reloadConfig()
     if (!devices.contains("ps2"))
         return;
 
+    // TWO SHAPES EXIST IN THE WILD and both must be tolerated:
+    //   "ps2": { "enabled": 0 }   -- what data/BUILD_IEC.*/.sys/devices.json ships
+    //   "ps2": 0                  -- the legacy scalar (see AGENTS.md), still on
+    //                                any device whose flash predates the object form
+    // nlohmann's value() THROWS when the node is not an object, and ESP-IDF
+    // builds -fno-exceptions, so a throw here is abort() -- which is exactly
+    // how this crashed on boot. Never call value()/operator[] on a config node
+    // without checking its type first.
     const psram_json &ps2 = devices["ps2"];
-    bool want = ps2.value("enabled", 0) != 0;
+    bool want = false;
+
+    if (ps2.is_object())
+    {
+        want = ps2.value("enabled", 0) != 0;
+    }
+    else if (ps2.is_number_integer() || ps2.is_boolean())
+    {
+        want = (ps2.get<int>() != 0);
+    }
+    else
+    {
+        Debug_printv("ps2: devices.ps2 has unexpected type; treating as disabled");
+    }
 
     // The DTV's scancode-to-C64-key table is a bench finding, so C64 names
     // (runstop, restore, commodore...) are bound here from config rather
-    // than guessed in the built-in table.
+    // than guessed in the built-in table.  Only the object form can carry one.
     _overrides.clear();
-    if (ps2.contains("keymap"))
+    if (ps2.is_object() && ps2.contains("keymap") && ps2["keymap"].is_object())
     {
         const psram_json &km = ps2["keymap"];
         for (auto it = km.begin(); it != km.end(); ++it)
@@ -49,6 +70,11 @@ void PS2KeyboardDevice::reloadConfig()
 void PS2KeyboardDevice::persistConfig()
 {
     auto &entry = mlConfig.data()["devices"]["ps2"];
+    // Same trap as reloadConfig(): subscripting a scalar node throws, and a
+    // throw is abort() here.  Upgrade a legacy "ps2": 0 to the object form
+    // before writing into it.
+    if (!entry.is_object())
+        entry = psram_json::object();
     entry["enabled"] = _enabled ? 1 : 0;
 }
 
