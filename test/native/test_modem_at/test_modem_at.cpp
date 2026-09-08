@@ -456,6 +456,175 @@ void test_result_x_degradation_applies_in_numeric_mode(void)
     TEST_ASSERT_EQUAL_STRING("3\r", at_format_result(AtResult::BUSY, s).c_str());
 }
 
+#include "escape.h"
+
+// -------------------------------------------------------------------- escape
+
+// Guard is in fiftieths of a second, so the default 50 is 1000 ms.
+static EscapeDetector make_detector()
+{
+    EscapeDetector d;
+    d.configure('+', 50);
+    d.reset();
+    return d;
+}
+
+void test_escape_plain_data_passes_straight_through(void)
+{
+    EscapeDetector d = make_detector();
+    std::string fwd;
+    TEST_ASSERT_TRUE(EscapeDetector::Verdict::NONE == d.feed('h', 5000, fwd));
+    TEST_ASSERT_TRUE(EscapeDetector::Verdict::NONE == d.feed('i', 5010, fwd));
+    TEST_ASSERT_EQUAL_STRING("hi", fwd.c_str());
+}
+
+void test_escape_full_sequence_is_detected(void)
+{
+    EscapeDetector d = make_detector();
+    std::string fwd;
+
+    // Data, then one second of silence, then +++, then another second.
+    d.feed('x', 1000, fwd);
+    fwd.clear();
+
+    TEST_ASSERT_TRUE(EscapeDetector::Verdict::NONE == d.feed('+', 3000, fwd));
+    TEST_ASSERT_TRUE(EscapeDetector::Verdict::NONE == d.feed('+', 3100, fwd));
+    TEST_ASSERT_TRUE(EscapeDetector::Verdict::NONE == d.feed('+', 3200, fwd));
+
+    // Nothing forwarded yet -- the three bytes are held until the trailing
+    // guard expires, because they are still potentially data.
+    TEST_ASSERT_EQUAL_STRING("", fwd.c_str());
+
+    TEST_ASSERT_TRUE(EscapeDetector::Verdict::NONE == d.tick(3900, fwd));
+    TEST_ASSERT_TRUE(EscapeDetector::Verdict::ESCAPED == d.tick(4300, fwd));
+    TEST_ASSERT_EQUAL_STRING("", fwd.c_str());
+}
+
+// The near-miss that matters most: a user typing "+++" inside a sentence must
+// neither escape nor lose the characters.
+void test_escape_data_after_the_sequence_releases_the_held_bytes(void)
+{
+    EscapeDetector d = make_detector();
+    std::string fwd;
+
+    d.feed('x', 1000, fwd);
+    fwd.clear();
+
+    d.feed('+', 3000, fwd);
+    d.feed('+', 3100, fwd);
+    d.feed('+', 3200, fwd);
+    TEST_ASSERT_EQUAL_STRING("", fwd.c_str());
+
+    TEST_ASSERT_TRUE(EscapeDetector::Verdict::NONE == d.feed('y', 3300, fwd));
+    TEST_ASSERT_EQUAL_STRING("+++y", fwd.c_str());
+}
+
+// Without a leading guard the run is data, not an escape.
+void test_escape_needs_a_leading_guard(void)
+{
+    EscapeDetector d = make_detector();
+    std::string fwd;
+
+    d.feed('x', 3000, fwd);
+    fwd.clear();
+
+    d.feed('+', 3050, fwd);   // only 50 ms after data
+    d.feed('+', 3100, fwd);
+    d.feed('+', 3150, fwd);
+    TEST_ASSERT_TRUE(EscapeDetector::Verdict::NONE == d.tick(5000, fwd));
+    TEST_ASSERT_EQUAL_STRING("+++", fwd.c_str());
+}
+
+// Too slow between the escape characters: they are data.
+void test_escape_characters_spaced_wider_than_the_guard_are_data(void)
+{
+    EscapeDetector d = make_detector();
+    std::string fwd;
+
+    d.feed('+', 3000, fwd);
+    d.feed('+', 4500, fwd);   // 1500 ms > 1000 ms guard
+    TEST_ASSERT_TRUE(EscapeDetector::Verdict::NONE == d.tick(6000, fwd));
+    // The first + timed out as data; the second started a fresh candidate and
+    // then timed out too. Both must reach the far end, in order.
+    TEST_ASSERT_EQUAL_STRING("++", fwd.c_str());
+}
+
+void test_escape_two_characters_then_silence_are_released_as_data(void)
+{
+    EscapeDetector d = make_detector();
+    std::string fwd;
+
+    d.feed('+', 3000, fwd);
+    d.feed('+', 3100, fwd);
+    TEST_ASSERT_EQUAL_STRING("", fwd.c_str());
+
+    TEST_ASSERT_TRUE(EscapeDetector::Verdict::NONE == d.tick(4500, fwd));
+    TEST_ASSERT_EQUAL_STRING("++", fwd.c_str());
+}
+
+void test_escape_four_characters_are_not_an_escape(void)
+{
+    EscapeDetector d = make_detector();
+    std::string fwd;
+
+    d.feed('x', 1000, fwd);
+    fwd.clear();
+
+    d.feed('+', 3000, fwd);
+    d.feed('+', 3100, fwd);
+    d.feed('+', 3200, fwd);
+    d.feed('+', 3300, fwd);
+    TEST_ASSERT_EQUAL_STRING("++++", fwd.c_str());
+    TEST_ASSERT_TRUE(EscapeDetector::Verdict::NONE == d.tick(5000, fwd));
+}
+
+// S2 is configurable, so the detector must not hard-code '+'.
+void test_escape_uses_the_configured_character(void)
+{
+    EscapeDetector d;
+    d.configure('#', 50);
+    d.reset();
+
+    std::string fwd;
+    d.feed('#', 3000, fwd);
+    d.feed('#', 3100, fwd);
+    d.feed('#', 3200, fwd);
+    TEST_ASSERT_TRUE(EscapeDetector::Verdict::ESCAPED == d.tick(4300, fwd));
+    TEST_ASSERT_EQUAL_STRING("", fwd.c_str());
+}
+
+// S2 above 127 disables the escape entirely, per the Hayes convention.
+void test_escape_disabled_when_character_is_out_of_range(void)
+{
+    EscapeDetector d;
+    d.configure(200, 50);
+    d.reset();
+
+    std::string fwd;
+    d.feed(200, 3000, fwd);
+    d.feed(200, 3100, fwd);
+    d.feed(200, 3200, fwd);
+    TEST_ASSERT_TRUE(EscapeDetector::Verdict::NONE == d.tick(4300, fwd));
+    TEST_ASSERT_EQUAL_UINT(3, fwd.size());
+}
+
+// reset() is called on connect and on return to stream mode, so a sequence
+// cannot span two sessions.
+void test_escape_reset_drops_held_bytes(void)
+{
+    EscapeDetector d = make_detector();
+    std::string fwd;
+
+    d.feed('x', 1000, fwd);
+    fwd.clear();
+    d.feed('+', 3000, fwd);
+    d.feed('+', 3100, fwd);
+
+    d.reset();
+    TEST_ASSERT_TRUE(EscapeDetector::Verdict::NONE == d.tick(9000, fwd));
+    TEST_ASSERT_EQUAL_STRING("", fwd.c_str());
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -496,6 +665,17 @@ int main(int, char **)
     RUN_TEST(test_result_x0_degrades_extended_codes_to_no_carrier);
     RUN_TEST(test_result_x_levels_gate_each_extended_code);
     RUN_TEST(test_result_x_degradation_applies_in_numeric_mode);
+
+    RUN_TEST(test_escape_plain_data_passes_straight_through);
+    RUN_TEST(test_escape_full_sequence_is_detected);
+    RUN_TEST(test_escape_data_after_the_sequence_releases_the_held_bytes);
+    RUN_TEST(test_escape_needs_a_leading_guard);
+    RUN_TEST(test_escape_characters_spaced_wider_than_the_guard_are_data);
+    RUN_TEST(test_escape_two_characters_then_silence_are_released_as_data);
+    RUN_TEST(test_escape_four_characters_are_not_an_escape);
+    RUN_TEST(test_escape_uses_the_configured_character);
+    RUN_TEST(test_escape_disabled_when_character_is_out_of_range);
+    RUN_TEST(test_escape_reset_drops_held_bytes);
 
     return UNITY_END();
 }

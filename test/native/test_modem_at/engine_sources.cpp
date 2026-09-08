@@ -32,3 +32,4 @@
 #include "../../../lib/modem/at_parser.cpp"
 #include "../../../lib/modem/at_settings.cpp"
 #include "../../../lib/modem/at_result.cpp"
+#include "../../../lib/modem/escape.cpp"
