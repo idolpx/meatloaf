@@ -52,10 +52,11 @@ sequence, not a reduced feature set. Each phase is independently testable and us
 | **1** | AT parser, settings + S-registers + `AT&W`, single dial-out, `+++`/`ATO`/`ATH`, result codes, telnet negotiation, phonebook |
 | **2** | Connection registry — `ATC"host:port"`, `ATC0`, `ATCn`, `ATDn`, `ATHn`, backgrounding and backpressure |
 | **3** | Listeners — `ATAn`, RING, `ATA`, `ATS0` auto-answer, `ATS41` auto-stream |
+| **3.5** | Extract `SSHMSession` out of `SFTPMSession`. No modem code. Ships and is verified on its own |
 | **4** | SSH dialing `ATDS"user:pass@host:port"` — the deep-stack tier |
 | **5a–5d** | ZMODEM, XMODEM/YMODEM, Punter, Kermit — one plan and one build gate each |
 
-This document specifies phase 1 in full and fixes the architecture all five phases share.
+This document specifies phase 1 in full and fixes the architecture every phase shares.
 Later phases get their own spec against this architecture.
 
 ## Architecture
@@ -69,7 +70,7 @@ back an `MStream`; a transfer moves bytes between two `MStream`s.
 |---|---|---|
 | `ATD"host:port"` | `MFSOwner::File("tcp://host:port")->getSourceStream(in\|out)` | exists |
 | `ATDT"host:port"` | `telnet://` — `TelnetMStream` decorating `TCPMStream`, running `lib/telnet/libtelnet.c` | fills the 3-line stub in `network/telnet.h` |
-| `ATDS"user:pass@host:port"` | `ssh://` — `SSHMStream`, libssh session setup reused from `network/sftp.cpp` | fills the empty `network/ssh.h` (phase 4) |
+| `ATDS"user:pass@host:port"` | `ssh://` — `SSHMSession` extracted out of `SFTPMSession`, plus a shell-channel `SSHMStream` | fills the empty `network/ssh.h` (phases 3.5 and 4) |
 | Connection lifetime | `MSession` + `SessionBroker` — refcounting, idle disposal, `addIO()`/`releaseIO()` | exists |
 | Transfer file end | `MFSOwner::File("/sd/...")->getSourceStream(out)` | exists |
 | Listener | `MeatSocketServer`, generalized off its `iecPort` assumption | partial (phase 3) |
@@ -83,6 +84,67 @@ The payoff is largest for transfers. A ZMODEM engine written as `MStream* remote
 natively against a mock `MStream` scripted from a recorded peer exchange. For a protocol
 of ZMODEM's complexity that is the difference between a testable component and
 hardware-only guesswork.
+
+### The SSH quartet, and where it comes from
+
+`ssh://` needs all four classes, because `MFSOwner` resolves a scheme by asking each
+registered `MFileSystem::handles()` and hands back an `MFile*`. Three of the four are
+small or already written.
+
+`SSHMFile` and `SSHMFileSystem` take the **`TCPMFile` shape, not the `SFTPMFile` shape**.
+An SSH shell channel is not a filesystem, so there is no `isDirectory`, `rewindDirectory`,
+`getNextFileInDir`, `mkDir`, `remove` or `rename` — `SSHMFile` is a connection handle
+whose `getSourceStream()` returns `createStream()` and whose `getDecodedStream()` returns
+its argument unwrapped. About 40 lines for the pair.
+
+`SSHMStream` wraps one `ssh_channel` and is largely a port of `lib/network-protocol/SSH.cpp`
+lines 177-280, which already runs the sequence: `ssh_channel_new`,
+`ssh_channel_open_session`, `ssh_channel_request_pty_size`, `ssh_channel_request_shell`,
+then `ssh_channel_read` / `ssh_channel_write`. `seek()` returns false — a shell has no
+position — and `waitReadable()` maps to `ssh_channel_read_nonblocking`.
+
+`SSHMSession` is **extracted from `SFTPMSession`, which then derives from it** (phase 3.5).
+SFTP genuinely runs as a subsystem over an SSH connection — `sftp_new()` takes the
+`ssh_session` — so the inheritance is not a convenience, it is the protocol relationship.
+The SSH transport is moved rather than duplicated, so this makes phase 4 *smaller*, not
+larger.
+
+| Stays in `SFTPMSession` | Moves to `SSHMSession` |
+|---|---|
+| `sftp_handle`, `getSFTPSession()` | `ssh_handle`, `getSSHSession()` |
+| `sftp_new` / `sftp_init` in a `connect()` override | `ssh_new`, options, `ssh_connect`, auth |
+| `sftp_free` in a `disconnect()` override | `ssh_disconnect` / `ssh_free` |
+| `getScheme()` returning `"sftp"` | `keep_alive()`, `setCredentials`, `setPrivateKey`, both auth methods |
+
+The critical constraint: **`SSHMSession` is pure transport.** The pty-and-shell channel
+lives in `SSHMStream`, never in the session. Putting it in the session would make every
+SFTP mount open a shell channel it never uses and spawn a remote shell process. That split
+is also the one the codebase already uses everywhere — session is the connection to the
+server, stream is one open thing on it, exactly as `TCPMSession`/`TCPMStream` and
+`SFTPMSession`/`SFTPMStream` are arranged.
+
+Three details that will bite if left unstated, each of which this repo has hit before:
+
+1. **`SSHMSession` needs a scheme-taking constructor.** `MSession::key` must be spelled
+   exactly as `SessionBroker::obtain()` spells it. This is the `FTPMSession` precedent
+   verbatim — its scheme-taking constructor exists for this reason, with `FTPSMSession`
+   beside it so `obtain<T>()` keys the two apart. Static `getScheme()` hiding in
+   `SFTPMSession` covers the rest.
+2. **The base destructor must not call virtual `disconnect()`.** `MSession`'s own comment
+   warns about this. Both `disconnect()` overrides call a non-virtual `closeSSH()` helper,
+   and `~SSHMSession()` calls that helper directly.
+3. **`connect()`'s stale-session check splits in two.** Today it tests
+   `ssh_handle == nullptr || sftp_handle == nullptr || !ssh_is_connected(...)` as one
+   condition. The base validates the transport; the override adds the subsystem check
+   after calling it.
+
+**Credentials in the dial URL are a documented trap.** `ATDS"user:pass@host:port"` carries
+credentials in the URL, and AGENTS.md records that FTP credentials in a URL never reached
+the client at all — the SessionBroker key did not carry them, so every connection silently
+fell back to anonymous. The fix was `ftpSessionHost()` embedding `user[:password]@` in the
+host key so the credentials reach the constructor before `connect()` runs, and so two users
+of one server get two sessions. `SSHMSession` needs the same treatment, and it composes
+with the per-connection-id keying described below.
 
 ### The modem task never touches a console fd
 
@@ -313,6 +375,12 @@ measurement, not an assumption, and is answered per phase.
   fastloaders. Mitigated by per-phase and per-protocol gates and by measuring each phase.
 - **libssh stack depth (phase 4).** Unknown until measured. Mitigated by isolating SSH on
   `modem_work` so a failed allocation refuses one command instead of the feature.
+- **Phase 3.5 edits working, hardware-verified SFTP code.** This is why it is its own
+  phase rather than a step inside phase 4: it ships as one commit containing no modem code
+  at all, and SFTP is re-verified on hardware — mount, list a directory, read a file
+  byte-exact, and confirm session reuse and idle disposal — before anything builds on it.
+  If SFTP regresses, the diff that caused it is small and isolated. `SFTPMSession` has
+  callers beyond the modem, so the ripple check covers every one of them.
 - **`MStream` readiness.** `waitReadable()` is a new virtual on a widely-derived base
   class. The default implementation polls `available()`, so no existing subclass changes
   behaviour.
