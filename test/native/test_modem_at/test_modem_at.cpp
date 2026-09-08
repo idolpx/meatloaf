@@ -662,6 +662,124 @@ void test_escape_starts_a_candidate_on_the_very_first_byte_even_with_a_small_tim
     TEST_ASSERT_EQUAL_STRING("", fwd.c_str());
 }
 
+#include "phonebook.h"
+
+// ----------------------------------------------------------------- phonebook
+
+void test_hostport_split(void)
+{
+    std::string host;
+    uint16_t port = 0;
+
+    TEST_ASSERT_TRUE(phonebook_split_hostport("bbs.example.com:23", host, port));
+    TEST_ASSERT_EQUAL_STRING("bbs.example.com", host.c_str());
+    TEST_ASSERT_EQUAL_UINT(23, port);
+}
+
+// A bare host is port 23. Every phase-1 dial target is a BBS, and typing the
+// port every time is the kind of friction that makes a feature go unused.
+void test_hostport_defaults_to_telnet_port(void)
+{
+    std::string host;
+    uint16_t port = 0;
+
+    TEST_ASSERT_TRUE(phonebook_split_hostport("bbs.example.com", host, port));
+    TEST_ASSERT_EQUAL_STRING("bbs.example.com", host.c_str());
+    TEST_ASSERT_EQUAL_UINT(23, port);
+}
+
+void test_hostport_rejects_malformed_input(void)
+{
+    std::string host;
+    uint16_t port = 0;
+
+    TEST_ASSERT_FALSE(phonebook_split_hostport("", host, port));
+    TEST_ASSERT_FALSE(phonebook_split_hostport(":23", host, port));
+    TEST_ASSERT_FALSE(phonebook_split_hostport("host:", host, port));
+    TEST_ASSERT_FALSE(phonebook_split_hostport("host:abc", host, port));
+    TEST_ASSERT_FALSE(phonebook_split_hostport("host:0", host, port));
+    TEST_ASSERT_FALSE(phonebook_split_hostport("host:65536", host, port));
+}
+
+void test_phonebook_store_and_find(void)
+{
+    Phonebook pb;
+    TEST_ASSERT_TRUE(pb.store("1", "bbs.example.com:23", "T"));
+
+    const PhonebookEntry *e = pb.find("1");
+    TEST_ASSERT_NOT_NULL(e);
+    TEST_ASSERT_EQUAL_STRING("bbs.example.com", e->host.c_str());
+    TEST_ASSERT_EQUAL_UINT(23, e->port);
+    TEST_ASSERT_EQUAL_STRING("T", e->mods.c_str());
+}
+
+void test_phonebook_find_misses_return_null(void)
+{
+    Phonebook pb;
+    pb.store("1", "a.example.com:23", "");
+    TEST_ASSERT_NULL(pb.find("2"));
+}
+
+// Leading zeros are significant: a user who stored 007 dials 007, not 7.
+void test_phonebook_numbers_are_compared_as_strings(void)
+{
+    Phonebook pb;
+    pb.store("007", "a.example.com:23", "");
+    TEST_ASSERT_NOT_NULL(pb.find("007"));
+    TEST_ASSERT_NULL(pb.find("7"));
+}
+
+void test_phonebook_store_replaces_an_existing_number(void)
+{
+    Phonebook pb;
+    pb.store("1", "a.example.com:23", "");
+    pb.store("1", "b.example.com:2323", "T");
+
+    TEST_ASSERT_EQUAL_UINT(1, pb.all().size());
+    const PhonebookEntry *e = pb.find("1");
+    TEST_ASSERT_EQUAL_STRING("b.example.com", e->host.c_str());
+    TEST_ASSERT_EQUAL_UINT(2323, e->port);
+}
+
+void test_phonebook_erase(void)
+{
+    Phonebook pb;
+    pb.store("1", "a.example.com:23", "");
+    TEST_ASSERT_TRUE(pb.erase("1"));
+    TEST_ASSERT_NULL(pb.find("1"));
+    TEST_ASSERT_FALSE(pb.erase("1"));
+}
+
+void test_phonebook_rejects_a_bad_hostport(void)
+{
+    Phonebook pb;
+    TEST_ASSERT_FALSE(pb.store("1", "host:99999", ""));
+    TEST_ASSERT_EQUAL_UINT(0, pb.all().size());
+}
+
+void test_phonebook_rejects_a_non_numeric_number(void)
+{
+    Phonebook pb;
+    TEST_ASSERT_FALSE(pb.store("abc", "a.example.com:23", ""));
+    TEST_ASSERT_FALSE(pb.store("", "a.example.com:23", ""));
+}
+
+// The listing order is what ATP prints, so it must be stable and numeric
+// rather than insertion-ordered or plain lexicographic.
+void test_phonebook_lists_in_numeric_order(void)
+{
+    Phonebook pb;
+    pb.store("10", "j.example.com", "");
+    pb.store("2",  "b.example.com", "");
+    pb.store("1",  "a.example.com", "");
+
+    const auto &all = pb.all();
+    TEST_ASSERT_EQUAL_UINT(3, all.size());
+    TEST_ASSERT_EQUAL_STRING("1",  all[0].number.c_str());
+    TEST_ASSERT_EQUAL_STRING("2",  all[1].number.c_str());
+    TEST_ASSERT_EQUAL_STRING("10", all[2].number.c_str());
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -715,6 +833,18 @@ int main(int, char **)
     RUN_TEST(test_escape_reset_drops_held_bytes);
     RUN_TEST(test_escape_feed_after_guard_elapsed_reports_escaped_and_drops_the_byte);
     RUN_TEST(test_escape_starts_a_candidate_on_the_very_first_byte_even_with_a_small_timestamp);
+
+    RUN_TEST(test_hostport_split);
+    RUN_TEST(test_hostport_defaults_to_telnet_port);
+    RUN_TEST(test_hostport_rejects_malformed_input);
+    RUN_TEST(test_phonebook_store_and_find);
+    RUN_TEST(test_phonebook_find_misses_return_null);
+    RUN_TEST(test_phonebook_numbers_are_compared_as_strings);
+    RUN_TEST(test_phonebook_store_replaces_an_existing_number);
+    RUN_TEST(test_phonebook_erase);
+    RUN_TEST(test_phonebook_rejects_a_bad_hostport);
+    RUN_TEST(test_phonebook_rejects_a_non_numeric_number);
+    RUN_TEST(test_phonebook_lists_in_numeric_order);
 
     return UNITY_END();
 }
