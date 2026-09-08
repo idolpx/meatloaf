@@ -246,6 +246,118 @@ void test_repeat_line_is_recognised_without_an_at_prefix(void)
     TEST_ASSERT_FALSE(at_is_repeat("A"));
 }
 
+#include "at_settings.h"
+
+// --------------------------------------------------------------- at_settings
+
+void test_settings_factory_defaults(void)
+{
+    AtSettings s;
+    s.factory();
+
+    TEST_ASSERT_EQUAL_INT(0,  s.getRegister(AT_S_AUTOANSWER));
+    TEST_ASSERT_EQUAL_INT(43, s.getRegister(AT_S_ESCCHAR));   // '+'
+    TEST_ASSERT_EQUAL_INT(13, s.getRegister(AT_S_CR));
+    TEST_ASSERT_EQUAL_INT(10, s.getRegister(AT_S_LF));
+    TEST_ASSERT_EQUAL_INT(8,  s.getRegister(AT_S_BS));
+    TEST_ASSERT_EQUAL_INT(60, s.getRegister(AT_S_CONNTIMEOUT));
+    TEST_ASSERT_EQUAL_INT(50, s.getRegister(AT_S_GUARD));
+    TEST_ASSERT_EQUAL_INT(0,  s.getRegister(AT_S_AUTOSTREAM));
+    TEST_ASSERT_EQUAL_INT(0,  s.getRegister(AT_S_TELNET));
+
+    TEST_ASSERT_TRUE(s.echo);
+    TEST_ASSERT_FALSE(s.quiet);
+    TEST_ASSERT_TRUE(s.verbose);
+    TEST_ASSERT_EQUAL_UINT(4, s.xlevel);
+}
+
+void test_settings_register_round_trip(void)
+{
+    AtSettings s;
+    s.factory();
+    TEST_ASSERT_TRUE(s.setRegister(12, 25));
+    TEST_ASSERT_EQUAL_INT(25, s.getRegister(12));
+}
+
+// The array is 128 entries. An out-of-range index must be refused rather than
+// written, which would corrupt whatever follows the struct.
+void test_settings_rejects_out_of_range_register(void)
+{
+    AtSettings s;
+    s.factory();
+    TEST_ASSERT_FALSE(s.setRegister(128, 1));
+    TEST_ASSERT_FALSE(s.setRegister(-1, 1));
+    TEST_ASSERT_EQUAL_INT(-1, s.getRegister(128));
+    TEST_ASSERT_EQUAL_INT(-1, s.getRegister(-1));
+}
+
+// Registers are one byte. A value past 255 is a user error, not something to
+// silently truncate into a different setting.
+void test_settings_rejects_out_of_range_value(void)
+{
+    AtSettings s;
+    s.factory();
+    TEST_ASSERT_FALSE(s.setRegister(12, 256));
+    TEST_ASSERT_FALSE(s.setRegister(12, -1));
+    TEST_ASSERT_EQUAL_INT(50, s.getRegister(12));
+}
+
+void test_settings_serialize_round_trip(void)
+{
+    AtSettings a;
+    a.factory();
+    a.setRegister(AT_S_GUARD, 25);
+    a.setRegister(AT_S_TELNET, 1);
+    a.echo = false;
+    a.verbose = false;
+    a.xlevel = 1;
+
+    AtSettings b;
+    b.factory();
+    b.fromKeyValues(a.toKeyValues());
+
+    TEST_ASSERT_EQUAL_INT(25, b.getRegister(AT_S_GUARD));
+    TEST_ASSERT_EQUAL_INT(1,  b.getRegister(AT_S_TELNET));
+    TEST_ASSERT_FALSE(b.echo);
+    TEST_ASSERT_FALSE(b.verbose);
+    TEST_ASSERT_EQUAL_UINT(1, b.xlevel);
+}
+
+// Only registers that differ from the factory default are serialized, so a
+// saved config stays small and a later change of default is picked up.
+void test_settings_serialization_omits_defaults(void)
+{
+    AtSettings s;
+    s.factory();
+    auto kv = s.toKeyValues();
+
+    TEST_ASSERT_EQUAL_UINT(0, kv.count("s12"));
+    TEST_ASSERT_EQUAL_UINT(0, kv.count("s3"));
+
+    s.setRegister(AT_S_GUARD, 25);
+    kv = s.toKeyValues();
+    TEST_ASSERT_EQUAL_UINT(1, kv.count("s12"));
+    TEST_ASSERT_EQUAL_INT(25, kv["s12"]);
+}
+
+// A config file written by a future version, or hand-edited, must not be able
+// to put the modem into a state its own setters would refuse.
+void test_settings_deserialization_ignores_bad_values(void)
+{
+    AtSettings s;
+    s.factory();
+
+    std::map<std::string, long> kv;
+    kv["s12"] = 999;      // out of byte range
+    kv["s999"] = 1;       // out of array range
+    kv["xlevel"] = 47;    // out of 0-4 range
+    kv["nonsense"] = 1;   // unknown key
+    s.fromKeyValues(kv);
+
+    TEST_ASSERT_EQUAL_INT(50, s.getRegister(AT_S_GUARD));
+    TEST_ASSERT_EQUAL_UINT(4, s.xlevel);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -270,6 +382,14 @@ int main(int, char **)
     RUN_TEST(test_parse_unterminated_quote_is_an_error_at_the_quote);
     RUN_TEST(test_parse_unknown_verb_is_an_error_at_the_verb);
     RUN_TEST(test_repeat_line_is_recognised_without_an_at_prefix);
+
+    RUN_TEST(test_settings_factory_defaults);
+    RUN_TEST(test_settings_register_round_trip);
+    RUN_TEST(test_settings_rejects_out_of_range_register);
+    RUN_TEST(test_settings_rejects_out_of_range_value);
+    RUN_TEST(test_settings_serialize_round_trip);
+    RUN_TEST(test_settings_serialization_omits_defaults);
+    RUN_TEST(test_settings_deserialization_ignores_bad_values);
 
     return UNITY_END();
 }

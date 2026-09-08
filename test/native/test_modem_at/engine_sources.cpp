@@ -30,3 +30,4 @@
 #define ENABLE_MODEM 1
 
 #include "../../../lib/modem/at_parser.cpp"
+#include "../../../lib/modem/at_settings.cpp"
