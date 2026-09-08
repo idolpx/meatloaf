@@ -57,7 +57,13 @@ public:
 
     // One byte arrived from the terminal at now_ms. Appends any bytes that
     // should reach the remote to `forward` (which is never cleared here, so a
-    // caller may batch).
+    // caller may batch). Usually returns NONE -- tick() is what normally
+    // completes a waiting escape. But if this byte arrives after the
+    // trailing guard has already fully elapsed (tick() just hasn't been
+    // polled yet), the escape has already won: this returns ESCAPED
+    // immediately, and the byte itself is DROPPED -- not forwarded, not held
+    // -- because by the time it arrived the modem had already switched to
+    // command mode.
     Verdict feed(uint8_t b, uint32_t now_ms, std::string &forward);
 
     // No byte arrived. Call this regularly -- it is what completes the

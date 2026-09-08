@@ -625,6 +625,43 @@ void test_escape_reset_drops_held_bytes(void)
     TEST_ASSERT_EQUAL_STRING("", fwd.c_str());
 }
 
+// Fix round 1: if a byte arrives after the trailing guard has already fully
+// elapsed -- tick() simply hasn't been polled yet -- the escape has already
+// won. feed() must report it immediately rather than let the blanket release
+// silently downgrade it to data, and the racing byte must be dropped.
+void test_escape_feed_after_guard_elapsed_reports_escaped_and_drops_the_byte(void)
+{
+    EscapeDetector d = make_detector();
+    std::string fwd;
+
+    d.feed('x', 1000, fwd);
+    fwd.clear();
+
+    d.feed('+', 3000, fwd);
+    d.feed('+', 3100, fwd);
+    d.feed('+', 3200, fwd);   // enters TRAILING
+
+    // The 1000 ms trailing guard has fully elapsed by 4300, but tick() was
+    // never called -- this byte arrives first.
+    TEST_ASSERT_TRUE(EscapeDetector::Verdict::ESCAPED == d.feed('z', 4300, fwd));
+    TEST_ASSERT_EQUAL_STRING("", fwd.c_str());
+}
+
+// Fix round 1: seen_any_ is what lets an escape typed as the very first thing
+// after connect start a candidate even though now_ms itself is small (and so
+// less than last_byte_ms_'s zero-initialised value would suggest a long gap).
+// Without it this first byte would be forwarded as data instead of held.
+void test_escape_starts_a_candidate_on_the_very_first_byte_even_with_a_small_timestamp(void)
+{
+    EscapeDetector d;
+    d.configure('+', 250);   // 250 * 20 = 5000 ms guard, far above now_ms below
+    d.reset();
+
+    std::string fwd;
+    TEST_ASSERT_TRUE(EscapeDetector::Verdict::NONE == d.feed('+', 5, fwd));
+    TEST_ASSERT_EQUAL_STRING("", fwd.c_str());
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -676,6 +713,8 @@ int main(int, char **)
     RUN_TEST(test_escape_uses_the_configured_character);
     RUN_TEST(test_escape_disabled_when_character_is_out_of_range);
     RUN_TEST(test_escape_reset_drops_held_bytes);
+    RUN_TEST(test_escape_feed_after_guard_elapsed_reports_escaped_and_drops_the_byte);
+    RUN_TEST(test_escape_starts_a_candidate_on_the_very_first_byte_even_with_a_small_timestamp);
 
     return UNITY_END();
 }

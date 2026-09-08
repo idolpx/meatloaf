@@ -59,6 +59,23 @@ EscapeDetector::Verdict EscapeDetector::feed(uint8_t b, uint32_t now_ms,
     // never start a candidate.
     uint32_t gap = seen_any_ ? (now_ms - last_byte_ms_) : guard_ms_;
 
+    // If the trailing guard has already fully elapsed by the time this byte
+    // arrives, the escape completed before tick() got a chance to say so --
+    // this is just polling latency, not a reason to downgrade it. The escape
+    // wins: the held bytes are consumed (never forwarded), and the racing
+    // byte itself is dropped rather than reaching the remote, because by
+    // Hayes semantics command mode has already taken over by the time it
+    // arrived. This must be checked before the blanket release below, or a
+    // completed escape would be silently turned back into data.
+    if (state_ == State::TRAILING && gap >= guard_ms_)
+    {
+        held_ = 0;
+        state_ = State::IDLE;
+        last_byte_ms_ = now_ms;
+        seen_any_ = true;
+        return Verdict::ESCAPED;
+    }
+
     // A gap at or past the guard retires whatever candidate was in progress:
     // those bytes were data after all. Do this before classifying the new byte
     // so their order is preserved.
