@@ -309,6 +309,10 @@ build_flags =
     -I components/zlib/zlib
     ; test_ps2_keys: scan_codes_set_2.h (stdint.h only, native-safe).
     -I components/ps2/src
+    ; test_modem_at: lib/modem's headers, included by name from the test file,
+    ; and libtelnet's header for the negotiation filter (Task 6).
+    -I lib/modem
+    -I lib/telnet
     -I test/native/test_archive_extract/host
     -include test/native/test_archive_extract/host/host_posix_compat.h
     ;-lgcov
