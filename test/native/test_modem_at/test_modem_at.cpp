@@ -358,6 +358,104 @@ void test_settings_deserialization_ignores_bad_values(void)
     TEST_ASSERT_EQUAL_UINT(4, s.xlevel);
 }
 
+#include "at_result.h"
+
+// ----------------------------------------------------------------- at_result
+
+void test_result_verbose_is_wrapped_in_terminators(void)
+{
+    AtSettings s;
+    s.factory();
+    // Verbose form is <CR><LF>TEXT<CR><LF>. Terminal programs parse the
+    // leading pair; omitting it makes responses run into the previous line.
+    TEST_ASSERT_EQUAL_STRING("\r\nOK\r\n", at_format_result(AtResult::OK, s).c_str());
+    TEST_ASSERT_EQUAL_STRING("\r\nNO CARRIER\r\n",
+                             at_format_result(AtResult::NO_CARRIER, s).c_str());
+}
+
+void test_result_numeric_form(void)
+{
+    AtSettings s;
+    s.factory();
+    s.verbose = false;
+    // Numeric form is CODE<CR> with no leading pair and no linefeed.
+    TEST_ASSERT_EQUAL_STRING("0\r", at_format_result(AtResult::OK, s).c_str());
+    TEST_ASSERT_EQUAL_STRING("3\r", at_format_result(AtResult::NO_CARRIER, s).c_str());
+}
+
+void test_result_quiet_suppresses_everything(void)
+{
+    AtSettings s;
+    s.factory();
+    s.quiet = true;
+    TEST_ASSERT_EQUAL_STRING("", at_format_result(AtResult::OK, s).c_str());
+    TEST_ASSERT_EQUAL_STRING("", at_format_result(AtResult::ERROR, s).c_str());
+}
+
+// S3 and S4 are the actual bytes sent, not decoration. A terminal set to
+// carriage-return only needs S4 removed from the stream entirely.
+void test_result_honours_s3_and_s4(void)
+{
+    AtSettings s;
+    s.factory();
+    s.setRegister(AT_S_LF, 0);   // 0 means "send nothing for LF"
+    TEST_ASSERT_EQUAL_STRING("\rOK\r", at_format_result(AtResult::OK, s).c_str());
+
+    s.factory();
+    s.setRegister(AT_S_CR, 30);
+    TEST_ASSERT_EQUAL_STRING("\x1E\nOK\x1E\n", at_format_result(AtResult::OK, s).c_str());
+}
+
+// X0 reports only the basic five. A suppressed code degrades to NO CARRIER
+// rather than vanishing, which is what a real modem does and what a dialer
+// script expects to see.
+void test_result_x0_degrades_extended_codes_to_no_carrier(void)
+{
+    AtSettings s;
+    s.factory();
+    s.xlevel = 0;
+    TEST_ASSERT_EQUAL_STRING("\r\nNO CARRIER\r\n",
+                             at_format_result(AtResult::BUSY, s).c_str());
+    TEST_ASSERT_EQUAL_STRING("\r\nNO CARRIER\r\n",
+                             at_format_result(AtResult::NO_DIALTONE, s).c_str());
+    TEST_ASSERT_EQUAL_STRING("\r\nNO CARRIER\r\n",
+                             at_format_result(AtResult::NO_ANSWER, s).c_str());
+    TEST_ASSERT_EQUAL_STRING("\r\nOK\r\n", at_format_result(AtResult::OK, s).c_str());
+}
+
+void test_result_x_levels_gate_each_extended_code(void)
+{
+    AtSettings s;
+    s.factory();
+
+    s.xlevel = 2;  // NO DIALTONE allowed, BUSY and NO ANSWER not
+    TEST_ASSERT_EQUAL_STRING("\r\nNO DIALTONE\r\n",
+                             at_format_result(AtResult::NO_DIALTONE, s).c_str());
+    TEST_ASSERT_EQUAL_STRING("\r\nNO CARRIER\r\n",
+                             at_format_result(AtResult::BUSY, s).c_str());
+
+    s.xlevel = 3;  // BUSY now allowed, NO ANSWER still not
+    TEST_ASSERT_EQUAL_STRING("\r\nBUSY\r\n",
+                             at_format_result(AtResult::BUSY, s).c_str());
+    TEST_ASSERT_EQUAL_STRING("\r\nNO CARRIER\r\n",
+                             at_format_result(AtResult::NO_ANSWER, s).c_str());
+
+    s.xlevel = 4;
+    TEST_ASSERT_EQUAL_STRING("\r\nNO ANSWER\r\n",
+                             at_format_result(AtResult::NO_ANSWER, s).c_str());
+}
+
+// The degradation must also apply in numeric mode, or a script reading codes
+// gets a 7 the X level said it would never see.
+void test_result_x_degradation_applies_in_numeric_mode(void)
+{
+    AtSettings s;
+    s.factory();
+    s.verbose = false;
+    s.xlevel = 0;
+    TEST_ASSERT_EQUAL_STRING("3\r", at_format_result(AtResult::BUSY, s).c_str());
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -390,6 +488,14 @@ int main(int, char **)
     RUN_TEST(test_settings_serialize_round_trip);
     RUN_TEST(test_settings_serialization_omits_defaults);
     RUN_TEST(test_settings_deserialization_ignores_bad_values);
+
+    RUN_TEST(test_result_verbose_is_wrapped_in_terminators);
+    RUN_TEST(test_result_numeric_form);
+    RUN_TEST(test_result_quiet_suppresses_everything);
+    RUN_TEST(test_result_honours_s3_and_s4);
+    RUN_TEST(test_result_x0_degrades_extended_codes_to_no_carrier);
+    RUN_TEST(test_result_x_levels_gate_each_extended_code);
+    RUN_TEST(test_result_x_degradation_applies_in_numeric_mode);
 
     return UNITY_END();
 }
