@@ -84,6 +84,23 @@ void WiFiManager::stop()
     _connected = false;
 }
 
+// Overrides the OUI of the WiFi station MAC address. Must run before ANYTHING
+// calls esp_read_mac()/esp_wifi_get_mac() for the first time (e.g. main.cpp's
+// crypto.setkey(fnWiFi.get_mac_str())) -- esp_read_mac() permanently caches
+// the per-type result the first time it's asked, so calling this any later
+// leaves ESP_MAC_WIFI_STA stuck on the factory MAC forever, even though
+// esp_base_mac_addr_set() below reports success.
+void WiFiManager::set_custom_mac()
+{
+    // Must read the raw factory MAC via esp_efuse_mac_get_default(), NOT
+    // esp_read_mac(mac, ESP_MAC_WIFI_STA) -- the latter also caches the
+    // per-type table entry with the unmodified value.
+    uint8_t mac[6];
+    esp_efuse_mac_get_default(mac);
+    mac[0]=0x00; mac[1]=0x80; mac[2]=0x10; // OUI 00:80:10 Commodore International
+    esp_base_mac_addr_set(mac);
+}
+
 // Set up requried resources and start WiFi driver
 int WiFiManager::start()
 {
@@ -92,12 +109,6 @@ int WiFiManager::start()
     // Initilize an event group
     if (_wifi_event_group == nullptr)
         _wifi_event_group = xEventGroupCreate();
-
-    // Set custom MAC Address
-    uint8_t mac[6];
-    esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    mac[0]=0x00; mac[1]=0x80; mac[2]=0x10; // OUI 00:80:10 Commodore International
-    esp_base_mac_addr_set(mac);
 
     // Make sure our network interface is initialized
     ESP_ERROR_CHECK(esp_netif_init());
@@ -126,7 +137,9 @@ int WiFiManager::start()
         //log_wifi_heap_checkpoint("after esp_wifi_set_storage()");
         Debug_printf("WiFiManager::start() complete\r\n");
 
+        uint8_t mac[6];
         char macStr[18] = {0};
+        esp_read_mac(mac, ESP_MAC_WIFI_STA);
         printf("MAC Address: %s\r\n", _mac_to_string(macStr, mac));
     }
 

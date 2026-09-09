@@ -223,6 +223,11 @@ void main_setup()
 #endif
     //log_heap_checkpoint("boot start");
 
+    // Must run before anything reads the WiFi station MAC (e.g. crypto.setkey()
+    // below via fnWiFi.get_mac_str()) -- esp_read_mac() latches the factory MAC
+    // permanently on first use, so overriding the OUI any later is a no-op.
+    fnWiFi.set_custom_mac();
+
     // Install a reboot handler
     esp_register_shutdown_handler(main_shutdown_handler);
 
