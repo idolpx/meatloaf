@@ -86,6 +86,7 @@ void W5500Ethernet::start()
     
     // Create MAC
     esp_eth_mac_t *mac = esp_eth_mac_new_w5500(&w5500_config, &mac_config);
+    mac[0]=0x00; mac[1]=0x80; mac[2]=0x10; // OUI 00:80:10 Commodore International
     
     // Create PHY
     eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
