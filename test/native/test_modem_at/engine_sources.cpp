@@ -34,3 +34,4 @@
 #include "../../../lib/modem/at_result.cpp"
 #include "../../../lib/modem/escape.cpp"
 #include "../../../lib/modem/phonebook.cpp"
+#include "../../../lib/modem/telnet_filter.cpp"

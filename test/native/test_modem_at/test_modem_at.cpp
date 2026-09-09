@@ -780,6 +780,118 @@ void test_phonebook_lists_in_numeric_order(void)
     TEST_ASSERT_EQUAL_STRING("10", all[2].number.c_str());
 }
 
+#include "telnet_filter.h"
+
+// ------------------------------------------------------------- telnet_filter
+
+namespace
+{
+struct FilterHarness
+{
+    TelnetFilter f;
+    std::string to_app;   // bytes the terminal should see
+    std::string to_peer;  // bytes that should go out on the socket
+
+    FilterHarness()
+    {
+        f.begin(
+            [this](const uint8_t *b, size_t n) {
+                to_app.append((const char *)b, n);
+            },
+            [this](const uint8_t *b, size_t n) {
+                to_peer.append((const char *)b, n);
+            });
+    }
+
+    void recv(const std::string &s)
+    {
+        f.receive((const uint8_t *)s.data(), s.size());
+    }
+};
+} // namespace
+
+void test_telnet_plain_data_reaches_the_application(void)
+{
+    FilterHarness h;
+    h.recv("hello");
+    TEST_ASSERT_EQUAL_STRING("hello", h.to_app.c_str());
+    TEST_ASSERT_EQUAL_STRING("", h.to_peer.c_str());
+}
+
+// The whole reason ATDT exists: without negotiation these bytes land on the
+// user's screen as garbage.
+void test_telnet_iac_negotiation_never_reaches_the_application(void)
+{
+    FilterHarness h;
+    // IAC DO ECHO (255 253 1)
+    h.recv("\xFF\xFD\x01");
+    TEST_ASSERT_EQUAL_STRING("", h.to_app.c_str());
+    TEST_ASSERT_TRUE(h.to_peer.size() > 0);
+}
+
+void test_telnet_negotiation_between_data_is_stripped_in_place(void)
+{
+    FilterHarness h;
+    h.recv("ab\xFF\xFD\x01" "cd");
+    TEST_ASSERT_EQUAL_STRING("abcd", h.to_app.c_str());
+}
+
+// A literal 0xFF in the data stream is sent as IAC IAC and must arrive as one
+// byte. Getting this wrong corrupts any binary or high-ASCII content.
+void test_telnet_escaped_iac_becomes_one_literal_byte(void)
+{
+    FilterHarness h;
+    h.recv("a\xFF\xFF" "b");
+    TEST_ASSERT_EQUAL_UINT(3, h.to_app.size());
+    TEST_ASSERT_EQUAL_UINT8(0xFF, (uint8_t)h.to_app[1]);
+}
+
+// Outbound: a literal 0xFF from the terminal must be doubled on the wire, or
+// the far end reads it as the start of a command.
+void test_telnet_transmit_escapes_a_literal_iac(void)
+{
+    FilterHarness h;
+    const uint8_t data[] = { 'a', 0xFF, 'b' };
+    h.f.transmit(data, sizeof(data));
+    TEST_ASSERT_EQUAL_UINT(4, h.to_peer.size());
+    TEST_ASSERT_EQUAL_UINT8(0xFF, (uint8_t)h.to_peer[1]);
+    TEST_ASSERT_EQUAL_UINT8(0xFF, (uint8_t)h.to_peer[2]);
+}
+
+// A negotiation split across two reads is the normal case on a real socket,
+// not an edge case -- TCP does not respect message boundaries.
+void test_telnet_negotiation_split_across_reads_is_handled(void)
+{
+    FilterHarness h;
+    h.recv("ab\xFF");
+    h.recv("\xFD\x01" "cd");
+    TEST_ASSERT_EQUAL_STRING("abcd", h.to_app.c_str());
+}
+
+void test_telnet_end_is_safe_to_call_twice(void)
+{
+    TelnetFilter f;
+    f.begin([](const uint8_t *, size_t) {}, [](const uint8_t *, size_t) {});
+    TEST_ASSERT_TRUE(f.isOpen());
+    f.end();
+    TEST_ASSERT_FALSE(f.isOpen());
+    f.end();  // must not double-free
+    TEST_ASSERT_FALSE(f.isOpen());
+}
+
+// Calls after end() are no-ops rather than a null dereference: the stream's
+// close() path can race a final read.
+void test_telnet_calls_after_end_are_inert(void)
+{
+    FilterHarness h;
+    h.f.end();
+    h.recv("hello");
+    const uint8_t data[] = { 'x' };
+    h.f.transmit(data, 1);
+    TEST_ASSERT_EQUAL_STRING("", h.to_app.c_str());
+    TEST_ASSERT_EQUAL_STRING("", h.to_peer.c_str());
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -845,6 +957,15 @@ int main(int, char **)
     RUN_TEST(test_phonebook_rejects_a_bad_hostport);
     RUN_TEST(test_phonebook_rejects_a_non_numeric_number);
     RUN_TEST(test_phonebook_lists_in_numeric_order);
+
+    RUN_TEST(test_telnet_plain_data_reaches_the_application);
+    RUN_TEST(test_telnet_iac_negotiation_never_reaches_the_application);
+    RUN_TEST(test_telnet_negotiation_between_data_is_stripped_in_place);
+    RUN_TEST(test_telnet_escaped_iac_becomes_one_literal_byte);
+    RUN_TEST(test_telnet_transmit_escapes_a_literal_iac);
+    RUN_TEST(test_telnet_negotiation_split_across_reads_is_handled);
+    RUN_TEST(test_telnet_end_is_safe_to_call_twice);
+    RUN_TEST(test_telnet_calls_after_end_are_inert);
 
     return UNITY_END();
 }
