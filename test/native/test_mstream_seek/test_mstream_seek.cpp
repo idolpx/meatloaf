@@ -115,6 +115,71 @@ void test_seek_modes_resolve_expected_targets(void)
     TEST_ASSERT_EQUAL_UINT32(900, s.observed_target);
 }
 
+// ------------------------------------------------------------- waitReadable
+
+// A stream whose available() becomes non-zero after a set number of polls,
+// standing in for a socket whose data arrives late. Derives from ProbeStream
+// to reuse its pure-virtual overrides (isOpen/close/open/read/write/seek)
+// rather than repeating them.
+class LateStream : public ProbeStream
+{
+public:
+    LateStream(int polls_until_ready) : remaining_(polls_until_ready) {}
+
+    uint32_t available() override
+    {
+        if (remaining_ > 0)
+        {
+            --remaining_;
+            return 0;
+        }
+        return 1;
+    }
+
+private:
+    int remaining_;
+};
+
+void test_wait_readable_returns_true_when_data_is_already_available(void)
+{
+    LateStream s(0);
+    TEST_ASSERT_TRUE(s.waitReadable(0));
+}
+
+void test_wait_readable_polls_until_data_arrives(void)
+{
+    LateStream s(3);
+    TEST_ASSERT_TRUE(s.waitReadable(1000));
+}
+
+// A zero timeout must still check once -- it is a poll, not a no-op.
+void test_wait_readable_with_zero_timeout_checks_once(void)
+{
+    LateStream s(1);
+    TEST_ASSERT_FALSE(s.waitReadable(0));
+}
+
+void test_wait_readable_times_out_when_no_data_arrives(void)
+{
+    LateStream s(1000000);
+    TEST_ASSERT_FALSE(s.waitReadable(50));
+}
+
+// A closed stream is not "not yet readable" -- it will never be readable, and
+// a caller looping on a timeout would spin until its own deadline.
+void test_wait_readable_returns_false_immediately_when_closed(void)
+{
+    class ClosedStream : public LateStream
+    {
+    public:
+        ClosedStream() : LateStream(1000000) {}
+        bool isOpen() override { return false; }
+    };
+
+    ClosedStream s;
+    TEST_ASSERT_FALSE(s.waitReadable(5000));
+}
+
 int main(int, char**)
 {
     UNITY_BEGIN();
@@ -122,5 +187,10 @@ int main(int, char**)
     RUN_TEST(test_failed_relative_seek_leaves_position_unchanged);
     RUN_TEST(test_successful_seek_commits_position);
     RUN_TEST(test_seek_modes_resolve_expected_targets);
+    RUN_TEST(test_wait_readable_returns_true_when_data_is_already_available);
+    RUN_TEST(test_wait_readable_polls_until_data_arrives);
+    RUN_TEST(test_wait_readable_with_zero_timeout_checks_once);
+    RUN_TEST(test_wait_readable_times_out_when_no_data_arrives);
+    RUN_TEST(test_wait_readable_returns_false_immediately_when_closed);
     return UNITY_END();
 }

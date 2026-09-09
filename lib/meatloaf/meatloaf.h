@@ -32,6 +32,22 @@
 #include "string_utils.h"
 #include "U8Char.h"
 
+// waitReadable()'s default polls available() and sleeps between polls. On
+// ESP-IDF that sleep must yield to FreeRTOS rather than block the task
+// outright; everywhere else (native tests, host tools) there is no FreeRTOS
+// scheduler, so it falls back to the standard library's own sleep. The
+// definition stays in this header (rather than meatloaf.cpp, which pulls in
+// esp_timer.h/esp_littlefs.h and cannot compile off-target) so it is reached
+// by every native test that includes meatloaf.h, not just the ones that pull
+// in the full engine.
+#ifdef ESP_PLATFORM
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#else
+#include <chrono>
+#include <thread>
+#endif
+
 // "No data available (yet)" sentinel returned by non-blocking stream
 // reads (e.g. TCP). Must NOT collide with any real byte count - it used
 // to be std::ios_base::eofbit (== 2), which made a legitimate 2-byte
@@ -42,6 +58,11 @@
 #define _MEAT_NO_DATA_AVAIL 0xFFFFFFFEu
 
 static const std::ios_base::iostate ndabit = std::ios_base::eofbit;
+
+// Polling interval for the default MStream::waitReadable(). Small enough
+// that an interactive session feels immediate, large enough that a task
+// blocked on it is not spinning.
+static constexpr uint32_t MSTREAM_POLL_INTERVAL_MS = 10;
 
 /********************************************************
  * Universal stream
@@ -133,6 +154,46 @@ public:
             return 0;
 
         return _size - _position;
+    };
+
+    // Blocks until at least one byte can be read, the stream closes, or
+    // timeout_ms elapses. Returns true only when data is available.
+    //
+    // The default polls available(), which is correct for every stream and
+    // cheap enough for the ones that are not sockets. A stream that can do
+    // better -- a socket that could select(), an SSH channel with its own
+    // non-blocking read -- overrides it.
+    //
+    // Exists because the modem multiplexes terminal input against a
+    // connection and must not reach past MStream to the underlying fd.
+    virtual bool waitReadable(uint32_t timeout_ms) {
+        uint32_t waited = 0;
+        for (;;)
+        {
+            // A closed stream will never become readable. Returning false at
+            // once stops a caller from spinning until its own deadline.
+            if (!isOpen())
+                return false;
+
+            if (available() > 0)
+                return true;
+
+            if (waited >= timeout_ms)
+                return false;
+
+            uint32_t slice = MSTREAM_POLL_INTERVAL_MS;
+            if (slice > timeout_ms - waited)
+                slice = timeout_ms - waited;
+            if (slice == 0)
+                slice = 1;
+
+#ifdef ESP_PLATFORM
+            vTaskDelay(pdMS_TO_TICKS(slice));
+#else
+            std::this_thread::sleep_for(std::chrono::milliseconds(slice));
+#endif
+            waited += slice;
+        }
     };
 
     virtual uint32_t position() {
