@@ -73,6 +73,8 @@ public:
 
     int retries;
 
+    void set_custom_mac();
+
     int start();
     void stop();
 
