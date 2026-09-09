@@ -14,6 +14,7 @@
 
 #include <unity.h>
 
+#include <chrono>
 #include <cstdint>
 #include <string>
 
@@ -166,7 +167,13 @@ void test_wait_readable_times_out_when_no_data_arrives(void)
 }
 
 // A closed stream is not "not yet readable" -- it will never be readable, and
-// a caller looping on a timeout would spin until its own deadline.
+// a caller looping on a timeout would spin until its own deadline. The
+// return value alone can't distinguish "checked isOpen() and bailed at once"
+// from "never checked isOpen(), and only returned false after exhausting the
+// timeout" -- both give false. Assert the elapsed time too: a 5000 ms
+// timeout with a well-under-a-second bound is coarse enough not to flake on
+// a loaded machine, but still fails outright if the wait is actually
+// performed.
 void test_wait_readable_returns_false_immediately_when_closed(void)
 {
     class ClosedStream : public LateStream
@@ -177,7 +184,13 @@ void test_wait_readable_returns_false_immediately_when_closed(void)
     };
 
     ClosedStream s;
-    TEST_ASSERT_FALSE(s.waitReadable(5000));
+    auto start = std::chrono::steady_clock::now();
+    bool result = s.waitReadable(5000);
+    auto elapsed = std::chrono::steady_clock::now() - start;
+
+    TEST_ASSERT_FALSE(result);
+    TEST_ASSERT_TRUE_MESSAGE(elapsed < std::chrono::milliseconds(500),
+        "a closed stream must return immediately, not after waiting out the timeout");
 }
 
 int main(int, char**)
