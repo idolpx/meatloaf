@@ -155,6 +155,15 @@
 // #include "network/ipfs.h"
 // #include "network/ws.h"
 // #include "network/tcp.h"
+#ifdef ENABLE_MODEM
+// telnet:// decorates tcp:// (TelnetMFile::createStream() resolves a
+// "tcp:" URL through MFSOwner), so tcp:// must be a registered scheme too --
+// otherwise MFSOwner::File() falls through to defaultFS for it (see
+// MFSOwner::findParentFS()) and a telnet dial silently resolves to a flash
+// path instead of failing loudly.
+#include "network/tcp.h"
+#include "network/telnet.h"
+#endif // ENABLE_MODEM
 #endif
 
 
@@ -465,6 +474,10 @@ ISCSIMFileSystem iscsiFS;
 // IPFSMFileSystem ipfsFS;
 // WSMFileSystem wsFS;
 // TCPMFileSystem tcpFS;
+#ifdef ENABLE_MODEM
+TCPMFileSystem tcpFS;
+TelnetMFileSystem telnetFS;
+#endif // ENABLE_MODEM
 #endif
 
 
@@ -570,6 +583,9 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &iscsiFS,
 #endif
     //&ipfsFS, &wsFS, &tcpFS,
+#ifdef ENABLE_MODEM
+    &tcpFS, &telnetFS,
+#endif // ENABLE_MODEM
 #endif
 
     // Service

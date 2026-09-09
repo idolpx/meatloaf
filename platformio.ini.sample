@@ -467,6 +467,7 @@ build_flags =
     -D ENABLE_DISPLAY
     -D ENABLE_CONSOLE
     -D ENABLE_CONSOLE_TCP
+    -D ENABLE_MODEM
 
 [env:esp32-s3-makemagazin]
 extends = esp32_base
