@@ -19,10 +19,13 @@
 //
 // lib/console and lib/device are not compiled in the native environment, and
 // lib/modem deliberately depends on neither -- so the parser, settings, result
-// codes, escape detector, phonebook and telnet filter are all reachable here.
-// What is NOT reachable is anything touching MStream, sockets or FreeRTOS: the
-// dial path, TelnetMStream, ModemPort and the modem task are verified on
-// hardware.
+// codes, escape detector and phonebook are all reachable here. TelnetMStream
+// (lib/meatloaf/network/telnet.cpp) is reachable too, via a FakeMStream
+// standing in for the tcp:// transport -- see the telnet_stream section below
+// for why that is safe (createStream(), the one thing that actually dials
+// out through MFSOwner, is never exercised). What is NOT reachable is
+// anything that genuinely needs a socket or FreeRTOS: the dial path itself,
+// ModemPort and the modem task are verified on hardware.
 //
 //   pio test -e native -f native/test_modem_at
 
@@ -892,6 +895,305 @@ void test_telnet_calls_after_end_are_inert(void)
     TEST_ASSERT_EQUAL_STRING("", h.to_peer.c_str());
 }
 
+// ------------------------------------------------------------- telnet_stream
+//
+// TelnetMStream (lib/meatloaf/network/telnet.cpp) decorates an inner
+// MStream -- normally TCPMStream -- with the filter tested above. FakeMStream
+// stands in for that inner transport with a scripted read() queue, so the
+// EOF/idle distinction, lazy open and waitReadable's timing can be driven
+// deterministically with no real socket. createStream() (the one thing that
+// touches MFSOwner, to dial tcp://) is deliberately never called from here --
+// every test below constructs TelnetMStream directly, as Task 9-11's dial
+// code and iecChannelHandlerFile both do once they hold a stream.
+
+#include "network/telnet.h"
+
+#include <chrono>
+#include <cstring>
+#include <deque>
+#include <memory>
+#include <vector>
+
+namespace
+{
+// One scripted response for FakeMStream::read(). An empty, non-sentinel
+// event means recv()==0 -- a genuine peer hangup. is_no_data means the
+// _MEAT_NO_DATA_AVAIL sentinel -- idle, socket still open.
+struct ReadEvent
+{
+    std::vector<uint8_t> bytes;
+    bool is_no_data = false;
+};
+
+class FakeMStream : public MStream
+{
+public:
+    FakeMStream() : MStream("fake://test") {}
+
+    std::deque<ReadEvent> queue;
+    int open_call_count = 0;
+    bool opened = false;
+    bool closed = true;
+    bool write_should_fail = false;
+    // Simulates an inner stream whose waitReadable() returns without
+    // actually blocking -- the case telnet.cpp's own comment calls out as
+    // something a future inner_ could legitimately do, and which the old
+    // `waited += slice` accounting could not survive.
+    bool instant_wait = false;
+    std::string written;
+
+    bool isOpen() override { return opened && !closed; }
+
+    bool open(std::ios_base::openmode) override
+    {
+        open_call_count++;
+        opened = true;
+        closed = false;
+        return true;
+    }
+
+    void close() override { closed = true; }
+
+    uint32_t read(uint8_t *buf, uint32_t size) override
+    {
+        if (queue.empty())
+            return _MEAT_NO_DATA_AVAIL;
+        ReadEvent ev = queue.front();
+        queue.pop_front();
+        if (ev.is_no_data)
+            return _MEAT_NO_DATA_AVAIL;
+        uint32_t n = (uint32_t)ev.bytes.size();
+        if (n > size)
+            n = size;
+        if (n > 0)
+            memcpy(buf, ev.bytes.data(), n);
+        return n;  // 0 (an empty, non-sentinel event) means EOF
+    }
+
+    uint32_t write(const uint8_t *buf, uint32_t size) override
+    {
+        if (write_should_fail)
+            return size > 0 ? size - 1 : 0;  // short write
+        written.append((const char *)buf, size);
+        return size;
+    }
+
+    bool waitReadable(uint32_t timeout_ms) override
+    {
+        if (instant_wait)
+            return false;
+        return MStream::waitReadable(timeout_ms);
+    }
+
+    bool seek(uint32_t) override { return false; }
+    uint32_t size() override { return 0; }
+    uint32_t position() override { return 0; }
+};
+
+void push_bytes(FakeMStream &f, const char *s)
+{
+    ReadEvent ev;
+    ev.bytes.assign(s, s + strlen(s));
+    f.queue.push_back(ev);
+}
+
+void push_eof(FakeMStream &f) { f.queue.push_back(ReadEvent{}); }
+} // namespace
+
+// (a) A caller must receive every byte that was already buffered BEFORE
+// isOpen() reports false, even though the peer hung up (the queued EOF)
+// before the last of them was drained.
+void test_telnet_stream_drains_buffered_bytes_before_isopen_goes_false(void)
+{
+    auto fake = std::make_shared<FakeMStream>();
+    push_bytes(*fake, "HELLO");
+    push_eof(*fake);
+
+    TelnetMStream ts("telnet://test:23", fake);
+    uint8_t buf[8];
+
+    // First read: opens lazily, pumps "HELLO" into rx_, hands back 2 bytes.
+    // rx_ still holds "LLO" -- pump() has not touched the queued EOF yet.
+    TEST_ASSERT_EQUAL_UINT32(2, ts.read(buf, 2));
+    TEST_ASSERT_EQUAL_UINT8('H', buf[0]);
+    TEST_ASSERT_EQUAL_UINT8('E', buf[1]);
+    TEST_ASSERT_TRUE(ts.isOpen());
+
+    // Second read: rx_ is not empty, so no pump runs this call either.
+    TEST_ASSERT_EQUAL_UINT32(2, ts.read(buf, 2));
+    TEST_ASSERT_EQUAL_UINT8('L', buf[0]);
+    TEST_ASSERT_EQUAL_UINT8('L', buf[1]);
+    TEST_ASSERT_TRUE(ts.isOpen());
+
+    // Third read: drains the very last buffered byte. rx_ was non-empty
+    // when this call STARTED, so pump() still does not run -- the EOF is
+    // not observed in this same call, and every byte the peer sent has now
+    // reached the caller.
+    TEST_ASSERT_EQUAL_UINT32(1, ts.read(buf, 8));
+    TEST_ASSERT_EQUAL_UINT8('O', buf[0]);
+    TEST_ASSERT_TRUE(ts.isOpen());
+
+    // Fourth read: rx_ is finally empty, so THIS call pumps -- and only now
+    // discovers the queued EOF.
+    TEST_ASSERT_EQUAL_UINT32(0, ts.read(buf, 8));
+    TEST_ASSERT_FALSE(ts.isOpen());
+}
+
+// (b) Nothing opens the inner transport until the first read()/write() --
+// mirroring tcp.h's own lazy-open idiom.
+void test_telnet_stream_lazy_opens_on_first_read(void)
+{
+    auto fake = std::make_shared<FakeMStream>();
+    push_eof(*fake);  // so the pump the lazy open triggers returns quickly
+
+    TelnetMStream ts("telnet://test:23", fake);
+    TEST_ASSERT_FALSE(fake->opened);
+
+    uint8_t buf[8];
+    ts.read(buf, sizeof(buf));
+    TEST_ASSERT_TRUE(fake->opened);
+    TEST_ASSERT_EQUAL_INT(1, fake->open_call_count);
+}
+
+// (c) Once a stream has drained to EOF, a further read() must not resurrect
+// it by re-entering open() -- which would both silently clear a write error
+// still waiting to be read by the caller (open() resets `_error = 0` on
+// success) and reset eof_, making a permanently-dead session look freshly
+// reopened. FakeMStream never actually closes on EOF (matching a real
+// socket: the local fd stays valid after a remote FIN), so a resurrection
+// here would not be caught by "did the transport get redialed" -- it has to
+// be caught by these two more specific effects instead.
+void test_telnet_stream_drained_eof_does_not_resurrect_or_clear_error(void)
+{
+    auto fake = std::make_shared<FakeMStream>();
+
+    TelnetMStream ts("telnet://test:23", fake);
+    uint8_t buf[8];
+
+    // Open the stream on a live (not yet EOF) connection, so the failing
+    // write below sets _error via its own ordinary failure path -- not by
+    // going through open() at all, which would make the effect this test
+    // targets unobservable (open()'s `_error = 0` would be immediately
+    // overwritten by the very write that triggered it).
+    TEST_ASSERT_EQUAL_UINT32(0, ts.read(buf, sizeof(buf)));  // idle sentinel
+    TEST_ASSERT_TRUE(ts.isOpen());
+
+    fake->write_should_fail = true;
+    const uint8_t data[] = { 'x', 'y' };
+    TEST_ASSERT_EQUAL_UINT32(0, ts.write(data, sizeof(data)));
+    TEST_ASSERT_EQUAL_UINT(1, ts.error());
+    fake->write_should_fail = false;
+
+    // Now drain to EOF, with the error still pending and untouched (read()
+    // never assigns _error).
+    push_eof(*fake);
+    TEST_ASSERT_EQUAL_UINT32(0, ts.read(buf, sizeof(buf)));
+    TEST_ASSERT_FALSE(ts.isOpen());
+    TEST_ASSERT_EQUAL_UINT(1, ts.error());
+
+    // The discriminating call: a further read on the drained-EOF stream.
+    // Queue a byte that a resurrection would wrongly deliver.
+    push_bytes(*fake, "Z");
+    uint32_t n = ts.read(buf, sizeof(buf));
+
+    // Correct: still refused. The pending error must survive untouched, and
+    // the queued byte must not have been delivered -- a drained-EOF stream
+    // stays dead until an explicit close() + reopen, not until the peer
+    // happens to have more to say.
+    TEST_ASSERT_EQUAL_UINT32(0, n);
+    TEST_ASSERT_EQUAL_UINT(1, ts.error());
+}
+
+// (d) available()==0 must not read as end-of-stream: an idle-but-live BBS
+// session reports it constantly between sends. eos() must track isOpen(),
+// not available().
+void test_telnet_stream_eos_is_false_while_idle_true_once_finished(void)
+{
+    auto fake = std::make_shared<FakeMStream>();
+    // Queue left empty: every read() returns the idle sentinel.
+
+    TelnetMStream ts("telnet://test:23", fake);
+    uint8_t buf[8];
+    TEST_ASSERT_EQUAL_UINT32(0, ts.read(buf, sizeof(buf)));
+    TEST_ASSERT_EQUAL_UINT32(0, ts.available());
+    TEST_ASSERT_FALSE(ts.eos());  // idle-but-live, not the same as finished
+
+    push_eof(*fake);
+    TEST_ASSERT_EQUAL_UINT32(0, ts.read(buf, sizeof(buf)));
+    TEST_ASSERT_TRUE(ts.eos());   // now genuinely finished
+}
+
+// (e) A failed transmit must be reported: write() returns 0, not the
+// caller's byte count, and error() reflects it.
+void test_telnet_stream_write_reports_a_transmit_failure(void)
+{
+    auto fake = std::make_shared<FakeMStream>();
+    fake->write_should_fail = true;
+
+    TelnetMStream ts("telnet://test:23", fake);
+    const uint8_t data[] = { 'a', 'b', 'c' };
+    TEST_ASSERT_EQUAL_UINT32(0, ts.write(data, sizeof(data)));
+    TEST_ASSERT_EQUAL_UINT(1, ts.error());
+}
+
+// (f) waitReadable() must not sit out the full timeout once EOF has been
+// discovered mid-wait.
+void test_telnet_stream_waitreadable_returns_promptly_once_eof_is_discovered(void)
+{
+    auto fake = std::make_shared<FakeMStream>();
+    push_eof(*fake);  // queued, not yet read
+
+    TelnetMStream ts("telnet://test:23", fake);
+
+    // Open via write() rather than read(), so the queued EOF event is still
+    // untouched going into the wait below.
+    const uint8_t data[] = { 'x' };
+    ts.write(data, sizeof(data));
+    TEST_ASSERT_TRUE(ts.isOpen());
+
+    auto start = std::chrono::steady_clock::now();
+    bool readable = ts.waitReadable(5000);
+    auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - start).count();
+
+    TEST_ASSERT_FALSE(readable);
+    TEST_ASSERT_FALSE(ts.isOpen());  // the wait's own pump() found the EOF
+    TEST_ASSERT_TRUE_MESSAGE(elapsed_ms < 1000,
+        "waitReadable() burned the full 5000ms timeout instead of "
+        "returning promptly once EOF was discovered");
+}
+
+// (f) waitReadable() must measure real elapsed time rather than assume each
+// slice fully elapsed. An inner wait that returns without blocking (legal --
+// waitReadable() is only guaranteed to wait UP TO its argument) must not
+// make the loop think time passed that did not: with the old `waited +=
+// slice` accounting this would return in a handful of microseconds instead
+// of genuinely waiting out the requested timeout.
+void test_telnet_stream_waitreadable_measures_real_elapsed_time(void)
+{
+    auto fake = std::make_shared<FakeMStream>();
+    // Queue left empty (idle sentinel) so the opening read does not set eof_.
+
+    TelnetMStream ts("telnet://test:23", fake);
+    uint8_t buf[8];
+    ts.read(buf, sizeof(buf));
+    TEST_ASSERT_TRUE(ts.isOpen());
+
+    fake->instant_wait = true;  // inner wait never actually blocks
+
+    auto start = std::chrono::steady_clock::now();
+    bool readable = ts.waitReadable(150);
+    auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - start).count();
+
+    TEST_ASSERT_FALSE(readable);
+    TEST_ASSERT_TRUE_MESSAGE(elapsed_ms >= 100,
+        "waitReadable() returned too quickly -- it must measure real "
+        "elapsed time rather than assume each slice fully elapsed");
+    TEST_ASSERT_TRUE_MESSAGE(elapsed_ms < 1000,
+        "waitReadable() took far longer than the requested 150ms timeout");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -966,6 +1268,14 @@ int main(int, char **)
     RUN_TEST(test_telnet_negotiation_split_across_reads_is_handled);
     RUN_TEST(test_telnet_end_is_safe_to_call_twice);
     RUN_TEST(test_telnet_calls_after_end_are_inert);
+
+    RUN_TEST(test_telnet_stream_drains_buffered_bytes_before_isopen_goes_false);
+    RUN_TEST(test_telnet_stream_lazy_opens_on_first_read);
+    RUN_TEST(test_telnet_stream_drained_eof_does_not_resurrect_or_clear_error);
+    RUN_TEST(test_telnet_stream_eos_is_false_while_idle_true_once_finished);
+    RUN_TEST(test_telnet_stream_write_reports_a_transmit_failure);
+    RUN_TEST(test_telnet_stream_waitreadable_returns_promptly_once_eof_is_discovered);
+    RUN_TEST(test_telnet_stream_waitreadable_measures_real_elapsed_time);
 
     return UNITY_END();
 }

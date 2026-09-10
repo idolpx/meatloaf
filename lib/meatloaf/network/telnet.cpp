@@ -22,8 +22,6 @@
 #include <chrono>
 #include <cstring>
 
-#include "tcp.h"
-
 TelnetMStream::TelnetMStream(std::string url, std::shared_ptr<MStream> inner)
     : MStream(url), inner_(inner)
 {
@@ -155,7 +153,16 @@ uint32_t TelnetMStream::read(uint8_t *buf, uint32_t size)
     if (buf == nullptr || size == 0)
         return 0;
 
-    if (!isOpen() && !open(std::ios_base::in))
+    // `!open_`, not `!isOpen()`. isOpen() also reports false once eof_ has
+    // been set and rx_ has drained -- a session the peer has genuinely hung
+    // up on. Guarding on isOpen() would treat that as "never opened" and
+    // redial through open() on every subsequent call: churning
+    // telnet_free()/telnet_init() forever on a dead connection (open()
+    // skips re-opening inner_ since a local fd stays valid after a remote
+    // FIN, so nothing here would ever detect the redial as pointless). open_
+    // is only false before the first successful open() and after an explicit
+    // close(), which is exactly when lazy-opening is wanted.
+    if (!open_ && !open(std::ios_base::in))
         return 0;
 
     if (rx_.empty())
@@ -175,7 +182,15 @@ uint32_t TelnetMStream::write(const uint8_t *buf, uint32_t size)
     if (buf == nullptr || size == 0)
         return 0;
 
-    if (!isOpen() && !open(std::ios_base::out))
+    // See the matching comment in read(): `!open_`, not `!isOpen()`, for the
+    // same reason -- plus one more that bites specifically here. open()
+    // resets `_error = 0` on success (a genuine reopen should clear a stale
+    // error). Guarding on isOpen() would let a drained-EOF stream re-enter
+    // open(), which would clear `_error` out from under a caller that has a
+    // write failure still pending -- iecChannelHandlerFile's destructor
+    // reads `_error` after close() to map it to drive status, so a real
+    // failure would be silently reported as success.
+    if (!open_ && !open(std::ios_base::out))
         return 0;
 
     if (!filter_.isOpen())
