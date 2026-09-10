@@ -294,6 +294,8 @@ void main_setup()
     mlConfig.load();
     //log_heap_checkpoint("after config load");
 
+    ps2Keyboard.start();
+
     // Setup IEC Bus
     SYSTEM_BUS.setup();
 #ifdef BUILD_IEC
@@ -338,11 +340,6 @@ void main_setup()
     PARALLEL.setup();
     printf( ANSI_GREEN_BOLD "Parallel Bus Initialized" ANSI_RESET "\r\n" );
 #endif
-
-    // Reads devices.ps2 only -- allocates nothing, touches no GPIO, does no
-    // network work, so it has none of the ordering hazards a drive's
-    // reloadConfig() has.  A no-op on boards without PIN_KB_CLK.
-    ps2Keyboard.start();
 
 #ifdef ENABLE_DISPLAY
     LEDS.start();

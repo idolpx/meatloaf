@@ -4,6 +4,14 @@
 namespace ps2dev
 {
 
+  uint32_t CLK_HALF_PERIOD_MICROS = 38;
+  uint32_t CLK_QUATER_PERIOD_MICROS = 15;
+  void set_clk_half_period_us(uint32_t half_period_us)
+  {
+    CLK_HALF_PERIOD_MICROS = half_period_us;
+    CLK_QUATER_PERIOD_MICROS = (half_period_us * 15) / 38;
+  }
+
   // A host request to send is CLK high && DATA low.  The host's sequence is
   // CLK low (inhibit) -> DATA low (start bit) -> CLK released, so the edge
   // that CREATES the condition is CLK rising.
@@ -64,7 +72,9 @@ namespace ps2dev
     io_conf.mode = GPIO_MODE_OUTPUT_OD;
     io_conf.pin_bit_mask = (1ULL << _ps2data);
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    // KeyboardTwister releases each line through its pull-up; use the ESP32
+    // equivalent so the DTV sees a defined idle-high level and a clean rise.
+    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
     gpio_config(&io_conf);
     io_conf.pin_bit_mask = (1ULL << _ps2clk);
     gpio_config(&io_conf);

@@ -12,12 +12,15 @@ PS2KeyboardDevice::PS2KeyboardDevice()
 {
 }
 
-// Boot: read config and nothing else.  Allocating here would defeat the
-// point of the lazy start -- the two tasks cost ~8 KB of INTERNAL DRAM,
-// which is the scarce kind on this platform.
+// Boot: read config, then bring the device up immediately if config says
+// enabled -- a host wired directly to CLK/DATA (no adapter reset pulse) has
+// no other way to make us start talking, so waiting for the first `ps2
+// type`/`ps2 start` left it stuck at running[0] after every reboot.
 void PS2KeyboardDevice::start()
 {
     reloadConfig();
+    if (_enabled)
+        ensureStarted();
 }
 
 void PS2KeyboardDevice::reloadConfig()
