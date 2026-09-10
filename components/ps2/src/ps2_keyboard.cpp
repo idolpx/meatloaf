@@ -117,7 +117,12 @@ void PS2Keyboard::begin()
   xSemaphoreTake(_mutex_bus, portMAX_DELAY);
   esp_rom_delay_us(BYTE_INTERVAL_MICROS);
   vTaskDelay(pdMS_TO_TICKS(200));
-  write(0xAA);
+  int bat_result = write(0xAA);
+  if (bat_result == 0)
+    ESP_LOGI("ps2", "sent BAT 0xAA");
+  else
+    ESP_LOGW("ps2", "BAT 0xAA failed clk[%d] data[%d]",
+             gpio_get_level(clkPin()), gpio_get_level(dataPin()));
   xSemaphoreGive(_mutex_bus);
 }
 void PS2Keyboard::end()
