@@ -134,6 +134,15 @@
 #include "network/ftp.h"
 #include "network/fsp.h"
 #include "network/tnfs.h"
+#ifdef ENABLE_MODEM
+// telnet:// decorates tcp:// (TelnetMFile::createStream() resolves a
+// "tcp:" URL through MFSOwner), so tcp:// must be a registered scheme too --
+// otherwise MFSOwner::File() falls through to defaultFS for it (see
+// MFSOwner::findParentFS()) and a telnet dial silently resolves to a flash
+// path instead of failing loudly.
+#include "network/tcp.h"
+#include "network/telnet.h"
+#endif // ENABLE_MODEM
 #ifndef MIN_CONFIG
 #ifndef DISABLE_SSH   // MEATLOAF-GATE
 #include "network/sftp.h"
@@ -154,17 +163,8 @@
 
 // #include "network/ipfs.h"
 // #include "network/ws.h"
-// #include "network/tcp.h"
-#ifdef ENABLE_MODEM
-// telnet:// decorates tcp:// (TelnetMFile::createStream() resolves a
-// "tcp:" URL through MFSOwner), so tcp:// must be a registered scheme too --
-// otherwise MFSOwner::File() falls through to defaultFS for it (see
-// MFSOwner::findParentFS()) and a telnet dial silently resolves to a flash
-// path instead of failing loudly.
-#include "network/tcp.h"
-#include "network/telnet.h"
-#endif // ENABLE_MODEM
 #endif
+
 
 
 // Service
@@ -453,6 +453,10 @@ HTTPMFileSystem httpFS;
 FTPMFileSystem ftpFS;
 FSPMFileSystem fspFS;
 TNFSMFileSystem tnfsFS;
+#ifdef ENABLE_MODEM
+TCPMFileSystem tcpFS;
+TelnetMFileSystem telnetFS;
+#endif // ENABLE_MODEM
 #ifndef MIN_CONFIG
 #ifndef DISABLE_SSH   // MEATLOAF-GATE
 SFTPMFileSystem sftpFS;
@@ -473,11 +477,6 @@ ISCSIMFileSystem iscsiFS;
 
 // IPFSMFileSystem ipfsFS;
 // WSMFileSystem wsFS;
-// TCPMFileSystem tcpFS;
-#ifdef ENABLE_MODEM
-TCPMFileSystem tcpFS;
-TelnetMFileSystem telnetFS;
-#endif // ENABLE_MODEM
 #endif
 
 
@@ -568,6 +567,9 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
 
     // Network
     &httpFS, &ftpFS, &fspFS, &tnfsFS,
+#ifdef ENABLE_MODEM
+    &tcpFS, &telnetFS,
+#endif // ENABLE_MODEM
 #ifndef MIN_CONFIG
     &smbFS,
 #ifndef DISABLE_SSH   // MEATLOAF-GATE
@@ -583,9 +585,6 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &iscsiFS,
 #endif
     //&ipfsFS, &wsFS, &tcpFS,
-#ifdef ENABLE_MODEM
-    &tcpFS, &telnetFS,
-#endif // ENABLE_MODEM
 #endif
 
     // Service

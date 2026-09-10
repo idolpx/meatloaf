@@ -63,17 +63,30 @@ public:
     uint32_t size() override { return 0; }
     uint32_t position() override { return 0; }
 
-    // Payload bytes already decoded and waiting, plus whatever the socket
-    // holds. Non-zero here does not guarantee read() returns data -- a socket
-    // read may be entirely negotiation -- which is why waitReadable() loops.
+    // Payload bytes already decoded and waiting in rx_. Does NOT reflect
+    // anything still sitting unread in the inner socket -- TCPMStream::
+    // available() (tcp.h) is hardcoded to 0, so there is nothing meaningful
+    // to add from it. Non-zero here does not guarantee read() returns MORE
+    // data next time -- a socket read may be entirely negotiation and add
+    // nothing to rx_ -- which is why waitReadable() pumps in a loop rather
+    // than trusting a single available() check.
     uint32_t available() override;
+
+    // available()==0 does not mean end of stream: an idle-but-live BBS
+    // session reports it constantly between sends. The real signal is
+    // isOpen() -- false once the peer has sent EOF and rx_ has drained.
+    bool eos() override;
 
     bool waitReadable(uint32_t timeout_ms) override;
 
 private:
     // Pulls one chunk off the inner stream and runs it through the filter,
     // which appends payload to rx_ and writes any response to the inner
-    // stream. Returns false when the inner stream is closed or errored.
+    // stream. Returns false when the inner stream is closed/errored, or has
+    // reached EOF with nothing left to pump. A genuine EOF (inner_->read()
+    // returning exactly 0 while the inner stream is still open -- an orderly
+    // remote close, not the "no data right now" sentinel) sets eof_ rather
+    // than being indistinguishable from idle.
     bool pump();
 
     static constexpr uint32_t CHUNK = 512;
@@ -82,6 +95,19 @@ private:
     TelnetFilter             filter_;
     std::deque<uint8_t>      rx_;
     bool                     open_ = false;
+
+    // Set by pump() when the remote has closed its end. isOpen() keeps
+    // answering true until rx_ has drained, so a caller mid-read still gets
+    // what already arrived; once rx_ is empty, isOpen() goes false for good
+    // (a closed TCP connection never produces more bytes).
+    bool eof_ = false;
+
+    // Set by the to_peer_ sink (bound in open()) when writing a transmitted
+    // byte through to inner_ does not fully succeed. write() resets this
+    // immediately before calling filter_.transmit() and checks it right
+    // after, so it reflects only that one call's outcome -- not an earlier
+    // negotiation reply's write, which also goes through the same sink.
+    bool tx_error_ = false;
 };
 
 class TelnetMFile : public MFile
