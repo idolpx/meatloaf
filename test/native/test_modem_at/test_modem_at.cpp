@@ -1194,6 +1194,115 @@ void test_telnet_stream_waitreadable_measures_real_elapsed_time(void)
         "waitReadable() took far longer than the requested 150ms timeout");
 }
 
+// (fix round 3, FINDING 1) The write()-side mirror of test (c) above.
+// Mutation 1 in fix round 2 only reverted the read() site's guard -- it
+// never exercised write()'s independently, so a re-review flipping ONLY
+// write()'s `!open_` back to `!isOpen()` still passed the whole suite. This
+// opens the stream via write() (not read()), so the resurrection this test
+// targets can only be reached through write()'s own guard.
+void test_telnet_stream_write_side_drained_eof_does_not_clear_pending_error(void)
+{
+    auto fake = std::make_shared<FakeMStream>();
+
+    TelnetMStream ts("telnet://test:23", fake);
+    uint8_t buf[8];
+
+    // Open via write(), not read() -- the discriminator this test needs.
+    const uint8_t open_byte[] = { 'o' };
+    TEST_ASSERT_EQUAL_UINT32(1, ts.write(open_byte, 1));
+    TEST_ASSERT_TRUE(ts.isOpen());
+    TEST_ASSERT_EQUAL_INT(1, fake->open_call_count);
+
+    // A failing write on the still-live connection sets a pending error via
+    // its own ordinary failure path (same reasoning as test (c): not via a
+    // resurrection, so the effect under test stays observable).
+    fake->write_should_fail = true;
+    const uint8_t data[] = { 'x', 'y' };
+    TEST_ASSERT_EQUAL_UINT32(0, ts.write(data, sizeof(data)));
+    TEST_ASSERT_EQUAL_UINT(1, ts.error());
+    fake->write_should_fail = false;
+
+    // Drain to EOF with the error still pending.
+    push_eof(*fake);
+    TEST_ASSERT_EQUAL_UINT32(0, ts.read(buf, sizeof(buf)));
+    TEST_ASSERT_FALSE(ts.isOpen());
+    TEST_ASSERT_EQUAL_UINT(1, ts.error());
+
+    // The discriminating call: a further write() on the drained-EOF stream.
+    // A resurrection re-enters open(), which resets `_error = 0` and
+    // `eof_ = false` -- observable here even though the write itself then
+    // succeeds either way (FakeMStream's inner transport never truly closes
+    // on EOF, matching a real socket, so the write reaches it regardless).
+    const uint8_t more[] = { 'z' };
+    ts.write(more, 1);
+    TEST_ASSERT_EQUAL_UINT(1, ts.error());
+    TEST_ASSERT_FALSE(ts.isOpen());
+}
+
+// (fix round 3, FINDING 1) Covers the `inner_->isOpen() == false` branch in
+// open() -- calling inner_->open() again to redial. No existing test reached
+// it past the very first open() of a fresh pair: FakeMStream never closes
+// itself on EOF, and nothing called TelnetMStream::close() before this.
+// An explicit close() DOES close the inner transport (TelnetMStream::close()
+// calls inner_->close()), so the next lazy-open genuinely finds
+// inner_->isOpen() false and must redial.
+void test_telnet_stream_explicit_close_then_reopen_redials_inner(void)
+{
+    auto fake = std::make_shared<FakeMStream>();
+    // Idle sentinel: opens cleanly without reaching EOF.
+
+    TelnetMStream ts("telnet://test:23", fake);
+    uint8_t buf[8];
+
+    TEST_ASSERT_EQUAL_UINT32(0, ts.read(buf, sizeof(buf)));  // lazy-opens
+    TEST_ASSERT_TRUE(ts.isOpen());
+    TEST_ASSERT_EQUAL_INT(1, fake->open_call_count);
+
+    ts.close();
+    TEST_ASSERT_TRUE(fake->closed);
+    TEST_ASSERT_FALSE(fake->isOpen());  // the branch under test needs this false
+
+    // Reopen: a fresh payload proves the inner transport was genuinely
+    // re-dialed, not just the outer bookkeeping reset.
+    push_bytes(*fake, "HI");
+    TEST_ASSERT_EQUAL_UINT32(2, ts.read(buf, sizeof(buf)));
+    TEST_ASSERT_EQUAL_UINT8('H', buf[0]);
+    TEST_ASSERT_EQUAL_UINT8('I', buf[1]);
+    TEST_ASSERT_TRUE(ts.isOpen());
+    TEST_ASSERT_EQUAL_INT(2, fake->open_call_count);
+}
+
+// (fix round 3, FINDING 2) eos() must lazy-open a fresh stream rather than
+// report it as already finished. Uses its own fake/stream pair (not shared
+// with the waitReadable() test below) so eos() opening the stream cannot
+// mask whether waitReadable() ALSO opens on its own.
+void test_telnet_stream_eos_lazy_opens_a_fresh_stream(void)
+{
+    auto fake = std::make_shared<FakeMStream>();
+    push_bytes(*fake, "HI");
+
+    TelnetMStream ts("telnet://test:23", fake);
+    TEST_ASSERT_FALSE(fake->opened);  // exactly what createStream() hands back
+
+    TEST_ASSERT_FALSE(ts.eos());
+    TEST_ASSERT_TRUE(fake->opened);  // eos() had to open it to answer correctly
+}
+
+// (fix round 3, FINDING 2) waitReadable() must lazy-open a fresh stream too
+// -- `while (waitReadable(...)) { read(...); }` on a freshly dialed stream
+// is exactly Tasks 9-11's connection-pump shape.
+void test_telnet_stream_waitreadable_lazy_opens_a_fresh_stream(void)
+{
+    auto fake = std::make_shared<FakeMStream>();
+    push_bytes(*fake, "HI");
+
+    TelnetMStream ts("telnet://test:23", fake);
+    TEST_ASSERT_FALSE(fake->opened);
+
+    TEST_ASSERT_TRUE(ts.waitReadable(1000));
+    TEST_ASSERT_TRUE(fake->opened);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1276,6 +1385,10 @@ int main(int, char **)
     RUN_TEST(test_telnet_stream_write_reports_a_transmit_failure);
     RUN_TEST(test_telnet_stream_waitreadable_returns_promptly_once_eof_is_discovered);
     RUN_TEST(test_telnet_stream_waitreadable_measures_real_elapsed_time);
+    RUN_TEST(test_telnet_stream_write_side_drained_eof_does_not_clear_pending_error);
+    RUN_TEST(test_telnet_stream_explicit_close_then_reopen_redials_inner);
+    RUN_TEST(test_telnet_stream_eos_lazy_opens_a_fresh_stream);
+    RUN_TEST(test_telnet_stream_waitreadable_lazy_opens_a_fresh_stream);
 
     return UNITY_END();
 }

@@ -229,11 +229,34 @@ uint32_t TelnetMStream::available()
 
 bool TelnetMStream::eos()
 {
+    // Mirrors read()/write()'s lazy-open guard (see the comment in read()).
+    // A fresh, never-opened stream -- exactly what createStream() hands
+    // back -- must not read as "finished": !isOpen() alone cannot tell
+    // "never opened" apart from "drained and dead", and without opening
+    // first a caller that checks eos() before its first read()/write() saw
+    // a live, never-dialed connection reported as already over. If opening
+    // now fails, there is genuinely nothing more this stream will ever
+    // produce, so true is the correct answer either way.
+    if (!open_ && !open(std::ios_base::in))
+        return true;
+
     return !isOpen();
 }
 
 bool TelnetMStream::waitReadable(uint32_t timeout_ms)
 {
+    // Mirrors read()/write()'s lazy-open guard (see the comment in read()).
+    // A fresh, never-opened stream -- exactly what createStream() hands
+    // back -- must actually dial before anything below can mean anything:
+    // without this, `while (waitReadable(...)) { read(...); }` on a freshly
+    // dialed stream never opened the connection at all, because every check
+    // in this function (isOpen(), rx_) reads as "nothing here yet" whether
+    // the stream was never opened or is genuinely dead. If opening now
+    // fails, nothing will ever become readable, so false is correct either
+    // way.
+    if (!open_ && !open(std::ios_base::in))
+        return false;
+
     // Decoded payload already waiting.
     if (!rx_.empty())
         return true;
@@ -278,6 +301,8 @@ bool TelnetMStream::waitReadable(uint32_t timeout_ms)
         if (slice == 0)
             slice = 1;
 
+        auto slice_start = std::chrono::steady_clock::now();
+
         if (inner_ != nullptr)
             inner_->waitReadable(slice);
 
@@ -285,6 +310,26 @@ bool TelnetMStream::waitReadable(uint32_t timeout_ms)
             return false;
         if (!rx_.empty())
             return true;
+
+        // inner_->waitReadable() is only guaranteed to wait UP TO slice ms
+        // (see the comment above) -- an inner that returns early without
+        // blocking (exactly what (f2)'s instant_wait constructs) must not
+        // turn this into a hot spin with no yield, burning a core on a
+        // single-core-shared FreeRTOS task for up to timeout_ms. Sleep out
+        // whatever part of the slice the inner wait plus pump() did not
+        // already consume. Harmless with a real inner_, which already
+        // blocks for close to the full slice.
+        auto slice_elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - slice_start).count();
+        if (slice_elapsed_ms < (int64_t)slice)
+        {
+            uint32_t remaining_slice = slice - (uint32_t)slice_elapsed_ms;
+#ifdef ESP_PLATFORM
+            vTaskDelay(pdMS_TO_TICKS(remaining_slice));
+#else
+            std::this_thread::sleep_for(std::chrono::milliseconds(remaining_slice));
+#endif
+        }
     }
 }
 
