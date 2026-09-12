@@ -115,6 +115,7 @@ void PS2Keyboard::begin()
   xTaskCreatePinnedToCore(_taskfn_send_packet, "send_packet", 4096, this, _config_task_priority - 1, &_task_send_packet, DEFAULT_TASK_CORE);
 
   xSemaphoreTake(_mutex_bus, portMAX_DELAY);
+  ESP_LOGI("ps2", "begin: mutex acquired, starting BAT");
   esp_rom_delay_us(BYTE_INTERVAL_MICROS);
   vTaskDelay(pdMS_TO_TICKS(200));
   int bat_result = write(0xAA);

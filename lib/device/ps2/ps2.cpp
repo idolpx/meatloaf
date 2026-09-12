@@ -78,6 +78,11 @@ bool PS2KeyboardDevice::startDevice()
     if (_started)
     {
         ok = (_kb.write_wait_idle(0xAA) == 0);
+        if (ok)
+            ESP_LOGI("ps2", "sent BAT 0xAA (re-announce)");
+        else
+            ESP_LOGW("ps2", "BAT 0xAA failed (re-announce) clk[%d] data[%d]",
+                     gpio_get_level(PIN_KB_CLK), gpio_get_level(PIN_KB_DATA));
         Debug_printv("ps2: re-announced BAT, ok[%d]", ok ? 1 : 0);
     }
     else
