@@ -940,6 +940,11 @@ public:
     // something a future inner_ could legitimately do, and which the old
     // `waited += slice` accounting could not survive.
     bool instant_wait = false;
+    // Counts entries into waitReadable(). The only way to discriminate
+    // telnet.cpp's sleep-remainder fix: wall-clock elapsed is ~timeout_ms
+    // either way, because the outer loop returns on a real clock -- what the
+    // fix changes is how many times it spins to get there.
+    int wait_call_count = 0;
     std::string written;
 
     bool isOpen() override { return opened && !closed; }
@@ -980,6 +985,7 @@ public:
 
     bool waitReadable(uint32_t timeout_ms) override
     {
+        wait_call_count++;
         if (instant_wait)
             return false;
         return MStream::waitReadable(timeout_ms);
@@ -1303,6 +1309,35 @@ void test_telnet_stream_waitreadable_lazy_opens_a_fresh_stream(void)
     TEST_ASSERT_TRUE(fake->opened);
 }
 
+// (fix round 3, FINDING 3) telnet.cpp's waitReadable() sleeps out whatever
+// part of each slice the inner wait did not consume. An inner that returns
+// immediately -- what `instant_wait` constructs -- would otherwise make the
+// outer loop a hot spin with no yield for the whole timeout, burning a core
+// on a FreeRTOS task shared with the IEC bus.
+//
+// Wall-clock cannot discriminate this: elapsed is ~timeout_ms with or without
+// the fix, since the loop only returns once a real clock says the timeout
+// expired. The ITERATION COUNT is what changes -- bounded to roughly
+// timeout_ms/slice with the fix, unbounded without it.
+void test_telnet_stream_waitreadable_does_not_hot_spin_on_an_instant_inner(void)
+{
+    auto fake = std::make_shared<FakeMStream>();
+    fake->instant_wait = true;   // returns false without blocking
+
+    TelnetMStream ts("telnet://test:23", fake);
+    uint8_t buf[8];
+    TEST_ASSERT_EQUAL_UINT32(0, ts.read(buf, sizeof(buf)));  // lazy-open, no data
+    fake->wait_call_count = 0;                               // count the loop only
+
+    TEST_ASSERT_FALSE(ts.waitReadable(150));
+
+    // 150ms of 50ms slices is 3 iterations; allow generous headroom for a
+    // slow host while still failing by orders of magnitude if the sleep is
+    // gone (an unslept spin re-enters the inner wait thousands of times).
+    TEST_ASSERT_LESS_OR_EQUAL_INT_MESSAGE(20, fake->wait_call_count,
+        "waitReadable() spun without yielding -- the per-slice sleep remainder is missing");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1389,6 +1424,7 @@ int main(int, char **)
     RUN_TEST(test_telnet_stream_explicit_close_then_reopen_redials_inner);
     RUN_TEST(test_telnet_stream_eos_lazy_opens_a_fresh_stream);
     RUN_TEST(test_telnet_stream_waitreadable_lazy_opens_a_fresh_stream);
+    RUN_TEST(test_telnet_stream_waitreadable_does_not_hot_spin_on_an_instant_inner);
 
     return UNITY_END();
 }
