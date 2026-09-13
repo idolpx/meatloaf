@@ -49,6 +49,53 @@ bool TCPServer::_shutdown = false;
 TaskHandle_t TCPServer::_htask = NULL;
 TaskHandle_t TCPServer::_session_htask = NULL;
 
+#ifdef ENABLE_MODEM
+#include "../modem/modem_port.h"
+
+ModemPort       *TCPServer::_modem_sink = nullptr;
+SemaphoreHandle_t TCPServer::_modem_sink_lock = nullptr;
+StaticSemaphore_t TCPServer::_modem_sink_lock_storage;
+
+// _modem_sink is written by a shell task entering and leaving modem mode, and
+// read by session_task(). A bare pointer plus a null check is NOT enough: the
+// shell can clear the pointer and then free the port's StreamBuffers in between
+// session_task()'s check and its dereference, and pushRx() on a deleted
+// StreamBuffer is a use-after-free on a FreeRTOS object -- heap corruption that
+// surfaces later in an unrelated task, the same NFS 0x6400 failure mode that
+// ModemPort exists to avoid. The mutex is therefore held across the WHOLE of
+// modemFeed(), not just the pointer read, so setModemSink(nullptr) cannot return
+// until any feed in progress has finished; the shell's port.end() is safe the
+// moment it does.
+//
+// Statically allocated and created in start(): a lazily created mutex would have
+// the same two-task race one level down.
+void TCPServer::setModemSink(ModemPort *port)
+{
+    if (_modem_sink_lock == nullptr)
+        return;  // start() never ran; refusing to route beats racing
+
+    xSemaphoreTake(_modem_sink_lock, portMAX_DELAY);
+    _modem_sink = port;
+    xSemaphoreGive(_modem_sink_lock);
+}
+
+bool TCPServer::modemFeed(const char *buf, size_t n)
+{
+    if (_modem_sink_lock == nullptr || buf == nullptr || n == 0)
+        return false;
+
+    xSemaphoreTake(_modem_sink_lock, portMAX_DELAY);
+    bool fed = false;
+    if (_modem_sink != nullptr)
+    {
+        _modem_sink->pushRx((const uint8_t *)buf, n, 100);
+        fed = true;
+    }
+    xSemaphoreGive(_modem_sink_lock);
+    return fed;
+}
+#endif // ENABLE_MODEM
+
 // Persistent per-client session worker: a thin recv loop for one connected
 // client per wakeup. Created ONCE in start() — allocating a task stack on
 // demand at connect time fails once internal heap fragments. Commands are
@@ -109,6 +156,18 @@ void TCPServer::session_task(void *pvParameters)
             // Data received
             else
             {
+#ifdef ENABLE_MODEM
+                // In modem mode this session is a byte stream, not a
+                // line-oriented shell: feed it raw and skip the command path
+                // entirely. Deliberately before the line accumulation below --
+                // a BBS stream has no line discipline to wait for, and holding
+                // bytes back until a newline arrives would stall it.
+                if (TCPServer::modemFeed(rx_buffer, (size_t)bytes_received))
+                {
+                    bzero(rx_buffer, sizeof(rx_buffer));
+                    continue;
+                }
+#endif
                 line += std::string(rx_buffer);
 
                 // break line on newline and send to console
@@ -244,6 +303,11 @@ void TCPServer::task(void *pvParameters)
 void TCPServer::start()
 {
     _shutdown = false;
+
+#ifdef ENABLE_MODEM
+    if (_modem_sink_lock == nullptr)
+        _modem_sink_lock = xSemaphoreCreateMutexStatic(&_modem_sink_lock_storage);
+#endif
 
     // Create the persistent session worker now, while internal RAM is still
     // plentiful (task stacks are internal-DRAM only, no PSRAM fallback).

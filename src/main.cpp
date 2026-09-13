@@ -87,6 +87,10 @@
 
 #include "bus.h"
 #include "meat_session.h"
+
+#ifdef ENABLE_MODEM
+#include "modem.h"
+#endif
 //#include "ml_tests.h"
 
 std::string statusMessage;
@@ -375,6 +379,15 @@ void main_setup()
     // Start SessionBroker service task on CPU0
     SessionBroker::setup();
     //log_heap_checkpoint("after SessionBroker::setup()");
+
+#ifdef ENABLE_MODEM
+    // Created at boot, not on the first `at`: task stacks are internal-DRAM only
+    // with no PSRAM fallback and can fail from fragmentation, so the stack is
+    // claimed while contiguous internal RAM is still available. The task idles
+    // on its ports until a console enters modem mode.
+    if (!modem.start())
+        Debug_printv("modem: failed to start; `at` will be unavailable");
+#endif
 
     // Restore each drive's persisted mlConfig state (enabled flag, mounted URL).
     // Must happen after fnWiFi.start(): reloadConfig() may mount a network URL
