@@ -660,6 +660,80 @@ gitignored.
 - **A Range request must ask for exactly what is wanted.** `rangeEnd` was `position + size + 5`, over-fetching 6 bytes on every request. That existed only to guarantee a short read, because the re-page test was `bytesRead > 0 && bytesRead < size` and a range consumed EXACTLY returns 0 next time, which was indistinguishable from real EOF. The margin left 6 unconsumed bytes in every response, so a caller that seeks rather than reading straight through slid 6 bytes further out of alignment per request. Fixed at the cause: a 0-byte read now means "range exhausted" whenever the total size is known and `_position` has not reached it, and it re-reads from the newly opened range rather than reporting EOF.
 - **`patch_framework.py` must be enabled in `platformio.ini`, and it is gitignored so nothing warns when it is not.** It was commented out locally while `platformio.ini.sample` had it on, so esp-idf#18359 was unpatched on framework-espidf@3.50503.0 and a D64 over HTTP aborted with `assert failed: http_on_body esp_http_client.c:318 (res_buffer->orig_raw_data == res_buffer->raw_data)` — body bytes arriving during `fetch_headers` on a handle whose previous response was left partly consumed. Still required at this version: 3.50503.0 is IDF 5.5.3 and upstream's own fix (`esp_http_client_clear_response_buffer()`, which `openAndFetchHeaders()` already has an `ESP_IDF_VERSION`-guarded call waiting for) lands in 5.5.5. **Check for the `MEATLOAF-PATCH` marker in the framework's `esp_http_client.c` before debugging any stale-buffer HTTP symptom.**
 
+## Recent Changes (September 13, 2026)
+
+### Console modem mode: `at` turns either console into a Hayes modem
+
+Typing `at` on the serial or TCP console enters modem mode; `AT+SHELL` leaves it.
+Phase 1 is the AT engine, a single dialled connection, telnet negotiation, a
+phonebook and S-register settings. Design is in
+`docs/superpowers/specs/2026-09-08-console-modem-mode-design.md`, the 12-task
+plan in `docs/superpowers/plans/2026-09-08-console-modem-mode-phase-1.md`.
+
+**Hardware-verified on an esp32-s3-devkitc-1 against bbs.fozztexx.com**: `CONNECT`
+and the full BBS banner with telnet negotiation stripped, `+++` returning `OK`
+with the carrier still up, `ATI` answering while suspended, `ATO` returning
+`CONNECT`, the BBS's own login prompt arriving after the resume - which is what
+proves the connection survived the escape rather than being re-dialled - then
+`ATH` giving `NO CARRIER` with the session torn down to `Active sessions: 0`, and
+`AT+SHELL` returning to the shell. Internal heap 64,203 bytes free with a session
+up. Flash 4,249,905 = 81.1%, RAM 101,492 = 31.0%.
+
+- **The modem task never touches a console fd.** Two tasks on one socket is the
+  condition behind the NFS `0x6400` heap corruption. The shell task stays the
+  sole reader and writer of its own fd and pumps bytes through a `ModemPort`
+  pair of FreeRTOS StreamBuffers, which are single-writer/single-reader by
+  design, so with exactly one task on each end no mutex is needed.
+- **`ONLINE` and `ONLINE_COMMAND` are deliberately different states.** `+++`
+  leaves the connection UP; that is what makes `ATO` meaningful and is the
+  distinction Zimodem blurs.
+- **`pdMS_TO_TICKS()` truncates, and `CONFIG_FREERTOS_HZ` is 100 on every board
+  here - so `pdMS_TO_TICKS(5)` is ZERO ticks and `vTaskDelay(0)` yields only to
+  tasks of equal or higher priority, never to a lower one.** The modem task is
+  priority 5 and the console shells are priority 4 on the same core, so a
+  five-millisecond idle delay made the modem task spin and starve the very task
+  that feeds it. The symptom is the trap: the session looks hung with the
+  connection still up and the remote still live, output keeps working (a burst
+  fills the port's TX buffer, blocking the modem task in `pushTx` long enough for
+  the shell to run) while **nothing typed ever arrives**. Command mode was
+  unaffected only by luck - its idle path asks for 20 ms, which is 2 real ticks.
+  Any idle delay under 10 ms anywhere in this codebase is a no-op; floor it at
+  one tick.
+- **A lazily-opened stream cannot be probed with `isOpen()`.** `TelnetMStream` is
+  constructed CLOSED and opens on its first `read()`/`write()`, so a freshly
+  created one always answers `isOpen() == false` however well the transport
+  underneath it connected. `doDial()` tested that and reported `NO ANSWER` for
+  every telnet dial with the socket already established. A dial has to settle
+  `CONNECT` versus `NO ANSWER` immediately, so it opens eagerly; `eos()` and
+  `waitReadable()` lazy-open for the same reason, which means calling either on a
+  never-read stream DIALS. Do not call them from a status or hang-up path.
+- **`tcp://` is now a registered filesystem.** It was declared but commented out
+  of every registration site, and `MFSOwner::findParentFS()` ends
+  `auto fs = *availableFS.begin(); return fs;` - it returns `defaultFS`, never
+  `nullptr`, so an unregistered scheme silently resolves to a flash path instead
+  of failing.
+- **`lib/modem` must stay in `src/CMakeLists.txt`'s hand-maintained INCLUDES and
+  SOURCES lists.** `lib_ldf_mode = off`, so nothing else compiles that directory;
+  removing the line gives `undefined reference to TelnetFilter::transmit`.
+- **`ConsoleRawIOGuard` moved to `lib/console/console_rawio.h`.** It was
+  file-local to `Commands/XFERCommands.cpp` and unreachable from modem mode, which
+  needs the same raw byte mode - the driver's CR/LF translation corrupts a BBS
+  stream and the modem emits its own S3/S4 terminators.
+- **Gated behind `ENABLE_MODEM`**, set only for `esp32-s3-devkitc-1`. On a board
+  without it every modem object compiles to nothing: `modem.cpp.o` is 1,548 bytes
+  on `lolin-d32-pro` against 3.33 MB on the S3.
+- **Native coverage is the pure units only** - AT parser, S-registers, result
+  codes, the `+++` escape detector, phonebook, the telnet filter, and
+  `TelnetMStream` itself through a `FakeMStream`: 77 cases in
+  `test/native/test_modem_at`. **The dial path, `ModemPort`, the modem task and
+  both `at` intercepts have NO regression test** and are hardware-verified only -
+  they need FreeRTOS, `MFSOwner`, `mlConfig` and a real socket. Both bugs above
+  were found only on hardware.
+- **Not verified**: nothing has been driven from a real C64 - this is a console
+  feature by design; the TCP console path (`ORIGIN_REMOTE`) was not exercised, only
+  serial; no SSH dialling, no file transfer, no incoming connections (those are
+  later phases); and `AT&W` persistence across a reboot was not tested.
+
 ## Recent Changes (September 5-6, 2026)
 
 ### G64 over a network filesystem: 61 s to list, now 2.2 s
