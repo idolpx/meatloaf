@@ -215,6 +215,21 @@ void Modem::run()
     vTaskDelete(nullptr);
 }
 
+// pdMS_TO_TICKS() TRUNCATES, and CONFIG_FREERTOS_HZ is 100 on every board here:
+// a 5 ms delay is ZERO ticks, and vTaskDelay(0) yields only to tasks of equal or
+// higher priority -- it never lets a lower-priority one run. The modem task is
+// priority 5 and the console shells are priority 4 on the same core, so an idle
+// delay that rounds to nothing starves the very task that feeds this one. The
+// session then looks hung with the connection still up and the remote still
+// live: output keeps working (a burst fills the port's TX buffer, which blocks
+// this task in pushTx and lets the shell run) while nothing typed ever arrives.
+// Never let an idle delay round to zero.
+static inline TickType_t modem_idle_ticks(uint32_t ms)
+{
+    TickType_t t = pdMS_TO_TICKS(ms);
+    return t > 0 ? t : 1;
+}
+
 void Modem::serviceCommandMode()
 {
     uint8_t buf[64];
@@ -241,7 +256,7 @@ void Modem::serviceCommandMode()
             state_ = ModemState::COMMAND;
             sendResult(AtResult::NO_CARRIER);
         }
-        vTaskDelay(pdMS_TO_TICKS(20));
+        vTaskDelay(modem_idle_ticks(20));
         return;
     }
 
@@ -341,7 +356,8 @@ void Modem::serviceStreamMode()
     if (n > 0)
         toAttached(out, n);
     else if (got == 0)
-        vTaskDelay(pdMS_TO_TICKS(5));
+        vTaskDelay(modem_idle_ticks(5));
+
 }
 
 void Modem::executeLine(const std::string &raw)
@@ -547,7 +563,16 @@ bool Modem::doDial(const AtCommand &cmd, bool &reported)
     if (file != nullptr)
         stream = file->getSourceStream(std::ios_base::in | std::ios_base::out);
 
-    if (stream == nullptr || !stream->isOpen())
+    // Open it, do not merely ask whether it is open. TelnetMStream is
+    // constructed CLOSED and opens lazily on its first read()/write(), so a
+    // freshly created one always answers isOpen() == false however well the
+    // transport underneath it connected -- testing isOpen() here reported
+    // NO ANSWER for every telnet dial, with the socket already established.
+    // A dial has to settle CONNECT versus NO ANSWER now rather than on some
+    // later first byte, so this is the one place that must open eagerly.
+    if (stream == nullptr ||
+        (!stream->isOpen() &&
+         !stream->open(std::ios_base::in | std::ios_base::out)))
     {
         state_ = ModemState::COMMAND;
         sendResult(AtResult::NO_ANSWER);
