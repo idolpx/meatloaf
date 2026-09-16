@@ -38,6 +38,7 @@
 #include "Esp.h"
 
 #ifdef ENABLE_MODEM
+#include <memory>
 #include "console_rawio.h"
 #include "../modem/modem.h"
 #include "../modem/modem_port.h"
@@ -142,15 +143,15 @@ namespace ESP32Console
         }
         port.setAttached(true);
 
-#ifdef ENABLE_CONSOLE_TCP
-        if (origin == Console::ORIGIN_REMOTE)
-            TCPServer::setModemSink(&port);
-#endif
-
         // Raw byte mode for the session: the console driver's interactive
         // line-end translation (RX CR -> LF, TX LF -> CRLF) corrupts a BBS
-        // stream, and the modem emits its own S3/S4 terminators.
-        ConsoleRawIOGuard raw_guard;
+        // stream, and the modem emits its own S3/S4 terminators. It configures
+        // the UART, so it is meaningful only for a serial session -- applying
+        // it for a TCP one would reconfigure the serial console out from under
+        // whoever is sitting at it, including another modem session.
+        std::unique_ptr<ConsoleRawIOGuard> raw_guard;
+        if (origin == Console::ORIGIN_SERIAL)
+            raw_guard.reset(new ConsoleRawIOGuard());
 
         ::printf("\r\nModem mode. AT+SHELL to return.\r\n");
 
@@ -177,10 +178,10 @@ namespace ESP32Console
             // Terminal -> modem. Serial reads its own fd here; a TCP session's
             // bytes arrive via TCPServer::modemFeed() from session_task(), which
             // must stay the only reader of that socket.
+            uint8_t in[64];
+            size_t got = 0;
             if (origin == Console::ORIGIN_SERIAL)
             {
-                uint8_t in[64];
-                size_t got = 0;
                 int fd = fileno(stdin);
                 int fl = fcntl(fd, F_GETFL, 0);
                 fcntl(fd, F_SETFL, fl | O_NONBLOCK);
@@ -192,18 +193,26 @@ namespace ESP32Console
                     in[got++] = (uint8_t)c;
                 }
                 fcntl(fd, F_SETFL, fl);
-                if (got > 0)
-                    port.pushRx(in, got, 100);
+                // A transport that signals "no data" with a 0-byte read would
+                // leave newlib's sticky EOF flag set and wedge every later
+                // fgetc. ESP-IDF's VFS returns -1/EWOULDBLOCK here, which sets
+                // the error flag instead, but clearing costs nothing and makes
+                // the loop independent of that detail.
+                clearerr(stdin);
             }
-        }
-
 #ifdef ENABLE_CONSOLE_TCP
-        // Must precede port.end(): setModemSink(nullptr) does not return until
-        // any feed in flight on session_task() has finished, so only after it
-        // is it safe to free the buffers that feed writes into.
-        if (origin == Console::ORIGIN_REMOTE)
-            TCPServer::setModemSink(nullptr);
+            else
+            {
+                // Read the client socket directly. session_task() is parked
+                // inside console.execute() for as long as this loop runs, so
+                // it is not reading the socket and cannot hand bytes over --
+                // anything that relied on it to do so could never run at all.
+                got = TCPServer::modemRecv(in, sizeof(in));
+            }
 #endif
+            if (got > 0)
+                port.pushRx(in, got, 100);
+        }
 
         // Same ordering rule for the modem task: detach() takes the Modem
         // mutex, so it waits out any in-flight broadcast()/toAttached() before

@@ -325,7 +325,12 @@ bool TelnetMStream::waitReadable(uint32_t timeout_ms)
         {
             uint32_t remaining_slice = slice - (uint32_t)slice_elapsed_ms;
 #ifdef ESP_PLATFORM
-            vTaskDelay(pdMS_TO_TICKS(remaining_slice));
+            // pdMS_TO_TICKS() truncates and CONFIG_FREERTOS_HZ is 100 here, so
+            // anything under 10 ms is ZERO ticks and vTaskDelay(0) yields only
+            // to equal-or-higher priority tasks -- which is exactly the hot
+            // spin this sleep exists to prevent. Floor it at one tick.
+            TickType_t slice_ticks = pdMS_TO_TICKS(remaining_slice);
+            vTaskDelay(slice_ticks > 0 ? slice_ticks : 1);
 #else
             std::this_thread::sleep_for(std::chrono::milliseconds(remaining_slice));
 #endif

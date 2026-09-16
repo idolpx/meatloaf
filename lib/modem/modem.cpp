@@ -353,7 +353,14 @@ void Modem::serviceStreamMode()
     // Remote -> terminal.
     uint8_t out[512];
     uint32_t n = conn_->read(out, sizeof(out));
-    if (n > 0)
+    // Bound the count before trusting it. A non-blocking MStream reports "no
+    // data" by RETURNING A SENTINEL, not 0: TCPMStream::read() answers
+    // _MEAT_NO_DATA_AVAIL (0xFFFFFFFE) on every idle poll, which is a huge
+    // positive number. `n > 0` alone therefore passes it straight into
+    // toAttached() as a length, streaming gigabytes out of a 512-byte stack
+    // buffer. TelnetMStream::read() normalises it away, which is why ATDT was
+    // unaffected and plain ATD -- the tcp:// path -- was not.
+    if (n > 0 && n <= sizeof(out))
         toAttached(out, n);
     else if (got == 0)
         vTaskDelay(modem_idle_ticks(5));
@@ -729,12 +736,17 @@ void Modem::loadConfig()
         for (auto it = m["phonebook"].begin(); it != m["phonebook"].end(); ++it)
         {
             auto &e = it.value();
-            if (!e.contains("host"))
+            // Type-check every field before reading it. nlohmann throws on a
+            // type mismatch and ESP-IDF builds -fno-exceptions, so a throw is
+            // std::terminate -- a hand-edited or truncated config.json would
+            // abort the board at BOOT, since loadConfig() runs from start().
+            // The settings loop above already guards this way; this one did not.
+            if (!e.is_object() || !e.contains("host") || !e["host"].is_string())
                 continue;
             std::string hostport = e["host"].template get<std::string>();
-            if (e.contains("port"))
+            if (e.contains("port") && e["port"].is_number_integer())
                 hostport += ":" + std::to_string(e["port"].template get<int>());
-            std::string mods = e.contains("mods")
+            std::string mods = (e.contains("mods") && e["mods"].is_string())
                                    ? e["mods"].template get<std::string>()
                                    : std::string();
             phonebook_.store(it.key(), hostport, mods);

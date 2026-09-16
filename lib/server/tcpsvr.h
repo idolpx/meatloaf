@@ -36,13 +36,6 @@ private:
     static TaskHandle_t _htask;
     static TaskHandle_t _session_htask;
 
-#ifdef ENABLE_MODEM
-    // The port a console in modem mode wants this session's raw bytes fed to,
-    // plus the mutex that makes handing it over safe. See tcpsvr.cpp.
-    static class ModemPort *_modem_sink;
-    static SemaphoreHandle_t _modem_sink_lock;
-    static StaticSemaphore_t _modem_sink_lock_storage;
-#endif
 
 public:
     void start();
@@ -61,12 +54,12 @@ public:
     static bool pollCancel();
 
 #ifdef ENABLE_MODEM
-    // Route this session's received bytes to a modem port instead of the
-    // command shell. setModemSink(nullptr) ends that routing and does not
-    // return until any feed already in progress has finished, which is what
-    // lets the caller then destroy the port safely.
-    static void setModemSink(class ModemPort *port);
-    static bool modemFeed(const char *buf, size_t n);
+    // Non-blocking read of whatever the client has sent, for a console sitting
+    // in modem mode. Safe from the task blocked inside console.execute() and
+    // ONLY from there -- exactly the same reasoning as pollCancel() above:
+    // session_task() is parked in that call and is not reading the socket, so
+    // there is no second reader to race.
+    static size_t modemRecv(uint8_t *buf, size_t n);
 #endif
 };
 

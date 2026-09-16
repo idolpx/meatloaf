@@ -50,49 +50,25 @@ TaskHandle_t TCPServer::_htask = NULL;
 TaskHandle_t TCPServer::_session_htask = NULL;
 
 #ifdef ENABLE_MODEM
-#include "../modem/modem_port.h"
-
-ModemPort       *TCPServer::_modem_sink = nullptr;
-SemaphoreHandle_t TCPServer::_modem_sink_lock = nullptr;
-StaticSemaphore_t TCPServer::_modem_sink_lock_storage;
-
-// _modem_sink is written by a shell task entering and leaving modem mode, and
-// read by session_task(). A bare pointer plus a null check is NOT enough: the
-// shell can clear the pointer and then free the port's StreamBuffers in between
-// session_task()'s check and its dereference, and pushRx() on a deleted
-// StreamBuffer is a use-after-free on a FreeRTOS object -- heap corruption that
-// surfaces later in an unrelated task, the same NFS 0x6400 failure mode that
-// ModemPort exists to avoid. The mutex is therefore held across the WHOLE of
-// modemFeed(), not just the pointer read, so setModemSink(nullptr) cannot return
-// until any feed in progress has finished; the shell's port.end() is safe the
-// moment it does.
+// A console in modem mode reads the client socket HERE rather than having
+// session_task() hand bytes over, because session_task() cannot hand anything
+// over: console.execute() runs ON session_task, so while the modem pump loop
+// is running that task is parked inside it and never reaches its own recv().
+// Anything that fed the pump from there could therefore never run, and the
+// session would wedge with no way to type AT+SHELL and no way for the listener
+// to accept another client.
 //
-// Statically allocated and created in start(): a lazily created mutex would have
-// the same two-task race one level down.
-void TCPServer::setModemSink(ModemPort *port)
+// Reading the socket from the pump is safe for precisely the reason pollCancel()
+// documents: the owning task is blocked in console.execute(), so there is no
+// second reader. MSG_DONTWAIT rather than a socket flag change, so the blocking
+// recv session_task() returns to afterwards is left exactly as it was.
+size_t TCPServer::modemRecv(uint8_t *buf, size_t n)
 {
-    if (_modem_sink_lock == nullptr)
-        return;  // start() never ran; refusing to route beats racing
+    if (_client_socket <= 0 || buf == nullptr || n == 0)
+        return 0;
 
-    xSemaphoreTake(_modem_sink_lock, portMAX_DELAY);
-    _modem_sink = port;
-    xSemaphoreGive(_modem_sink_lock);
-}
-
-bool TCPServer::modemFeed(const char *buf, size_t n)
-{
-    if (_modem_sink_lock == nullptr || buf == nullptr || n == 0)
-        return false;
-
-    xSemaphoreTake(_modem_sink_lock, portMAX_DELAY);
-    bool fed = false;
-    if (_modem_sink != nullptr)
-    {
-        _modem_sink->pushRx((const uint8_t *)buf, n, 100);
-        fed = true;
-    }
-    xSemaphoreGive(_modem_sink_lock);
-    return fed;
+    int got = recv(_client_socket, buf, n, MSG_DONTWAIT);
+    return got > 0 ? (size_t)got : 0;
 }
 #endif // ENABLE_MODEM
 
@@ -156,18 +132,6 @@ void TCPServer::session_task(void *pvParameters)
             // Data received
             else
             {
-#ifdef ENABLE_MODEM
-                // In modem mode this session is a byte stream, not a
-                // line-oriented shell: feed it raw and skip the command path
-                // entirely. Deliberately before the line accumulation below --
-                // a BBS stream has no line discipline to wait for, and holding
-                // bytes back until a newline arrives would stall it.
-                if (TCPServer::modemFeed(rx_buffer, (size_t)bytes_received))
-                {
-                    bzero(rx_buffer, sizeof(rx_buffer));
-                    continue;
-                }
-#endif
                 line += std::string(rx_buffer);
 
                 // break line on newline and send to console
@@ -303,11 +267,6 @@ void TCPServer::task(void *pvParameters)
 void TCPServer::start()
 {
     _shutdown = false;
-
-#ifdef ENABLE_MODEM
-    if (_modem_sink_lock == nullptr)
-        _modem_sink_lock = xSemaphoreCreateMutexStatic(&_modem_sink_lock_storage);
-#endif
 
     // Create the persistent session worker now, while internal RAM is still
     // plentiful (task stacks are internal-DRAM only, no PSRAM fallback).
