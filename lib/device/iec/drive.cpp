@@ -2538,7 +2538,7 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                         // Persist the IANA name (not the resolved POSIX
                         // string) so mlConfig.load() re-resolves it the
                         // same way on the next boot.
-                        mlConfig.data()["preferences"]["timezone"] = command;
+                        json_object_at(mlConfig.data(), "preferences")["timezone"] = command;
                         mlConfig.save();
                     }
                 }
@@ -3254,7 +3254,10 @@ void iecDrive::unmount()
 // (mode, media_stack, ...) are preserved.
 void iecDrive::persistConfig()
 {
-    auto &entry = mlConfig.data()["devices"]["iec"][std::to_string(m_devnr)];
+    // json_object_at, not operator[]: indexing through a stale non-object
+    // node anywhere along this path is type_error.305, an abort().
+    auto &iec = json_object_at(json_object_at(mlConfig.data(), "devices"), "iec");
+    auto &entry = json_object_at(iec, std::to_string(m_devnr).c_str());
     entry["enabled"] = isActive() ? 1 : 0;
     if (!entry.contains("type"))
         entry["type"] = "drive";  // don't clobber subclass types (e.g. "meatloaf")

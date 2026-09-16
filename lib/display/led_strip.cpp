@@ -451,7 +451,10 @@ void DisplayLEDs::start(void)
 // stale live n_of_leds.
 void DisplayLEDs::persistConfig()
 {
-    auto &entry = mlConfig.data()["devices"]["led_strip"];
+    // json_object_at, not operator[]: indexing through a stale non-object
+    // node is type_error.305, an abort() -- and `led count`/`led brightness`
+    // reach this from the console.
+    auto &entry = json_object_at(json_object_at(mlConfig.data(), "devices"), "led_strip");
     if (!entry.contains("enabled"))
         entry["enabled"] = 1;
     entry["count"] = (m_pending_count >= 0) ? m_pending_count : n_of_leds;

@@ -156,3 +156,24 @@ inline std::string json_str(const psram_json &node, const char *key, const char 
     const psram_json &v = node.at(key);
     return v.is_string() ? v.get<std::string>() : std::string(fallback);
 }
+
+// The write-side counterpart: fetch a child node to write into, guaranteeing
+// it is an object.
+//
+// The non-const `operator[]` auto-creates only through a null -- on a number
+// or a string it is type_error.305, which is the same abort(). So a node left
+// behind by an older firmware has to be REPLACED rather than indexed into,
+// and a config that aborts the boot would otherwise also abort the first
+// save. Chain it for a nested path:
+//   json_object_at(json_object_at(mlConfig.data(), "devices"), "led_strip")
+inline psram_json &json_object_at(psram_json &parent, const char *key)
+{
+    if (!parent.is_object())
+        parent = psram_json::object();
+
+    psram_json &child = parent[key];
+    if (!child.is_object())
+        child = psram_json::object();
+
+    return child;
+}

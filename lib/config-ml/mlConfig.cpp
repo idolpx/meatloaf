@@ -269,7 +269,13 @@ bool MeatloafConfig::load()
     // it immediately. iana_to_posix_tz() maps the IANA zone name (e.g.
     // "America/New_York") to a POSIX TZ string, since newlib's tzset() has
     // no IANA tzdata database to resolve it from directly.
-    std::string tz = _data.value("preferences", psram_json::object()).value("timezone", "");
+    // The chained value() was two aborts in one line: the outer one raises
+    // type_error.306 if _data is not an object, and a "preferences" that is a
+    // scalar makes the outer call RETURN that scalar, so the inner .value()
+    // then raises 306 on it. Both reboot the device -- during load(), at boot.
+    std::string tz;
+    if (_data.is_object() && _data.contains("preferences"))
+        tz = json_str(_data.at("preferences"), "timezone");
     if (!tz.empty()) {
         const char *posix_tz = iana_to_posix_tz(tz);
         setenv("TZ", posix_tz ? posix_tz : tz.c_str(), 1);
@@ -280,7 +286,9 @@ bool MeatloafConfig::load()
     // (esp_app_desc_t.version, split at the last '.').
     std::string actual_firmware = ESP.getFirmwareVersion();
     std::string actual_hardware = ESP.getHardwareVersion();
-    if (_data.value("firmware", "") != actual_firmware || _data.value("hardware", "") != actual_hardware) {
+    if (json_str(_data, "firmware") != actual_firmware || json_str(_data, "hardware") != actual_hardware) {
+        if (!_data.is_object())
+            _data = psram_json::object();
         _data["firmware"] = actual_firmware;
         _data["hardware"] = actual_hardware;
         save();

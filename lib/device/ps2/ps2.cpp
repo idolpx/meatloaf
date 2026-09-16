@@ -67,18 +67,9 @@ void PS2KeyboardDevice::reloadConfig()
 
 void PS2KeyboardDevice::persistConfig()
 {
-    // The non-const operator[] auto-creates only through a null; on a number
-    // or a string it is type_error.305 -- so the very config that used to
-    // abort the boot would also abort the first save. Replace a stale node
-    // rather than indexing into it.
-    auto &devices = mlConfig.data()["devices"];
-    if (!devices.is_object())
-        devices = psram_json::object();
-
-    auto &entry = devices["ps2"];
-    if (!entry.is_object())
-        entry = psram_json::object();
-
+    // json_object_at, not operator[]: the stale "ps2": 0 node that used to
+    // abort the boot would abort this save too (type_error.305).
+    auto &entry = json_object_at(json_object_at(mlConfig.data(), "devices"), "ps2");
     entry["enabled"] = _enabled ? 1 : 0;
 }
 
