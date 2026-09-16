@@ -29,19 +29,35 @@ void PS2KeyboardDevice::reloadConfig()
     if (!devices.contains("ps2"))
         return;
 
+    // Every read here goes through json_int: this runs from main_setup()
+    // before the console exists, so a devices.json holding an unexpected
+    // shape aborts the boot with nothing able to intervene.
     const psram_json &ps2 = devices["ps2"];
-    bool want = ps2.value("enabled", 0) != 0;
+    if (!ps2.is_object())
+        Debug_printv("ps2: config node is [%s], not an object -- keyboard disabled", ps2.type_name());
+
+    bool want = json_int(ps2, "enabled", 0) != 0;
 
     // The DTV's scancode-to-C64-key table is a bench finding, so C64 names
     // (runstop, restore, commodore...) are bound here from config rather
     // than guessed in the built-in table.
     _overrides.clear();
-    if (ps2.contains("keymap"))
+    if (ps2.is_object() && ps2.contains("keymap"))
     {
-        const psram_json &km = ps2["keymap"];
-        for (auto it = km.begin(); it != km.end(); ++it)
-            if (it.value().is_string())
-                _overrides[it.key()] = it.value().get<std::string>();
+        // nlohmann iterates a primitive happily, yielding one element -- and
+        // key() on that iterator is type_error.207, another abort. So the
+        // keymap has to BE an object, not merely be present.
+        const psram_json &km = ps2.at("keymap");
+        if (km.is_object())
+        {
+            for (auto it = km.begin(); it != km.end(); ++it)
+                if (it.value().is_string())
+                    _overrides[it.key()] = it.value().get<std::string>();
+        }
+        else
+        {
+            Debug_printv("ps2: keymap is [%s], not an object -- ignored", km.type_name());
+        }
     }
 
     if (!want && _started)
@@ -51,7 +67,18 @@ void PS2KeyboardDevice::reloadConfig()
 
 void PS2KeyboardDevice::persistConfig()
 {
-    auto &entry = mlConfig.data()["devices"]["ps2"];
+    // The non-const operator[] auto-creates only through a null; on a number
+    // or a string it is type_error.305 -- so the very config that used to
+    // abort the boot would also abort the first save. Replace a stale node
+    // rather than indexing into it.
+    auto &devices = mlConfig.data()["devices"];
+    if (!devices.is_object())
+        devices = psram_json::object();
+
+    auto &entry = devices["ps2"];
+    if (!entry.is_object())
+        entry = psram_json::object();
+
     entry["enabled"] = _enabled ? 1 : 0;
 }
 

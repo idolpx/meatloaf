@@ -118,3 +118,41 @@ private:
 };
 
 extern MeatloafConfig mlConfig;
+
+// Read one field out of a config node that may be ANY shape.
+//
+// A stale or hand-edited devices.json can hold a number, a string or null
+// where the code expects an object, and ESP-IDF builds -fno-exceptions -- so
+// every nlohmann type error is an abort() that reboots the device rather than
+// a throw anything can catch. `value()` raises type_error.306 when the node is
+// not an object and type_error.302 when the named field will not convert, so
+// BOTH have to be ruled out before the call rather than handled after it.
+// A devices.json written by an older firmware is enough to brick a boot:
+// PS2KeyboardDevice::start() runs from main_setup() before the console exists.
+//
+// `contains()` alone is not sufficient, and is what every call site had: it
+// answers false for a non-object, which covers the container, but says nothing
+// about the type of the field it found.
+inline int json_int(const psram_json &node, const char *key, int fallback)
+{
+    if (!node.is_object() || !node.contains(key))
+        return fallback;
+
+    const psram_json &v = node.at(key);
+    if (v.is_number_integer())
+        return v.get<int>();
+    // `"enabled": true` is the likeliest hand-edit of a 0/1 flag, and reading
+    // it as the fallback would mean the opposite of what was written.
+    if (v.is_boolean())
+        return v.get<bool>() ? 1 : 0;
+    return fallback;
+}
+
+inline std::string json_str(const psram_json &node, const char *key, const char *fallback = "")
+{
+    if (!node.is_object() || !node.contains(key))
+        return fallback;
+
+    const psram_json &v = node.at(key);
+    return v.is_string() ? v.get<std::string>() : std::string(fallback);
+}

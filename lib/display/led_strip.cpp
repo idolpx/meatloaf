@@ -404,10 +404,13 @@ void DisplayLEDs::start(void)
     const psram_json &devices = mlConfig["devices"];
     if (devices.contains("led_strip"))
     {
+        // json_int, not value(): this runs at boot, and value() on a node
+        // that is not an object -- or on a field that will not convert to
+        // int -- is an abort() under -fno-exceptions, not a throw.
         const psram_json &strip = devices["led_strip"];
-        enabled = strip.value("enabled", 1) != 0;
-        count = strip.value("count", (int)RGB_LED_COUNT);
-        brightness = static_cast<uint8_t>(strip.value("brightness", (int)brightness));
+        enabled = json_int(strip, "enabled", 1) != 0;
+        count = json_int(strip, "count", (int)RGB_LED_COUNT);
+        brightness = static_cast<uint8_t>(json_int(strip, "brightness", (int)brightness));
     }
 
     if (!enabled)
@@ -467,9 +470,9 @@ bool DisplayLEDs::reloadConfig()
         return false;
 
     const psram_json &strip = devices["led_strip"];
-    set_brightness(static_cast<uint8_t>(strip.value("brightness", (int)brightness)));
+    set_brightness(static_cast<uint8_t>(json_int(strip, "brightness", (int)brightness)));
 
-    int count = strip.value("count", n_of_leds);
+    int count = json_int(strip, "count", n_of_leds);
     if (count < 0) count = 0;
     if (count > 255) count = 255;
     set_count(static_cast<uint8_t>(count));

@@ -3276,13 +3276,16 @@ bool iecDrive::reloadConfig()
     if (!iec.contains(key))
         return false;
 
+    // json_int/json_str, not value(): a per-drive entry that is not an
+    // object, or an `enabled`/`url` of the wrong type, is an abort() under
+    // -fno-exceptions -- and this runs at boot from main_setup().
     const psram_json &entry = iec[key];
     bool wasActive = isActive();
-    setActive(entry.value("enabled", 1) != 0);
+    setActive(json_int(entry, "enabled", 1) != 0);
     if (isActive() != wasActive)
         notify_activity(activitySource(), isActive() ? "active" : "disabled");
 
-    std::string url = entry.value("url", "");
+    std::string url = json_str(entry, "url");
     if (!url.empty() && (m_cwd == nullptr || m_cwd->url != url))
     {
         // Network-scheme URLs (fsp://, http://, ...) need a live route. Attempting
@@ -3312,7 +3315,9 @@ void iecDrive::restoreActiveFromConfig()
         return;
 
     bool wasActive = isActive();
-    setActive(iec[key].value("enabled", 1) != 0);
+    // Same guard as reloadConfig(), and it matters more here: this one is
+    // reached from the real-time IEC bus task's RESET handling.
+    setActive(json_int(iec[key], "enabled", 1) != 0);
     if (isActive() != wasActive)
         notify_activity(activitySource(), isActive() ? "active" : "disabled");
 }
