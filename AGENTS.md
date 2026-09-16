@@ -660,6 +660,75 @@ gitignored.
 - **A Range request must ask for exactly what is wanted.** `rangeEnd` was `position + size + 5`, over-fetching 6 bytes on every request. That existed only to guarantee a short read, because the re-page test was `bytesRead > 0 && bytesRead < size` and a range consumed EXACTLY returns 0 next time, which was indistinguishable from real EOF. The margin left 6 unconsumed bytes in every response, so a caller that seeks rather than reading straight through slid 6 bytes further out of alignment per request. Fixed at the cause: a 0-byte read now means "range exhausted" whenever the total size is known and `_position` has not reached it, and it re-reads from the newly opened range rather than reporting EOF.
 - **`patch_framework.py` must be enabled in `platformio.ini`, and it is gitignored so nothing warns when it is not.** It was commented out locally while `platformio.ini.sample` had it on, so esp-idf#18359 was unpatched on framework-espidf@3.50503.0 and a D64 over HTTP aborted with `assert failed: http_on_body esp_http_client.c:318 (res_buffer->orig_raw_data == res_buffer->raw_data)` — body bytes arriving during `fetch_headers` on a handle whose previous response was left partly consumed. Still required at this version: 3.50503.0 is IDF 5.5.3 and upstream's own fix (`esp_http_client_clear_response_buffer()`, which `openAndFetchHeaders()` already has an `ESP_IDF_VERSION`-guarded call waiting for) lands in 5.5.5. **Check for the `MEATLOAF-PATCH` marker in the framework's `esp_http_client.c` before debugging any stale-buffer HTTP symptom.**
 
+## Recent Changes (September 16, 2026)
+
+### Modem mode tasks 9-12: independent review and hardware verification
+
+Tasks 1-8 each had an independent reviewer; tasks 9-12 (phonebook, telnet
+negotiation, `waitReadable()`, and the plan's final integration work) were written
+and self-reviewed by the same author, so they were reviewed again from scratch and
+then driven on hardware. Board: `freenove-s3-wroom` at 192.168.1.187, dialling
+`bbs.fozztexx.com`, console over both serial and TCP (port 23).
+
+**What the hardware run closed.** Eight of the ten prioritised tests passed
+outright, and two of the three "Not verified" items in the 2026-09-13 entry above
+are now verified:
+
+- **The TCP console path (`ORIGIN_REMOTE`) works end to end** - `at`, a dial, the
+  BBS banner, `+++`, `ATI`, `ATH` and `AT+SHELL` all over port 23, and the shell
+  is still usable afterwards. This was the most important unverified fix.
+- **`AT&W` survives a reboot.** Settings and phonebook entries written with `AT&W`
+  came back after a power cycle.
+- **A malformed `config.json` no longer aborts the boot.** A file carrying seven
+  distinct malformed phonebook shapes plus two malformed settings was written over
+  WebDAV, and the board booted clean with exactly the three well-formed entries
+  surviving. ESP-IDF is `-fno-exceptions`, so a nlohmann `get<>` type mismatch is
+  an `abort()`, not a throw - the `is_object()`/`is_string()`/`is_number_integer()`
+  guards in `Modem::loadConfig()` are what make a hand-edited config safe.
+- **No starvation at the current task priorities.** The reviewer recommended
+  dropping the modem task below `console_repl`; the measurement supersedes it.
+  With `modem` at priority 5 and `console_repl` at 4 on core 0, a 4000-byte
+  transfer arrived 4000/4000 bytes intact with `modem` Blocked, `console_repl`
+  Running and the heap flat. Leave the priorities alone.
+
+**`mlConfig` writes to SD when `fnSDFAT.running()`**, so on a board with a card the
+config is at `/sd/.sys/config.json`, not `/.sys/config.json` - the boot log prints
+the latter and `cat` of it answers ENOENT. WebDAV is registered at `/`, so a PUT to
+`http://<ip>/sd/.sys/config.json` is the way to install a test config.
+
+**Findings still open**, none of them fixed by this review:
+
+- **`tcp://` never reports a peer hangup, and `telnet://` does.** `ATDT` builds a
+  `telnet://` URL, whose `TelnetMStream` records the peer's FIN in its own `eof_`
+  flag from `pump()`, so a remote hangup fires `NO CARRIER` correctly. `ATD`
+  builds `tcp://`, and `TCPMStream::isOpen()` is
+  `_session && _session->isConnected() && _session->socket()->isOpen()` - nothing
+  anywhere records the FIN, so the modem's two carrier-loss checks
+  (`modem.cpp:246` and `:305`, both keyed on `conn_->isOpen()`) never fire. The fix
+  is to mirror the telnet `eof_` flag in `TCPMStream`.
+- **S7 is settable, readable and reported by `ATI`, and does nothing.** It is
+  referenced exactly once in all of `lib/modem` - `modem.cpp:653`, which prints it.
+  No dial is bounded by it, and a dial in progress cannot be interrupted: commands
+  typed during one are queued, not serviced. The "wedge on an unreachable host"
+  half of this could not be reproduced here - every unreachable destination on this
+  network answers EHOSTUNREACH (errno 113) in about 9 s - so it is a network fact,
+  not evidence the code is safe. A register that accepts a value and reports it
+  back while doing nothing is worse than one that refuses.
+- **`ATZ` and `ATH` emit `NO CARRIER` *and* `OK`.** Confirmed on hardware. A real
+  Hayes `ATH` answers `OK` alone and uses `NO CARRIER` as the unsolicited
+  loss report - but scripts key off `NO CARRIER` to learn a call ended, so emitting
+  both is defensible and removing it could hang a caller. Left as it is,
+  deliberately.
+- **`+++` typed in COMMAND mode is buffered into the command line** and corrupts
+  the next command. Found during this run; not in the original review.
+- **F8, the `attached` doc/behaviour mismatch, was not tested.** None of the ten
+  hardware tests reaches it; it needs two consoles attached at once.
+
+**A `Debug_printv` line can interleave mid-line with modem output** on the serial
+console, which makes a transfer look like it dropped a line when every byte is
+present. An integrity check over a captured log must re-join lines before counting,
+or it will report a loss that did not happen.
+
 ## Recent Changes (September 13, 2026)
 
 ### Console modem mode: `at` turns either console into a Hayes modem
@@ -730,9 +799,9 @@ up. Flash 4,249,905 = 81.1%, RAM 101,492 = 31.0%.
   they need FreeRTOS, `MFSOwner`, `mlConfig` and a real socket. Both bugs above
   were found only on hardware.
 - **Not verified**: nothing has been driven from a real C64 - this is a console
-  feature by design; the TCP console path (`ORIGIN_REMOTE`) was not exercised, only
-  serial; no SSH dialling, no file transfer, no incoming connections (those are
-  later phases); and `AT&W` persistence across a reboot was not tested.
+  feature by design; no SSH dialling, no file transfer, no incoming connections
+  (those are later phases). The TCP console path (`ORIGIN_REMOTE`) and `AT&W`
+  persistence across a reboot were closed on 2026-09-16 - see that entry.
 
 ## Recent Changes (September 5-6, 2026)
 
