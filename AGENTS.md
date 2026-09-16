@@ -731,6 +731,42 @@ keyed on `conn_->isOpen()`) never fired.
   77/77. **`irc.h` is the only other `TCPMStream` consumer** (`tcpFS`/`telnetFS`
   are registered only under `ENABLE_MODEM`); its `isOpen()` now also reports a
   peer hangup, which is correct there too, but that path was not exercised.
+- **A redial inside the SessionBroker window reuses the session OBJECT and
+  reconnects it - it does not resurrect a corpse.** This was the one hazard the
+  fix could have introduced, and it is the reason to check: `obtain<TCPMSession>()`
+  keys on host:port, `TCPMSession::connect()` is `if (connected) return true;`,
+  and `keep_alive()` clears `connected` only when the socket object reports
+  closed - which a post-FIN descriptor does not. So a second `ATD` landing
+  before `service()` disposes the first dial's session could in principle get a
+  no-op `connect()` on a dead socket. It cannot, because `conn_.reset()` on
+  carrier loss destroys the stream, `~TCPMStream()` calls `close()`, and that
+  calls `_session->disconnect()` - `connected` is already false by the time any
+  redial asks. **Measured**: the redial has to be fired ON the `NO CARRIER`,
+  since the 1 Hz sweep disposed the session 0.1 s after it in one run and 0.7 s
+  in another; a blind delay misses. Firing 12 ms after `NO CARRIER` produced no
+  `TCPMSession created` line and no `Removing session` line - the existing
+  object was reused - followed by `After connect for socket`, `CONNECT`, and a
+  second real HTTP response. The absence of the `created` line is what proves
+  the window was hit; `After connect for socket` is what proves the socket is
+  new.
+- **Hardened while confirming that: `TelnetMStream::isOpen()` tests `rx_` before
+  the inner stream.** Its drain grace ("keep answering true until rx_ has
+  drained") was written against a `TCPMStream` that never reported a hangup, so
+  the `!inner_->isOpen()` test in front of it short-circuited the grace the
+  moment the fix above made the inner stream honest. Nothing was stranded in
+  practice - `pump()` only runs when `rx_` is empty, and the modem reads 512
+  bytes against `CHUNK` 512, so `rx_` is always fully drained - but the function
+  now holds its stated invariant independently of that coupling.
+
+**A local Python listener is no longer reachable from the board.** Windows
+Firewall answers the board's SYN with an ICMP administratively-prohibited, which
+lwIP reports as **EHOSTUNREACH (errno 113) after ~9 s** - indistinguishable in
+the log from a genuinely absent host, and it worked earlier the same day, so it
+is a firewall-state change rather than anything in the code. ICMP echo still
+succeeds (`ping 192.168.1.165` from the console: 5/5, 17-30 ms), which is what
+separates the two. An HTTP/1.0 request to a public server is the substitute that
+needs no inbound rule: it answers and then CLOSES, which is a peer-initiated FIN
+on demand.
 
 **Findings still open**, none of them fixed by this review:
 - **S7 is settable, readable and reported by `ATI`, and does nothing.** It is

@@ -34,16 +34,26 @@ TelnetMStream::~TelnetMStream()
 
 bool TelnetMStream::isOpen()
 {
-    if (!open_ || inner_ == nullptr || !inner_->isOpen())
+    if (!open_ || inner_ == nullptr)
         return false;
 
     // The remote sent EOF: keep answering true until rx_ has drained (a
     // caller mid-read still needs what already arrived), then false for
     // good -- a closed TCP connection never produces more bytes.
-    if (eof_ && rx_.empty())
+    //
+    // rx_ is tested BEFORE the inner stream, not after. TCPMStream::isOpen()
+    // now answers false the moment its read() sees the peer's FIN, so asking
+    // it first would discard bytes this stream has already decoded out of the
+    // last chunk before that FIN -- the drain grace would exist only for a
+    // hangup this stream noticed before the one underneath it did, which is
+    // never.
+    if (!rx_.empty())
+        return true;
+
+    if (eof_)
         return false;
 
-    return true;
+    return inner_->isOpen();
 }
 
 bool TelnetMStream::open(std::ios_base::openmode m)
