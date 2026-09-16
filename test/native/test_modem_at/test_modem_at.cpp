@@ -972,7 +972,15 @@ public:
             n = size;
         if (n > 0)
             memcpy(buf, ev.bytes.data(), n);
-        return n;  // 0 (an empty, non-sentinel event) means EOF
+        // 0 (an empty, non-sentinel event) means EOF. TCPMStream::read()
+        // records that in its own eof_ and answers isOpen() false from then
+        // on -- the local descriptor stays valid after a remote FIN, so
+        // read() is the only place the hangup is observable. Model that here
+        // or every assertion about a drained-EOF TelnetMStream is made
+        // against an inner stream that behaves as no real one does.
+        if (n == 0 && !ev.is_no_data)
+            closed = true;
+        return n;
     }
 
     uint32_t write(const uint8_t *buf, uint32_t size) override
@@ -1045,6 +1053,41 @@ void test_telnet_stream_drains_buffered_bytes_before_isopen_goes_false(void)
     TEST_ASSERT_FALSE(ts.isOpen());
 }
 
+// (a2) The drain grace must survive the inner stream noticing the hangup
+// FIRST, which is the only way it ever happens now: TCPMStream::isOpen()
+// answers false the moment its own read() sees the peer's FIN, so bytes this
+// stream already decoded out of that last chunk are still sitting in rx_ when
+// the transport underneath reports itself closed. isOpen() therefore tests rx_
+// before it asks inner_ -- asking inner_ first strands those bytes.
+void test_telnet_stream_buffered_bytes_outlive_a_closed_inner_stream(void)
+{
+    auto fake = std::make_shared<FakeMStream>();
+    push_bytes(*fake, "HELLO");
+
+    TelnetMStream ts("telnet://test:23", fake);
+    uint8_t buf[8];
+
+    // Opens lazily, pumps "HELLO" into rx_, hands back 2. rx_ holds "LLO".
+    TEST_ASSERT_EQUAL_UINT32(2, ts.read(buf, 2));
+    TEST_ASSERT_TRUE(ts.isOpen());
+
+    // The transport discovers the hangup on its own, before this stream has
+    // pumped again -- exactly what a real TCPMStream does on a FIN.
+    fake->close();
+    TEST_ASSERT_FALSE(fake->isOpen());
+
+    // Still open: there are decoded bytes the caller has not been given.
+    TEST_ASSERT_TRUE(ts.isOpen());
+
+    TEST_ASSERT_EQUAL_UINT32(3, ts.read(buf, sizeof(buf)));
+    TEST_ASSERT_EQUAL_UINT8('L', buf[0]);
+    TEST_ASSERT_EQUAL_UINT8('L', buf[1]);
+    TEST_ASSERT_EQUAL_UINT8('O', buf[2]);
+
+    // Drained, and the inner stream is gone -- now it is closed for good.
+    TEST_ASSERT_FALSE(ts.isOpen());
+}
+
 // (b) Nothing opens the inner transport until the first read()/write() --
 // mirroring tcp.h's own lazy-open idiom.
 void test_telnet_stream_lazy_opens_on_first_read(void)
@@ -1065,7 +1108,7 @@ void test_telnet_stream_lazy_opens_on_first_read(void)
 // it by re-entering open() -- which would both silently clear a write error
 // still waiting to be read by the caller (open() resets `_error = 0` on
 // success) and reset eof_, making a permanently-dead session look freshly
-// reopened. FakeMStream never actually closes on EOF (matching a real
+// reopened. FakeMStream closes on EOF, as TCPMStream does (a real
 // socket: the local fd stays valid after a remote FIN), so a resurrection
 // here would not be caught by "did the transport get redialed" -- it has to
 // be caught by these two more specific effects instead.
@@ -1414,6 +1457,7 @@ int main(int, char **)
     RUN_TEST(test_telnet_calls_after_end_are_inert);
 
     RUN_TEST(test_telnet_stream_drains_buffered_bytes_before_isopen_goes_false);
+    RUN_TEST(test_telnet_stream_buffered_bytes_outlive_a_closed_inner_stream);
     RUN_TEST(test_telnet_stream_lazy_opens_on_first_read);
     RUN_TEST(test_telnet_stream_drained_eof_does_not_resurrect_or_clear_error);
     RUN_TEST(test_telnet_stream_eos_is_false_while_idle_true_once_finished);

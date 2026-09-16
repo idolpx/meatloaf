@@ -753,10 +753,22 @@ keyed on `conn_->isOpen()`) never fired.
   the inner stream.** Its drain grace ("keep answering true until rx_ has
   drained") was written against a `TCPMStream` that never reported a hangup, so
   the `!inner_->isOpen()` test in front of it short-circuited the grace the
-  moment the fix above made the inner stream honest. Nothing was stranded in
-  practice - `pump()` only runs when `rx_` is empty, and the modem reads 512
-  bytes against `CHUNK` 512, so `rx_` is always fully drained - but the function
-  now holds its stated invariant independently of that coupling.
+  moment the fix above made the inner stream honest. Nothing is stranded through
+  the modem - `pump()` only runs when `rx_` is empty, and the modem reads 512
+  bytes against `CHUNK` 512, so `rx_` is always fully drained - but any caller
+  reading in smaller pieces than the chunk that carried the FIN loses the tail.
+- **The test double had stopped modelling the thing it doubles, and that is what
+  hid this.** `FakeMStream::isOpen()` was `opened && !closed`, faithful to
+  `TCPMStream` before the fix above and wrong after it, so all four assertions
+  the suite makes *at* drained EOF were being made against an inner stream that
+  behaves as no real one does - and the reordered line was unreachable from the
+  suite entirely. The fake now closes when a `read()` returns 0, exactly as
+  `TCPMStream` does; all 77 existing cases still pass, so those four were sound.
+  `test_telnet_stream_buffered_bytes_outlive_a_closed_inner_stream` is the case
+  that was missing: `rx_` non-empty while the inner stream reports closed. It
+  fails against the old ordering and passes against the new one, which is the
+  mutation check that makes it worth keeping. **Whenever a real class's
+  observable behaviour changes, re-check the double before trusting the green.**
 
 **A local Python listener is no longer reachable from the board.** Windows
 Firewall answers the board's SYN with an ICMP administratively-prohibited, which
@@ -775,8 +787,16 @@ on demand.
   typed during one are queued, not serviced. The "wedge on an unreachable host"
   half of this could not be reproduced here - every unreachable destination on this
   network answers EHOSTUNREACH (errno 113) in about 9 s - so it is a network fact,
-  not evidence the code is safe. A register that accepts a value and reports it
-  back while doing nothing is worse than one that refuses.
+  not evidence the code is safe. **What the queued commands then do is worse than
+  being ignored: they are executed as command lines after the dial returns.**
+  Measured during the redial runs, across two ~9 s dials - `PING two`, `+++` and
+  `ATH` typed while a dial was in flight came back afterwards as
+  `executeLine(): modem: parse error at 0 in [PING two]` and
+  `... in [+++ATH]`, each answering `ERROR`. So a user who tries to abort a long
+  dial gets their abort attempt replayed as garbage once the dial finishes. That
+  is the argument for bounding the dial with S7 rather than having `ATS7=` merely
+  warn. A register that accepts a value and reports it back while doing nothing is
+  worse than one that refuses.
 - **`ATZ` and `ATH` emit `NO CARRIER` *and* `OK`.** Confirmed on hardware. A real
   Hayes `ATH` answers `OK` alone and uses `NO CARRIER` as the unsolicited
   loss report - but scripts key off `NO CARRIER` to learn a call ended, so emitting
