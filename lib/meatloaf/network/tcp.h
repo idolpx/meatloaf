@@ -332,10 +332,18 @@ public:
             _session->disconnect();
             _session.reset();
         }
+        open_ = false;
+        eof_ = false;
     }
 
     bool open(std::ios_base::openmode mode) override {
-        if (isOpen()) {
+        // `open_`, not `isOpen()`. Once the remote has hung up isOpen() answers
+        // false for good, and guarding on it here would make every later read()
+        // re-obtain the session and re-connect -- an endless redial on a
+        // connection the peer has finished with. open_ is true from the first
+        // successful open until an explicit close(), which is exactly when
+        // lazy-opening is wanted. Same reasoning as TelnetMStream::read().
+        if (open_) {
             return true;
         }
 
@@ -360,29 +368,56 @@ public:
 
         _session->acquireIO();
 
+        open_ = true;
+        eof_ = false;
+
         return true;
     }
 
     // MStream methods
     uint32_t read(uint8_t* buf, uint32_t size) override {
-        if (!isOpen() && !open(std::ios_base::in)) {
+        if (!open_ && !open(std::ios_base::in)) {
             return 0;
         }
-        return _session->socket()->read(buf, size);
+        if (eof_) {
+            return 0;
+        }
+
+        int got = _session->socket()->read(buf, size);
+
+        // recv(2) returning exactly 0 is an orderly shutdown by the remote --
+        // genuine EOF, not "no data right now", which comes back as
+        // _MEAT_NO_DATA_AVAIL instead. The local descriptor stays valid after a
+        // remote FIN, so isOpen() below cannot tell on its own: this is the only
+        // place the hangup is observable. Without it a dialled tcp:// connection
+        // never reported NO CARRIER and ATO answered CONNECT on a dead socket.
+        if (got == 0 && size > 0) {
+            eof_ = true;
+        }
+
+        return (uint32_t)got;
     }
     uint32_t write(const uint8_t *buf, uint32_t size) override {
-        if (!isOpen() && !open(std::ios_base::out)) {
+        if (!open_ && !open(std::ios_base::out)) {
             return 0;
         }
         return _session->socket()->write(buf, size);
     }
 
     bool isOpen() {
-        return _session && _session->isConnected() && _session->socket()->isOpen();
+        return open_ && !eof_ && _session && _session->isConnected() &&
+               _session->socket()->isOpen();
     }
 
 protected:
     std::shared_ptr<TCPMSession> _session;
+
+    // True from the first successful open() until close(); see open().
+    bool open_ = false;
+    // The remote performed an orderly shutdown. Set by read() and never
+    // cleared except by open()/close() -- a closed TCP connection never
+    // produces another byte.
+    bool eof_ = false;
 };
 
 

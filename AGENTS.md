@@ -696,16 +696,43 @@ config is at `/sd/.sys/config.json`, not `/.sys/config.json` - the boot log prin
 the latter and `cat` of it answers ENOENT. WebDAV is registered at `/`, so a PUT to
 `http://<ip>/sd/.sys/config.json` is the way to install a test config.
 
-**Findings still open**, none of them fixed by this review:
+**Fixed here: `tcp://` never reported a peer hangup, while `telnet://` did.**
+`ATDT` builds a `telnet://` URL, whose `TelnetMStream` records the peer's FIN in
+its own `eof_` flag from `pump()`, so a remote hangup fired `NO CARRIER`
+correctly. `ATD` builds `tcp://`, and `TCPMStream::isOpen()` was
+`_session && _session->isConnected() && _session->socket()->isOpen()` - the local
+descriptor stays valid after a remote FIN, so nothing anywhere recorded the
+hangup and the modem's two carrier-loss checks (`modem.cpp:246` and `:305`, both
+keyed on `conn_->isOpen()`) never fired.
 
-- **`tcp://` never reports a peer hangup, and `telnet://` does.** `ATDT` builds a
-  `telnet://` URL, whose `TelnetMStream` records the peer's FIN in its own `eof_`
-  flag from `pump()`, so a remote hangup fires `NO CARRIER` correctly. `ATD`
-  builds `tcp://`, and `TCPMStream::isOpen()` is
-  `_session && _session->isConnected() && _session->socket()->isOpen()` - nothing
-  anywhere records the FIN, so the modem's two carrier-loss checks
-  (`modem.cpp:246` and `:305`, both keyed on `conn_->isOpen()`) never fire. The fix
-  is to mirror the telnet `eof_` flag in `TCPMStream`.
+- **The hangup is only observable in `read()`.** `MeatSocket::read()` returns
+  exactly 0 for an orderly remote shutdown, `_MEAT_NO_DATA_AVAIL` (0xFFFFFFFE)
+  for a would-block and -100 for not-open, so a 0 is the one unambiguous proof
+  the peer is gone. `TCPMStream` now carries `eof_`, set there and cleared only
+  by `open()`/`close()`, and `isOpen()` answers false once it is set - the same
+  shape `TelnetMStream` already had.
+- **`read()`/`write()` must guard on a separate `open_` flag, not on `isOpen()`.**
+  Once `eof_` makes `isOpen()` false, the old `if (!isOpen() && !open(...))` guard
+  would re-obtain the session and re-connect on every later call: an endless
+  redial on a connection the peer has finished with. `TelnetMStream::read()`
+  documents the identical trap.
+- **There was a second symptom, worse than the missing `NO CARRIER`: `ATO`
+  answered `CONNECT` on a dead socket.** `serviceCommandMode`'s `ONLINE_COMMAND`
+  branch gates on `conn_->isOpen()` too, so a resumed connection reported success
+  and then went silent. Measured before the fix (peer closed 12 s earlier, `ATO`
+  → `CONNECT`); after it, the unsolicited `NO CARRIER` arrives ~80 ms after the
+  peer's FIN, the session is torn down to `Active sessions: 0` on its own, and
+  `ATO` answers `ERROR`.
+- **Verified on hardware after the fix**, all three on the freenove S3: a killed
+  `tcp://` peer produces `NO CARRIER` unprompted; a live `tcp://` connection still
+  reads, writes, suspends on `+++`, resumes on `ATO` with `CONNECT` and carries
+  data afterwards; and `ATDT bbs.fozztexx.com` still connects, shows the banner
+  with negotiation stripped, and hangs up cleanly. Native suite `test_modem_at`
+  77/77. **`irc.h` is the only other `TCPMStream` consumer** (`tcpFS`/`telnetFS`
+  are registered only under `ENABLE_MODEM`); its `isOpen()` now also reports a
+  peer hangup, which is correct there too, but that path was not exercised.
+
+**Findings still open**, none of them fixed by this review:
 - **S7 is settable, readable and reported by `ATI`, and does nothing.** It is
   referenced exactly once in all of `lib/modem` - `modem.cpp:653`, which prints it.
   No dial is bounded by it, and a dial in progress cannot be interrupted: commands
@@ -719,8 +746,13 @@ the latter and `cat` of it answers ENOENT. WebDAV is registered at `/`, so a PUT
   loss report - but scripts key off `NO CARRIER` to learn a call ended, so emitting
   both is defensible and removing it could hang a caller. Left as it is,
   deliberately.
-- **`+++` typed in COMMAND mode is buffered into the command line** and corrupts
-  the next command. Found during this run; not in the original review.
+- **`+++` typed in COMMAND mode is buffered into the command line**, so the next
+  command is prefixed with it and answers `ERROR`. Noticed during this run and
+  deliberately left alone: a real Hayes modem accumulates the same characters and
+  errors on the line for the same reason. The negative case that does matter is
+  covered - `+++` embedded mid-burst with no guard silence is forwarded to the
+  remote as data. Measured: 120 bytes of filler, `+++`, then `ZZZ` arrived at the
+  far end as exactly 126 bytes in order, with no `OK` emitted.
 - **F8, the `attached` doc/behaviour mismatch, was not tested.** None of the ten
   hardware tests reaches it; it needs two consoles attached at once.
 
