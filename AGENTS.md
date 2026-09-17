@@ -816,14 +816,32 @@ on demand.
   through `MFile`/`MStream`/`MSession`, which `irc.h` shares - and it cannot be
   reproduced on this network, where every unreachable host answers EHOSTUNREACH in
   about 9 s.
-- **Three pre-existing defects in `MeatSocket` (`lib/meatloaf/network/tcp.h`), found
-  while reading the connect path for the S7 work and deliberately NOT fixed.** The
-  one that matters: **`open()` leaks the descriptor on every failed connect** - it
-  returns false with `sock` still >= 0 and never closed, so each failed dial costs
-  an fd. Also `close()` calls `closesocket(sock)` and only then `shutdown(sock, 0)`,
-  which is a shutdown on an already-closed descriptor; and `connect()` passes
-  `sizeof(struct sockaddr_in6)` as the addrlen for a `sockaddr_in`. Any future work
-  that makes dialling cheaper or more frequent should fix the leak first.
+- **`MeatSocket::open()` leaked the descriptor on every failed connect. FIXED, and
+  the leak was worse than a slow drip - eleven failed dials bricked the board's
+  networking.** `open()` returned false with `sock` still >= 0 and never closed, and
+  nothing downstream closed it either: `TCPMSession::disconnect()` returns early
+  unless `connected` is set, which a failed `connect()` never sets, so
+  `~TCPMSession()` did not clean it up. **Measured** on a freenove-esp32-s3-wroom-1
+  dialling a refused port on loopback - `ATD"127.0.0.1:4131"`, which answers errno
+  104 immediately and so costs about a second per dial rather than the ~9 s an
+  unreachable host on this network takes: the **12th** dial could not create a socket
+  at all (`errno 23`), all 16 of `CONFIG_LWIP_MAX_SOCKETS` having gone, leaving the
+  device unable to open any connection until rebooted. It failed at exactly that
+  dial on both runs. After the fix, **40** consecutive failed dials were all errno
+  104 with no errno 23. **Resetting `sock` to -1 matters as much as closing it**:
+  `isOpen()` is `sock != -1`, so the object otherwise reported itself OPEN on a dead
+  descriptor - and with it back to -1, `disconnect()`'s early return is merely
+  redundant rather than a leak, which is why that function needs no change.
+  `closesocket()` is called directly rather than through the member `close()`,
+  because `shutdown()` is meaningless on a connection that was never established.
+  Note the loopback target is what makes this measurable at all; a firewall-refused
+  LAN host takes ~9 s per dial and would turn the same run into six minutes.
+- **Two OTHER pre-existing `MeatSocket` defects remain, deliberately.** `close()`
+  calls `closesocket(sock)` and only then `shutdown(sock, 0)`, which is a shutdown
+  on an already-closed descriptor - correcting the order would start sending a FIN
+  where today it is a no-op, a real change to teardown across `tcp://`, `telnet://`
+  and `irc.h`, so it wants its own decision. And `connect()` passes
+  `sizeof(struct sockaddr_in6)` as the addrlen for a `sockaddr_in`.
 - **`ATZ` and `ATH` emit `NO CARRIER` *and* `OK`.** Confirmed on hardware. A real
   Hayes `ATH` answers `OK` alone and uses `NO CARRIER` as the unsolicited
   loss report - but scripts key off `NO CARRIER` to learn a call ended, so emitting
@@ -843,6 +861,23 @@ on demand.
 console, which makes a transfer look like it dropped a line when every byte is
 present. An integrity check over a captured log must re-join lines before counting,
 or it will report a loss that did not happen.
+
+**Modem mode cannot be driven through the debug skill's capture daemon, and the
+reason is one line of Python.** `serial_capture.py` does
+`cmd_text = cmd_data.decode(...).strip()` and then writes `cmd_text + "\n"`, so a
+trailing CR can never reach the board - and the modem's command terminator is S3,
+which is CR. The shell is unaffected because the console driver translates RX CR to
+LF for it, but modem mode installs `ConsoleRawIOGuard`, which turns that translation
+off. The symptom is precise and easy to misread: the modem ECHOES `AT` and then
+answers nothing at all, because it is still waiting for the end of the line. Drive
+modem mode with pyserial directly instead, writing `b"AT\r"`.
+
+**Closing the port from pyserial REBOOTS the board**, via the DTR/RTS auto-reset
+circuit. That is convenient for a measurement wanting a clean slate each run - it is
+why the socket-exhaustion figure above reproduced exactly - but it means a script
+cannot close the port and re-open it to check that some state PERSISTED: the state
+is gone either way, and a "recovered" reading proves nothing. Do the whole of such a
+measurement inside one open port.
 
 ## Recent Changes (September 13, 2026)
 
