@@ -74,6 +74,22 @@ public:
 
         if (err != 0) {
             Debug_printv("Socket unable to connect: errno %d", errno);
+            // Close it here, because nothing else will. TCPMSession::disconnect()
+            // returns early unless `connected` is set, and a failed connect()
+            // never sets it -- so the session destructor does not clean this up
+            // and every failed dial cost a descriptor permanently. Measured on a
+            // freenove-esp32-s3-wroom-1: eleven refused dials exhausted all 16
+            // sockets (CONFIG_LWIP_MAX_SOCKETS) and the twelfth could not create
+            // one at all (errno 23), leaving the board unable to open any
+            // connection until it was rebooted.
+            //
+            // Resetting sock matters as much as closing it: isOpen() is
+            // `sock != -1`, so the object would otherwise report itself OPEN on a
+            // dead descriptor. closesocket() directly rather than the member
+            // close(), because shutdown() is meaningless on a connection that was
+            // never established.
+            closesocket(sock);
+            sock = -1;
             return false;
         }
         Debug_printv("After connect for socket");
