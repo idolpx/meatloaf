@@ -661,6 +661,70 @@ gitignored.
 - **A Range request must ask for exactly what is wanted.** `rangeEnd` was `position + size + 5`, over-fetching 6 bytes on every request. That existed only to guarantee a short read, because the re-page test was `bytesRead > 0 && bytesRead < size` and a range consumed EXACTLY returns 0 next time, which was indistinguishable from real EOF. The margin left 6 unconsumed bytes in every response, so a caller that seeks rather than reading straight through slid 6 bytes further out of alignment per request. Fixed at the cause: a 0-byte read now means "range exhausted" whenever the total size is known and `_position` has not reached it, and it re-reads from the newly opened range rather than reporting EOF.
 - **`patch_framework.py` must be enabled in `platformio.ini`, and it is gitignored so nothing warns when it is not.** It was commented out locally while `platformio.ini.sample` had it on, so esp-idf#18359 was unpatched on framework-espidf@3.50503.0 and a D64 over HTTP aborted with `assert failed: http_on_body esp_http_client.c:318 (res_buffer->orig_raw_data == res_buffer->raw_data)` — body bytes arriving during `fetch_headers` on a handle whose previous response was left partly consumed. Still required at this version: 3.50503.0 is IDF 5.5.3 and upstream's own fix (`esp_http_client_clear_response_buffer()`, which `openAndFetchHeaders()` already has an `ESP_IDF_VERSION`-guarded call waiting for) lands in 5.5.5. **Check for the `MEATLOAF-PATCH` marker in the framework's `esp_http_client.c` before debugging any stale-buffer HTTP symptom.**
 
+## Recent Changes (September 17, 2026)
+
+### Modem mode: a terminal's init string no longer answers ERROR
+
+A terminal program configures the modem before it dials, and what it sends
+describes HARDWARE - carrier detect, DTR, flow control, speaker volume. None of
+that can exist over a socket, and every one of those verbs failed the whole line
+with `ERROR`. Some terminal software reads that as "there is no modem here" and
+gives up, so a perfectly good connection was unreachable for a reason that had
+nothing to do with the connection.
+
+Thirteen verbs are now accepted and ignored - `B` `L` `M` `N` `W` `Y` and `&C`
+`&D` `&K` `&G` `&Q` `&R` `&T` - `ATDP` (pulse) is accepted as a dial modifier,
+and `AT&V` is aliased to the `ATI1` settings report.
+
+- **The accept list is EXPLICIT, never "anything unrecognised is OK".** A typo
+  must still be reported, or a mistyped command silently answers OK and the user
+  is left wondering why nothing happened. `ATG` and `AT&Z1` both answer `ERROR`.
+  `verb_is_accepted_and_ignored()` in `at_parser.cpp` is the list, and
+  `executeCommand()` carries the matching no-op cases in both switches.
+  **The native suite pins this with a mutation check**: making that function
+  return true unconditionally fails
+  `test_parse_still_rejects_a_verb_that_means_nothing` and NOTHING else - the
+  pre-existing unknown-verb test uses `ATE0@`, a non-alpha character, so it
+  cannot reach a widened letter list. That is exactly the "a suite that cannot
+  reach the defect it exists for" trap the g64 and nib entries document.
+- **`ATDP`'s `P` is accepted and DROPPED, not stored in `mods`.** `doDial()`
+  falls back to a phonebook entry's own modifiers only when the dial line
+  carried none (`modem.cpp:548`), so a retained `P` would have suppressed a
+  stored `T` and dialled a telnet entry as raw `tcp://`. The parser skips it in
+  the modifier loop, which keeps `cmd.mods` meaning "modifiers that do
+  something" and leaves the phonebook fallback intact.
+- **The ignored verbs do NOT range-check their numeric suffix** - `AT&D9` is
+  accepted - because nothing reads the number. `ATX` still range-checks its
+  `0..4`, since there the value selects behaviour. The asymmetry is deliberate;
+  `ATE`/`ATQ`/`ATV` accept any number and coerce to bool, which is pre-existing
+  and was left alone.
+- **`AT&V` reports only the settings that exist.** The ignored verbs are
+  deliberately NOT echoed back as though they had been stored - a register that
+  accepts a value and reports it back while doing nothing is worse than one that
+  refuses, which is the rule the S7 finding already established.
+- **A line that fails to PARSE is rejected whole and applies nothing**, which is
+  stricter than a real Hayes modem and is the documented intent ("stops a line
+  like `AT&S62=1DT"bad"` from half-applying silently"). The left-to-right stop
+  is a different layer: it applies to commands that parse and then fail at
+  EXECUTION. Both were checked separately on hardware, because a test that
+  conflates them reads as a regression when it is not - `ATE1&C1J&D2` answers
+  `parse error at 7` and leaves `E0` in force, while `ATE1X9` answers `ERROR`
+  with `E1` applied and `X` still 4.
+- **Hardware-verified on a freenove-esp32-s3-wroom-1** over serial, driven with
+  pyserial directly (the capture daemon strips the CR the modem needs): the init
+  string `ATE0V1&C1&D2&K3S0=0` answers `OK` as ONE line with `ATI1` afterwards
+  confirming `E0 Q0 V1 X4` and `S0=0`; each of the thirteen verbs answers `OK`
+  alone; `ATG` and `AT&Z1` answer `ERROR`; `AT&V` prints the settings;
+  `ATDP"127.0.0.1:4131"` dials, is refused with errno 104 and answers
+  `NO ANSWER`; and `AT+SHELL` returns to a usable shell. Native suite
+  `test_modem_at` 83/83. Build unchanged at RAM 31.0% / Flash 40.6%.
+- **Still not done, and each is its own decision**: `ATA` stays stubbed (phase 3
+  owns it); the dial modifiers `;` `,` `W` `@` `!` `$` are still refused, and
+  `;` in particular is NOT a no-op - it means "return to command mode after
+  dialling", which is real behaviour and not something to accept and ignore;
+  `CONNECT` still carries no speed; `ATDL` (redial) does not exist; and `S41` is
+  still declared and referenced nowhere.
+
 ## Recent Changes (September 16, 2026)
 
 ### Modem mode tasks 9-12: independent review and hardware verification
