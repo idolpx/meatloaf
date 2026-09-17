@@ -33,6 +33,21 @@
 #define IEC_USE_INVERTED_LINE_DRIVERS
 #endif
 
+#ifdef IEC_SPLIT_SRQ
+#if !defined(PIN_IEC_SRQ_IN)
+#error "IEC_SPLIT_SRQ requires PIN_IEC_SRQ_IN"
+#elif !defined(PIN_IEC_SRQ_OUT)
+#error "IEC_SPLIT_SRQ requires PIN_IEC_SRQ_OUT"
+#else
+static_assert(PIN_IEC_SRQ_IN != PIN_IEC_SRQ_OUT,
+              "IEC_SPLIT_SRQ requires different input and output pins");
+#endif
+#endif
+
+#if defined(IEC_USE_LINE_DRIVERS) || defined(IEC_SPLIT_SRQ)
+#define IEC_USE_SRQ_LINE_DRIVER
+#endif
+
 // un-comment this if you are using inverters on the IEC bus input signals
 // (only has an effect if IEC_USE_LINE_DRIVERS is also enabled)
 //#define IEC_USE_INVERTED_INPUTS

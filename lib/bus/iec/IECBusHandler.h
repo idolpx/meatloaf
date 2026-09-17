@@ -54,10 +54,14 @@ class IECBusHandler
   // gets called at least once evey millisecond, otherwise "device not present" 
   // errors may result
 #ifdef IEC_USE_LINE_DRIVERS
-  IECBusHandler(uint8_t pinATN, uint8_t pinCLKin, uint8_t pinCLKout, uint8_t pinDATAin, uint8_t pinDATAout, uint8_t pinRESET = 0xFF, uint8_t pinCTRL = 0xFF, uint8_t pinSRQ = 0xFF);
+  IECBusHandler(uint8_t pinATN, uint8_t pinCLKin, uint8_t pinCLKout, uint8_t pinDATAin, uint8_t pinDATAout, uint8_t pinRESET = 0xFF, uint8_t pinCTRL = 0xFF, uint8_t pinSRQ = 0xFF
 #else
-  IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinDATA, uint8_t pinRESET = 0xFF, uint8_t pinCTRL = 0xFF, uint8_t pinSRQ = 0xFF);
+  IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinDATA, uint8_t pinRESET = 0xFF, uint8_t pinCTRL = 0xFF, uint8_t pinSRQ = 0xFF
 #endif
+#ifdef IEC_SPLIT_SRQ
+                , uint8_t pinSRQout = 0xFF
+#endif
+                );
 
   // must be called once at startup before the first call to "task", devnr
   // is the IEC bus device number that this device should react to
@@ -158,6 +162,9 @@ class IECBusHandler
   uint8_t m_pinATN, m_pinCLK, m_pinDATA, m_pinRESET, m_pinSRQ, m_pinCTRL;
 #ifdef IEC_USE_LINE_DRIVERS
   uint8_t m_pinCLKout, m_pinDATAout;
+#endif
+#ifdef IEC_SPLIT_SRQ
+  uint8_t m_pinSRQout;
 #endif
 
   // IECHost acts as bus master and needs direct access to the low-level

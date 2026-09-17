@@ -244,31 +244,41 @@ bool IECBusHandler::waitPinCLK(bool state, uint16_t timeout)
 
 void IECBusHandler::sendSRQ()
 {
-  if( m_pinSRQ!=0xFF )
-    {
-#if !defined(IEC_USE_LINE_DRIVERS)
-      digitalWrite(m_pinSRQ, LOW);
-      pinMode(m_pinSRQ, OUTPUT);
-      delayMicrosecondsISafe(1);
-      pinMode(m_pinSRQ, INPUT);
-#elif defined(IEC_USE_INVERTED_LINE_DRIVERS)
-      digitalWrite(m_pinSRQ, HIGH);
-      delayMicrosecondsISafe(1);
-      digitalWrite(m_pinSRQ, LOW);
+#ifdef IEC_SPLIT_SRQ
+  const uint8_t pinSRQ = m_pinSRQout;
 #else
-      digitalWrite(m_pinSRQ, LOW);
+  const uint8_t pinSRQ = m_pinSRQ;
+#endif
+
+  if( pinSRQ!=0xFF )
+    {
+#if !defined(IEC_USE_SRQ_LINE_DRIVER)
+      digitalWrite(pinSRQ, LOW);
+      pinMode(pinSRQ, OUTPUT);
       delayMicrosecondsISafe(1);
-      digitalWrite(m_pinSRQ, HIGH);
+      pinMode(pinSRQ, INPUT);
+#elif defined(IEC_USE_INVERTED_LINE_DRIVERS)
+      digitalWrite(pinSRQ, HIGH);
+      delayMicrosecondsISafe(1);
+      digitalWrite(pinSRQ, LOW);
+#else
+      digitalWrite(pinSRQ, LOW);
+      delayMicrosecondsISafe(1);
+      digitalWrite(pinSRQ, HIGH);
 #endif
     }
 }
 
 
 #ifdef IEC_USE_LINE_DRIVERS
-IECBusHandler::IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinCLKout, uint8_t pinDATA, uint8_t pinDATAout, uint8_t pinRESET, uint8_t pinCTRL, uint8_t pinSRQ)
+IECBusHandler::IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinCLKout, uint8_t pinDATA, uint8_t pinDATAout, uint8_t pinRESET, uint8_t pinCTRL, uint8_t pinSRQ
 #else
-IECBusHandler::IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinDATA, uint8_t pinRESET, uint8_t pinCTRL, uint8_t pinSRQ)
+IECBusHandler::IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinDATA, uint8_t pinRESET, uint8_t pinCTRL, uint8_t pinSRQ
 #endif
+#ifdef IEC_SPLIT_SRQ
+                             , uint8_t pinSRQout
+#endif
+                             )
 #if defined(IEC_SUPPORT_PARALLEL)
 #if defined(IEC_SUPPORT_PARALLEL_XRA1405)
 #if defined(ESP_PLATFORM)
@@ -349,6 +359,9 @@ IECBusHandler::IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinDATA, ui
   m_pinCLKout    = pinCLKout;
   m_pinDATAout   = pinDATAout;
 #endif
+#ifdef IEC_SPLIT_SRQ
+  m_pinSRQout    = pinSRQout;
+#endif
 
 #if defined(IEC_SUPPORT_FASTLOAD)
 #if IEC_DEFAULT_FASTLOAD_BUFFER_SIZE>254
@@ -414,20 +427,31 @@ void IECBusHandler::begin()
   pinMode(m_pinDATAout, OUTPUT);
   writePinCLK(HIGH);
   writePinDATA(HIGH);
-  if( m_pinSRQ<0xFF )
-    {
-#if defined(IEC_USE_INVERTED_LINE_DRIVERS)
-      digitalWrite(m_pinSRQ, LOW);
-#else
-      digitalWrite(m_pinSRQ, HIGH);
-#endif
-      pinMode(m_pinSRQ, OUTPUT);
-    }
 #else
   // set pins to output 0 (when in output mode)
-  pinMode(m_pinCLK,  OUTPUT); digitalWrite(m_pinCLK, LOW); 
-  pinMode(m_pinDATA, OUTPUT); digitalWrite(m_pinDATA, LOW); 
-  if( m_pinSRQ<0xFF ) pinMode(m_pinSRQ,   INPUT);
+  pinMode(m_pinCLK,  OUTPUT); digitalWrite(m_pinCLK, LOW);
+  pinMode(m_pinDATA, OUTPUT); digitalWrite(m_pinDATA, LOW);
+#endif
+
+#ifdef IEC_SPLIT_SRQ
+  if( m_pinSRQ<0xFF ) pinMode(m_pinSRQ, INPUT);
+  const uint8_t pinSRQout = m_pinSRQout;
+#else
+  const uint8_t pinSRQout = m_pinSRQ;
+#endif
+
+#if defined(IEC_USE_SRQ_LINE_DRIVER)
+  if( pinSRQout<0xFF )
+    {
+#if defined(IEC_USE_INVERTED_LINE_DRIVERS)
+      digitalWrite(pinSRQout, LOW);
+#else
+      digitalWrite(pinSRQout, HIGH);
+#endif
+      pinMode(pinSRQout, OUTPUT);
+    }
+#else
+  if( m_pinSRQ<0xFF ) pinMode(m_pinSRQ, INPUT);
 #endif
 
   pinMode(m_pinATN,   INPUT);
