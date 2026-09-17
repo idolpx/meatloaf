@@ -723,6 +723,18 @@ other consumer still gets - only the modem passes anything else.
   a descriptor left non-blocking, which no native test can reach. A refused
   port still answers at 0.05 s with errno 104, and 41 bounded dials produced
   no errno 23, so the socket-leak fix holds through the new early returns.
+- **`ATDT` is bounded too, and was checked separately.** Every other leg above
+  used `ATD`, which builds `tcp://`; `ATDT` builds `telnet://` and reaches the
+  socket only through `TelnetMStream`'s forward to its inner stream - the one
+  part of this with no evidence behind it until it was dialled. `ATS7=3` against
+  the same black hole ends at 3.06 s with errno 116 on BOTH `ATDT` and `ATD`.
+  Worth the extra dial: `ATDT` and `S62` are what terminal software actually
+  sends, so an unbounded telnet path would have left the common case broken.
+- **S7 only governs a dial that actually opens a socket.** `obtain()` applies it
+  on the create path, so redialling the same host:port inside the SessionBroker
+  window reuses the session, `connect()` returns early on `connected`, and a new
+  S7 governs nothing - correct, since there is no connect to bound, but it means
+  a changed S7 does not necessarily take effect on the very next dial.
 - **Still not done: a dial cannot be INTERRUPTED from the keyboard.** Nothing
   services the ports while it blocks, so S7 ends a dial by itself and the
   keyboard still cannot. `drainRx()` continues to discard what was typed.
