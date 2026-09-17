@@ -149,6 +149,17 @@ public:
         _size = size;
     };
 
+    // Bound the connect this stream will make, in milliseconds; 0 (the
+    // default) leaves it unbounded, which is what every stream did before.
+    // Must be called BEFORE open() -- a connecting stream obtains and connects
+    // its session inside open(), so afterwards there is nothing left to bound.
+    //
+    // A no-op virtual here rather than a cast at the call site: the dial path
+    // holds a shared_ptr<MStream> and this build has no RTTI, so it cannot
+    // narrow to the concrete stream to ask. Streams that do not connect to
+    // anything correctly ignore it.
+    virtual void setConnectTimeout(uint32_t ms) { (void)ms; };
+
     virtual uint32_t available() {
         if ( _position > _size )
             return 0;

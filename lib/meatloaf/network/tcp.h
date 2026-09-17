@@ -25,6 +25,9 @@
 #include "lwip/sockets.h"
 #include "lwip/netdb.h"
 
+#include <fcntl.h>
+#include <esp_timer.h>
+
 #include "meatloaf.h"
 #include "meat_session.h"
 
@@ -38,13 +41,105 @@ class MeatSocket {
     uint8_t iecPort = 0;
     bool blocking = false;
 
+private:
+    // A connect bounded by timeout_ms. Returns 0 on success and -1 on failure
+    // with errno set to something worth logging (ETIMEDOUT when the bound
+    // expired), so the caller's existing failure path reads the same either way.
+    //
+    // The descriptor is restored to BLOCKING on every exit, success included.
+    // write() calls send() with no flags, so a descriptor left O_NONBLOCK would
+    // answer EAGAIN instead of blocking -- and only on dials that set a bound,
+    // which is the worst shape of divergence: the default path stays correct
+    // and nobody notices.
+    int connectBounded(struct sockaddr_in &dest_addr, uint32_t timeout_ms)
+    {
+        int flags = fcntl(sock, F_GETFL, 0);
+        if (flags < 0 || fcntl(sock, F_SETFL, flags | O_NONBLOCK) < 0)
+        {
+            // Cannot go non-blocking. Dial unbounded rather than refuse to dial
+            // at all -- an unbounded connect is what this did before.
+            return connect(sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
+        }
+
+        int err = connect(sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
+        if (err == 0)
+        {
+            fcntl(sock, F_SETFL, flags);
+            return 0;
+        }
+
+        // A refused port answers HERE, immediately, not through select() --
+        // loopback does exactly that with errno 104. Only EINPROGRESS means
+        // "ask again later"; anything else is the real answer already, and
+        // waiting out the bound would turn a one-second failure into a slow one
+        // and replace its errno with whatever SO_ERROR reports.
+        if (errno != EINPROGRESS)
+        {
+            int saved = errno;
+            fcntl(sock, F_SETFL, flags);
+            errno = saved;
+            return -1;
+        }
+
+        // An ABSOLUTE deadline, because select() may return early: one call is
+        // not the bound, it has to be re-armed with the time that is left.
+        int64_t deadline = esp_timer_get_time() + (int64_t)timeout_ms * 1000;
+        for (;;)
+        {
+            int64_t left = deadline - esp_timer_get_time();
+            if (left <= 0)
+            {
+                fcntl(sock, F_SETFL, flags);
+                errno = ETIMEDOUT;
+                return -1;
+            }
+
+            struct timeval tv;
+            tv.tv_sec = (time_t)(left / 1000000);
+            tv.tv_usec = (suseconds_t)(left % 1000000);
+
+            fd_set wfds;
+            FD_ZERO(&wfds);
+            FD_SET(sock, &wfds);
+
+            // nfds is the highest descriptor PLUS ONE. Passing sock alone never
+            // reports ready, which presents as the bound always firing.
+            int r = select(sock + 1, NULL, &wfds, NULL, &tv);
+            if (r > 0)
+            {
+                int so_err = 0;
+                socklen_t len = sizeof(so_err);
+                if (getsockopt(sock, SOL_SOCKET, SO_ERROR, &so_err, &len) < 0)
+                    so_err = errno;
+                fcntl(sock, F_SETFL, flags);
+                if (so_err != 0)
+                {
+                    errno = so_err;
+                    return -1;
+                }
+                return 0;
+            }
+            if (r == 0 || errno == EINTR)
+                continue;  // expired or woken early: re-arm with what is left
+
+            int saved = errno;
+            fcntl(sock, F_SETFL, flags);
+            errno = saved;
+            return -1;
+        }
+    }
+
 public:
     MeatSocket() {};
     MeatSocket(int s, uint8_t iecp) : sock(s), iecPort(iecp) {
         // for socket created by our server
     }
 
-    bool open(const char *address, u16_t port) {
+    // timeout_ms bounds the connect. Zero means UNBOUNDED, which is exactly
+    // what every caller got before this parameter existed -- real modems split
+    // on what S7=0 should mean, and preserving the old behaviour is the reading
+    // that cannot regress anything. Only the modem passes a non-zero value.
+    bool open(const char *address, u16_t port, uint32_t timeout_ms = 0) {
         struct sockaddr_in dest_addr;
         memset(&dest_addr, 0, sizeof(dest_addr));
         dest_addr.sin_family = AF_INET;
@@ -70,7 +165,9 @@ public:
         }
         //Debug_printv("Socket created, connecting to %s:%d (%x)", address, port, dest_addr.sin_addr.s_addr);
 
-        int err = connect(sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
+        int err = (timeout_ms == 0)
+                      ? connect(sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6))
+                      : connectBounded(dest_addr, timeout_ms);
 
         if (err != 0) {
             Debug_printv("Socket unable to connect: errno %d", errno);
@@ -161,7 +258,7 @@ public:
             return false;
         }
 
-        if (!_socket.open(host.c_str(), port)) {
+        if (!_socket.open(host.c_str(), port, connect_timeout_ms)) {
             Debug_printv("TCPMSession connect failed for %s:%d", host.c_str(), port);
             connected = false;
             return false;
@@ -320,6 +417,10 @@ public:
     TCPMStream(std::string path): MStream(path) {
         //url = path;
     };
+
+    // Bounds the connect this stream is about to make. It has to be set
+    // BEFORE open(), because the session is obtained and connected inside it.
+    void setConnectTimeout(uint32_t ms) override { connect_timeout_ms_ = ms; }
     ~TCPMStream() {
         close();
     };
@@ -370,11 +471,20 @@ public:
         }
 
         uint16_t tcp_port = p->getPort();
-        _session = SessionBroker::obtain<TCPMSession>(p->host, tcp_port);
+        _session = SessionBroker::obtain<TCPMSession>(p->host, tcp_port,
+                                                      connect_timeout_ms_);
         if (!_session) {
             Debug_printv("TCPMStream: failed to obtain session for %s:%d", p->host.c_str(), tcp_port);
             return false;
         }
+
+        // The session is shared per host:port, so this is set every time rather
+        // than once at construction: a later dial with a different S7 must get
+        // its own bound, not the one the first caller happened to leave.
+        // Also set on the session object itself. obtain() already applied it to
+        // a session it CREATED; this covers one it returned from the repo,
+        // which is already connected now but may reconnect later.
+        _session->connect_timeout_ms = connect_timeout_ms_;
 
         if (!_session->connect()) {
             Debug_printv("TCPMStream: failed to connect to %s:%d", p->host.c_str(), tcp_port);
@@ -434,6 +544,9 @@ protected:
     // cleared except by open()/close() -- a closed TCP connection never
     // produces another byte.
     bool eof_ = false;
+    // Bound for the connect open() makes. 0 = unbounded, which is what every
+    // consumer that never calls setConnectTimeout() keeps getting.
+    uint32_t connect_timeout_ms_ = 0;
 };
 
 

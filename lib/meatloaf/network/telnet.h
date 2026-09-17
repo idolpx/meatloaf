@@ -55,6 +55,12 @@ public:
     bool open(std::ios_base::openmode mode) override;
     void close() override;
 
+    // Forwarded: this layer never connects anything itself, the inner
+    // TCPMStream does. Must be called before open(), as on the inner stream.
+    void setConnectTimeout(uint32_t ms) override {
+        if (inner_) inner_->setConnectTimeout(ms);
+    }
+
     uint32_t read(uint8_t *buf, uint32_t size) override;
     uint32_t write(const uint8_t *buf, uint32_t size) override;
 

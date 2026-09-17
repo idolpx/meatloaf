@@ -604,6 +604,20 @@ bool Modem::doDial(const AtCommand &cmd, bool &reported)
     if (file != nullptr)
         stream = file->getSourceStream(std::ios_base::in | std::ios_base::out);
 
+    // S7 is the Hayes "wait for carrier" register, in seconds. It has to be
+    // applied BEFORE opening: a connecting stream obtains and connects its
+    // session inside open(), so afterwards there is nothing left to bound.
+    //
+    // S7 == 0 keeps the connect UNBOUNDED rather than meaning "give up at
+    // once". Real modems split on that reading, and this is the one that
+    // cannot turn a dial that works today into one that never connects.
+    if (stream != nullptr)
+    {
+        long s7 = settings_.getRegister(AT_S_CONNTIMEOUT);
+        if (s7 > 0)
+            stream->setConnectTimeout((uint32_t)s7 * 1000);
+    }
+
     // Open it, do not merely ask whether it is open. TelnetMStream is
     // constructed CLOSED and opens lazily on its first read()/write(), so a
     // freshly created one always answers isOpen() == false however well the
@@ -623,9 +637,10 @@ bool Modem::doDial(const AtCommand &cmd, bool &reported)
     // dial came back as `parse error at 0 in [PING two]` and `... in [+++ATH]`,
     // one ERROR per line, after the dial had already finished.
     //
-    // This is a DISCARD, not an abort. The dial still runs to completion and
-    // there is still no way to interrupt one -- S7 is settable and reported by
-    // ATI but bounds nothing (see AGENTS.md). Dropping the bytes only stops
+    // This is a DISCARD, not an abort. S7 now bounds how long the connect may
+    // take, so a dial ends by itself rather than running as long as the network
+    // makes it -- but it still cannot be INTERRUPTED from the keyboard, because
+    // nothing services the ports while it blocks. Dropping the bytes only stops
     // them being re-read as commands; it does not make the abort work.
     //
     // The early returns above (BUSY, NO_DIALTONE, a phonebook miss, a bad
