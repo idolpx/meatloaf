@@ -577,9 +577,29 @@ bool Modem::doDial(const AtCommand &cmd, bool &reported)
     // NO ANSWER for every telnet dial, with the socket already established.
     // A dial has to settle CONNECT versus NO ANSWER now rather than on some
     // later first byte, so this is the one place that must open eagerly.
-    if (stream == nullptr ||
-        (!stream->isOpen() &&
-         !stream->open(std::ios_base::in | std::ios_base::out)))
+    bool opened = (stream != nullptr &&
+                   (stream->isOpen() ||
+                    stream->open(std::ios_base::in | std::ios_base::out)));
+
+    // A dial BLOCKS for however long the connect takes -- about 9 s to an
+    // unreachable host on this network, longer to one that drops SYNs -- and
+    // nothing services the ports meanwhile, so everything typed during it is
+    // still sitting in the RX buffer. Executing it afterwards is worse than
+    // ignoring it: `PING two`, `+++` and `ATH` banged in to give up on a slow
+    // dial came back as `parse error at 0 in [PING two]` and `... in [+++ATH]`,
+    // one ERROR per line, after the dial had already finished.
+    //
+    // This is a DISCARD, not an abort. The dial still runs to completion and
+    // there is still no way to interrupt one -- S7 is settable and reported by
+    // ATI but bounds nothing (see AGENTS.md). Dropping the bytes only stops
+    // them being re-read as commands; it does not make the abort work.
+    //
+    // The early returns above (BUSY, NO_DIALTONE, a phonebook miss, a bad
+    // host:port) all happen before any of this blocks, so nothing has had a
+    // chance to queue and they need no drain.
+    drainRx();
+
+    if (!opened)
     {
         state_ = ModemState::COMMAND;
         sendResult(AtResult::NO_ANSWER);
@@ -596,6 +616,24 @@ bool Modem::doDial(const AtCommand &cmd, bool &reported)
     sendResult(AtResult::CONNECT);
     reported = true;
     return true;
+}
+
+// Only ATTACHED ports are drained, matching the two read loops: an unattached
+// port's buffer is not being consumed by anyone, so what sits in it did not
+// arrive during this dial and is not ours to throw away.
+void Modem::drainRx()
+{
+    uint8_t scratch[128];
+
+    Lock lock(mutex_);
+    for (size_t i = 0; i < MAX_PORTS; ++i)
+    {
+        if (ports_[i] == nullptr || !ports_[i]->isOpen() || !ports_[i]->attached())
+            continue;
+
+        while (ports_[i]->popRx(scratch, sizeof(scratch), 0) > 0)
+            ;
+    }
 }
 
 void Modem::doHangup()
@@ -665,7 +703,7 @@ void Modem::doInfo(long which)
         break;
 
     case 4:
-        out += std::string(FN_VERSION_FULL) + "\r\n";
+        out += std::string(FW_VERSION) + "\r\n";
         break;
 
     case 5:
@@ -678,7 +716,7 @@ void Modem::doInfo(long which)
         break;
 
     default:
-        out += "Meatloaf modem " + std::string(FN_VERSION_FULL) + "\r\n";
+        out += "Meatloaf " + std::string(FW_VERSION) + "\r\n";
         break;
     }
 

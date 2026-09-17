@@ -102,6 +102,9 @@ private:
 
     bool doDial(const AtCommand &cmd, bool &reported);
     void doHangup();
+
+    // Throw away whatever is queued on the attached ports' RX.
+    void drainRx();
     bool doReturnOnline(bool &reported);
     void doInfo(long which);
     bool doPhonebook(const AtCommand &cmd);
