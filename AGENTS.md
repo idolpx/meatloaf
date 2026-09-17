@@ -797,7 +797,33 @@ on demand.
   dial gets their abort attempt replayed as garbage once the dial finishes. That
   is the argument for bounding the dial with S7 rather than having `ATS7=` merely
   warn. A register that accepts a value and reports it back while doing nothing is
-  worse than one that refuses.
+  worse than one that refuses. **The replay half is FIXED and hardware-verified**
+  (2026-09-17): `doDial()` calls `drainRx()` once the connect has settled, on both
+  the `CONNECT` and `NO ANSWER` paths, so those bytes are discarded instead of
+  being re-read as command lines. It is a DISCARD, not an abort - the dial still
+  runs to completion and still cannot be interrupted. **The control is what makes
+  that evidence**: the same `PING two` / `+++ATH` typed at the modem prompt with no
+  dial in flight still produces 2 `parse error at 0 in [...]` lines and 2 `ERROR`s,
+  while typed during a dial it now produces zero of each - same firmware, same
+  input, same mode, the only difference being whether a dial was in flight. Without
+  that control a clean run proves nothing, since it is equally consistent with the
+  input never arriving. **Only ATTACHED ports are drained**, matching the two read
+  loops: an unattached port's buffer is not being consumed by anyone, so what sits
+  in it did not arrive during this dial. The `BUSY`/`NO_DIALTONE`/phonebook-miss/
+  bad-host:port early returns all precede the blocking work and need no drain.
+  **Bounding the dial with S7 is still NOT done, deliberately**: it needs a
+  non-blocking connect in `MeatSocket::open()` plus a per-dial timeout threaded
+  through `MFile`/`MStream`/`MSession`, which `irc.h` shares - and it cannot be
+  reproduced on this network, where every unreachable host answers EHOSTUNREACH in
+  about 9 s.
+- **Three pre-existing defects in `MeatSocket` (`lib/meatloaf/network/tcp.h`), found
+  while reading the connect path for the S7 work and deliberately NOT fixed.** The
+  one that matters: **`open()` leaks the descriptor on every failed connect** - it
+  returns false with `sock` still >= 0 and never closed, so each failed dial costs
+  an fd. Also `close()` calls `closesocket(sock)` and only then `shutdown(sock, 0)`,
+  which is a shutdown on an already-closed descriptor; and `connect()` passes
+  `sizeof(struct sockaddr_in6)` as the addrlen for a `sockaddr_in`. Any future work
+  that makes dialling cheaper or more frequent should fix the leak first.
 - **`ATZ` and `ATH` emit `NO CARRIER` *and* `OK`.** Confirmed on hardware. A real
   Hayes `ATH` answers `OK` alone and uses `NO CARRIER` as the unsolicited
   loss report - but scripts key off `NO CARRIER` to learn a call ended, so emitting
