@@ -241,6 +241,113 @@ void test_parse_unknown_verb_is_an_error_at_the_verb(void)
     TEST_ASSERT_EQUAL_UINT(4, err);
 }
 
+void test_parse_accepts_the_harmless_hayes_verbs_terminals_send(void)
+{
+    // A terminal's init string carries verbs for hardware a virtual modem
+    // does not have -- carrier detect, DTR, flow control, speaker volume.
+    // Each parses as an ordinary numeric-suffix command; executeCommand
+    // accepts and ignores them. Failing the line instead made real terminal
+    // software give up on the modem entirely.
+    const char *lines[] = {
+        "ATB0", "ATL3", "ATM1", "ATN1", "ATW2", "ATY0",
+        "AT&C1", "AT&D2", "AT&K3", "AT&G0", "AT&Q5", "AT&R1", "AT&T0",
+    };
+
+    for (const char *text : lines)
+    {
+        AtLine line;
+        size_t err = 0;
+        TEST_ASSERT_TRUE_MESSAGE(at_parse(text, line, &err), text);
+        TEST_ASSERT_EQUAL_UINT_MESSAGE(1, line.size(), text);
+    }
+}
+
+void test_parse_reads_a_full_terminal_init_string_as_one_line(void)
+{
+    // The shape that actually arrives from a terminal program, in one line.
+    // Every command must be present and in order -- a line that half-applies
+    // and then errors is the failure mode this change exists to remove.
+    AtLine line;
+    TEST_ASSERT_TRUE(at_parse("ATE0V1&C1&D2&K3S0=0", line, nullptr));
+    TEST_ASSERT_EQUAL_UINT(6, line.size());
+
+    TEST_ASSERT_EQUAL_CHAR('E', line[0].verb);
+    TEST_ASSERT_EQUAL_INT(0, line[0].number);
+    TEST_ASSERT_EQUAL_CHAR('V', line[1].verb);
+    TEST_ASSERT_EQUAL_INT(1, line[1].number);
+    TEST_ASSERT_EQUAL_CHAR('&', line[2].prefix);
+    TEST_ASSERT_EQUAL_CHAR('C', line[2].verb);
+    TEST_ASSERT_EQUAL_INT(1, line[2].number);
+    TEST_ASSERT_EQUAL_CHAR('&', line[3].prefix);
+    TEST_ASSERT_EQUAL_CHAR('D', line[3].verb);
+    TEST_ASSERT_EQUAL_INT(2, line[3].number);
+    TEST_ASSERT_EQUAL_CHAR('&', line[4].prefix);
+    TEST_ASSERT_EQUAL_CHAR('K', line[4].verb);
+    TEST_ASSERT_EQUAL_INT(3, line[4].number);
+    TEST_ASSERT_EQUAL_CHAR('S', line[5].verb);
+    TEST_ASSERT_EQUAL_INT(0, line[5].number);
+}
+
+void test_parse_accepts_view_configuration(void)
+{
+    // AT&V is a real command, not one of the ignored group: executeCommand
+    // aliases it to the ATI1 settings report.
+    AtLine line;
+    TEST_ASSERT_TRUE(at_parse("AT&V", line, nullptr));
+    TEST_ASSERT_EQUAL_UINT(1, line.size());
+    TEST_ASSERT_EQUAL_CHAR('&', line[0].prefix);
+    TEST_ASSERT_EQUAL_CHAR('V', line[0].verb);
+}
+
+void test_parse_still_rejects_a_verb_that_means_nothing(void)
+{
+    // The mutation guard for the two tests above: the accept list is
+    // explicit, so a typo is still reported rather than silently answering
+    // OK. Without this, widening the list to "any letter" passes everything
+    // else here. Both prefixes, since they have separate lists.
+    AtLine line;
+    size_t err = 0;
+
+    TEST_ASSERT_FALSE(at_parse("ATG", line, &err));
+    TEST_ASSERT_EQUAL_UINT(2, err);
+
+    err = 0;
+    TEST_ASSERT_FALSE(at_parse("ATE0&Z1", line, &err));
+    TEST_ASSERT_EQUAL_UINT(4, err);
+
+    // And a failure part way along still reports the position of the verb
+    // that failed, not the start of the line.
+    err = 0;
+    TEST_ASSERT_FALSE(at_parse("ATE0&C1J&D2", line, &err));
+    TEST_ASSERT_EQUAL_UINT(7, err);
+}
+
+void test_parse_accepts_pulse_as_a_dial_modifier_and_drops_it(void)
+{
+    // ATDP is pulse dialling, which has no meaning over a socket. It is
+    // accepted so a user typing it is not refused, and deliberately NOT kept
+    // in mods: doDial falls back to a phonebook entry's own modifiers only
+    // when the dial line carried none, so a retained 'P' would suppress a
+    // stored 'T' and dial a telnet entry as raw TCP.
+    AtLine line;
+    TEST_ASSERT_TRUE(at_parse("ATDP\"host:23\"", line, nullptr));
+    TEST_ASSERT_EQUAL_UINT(1, line.size());
+    TEST_ASSERT_EQUAL_CHAR('D', line[0].verb);
+    TEST_ASSERT_EQUAL_STRING("", line[0].mods.c_str());
+    TEST_ASSERT_EQUAL_STRING("host:23", line[0].arg.c_str());
+
+    // Mixed with a modifier that does mean something, only that one survives.
+    AtLine line2;
+    TEST_ASSERT_TRUE(at_parse("ATDPT\"host:23\"", line2, nullptr));
+    TEST_ASSERT_EQUAL_STRING("T", line2[0].mods.c_str());
+
+    // And a pulse-dialled phonebook entry is the same dial as ATD<n>.
+    AtLine line3;
+    TEST_ASSERT_TRUE(at_parse("ATDP5", line3, nullptr));
+    TEST_ASSERT_EQUAL_STRING("", line3[0].mods.c_str());
+    TEST_ASSERT_EQUAL_STRING("5", line3[0].arg.c_str());
+}
+
 void test_repeat_line_is_recognised_without_an_at_prefix(void)
 {
     TEST_ASSERT_TRUE(at_is_repeat("A/"));
@@ -1404,6 +1511,11 @@ int main(int, char **)
     RUN_TEST(test_parse_phonebook_list_form);
     RUN_TEST(test_parse_unterminated_quote_is_an_error_at_the_quote);
     RUN_TEST(test_parse_unknown_verb_is_an_error_at_the_verb);
+    RUN_TEST(test_parse_accepts_the_harmless_hayes_verbs_terminals_send);
+    RUN_TEST(test_parse_reads_a_full_terminal_init_string_as_one_line);
+    RUN_TEST(test_parse_accepts_view_configuration);
+    RUN_TEST(test_parse_still_rejects_a_verb_that_means_nothing);
+    RUN_TEST(test_parse_accepts_pulse_as_a_dial_modifier_and_drops_it);
     RUN_TEST(test_repeat_line_is_recognised_without_an_at_prefix);
 
     RUN_TEST(test_settings_factory_defaults);

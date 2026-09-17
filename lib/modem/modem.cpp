@@ -447,6 +447,31 @@ bool Modem::executeCommand(const AtCommand &cmd, bool &reported)
         case 'F':
             settings_.factory();
             return true;
+
+        case 'V':
+            // AT&V views the active configuration. ATI1 already reports the
+            // real settings, so it is an alias rather than a second renderer
+            // that could drift from it. Note it shows only settings that
+            // exist -- the commands below are accepted and do nothing, and
+            // are deliberately not echoed back as though they had been
+            // stored: a value reported back while doing nothing is worse
+            // than one refused.
+            doInfo(1);
+            return true;
+
+        // Accepted and ignored -- see verb_is_accepted_and_ignored() in
+        // at_parser.cpp for why each of these cannot mean anything here.
+        // Answering OK matters: a terminal program that gets ERROR from its
+        // init string can conclude there is no modem and stop.
+        case 'C':  // carrier detect (DCD) behaviour
+        case 'D':  // DTR behaviour
+        case 'K':  // flow control
+        case 'G':  // guard tone
+        case 'Q':  // async/sync mode
+        case 'R':  // RTS/CTS behaviour
+        case 'T':  // loopback self-test
+            return true;
+
         default:
             return false;
         }
@@ -512,6 +537,15 @@ bool Modem::executeCommand(const AtCommand &cmd, bool &reported)
     // succeed, which is a clearer answer than "unknown command".
     case 'A':
         return false;
+
+    // Accepted and ignored, as the ampersand-prefixed group above.
+    case 'B':  // communication standard (Bell/CCITT)
+    case 'L':  // speaker volume
+    case 'M':  // speaker control
+    case 'N':  // negotiate handshake speed
+    case 'W':  // connection-message content
+    case 'Y':  // long-space disconnect
+        return true;
 
     default:
         return false;

@@ -34,11 +34,42 @@ bool is_digit(char c)
     return c >= '0' && c <= '9';
 }
 
+// Verbs that describe hardware this modem does not have, accepted so that a
+// terminal's init string does not fail. Each is a real Hayes command whose
+// subject matter cannot exist over a socket: carrier detect and DTR are
+// modem-to-DTE signal lines, flow control has no DTE to throttle, and speaker
+// volume, dial tone and loopback self-test have no hardware behind them.
+// executeCommand answers OK and does nothing.
+//
+// This is an explicit list rather than "accept anything unrecognised" so that
+// a typo is still reported. The numeric suffix is NOT range-checked -- ATX
+// validates its 0..4 because the value selects behaviour, while nothing here
+// reads the number at all, so AT&D9 is accepted.
+bool verb_is_accepted_and_ignored(char prefix, char v)
+{
+    if (prefix == '&')
+        return v == 'C' ||   // carrier detect (DCD) behaviour
+               v == 'D' ||   // DTR behaviour
+               v == 'K' ||   // flow control
+               v == 'G' ||   // guard tone
+               v == 'Q' ||   // async/sync mode; a socket is already reliable
+               v == 'R' ||   // RTS/CTS behaviour
+               v == 'T';     // loopback self-test
+    return v == 'B' ||       // communication standard (Bell/CCITT)
+           v == 'L' ||       // speaker volume
+           v == 'M' ||       // speaker control
+           v == 'N' ||       // negotiate handshake speed
+           v == 'W' ||       // connection-message content
+           v == 'Y';         // long-space disconnect
+}
+
 // Verbs that take an optional numeric suffix and nothing else.
 bool verb_takes_number(char prefix, char v)
 {
+    if (verb_is_accepted_and_ignored(prefix, v))
+        return true;
     if (prefix == '&')
-        return v == 'W' || v == 'F';
+        return v == 'W' || v == 'F' || v == 'V';
     return v == 'E' || v == 'Q' || v == 'V' || v == 'X' || v == 'Z' ||
            v == 'O' || v == 'H' || v == 'I' || v == 'A';
 }
@@ -225,12 +256,23 @@ bool at_parse(const std::string &line, AtLine &out, size_t *err_pos)
         // ---- ATD[mods]"host:port" or ATD<digits> ---------------------------
         if (cmd.prefix == 0 && cmd.verb == 'D')
         {
-            // Phase 1 accepts T (telnet) and E (local echo). P, X and S are
+            // Phase 1 accepts T (telnet) and E (local echo). X and S are
             // phase 2 and later; they are rejected rather than silently
             // ignored, so a user is told rather than surprised.
+            //
+            // P (pulse) is accepted and DROPPED rather than kept: it has no
+            // meaning over a socket, and doDial falls back to a phonebook
+            // entry's own modifiers only when the dial line carried none, so
+            // a retained 'P' would suppress a stored 'T' and dial a telnet
+            // entry as raw TCP.
             while (i < line.size() && std::isalpha((unsigned char)line[i]))
             {
                 char m = upper(line[i]);
+                if (m == 'P')
+                {
+                    ++i;
+                    continue;
+                }
                 if (m != 'T' && m != 'E')
                     return fail(i);
                 cmd.mods.push_back(m);
