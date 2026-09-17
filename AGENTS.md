@@ -663,6 +663,78 @@ gitignored.
 
 ## Recent Changes (September 17, 2026)
 
+### Modem mode: S7 bounds the dial
+
+S7 is the Hayes "wait for carrier" register. It was settable, readable and
+printed by `ATI`, and bounded nothing - referenced exactly once in all of
+`lib/modem`, by the line that prints it. That mattered more than a cosmetic
+gap: a dial blocks the modem task completely, so until the network chose to
+answer there was no way to get the modem back.
+
+`MeatSocket::open()` now takes a timeout in milliseconds. Non-zero switches the
+connect to non-blocking and bounds it with `select()`; **zero is unbounded**,
+which is exactly what every caller got before, and is what `irc.h` and every
+other consumer still gets - only the modem passes anything else.
+
+- **Four things in the bounded connect are load-bearing and each fails
+  quietly on its own.** (1) The deadline is ABSOLUTE and `select()` is
+  **re-armed with the time that is left**; `select()` can return early, so
+  treating one call as the bound silently shortens it to whenever the first
+  wake happened. (2) `nfds` is `sock + 1` - passing `sock` alone never reports
+  ready, which presents as the bound always firing rather than as an error.
+  (3) The descriptor is restored to BLOCKING on every exit, success included:
+  `write()` calls `send()` with no flags, so one left `O_NONBLOCK` answers
+  EAGAIN, and *only on dials that set a bound* - the worst shape of divergence,
+  because the default path stays correct and nobody notices. (4) A `connect()`
+  returning non-zero with errno other than `EINPROGRESS` has already failed and
+  is NOT waited on - a refused port answers immediately (loopback, errno 104),
+  and waiting out the bound would turn a 0.05 s failure into a slow one and
+  replace its errno with whatever `SO_ERROR` reports.
+- **`SessionBroker::obtain()` both CREATES and CONNECTS, so a timeout set on
+  the session it hands back is applied after the connect it was meant to
+  bound.** This is the trap in the whole change and it cost a hardware round
+  trip: the plumbing looked right and did nothing, because `TCPMStream::open()`
+  sets the value on `_session` *after* `obtain()` returns. The bound is
+  therefore a parameter on `obtain()` itself, applied between construction and
+  `connect()`. Both it and `MSession::connect_timeout_ms` are defaulted to 0,
+  so no other call site changes. **The probe that settled it printed at each
+  hop**: `TCPMStream::setConnectTimeout(3000)` ran, `TCPMStream::open applying`
+  never did, and `TCPMSession::connect timeout=0` did - which says the connect
+  happened somewhere `open()` never reached.
+- **`MSession::connect_timeout_ms` is a member, not a parameter on
+  `connect()`.** That virtual is implemented by every protocol here (FTP, HTTP,
+  SMB, NFS, AFP, ...) and widening its signature to serve one of them would
+  touch all of them.
+- **`MStream::setConnectTimeout()` is a no-op virtual**, not a cast at the call
+  site: the dial path holds a `shared_ptr<MStream>` and this build has no RTTI,
+  so it cannot narrow to the concrete stream to ask. `TelnetMStream` forwards
+  it to its inner stream; streams that connect to nothing ignore it correctly.
+  It must be called BEFORE `open()`, since that is where the session is
+  obtained and connected.
+- **Hardware-verified** on a freenove-esp32-s3-wroom-1 against `192.0.2.1:23`
+  (TEST-NET-1), 11 checks, 0 failed, reproduced across two runs.
+  **`ATS7=3` ends the dial at 3.07 s with errno 116 (ETIMEDOUT)** - the bound
+  firing - while **`ATS7=10` ends at 9.22 s with errno 113 (EHOSTUNREACH)**,
+  the network answering inside the bound. Differing in BOTH the time and the
+  errno is what makes this evidence: it shows a real ceiling rather than a
+  fixed timeout elsewhere, and that a generous S7 leaves the ordinary failure
+  path untouched. A reachable host under `ATS7=3` still connects in 0.05 s and
+  carries 4567 bytes with `+++` / `ATO` / `ATH` intact - the check that catches
+  a descriptor left non-blocking, which no native test can reach. A refused
+  port still answers at 0.05 s with errno 104, and 41 bounded dials produced
+  no errno 23, so the socket-leak fix holds through the new early returns.
+- **Still not done: a dial cannot be INTERRUPTED from the keyboard.** Nothing
+  services the ports while it blocks, so S7 ends a dial by itself and the
+  keyboard still cannot. `drainRx()` continues to discard what was typed.
+
+**The native baseline is now FIVE erroring suites, not the three recorded
+earlier**: `test_arc_read` and `test_ps2_keys` join `test_EdUrlParser`,
+`test_hdd_read` and `test_strings`. Both were confirmed pre-existing by
+stashing and re-running, and neither is related to any modem work -
+`test_arc_read` has a test-source bug (`Known` has no member `data`, `media`
+not declared at `test_arc_read.cpp:178`) and `test_ps2_keys` is missing the
+header `scan_codes_set_2.h`. Full suite: 403 cases, 388 succeeded, 10 skipped.
+
 ### Modem mode: a terminal's init string no longer answers ERROR
 
 A terminal program configures the modem before it dials, and what it sends
@@ -846,10 +918,11 @@ needs no inbound rule: it answers and then CLOSES, which is a peer-initiated FIN
 on demand.
 
 **Findings still open**, none of them fixed by this review:
-- **S7 is settable, readable and reported by `ATI`, and does nothing.** It is
-  referenced exactly once in all of `lib/modem` - `modem.cpp:653`, which prints it.
-  No dial is bounded by it, and a dial in progress cannot be interrupted: commands
-  typed during one are queued, not serviced. The "wedge on an unreachable host"
+- **S7 was settable, readable and reported by `ATI`, and did nothing. FIXED
+  2026-09-17 - see the September 17 entry above.** It was referenced exactly once
+  in all of `lib/modem`, by the line that prints it. No dial was bounded by it,
+  and a dial in progress still cannot be interrupted: commands typed during one
+  are queued, not serviced. The "wedge on an unreachable host"
   half of this could not be reproduced here - every unreachable destination on this
   network answers EHOSTUNREACH (errno 113) in about 9 s - so it is a network fact,
   not evidence the code is safe. **What the queued commands then do is worse than
@@ -875,11 +948,14 @@ on demand.
   loops: an unattached port's buffer is not being consumed by anyone, so what sits
   in it did not arrive during this dial. The `BUSY`/`NO_DIALTONE`/phonebook-miss/
   bad-host:port early returns all precede the blocking work and need no drain.
-  **Bounding the dial with S7 is still NOT done, deliberately**: it needs a
-  non-blocking connect in `MeatSocket::open()` plus a per-dial timeout threaded
-  through `MFile`/`MStream`/`MSession`, which `irc.h` shares - and it cannot be
-  reproduced on this network, where every unreachable host answers EHOSTUNREACH in
-  about 9 s.
+  **Bounding the dial with S7 is now DONE** (2026-09-17): a non-blocking connect
+  in `MeatSocket::open()` plus a timeout threaded through
+  `MStream`/`MSession`/`SessionBroker::obtain()`, defaulted to 0 so `irc.h` and
+  every other consumer are unchanged. The claim here that it "cannot be
+  reproduced on this network" was wrong and worth correcting: the ~9 s
+  EHOSTUNREACH is a CEILING to measure against, not an obstacle - `ATS7=3`
+  against a host that takes 9 s is a perfectly clean test, and it is the one
+  that proved the fix.
 - **`MeatSocket::open()` leaked the descriptor on every failed connect. FIXED, and
   the leak was worse than a slow drip - eleven failed dials bricked the board's
   networking.** `open()` returned false with `sock` still >= 0 and never closed, and
