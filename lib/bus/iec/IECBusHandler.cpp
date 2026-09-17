@@ -416,8 +416,12 @@ void IECBusHandler::begin()
   writePinDATA(HIGH);
   if( m_pinSRQ<0xFF )
     {
-      pinMode(m_pinSRQ, OUTPUT);
+#if defined(IEC_USE_INVERTED_LINE_DRIVERS)
+      digitalWrite(m_pinSRQ, LOW);
+#else
       digitalWrite(m_pinSRQ, HIGH);
+#endif
+      pinMode(m_pinSRQ, OUTPUT);
     }
 #else
   // set pins to output 0 (when in output mode)
