@@ -661,6 +661,188 @@ gitignored.
 - **A Range request must ask for exactly what is wanted.** `rangeEnd` was `position + size + 5`, over-fetching 6 bytes on every request. That existed only to guarantee a short read, because the re-page test was `bytesRead > 0 && bytesRead < size` and a range consumed EXACTLY returns 0 next time, which was indistinguishable from real EOF. The margin left 6 unconsumed bytes in every response, so a caller that seeks rather than reading straight through slid 6 bytes further out of alignment per request. Fixed at the cause: a 0-byte read now means "range exhausted" whenever the total size is known and `_position` has not reached it, and it re-reads from the newly opened range rather than reporting EOF.
 - **`patch_framework.py` must be enabled in `platformio.ini`, and it is gitignored so nothing warns when it is not.** It was commented out locally while `platformio.ini.sample` had it on, so esp-idf#18359 was unpatched on framework-espidf@3.50503.0 and a D64 over HTTP aborted with `assert failed: http_on_body esp_http_client.c:318 (res_buffer->orig_raw_data == res_buffer->raw_data)` — body bytes arriving during `fetch_headers` on a handle whose previous response was left partly consumed. Still required at this version: 3.50503.0 is IDF 5.5.3 and upstream's own fix (`esp_http_client_clear_response_buffer()`, which `openAndFetchHeaders()` already has an `ESP_IDF_VERSION`-guarded call waiting for) lands in 5.5.5. **Check for the `MEATLOAF-PATCH` marker in the framework's `esp_http_client.c` before debugging any stale-buffer HTTP symptom.**
 
+## Recent Changes (September 18, 2026)
+
+### Console and modem mode share one serial baud rate, changeable at runtime
+
+There was no way to change the console UART's rate without a reflash. Two
+callers needed it: a terminal or real Commodore driving **modem mode** at
+300-19200 baud, which cannot talk to a port fixed at `DEBUG_SPEED` (2000000),
+and a debug console on a board whose USB-serial bridge cannot reach 2 Mbps
+(AGENTS.md already notes CP2102 maxes near 1 Mbps). Design in
+`docs/superpowers/specs/2026-09-18-console-modem-baud-rate-design.md`.
+
+- **One rate, shared by both modes.** There is one physical UART0, so a
+  separate "console rate" and "modem rate" would be a fiction. `baud <n>` at
+  the shell and `AT+IPR=<n>` in modem mode both end at the same
+  `consoleBaudSet()`.
+- **Five boards have no UART console and must refuse, not silently
+  succeed.** Surveyed across all 28 board sdkconfigs: 22 use
+  `CONFIG_ESP_CONSOLE_UART_CUSTOM`, four (`esp32-s3-devkitc-1`,
+  `esp32-s3-makemagazin`, `freenove-esp32-s3-wroom-1`, `pocket-dongle-s3`) use
+  `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG`, and one (`esp32-s3-super-mini`) uses
+  `CONFIG_ESP_CONSOLE_USB_CDC`. On those five `CONFIG_ESP_CONSOLE_UART_NUM` is
+  -1 and a rate set there is simply discarded by the USB stack — exactly why a
+  pyserial session can open `freenove-esp32-s3-wroom-1` at 2000000 and work
+  regardless of what `baud`/`AT+IPR` are told. `consoleBaudSupported()` gates
+  both entry points and both refuse with `this console is <transport>, it has
+  no baud rate` / `ERROR` rather than accepting a value and reporting success
+  for a rate that was never applied — the same "a register that accepts a
+  value and does nothing is worse than a refusal" rule the S7 finding
+  established.
+- **Apply before persist, never the reverse.** `consoleBaudSet()` calls
+  `uart_set_baudrate()` and only on `ESP_OK` writes `preferences.baud` and
+  calls `mlConfig.save()`; on failure it restores the previous rate and
+  persists nothing. Persisting first would make a rate the driver rejects the
+  rate the next boot reads — unrecoverable without a reflash or an SD/flash
+  edit, which is the one failure this design exists to rule out.
+- **Two apply paths exist because one call site genuinely cannot serve
+  both modes, not from a lack of refactoring.** Shell mode has no pump —
+  `console_exec` is blocked inside the command for the command's whole
+  duration, so `baud <n>` calls `consoleBaudSet()` inline, at the end of the
+  command, after its own notice has been printed. Modem mode does have a
+  pump (`modem_shell_pump()`, `Console.cpp:125`): `AT+IPR=<n>` runs on the
+  modem task, whose `OK` reply is still sitting in the `ModemPort` `tx_`
+  StreamBuffer when the handler returns — switching the UART there would
+  clock that very reply out at the new rate as garbage. So `AT+IPR=<n>` only
+  calls `consoleBaudSetPending()`, and the shell-task pump applies it with
+  `consoleBaudApplyPending()` **after** it has drained `tx_` to the fd, the
+  first point the reply is known to be on the wire. (The modem task cannot
+  write the fd itself either way — `lib/modem/modem_port.h` documents that
+  two tasks touching one console fd is the condition behind the NFS `0x6400`
+  heap corruption.) Both paths converge on the same validate/drain/switch/
+  persist sequence inside `consoleBaudSet()`, so there is still exactly one
+  piece of code that reconfigures the UART.
+- **`read_number()` was clamped at 1,000,000**, a limit every existing
+  S-register caller was happy with because no register needs a seven-digit
+  value. `AT+IPR=2000000` — this project's own console rate — would have
+  silently become 1000000 and answered `OK` for a rate the user never asked
+  for. Fixed with a defaulted third parameter (`limit = 1000000`); the
+  `AT+IPR` call site passes `10000000`, comfortably clearing the 4,000,000
+  ceiling `BAUD_MAX` enforces, so the range check happens in exactly one
+  place instead of being half-done by a silent clamp. Every existing caller
+  is unchanged.
+- **Widening the parser to accept `+NAME=<n>` and `+NAME?` for `AT+IPR` also
+  made `AT+SHELL?` and `AT+SHELL=1` parse**, where before they failed the
+  whole line. The unchanged `SHELL` handler would then have exited modem mode
+  while reporting `OK` for what is really a typo. Guarded: `cmd.query ||
+  cmd.assign` on the `SHELL` branch now returns false (`ERROR`) before doing
+  anything, so a stray `?` or `=1` is reported rather than silently accepted
+  — the same rule the accepted-verb list in the September 17 Hayes-compat
+  entry above already establishes for this codebase.
+- **The pending-rate handoff was a plain `volatile int` read-then-clear in
+  two separate steps**, which let a rate set by one `AT+IPR=<n>` land in the
+  gap between the pump's read and its clear and be silently dropped. Replaced
+  with `std::atomic<int>::exchange(0)`, making the read-and-clear one
+  indivisible step: a rate set while the pump is mid-apply is either taken by
+  this pass or left intact for the next one, never lost.
+- **A batched `AT+IPR=<n>+SHELL` on one line could strand the pending rate
+  past its own session and apply it to whichever session's pump ran next** —
+  possibly the OTHER console entirely, since `s_pending` is process-global.
+  `SHELL` detaches the ports and returns from the pump loop before the
+  pump's own per-pass `consoleBaudApplyPending()` (called after each write)
+  gets another chance to run against that iteration's reply. Closed by a
+  second, unconditional `consoleBaudApplyPending()` after the pump's
+  post-loop bounded drain (`for (i<64 && drainTx()>0...)`) and before
+  `modem.detach()` — by the time that runs, the reply is provably on the wire
+  and there is no more modem-side work left that a rate switch could corrupt.
+- **The `DEBUG_SPEED` boot window is the documented no-network recovery
+  path, by design, not by accident.** The persisted rate is restored only
+  after `mlConfig.load()` (config lives on flash/SD, not mounted until line
+  267 of `main_setup()`), never at `console.begin()`. Every line before that
+  point — shutdown-sequence messages on a reboot, then the fresh ROM
+  bootloader and early `app_main()` startup — is always emitted at
+  `DEBUG_SPEED` (2000000) regardless of what is persisted, so a wrong or
+  forgotten persisted rate can never hide the one log a user with no network
+  and no working terminal still has.
+- **`lolin-d32-pro` did not define `ENABLE_MODEM`** before this task, so
+  `AT+IPR` and all of `modem_shell_pump()` were not compiled on the only
+  connected board with a UART console — the shell half (`baud`) worked, the
+  modem half was unreachable. Added `-D ENABLE_MODEM` beside
+  `-D ENABLE_CONSOLE_TCP` in `[env:lolin-d32-pro]` (`platformio.ini` is
+  gitignored, so this is the only record of the change). This is an
+  ESP32-WROVER with the small ~3.3 MB `iram0_2_seg` flash-text window and
+  `EXTRA_FASTLOADERS` already consuming most of its margin (see the August 25
+  entry — 87,271 bytes free at the time); enabling the whole modem subsystem
+  there for the first time was the real risk in this task, not a formality.
+  It fit, with margin to spare: RAM 32.4% (106,020/327,680) → 32.5%
+  (106,500/327,680), Flash 41.7% (4,374,568/10,485,760) → 42.0%
+  (4,409,192/10,485,760) — **+480 bytes RAM, +34,624 bytes flash**, and no
+  `iram0_2_seg` overflow message from either a full clean build or the
+  final `-t upload` build. `freenove-esp32-s3-wroom-1` and
+  `esp32-s3-devkitc-1` already carried `ENABLE_MODEM` from the original
+  2026-09-08 modem-mode work and needed no change.
+
+**Hardware-verified on both connected boards, 2026-09-18, each proving the
+half the other cannot:**
+
+- **`lolin-d32-pro` (COM13, CH340 bridge) — the rate genuinely changes and
+  both apply paths work.** `baud` reports 2000000; `baud 50` and
+  `baud 9600x` are refused with the range/not-a-number messages; `baud 9600`
+  prints its notice **readable at 2000000** (captured before switching the
+  listener), and reopening at 9600 reads a live prompt and `baud` reporting
+  9600 — proving the shell path's inline apply. `AT` then `AT+IPR?` (9600),
+  `AT+IPR=2400` (`OK`, captured readable at 9600 — the check the whole
+  pending/apply design exists for), then reopening at 2400 still gets `OK`
+  from `AT` and `NO CARRIER`/`OK` from a real dial-connect-hangup cycle
+  against the board's own web server (`ATD"127.0.0.1:80"` → `CONNECT`, a
+  real HTTP response read back, `+++`, `ATH`) — proving the modem path
+  survives the switch and the pump's apply-on-write is correct. A full
+  reboot cycle was captured with two continuous timed passes rather than
+  short fixed-length drains (the first attempt's ~3.5s windows missed the
+  actual reset entirely): listening at 2400 across a reboot shows the
+  shutdown sequence readable, then ~2.1s of silence (the persisted-rate
+  listener cannot decode the DEBUG_SPEED window at all — UART framing
+  errors at a ~833:1 rate mismatch, not garbage bytes), then readable text
+  resumes once restore switches the line back; listening at 2000000 across
+  a second, independent reboot shows the mirror image — garbled/NUL bytes
+  during the shutdown phase (transmitted at 2400, misread at 2000000), then
+  a clean, fully readable boot banner (`MEATLOAF CBM ...`, `LittleFS
+  mounted.`, `fnConfig::load read 811 bytes from FLASH config file`) for
+  about 460ms, then NUL bytes again the instant `consoleBaudRestore()`
+  switches back to 2400 — precisely pinning the restore point to
+  immediately after config load, as designed. `baud` after that reboot still
+  reports 2400 (persistence proven). The TCP console on port 23 was checked
+  separately (`192.168.1.164:23`): `baud 9600` there answers exactly
+  `serial console baud 2000000 -> 9600` with no "reconnect now" wording
+  (`execOrigin() == ORIGIN_REMOTE`), confirming the documented recovery
+  route reads correctly for a caller whose own link is not the one being
+  retuned. Board left at 2000000 (`baud 2000000` over both the serial and,
+  redundantly, the TCP console) and reconfirmed reachable at that rate
+  before finishing.
+- **`freenove-esp32-s3-wroom-1` (COM12, native USB-Serial-JTAG,
+  `303A:1001`) — the refusal is real and nothing else regresses.** Opened
+  with `dtr = rts = False` per the native-USB entry above (asserting either
+  resets the chip and orphans the handle). `baud` answers `this console is
+  USB-Serial-JTAG, it has no baud rate`, and esp_console's own
+  `Command returned non-zero error code: 0x1 (ERROR)` line confirms the
+  handler's `EXIT_FAILURE`. `AT+IPR=9600` and, checked as a bonus, bare
+  `AT+IPR?` both answer `ERROR` (`consoleBaudSupported()` gates both the
+  same way). Modem mode itself and `AT+SHELL` still work normally on this
+  board (`AT` → `OK`, `AT+SHELL` → back to the shell prompt) — the refusal
+  is scoped to the two baud commands only, nothing else in modem mode is
+  affected by `ENABLE_MODEM` already being on for this board.
+- **Not verified**: `esp32-s3-devkitc-1` (also `ENABLE_MODEM`, also
+  USB-Serial-JTAG) was not physically connected for this task and the
+  refusal was exercised only on `freenove-esp32-s3-wroom-1`; the four other
+  USB-Serial-JTAG boards and `esp32-s3-super-mini` (USB-CDC) are covered
+  only by the `consoleBaudSupported()` compile-time gate and the sdkconfig
+  survey above, not by hardware. `console_baud` itself has no native test —
+  `lib/console` is not compiled in the native environment and the apply path
+  needs a real UART — so this feature is hardware-verified only, the same
+  limitation the console file-channel work carries.
+- **A CH340 reopen/rebaud glitch, found while writing the hardware
+  harness**: opening a fresh `pyserial.Serial()` to COM13 at a new baud
+  rate (even without touching DTR/RTS) occasionally injects one spurious
+  byte at the very start of the new session, which merges with the next
+  line typed (`"<glitch>AT"` fails to parse as `AT`). Not a firmware bug —
+  send a throwaway `\r` immediately after every reopen to flush it before
+  sending a real command; every script for this task does so. Confirmed
+  separately that a plain reopen on COM13 (CH340) does **not** reset the
+  board (no boot banner reappears), unlike the DTR/RTS hazard on COM12 —
+  the two ports fail in different, unrelated ways and neither assumption
+  transfers to the other.
+
 ## Recent Changes (September 17, 2026)
 
 ### An IPv6-only name was dialled as a garbage IPv4 address
