@@ -18,6 +18,7 @@
 #include "console_baud.h"
 
 #include <atomic>
+#include <mutex>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -44,6 +45,20 @@ namespace ESP32Console
     // mid-apply is either taken by this pass or left for the next one, never
     // dropped.
     static std::atomic<int> s_pending{0};
+
+    // Serializes the whole of consoleBaudSet(). s_pending's exchange() decides
+    // which pump WINS a pending rate; it says nothing about two tasks being
+    // inside the apply itself. "baud 9600" from the TCP console runs on
+    // console_exec while a serial pump can concurrently apply a pending rate,
+    // and both would reach uart_set_baudrate() and mlConfig.save(). mlConfig
+    // has no locking of any kind, so that is a concurrent mutate-and-serialize
+    // of one nlohmann tree -- a corrupted config.json, which is the worse half.
+    //
+    // Held across the drain as well as the persist, deliberately. Narrowing it
+    // to the persist would leave two uart_set_baudrate() calls racing, which is
+    // the same defect one layer down. The only task that can ever block on it
+    // is another consoleBaudSet() caller, which is exactly what must serialize.
+    static std::mutex s_set_mutex;
 
     bool consoleBaudSupported()
     {
@@ -79,6 +94,8 @@ namespace ESP32Console
 #else
         if (baud < BAUD_MIN || baud > BAUD_MAX)
             return ESP_ERR_INVALID_ARG;
+
+        std::lock_guard<std::mutex> guard(s_set_mutex);
 
         const uart_port_t port = (uart_port_t)CONFIG_ESP_CONSOLE_UART_NUM;
         const int previous = consoleBaudGet();

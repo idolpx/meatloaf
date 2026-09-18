@@ -15,7 +15,11 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-// The one owner of the console UART's rate.
+// The one place that reconfigures the console UART's rate.
+//
+// "One place" is not "one caller at a time": "baud" from the TCP console runs
+// on console_exec while a serial modem pump can apply a pending rate, so
+// consoleBaudSet() serializes itself internally -- see the mutex in the .cpp.
 //
 // Both the "baud" shell command and the modem's AT+IPR end here, but they
 // reach it by different routes, and that difference is the reason this module
@@ -54,7 +58,8 @@ namespace ESP32Console
 
     // Validate, drain, switch, and only then persist. Safe to call from a task
     // that owns the console fd, or from a TCP-origin command, whose reply never
-    // crosses the UART at all.
+    // crosses the UART at all. Serialized against itself; BLOCKS until the
+    // UART's transmit FIFO has drained, which at 300 baud is several seconds.
     esp_err_t consoleBaudSet(int baud);
 
     // Record a rate for modem_shell_pump() to apply after its next write.
