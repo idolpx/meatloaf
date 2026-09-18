@@ -677,9 +677,13 @@ and a debug console on a board whose USB-serial bridge cannot reach 2 Mbps
   the shell and `AT+IPR=<n>` in modem mode both end at the same
   `consoleBaudSet()`.
 - **Five boards have no UART console and must refuse, not silently
-  succeed.** Surveyed across all 28 board sdkconfigs (re-counted directly
-  with `grep -rl` during this task, correcting the design doc's "22" to
-  the actual **23**): 23 use `CONFIG_ESP_CONSOLE_UART_CUSTOM`, four (`esp32-s3-devkitc-1`,
+  succeed.** Surveyed across the **26 per-board sdkconfigs** (`ls
+  sdkconfig.*` lists 28; `sdkconfig.defaults` and
+  `sdkconfig.defaults.esp32s3` are shared base templates, not boards, and
+  are excluded — both carry `CONFIG_ESP_CONSOLE_UART_CUSTOM=y`, which is
+  exactly what inflates a naive count of all 28 files by two; watch for
+  this on any future re-count): **21** use
+  `CONFIG_ESP_CONSOLE_UART_CUSTOM`, four (`esp32-s3-devkitc-1`,
   `esp32-s3-makemagazin`, `freenove-esp32-s3-wroom-1`, `pocket-dongle-s3`) use
   `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG`, and one (`esp32-s3-super-mini`) uses
   `CONFIG_ESP_CONSOLE_USB_CDC`. On those five `CONFIG_ESP_CONSOLE_UART_NUM` is
