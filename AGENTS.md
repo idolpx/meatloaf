@@ -677,8 +677,9 @@ and a debug console on a board whose USB-serial bridge cannot reach 2 Mbps
   the shell and `AT+IPR=<n>` in modem mode both end at the same
   `consoleBaudSet()`.
 - **Five boards have no UART console and must refuse, not silently
-  succeed.** Surveyed across all 28 board sdkconfigs: 22 use
-  `CONFIG_ESP_CONSOLE_UART_CUSTOM`, four (`esp32-s3-devkitc-1`,
+  succeed.** Surveyed across all 28 board sdkconfigs (re-counted directly
+  with `grep -rl` during this task, correcting the design doc's "22" to
+  the actual **23**): 23 use `CONFIG_ESP_CONSOLE_UART_CUSTOM`, four (`esp32-s3-devkitc-1`,
   `esp32-s3-makemagazin`, `freenove-esp32-s3-wroom-1`, `pocket-dongle-s3`) use
   `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG`, and one (`esp32-s3-super-mini`) uses
   `CONFIG_ESP_CONSOLE_USB_CDC`. On those five `CONFIG_ESP_CONSOLE_UART_NUM` is
@@ -762,16 +763,38 @@ and a debug console on a board whose USB-serial bridge cannot reach 2 Mbps
   `-D ENABLE_CONSOLE_TCP` in `[env:lolin-d32-pro]` (`platformio.ini` is
   gitignored, so this is the only record of the change). This is an
   ESP32-WROVER with the small ~3.3 MB `iram0_2_seg` flash-text window and
-  `EXTRA_FASTLOADERS` already consuming most of its margin (see the August 25
-  entry — 87,271 bytes free at the time); enabling the whole modem subsystem
-  there for the first time was the real risk in this task, not a formality.
-  It fit, with margin to spare: RAM 32.4% (106,020/327,680) → 32.5%
-  (106,500/327,680), Flash 41.7% (4,374,568/10,485,760) → 42.0%
-  (4,409,192/10,485,760) — **+480 bytes RAM, +34,624 bytes flash**, and no
-  `iram0_2_seg` overflow message from either a full clean build or the
-  final `-t upload` build. `freenove-esp32-s3-wroom-1` and
-  `esp32-s3-devkitc-1` already carried `ENABLE_MODEM` from the original
-  2026-09-08 modem-mode work and needed no change.
+  `EXTRA_FASTLOADERS` already consuming most of its margin (see the August
+  25 entry — 87,271 bytes free at the time, in that SAME `.flash.text`
+  budget); enabling the whole modem subsystem there for the first time was
+  the real risk in this task, not a formality. **Two different budgets, do
+  not conflate them** (the August 25 entry itself warns of exactly this):
+  the app-partition figures below are `Flash:`/`RAM:` from the build
+  summary, a different denominator from `iram0_2_seg`. It fit both: app
+  partition RAM 32.4% (106,020/327,680, Task 5's figure, same HEAD, not
+  re-measured here) → 32.5% (106,500/327,680), Flash 41.7%
+  (4,374,568/10,485,760) → 42.0% (4,409,192/10,485,760) — **+480 bytes RAM,
+  +34,624 bytes flash on the app partition**. Separately, and this is the
+  figure that actually answers the brief's overflow question,
+  `xtensa-esp32-elf-size -A` on the flashed `firmware.elf` gives
+  `.flash.text` = 3,297,793 bytes against the 3,342,304-byte `iram0_2_seg`
+  window — **44,511 bytes free**, not re-measured without `ENABLE_MODEM` so
+  no delta is claimed, only that it fits now. `.iram0.vectors` +
+  `.iram0.text` = 128,279 bytes against the 131,072-byte real-IRAM
+  `iram0_0_seg` — **2,793 bytes free**, tighter than the ~4.8 KB the August
+  25 entry measured after its `CONFIG_SPI_MASTER_ISR_IN_IRAM=n` lever, and
+  with no further lever documented as available for that segment. No
+  `iram0_2_seg` (or `iram0_0_seg`) overflow message from either a full
+  clean build or the final `-t upload` build — both would abort the link,
+  and both produced a working `firmware.elf` that flashed and ran the
+  entire rest of this task's verification. A separate, earlier build of
+  this same board+flags (found already in the scratchpad, of uncertain
+  provenance, not reproduced or trusted as evidence) reported Flash
+  4,373,444 — 35,748 bytes BELOW this task's own measured figure. Not
+  investigated further since it is not this task's build; the numbers
+  reported above are from a build this task performed, flashed, and then
+  drove through the rest of the verification below. `freenove-esp32-s3-
+  wroom-1` and `esp32-s3-devkitc-1` already carried `ENABLE_MODEM` from the
+  original 2026-09-08 modem-mode work and needed no change.
 
 **Hardware-verified on both connected boards, 2026-09-18, each proving the
 half the other cannot:**
@@ -828,9 +851,13 @@ half the other cannot:**
   following bare `AT` still answers `OK`), and a plain `AT+SHELL`
   afterwards still exits correctly — six checks, all pass. On COM13: a
   single BATCHED line `AT+IPR=2400+SHELL` (the exact shape `df4e3d17`
-  fixes) produces one `OK` readable at 2000000, the old rate; the SHELL
-  half's own detach happens inside the same pump pass that just applied the
-  pending rate, so the "Modem mode exited." text and the next prompt are
+  fixes) produces one `OK` readable at 2000000, the old rate; the switch to
+  2400 and the SHELL detach have both already happened by the time the
+  next bytes go out — this is consistent with either of `df4e3d17`'s two
+  apply sites (the per-pass apply at `Console.cpp:189`, or the post-loop
+  drain-then-apply at `:239` that is the actual fix under test) and the
+  hardware evidence here does not distinguish which one fired, only that
+  one of them did. The "Modem mode exited." text and the next prompt are
   already on the wire at 2400 by the time they are sent — a naive capture
   at 2000000 sees only NUL bytes for that part, which is **correct
   behaviour, not a failure**: reopening at 2400 immediately afterward gets
@@ -848,14 +875,23 @@ half the other cannot:**
   survey above, not by hardware. `console_baud` itself has no native test —
   `lib/console` is not compiled in the native environment and the apply path
   needs a real UART — so this feature is hardware-verified only, the same
-  limitation the console file-channel work carries.
-- **A CH340 reopen/rebaud glitch, found while writing the hardware
-  harness**: opening a fresh `pyserial.Serial()` to COM13 at a new baud
-  rate (even without touching DTR/RTS) occasionally injects one spurious
-  byte at the very start of the new session, which merges with the next
-  line typed (`"<glitch>AT"` fails to parse as `AT`). Not a firmware bug —
-  send a throwaway `\r` immediately after every reopen to flush it before
-  sending a real command; every script for this task does so. Confirmed
+  limitation the console file-channel work carries. The upper bound of the
+  range (`baud 9000000` / `AT+IPR=9000000`, above `BAUD_MAX`) was not
+  tested on hardware — only the lower bound (`baud 50`, `AT+IPR=50`) was —
+  though it is the same branch and comparison in `console_baud.cpp` either
+  way.
+- **One stray byte occasionally shows up at the very start of a fresh
+  `pyserial.Serial()` session to COM13, merging with the next line typed
+  (`"<glitch>AT"` fails to parse as `AT`).** Found while writing the
+  hardware harness (`state_probe3.py`/`state_probe4.py`). **The exact
+  source is not pinned down** — the probe that hit it had just written a
+  bare `\r` at three DIFFERENT, mostly-mismatched baud rates immediately
+  before, so the stray byte could equally be a genuine CH340 open-time
+  glitch or a leftover partial line sitting in the FIRMWARE's own AT-line
+  buffer from one of those earlier mismatched writes; the confound was not
+  isolated. The remedy is unaffected either way: send a throwaway `\r`
+  immediately after every reopen to flush whatever is pending, before
+  sending a real command — every script for this task does so. Confirmed
   separately that a plain reopen on COM13 (CH340) does **not** reset the
   board (no boot banner reappears), unlike the DTR/RTS hazard on COM12 —
   the two ports fail in different, unrelated ways and neither assumption
