@@ -104,9 +104,34 @@ namespace ESP32Console
         // only moves it into the driver; uart_wait_tx_done() is what puts it on
         // the wire. Switching before that clocks the last characters out at the
         // new rate, which is exactly the garbage this whole design avoids.
+        //
+        // The budget is derived from the rate IN EFFECT, not a constant. The
+        // driver is installed with tx_buffer_size 0 (console_settings.c), so
+        // writes go straight into the 128-byte hardware FIFO and this wait is
+        // the only thing that empties it. At 8N1 -- 10 bits per character -- a
+        // full FIFO takes 4.27 s at 300 baud, 1.07 s at 1200, 133 ms at 9600,
+        // and 0.64 ms at DEBUG_SPEED. The modem's advertised range is 300-19200,
+        // so a flat 200 ms lost most of its own notice at the bottom of it.
+        //
+        // Derived rather than a generous flat constant because the wait returns
+        // as soon as the FIFO is empty either way -- but then a TIMEOUT means
+        // something specific: a full FIFO failed to drain in the time a full
+        // FIFO takes. A flat value makes a timeout uninterpretable.
         fflush(stdout);
         fsync(fileno(stdout));
-        uart_wait_tx_done(port, pdMS_TO_TICKS(200));
+        const int drain_ms = (previous > 0)
+                                 ? ((UART_HW_FIFO_LEN(port) * 10 * 1000) / previous) + 100
+                                 : 2000; // consoleBaudGet() failed; be generous
+        esp_err_t drained = uart_wait_tx_done(port, pdMS_TO_TICKS(drain_ms));
+        if (drained != ESP_OK)
+        {
+            // Discarding this is what made the old 200 ms invisible. The line
+            // goes out at the old rate, ahead of the switch, so it is readable
+            // by whoever is about to lose some of their notice.
+            Debug_printv("console baud: TX not drained in %d ms at %d (%s); "
+                         "the tail of this output will be garbled",
+                         drain_ms, previous, esp_err_to_name(drained));
+        }
 
         esp_err_t err = uart_set_baudrate(port, baud);
         if (err != ESP_OK)
