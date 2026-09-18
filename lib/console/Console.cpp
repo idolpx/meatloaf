@@ -286,6 +286,7 @@ namespace ESP32Console
         registerCommand(getEnvCommand());
         registerCommand(getDeclareCommand());
         registerCommand(getRunCommand());
+        registerCommand(getBaudCommand());
         registerCommand(getRebootCommand());
         registerCommand(getExitCommand());
     }

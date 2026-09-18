@@ -10,6 +10,7 @@
 #include "mlConfig.h"
 #include "Esp.h"
 #include "tcpsvr.h"
+#include "../console_baud.h"
 #include <cstdio>
 #include <getopt.h>
 #include "esp_console.h"
@@ -145,6 +146,61 @@ static int run(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+static int baud(int argc, char **argv)
+{
+    if (!ESP32Console::consoleBaudSupported())
+    {
+        // Refuse rather than accept a value and report it back while doing
+        // nothing -- the failure mode the S7 finding established as worse than
+        // a refusal. This board's console is USB; there is no rate to set.
+        printf("this console is %s, it has no baud rate\r\n",
+               ESP32Console::consoleBaudTransportName());
+        return EXIT_FAILURE;
+    }
+
+    if (argc < 2)
+    {
+        printf("console baud %d\r\n", ESP32Console::consoleBaudGet());
+        return EXIT_SUCCESS;
+    }
+
+    // strtol, never std::stoi: ESP-IDF is -fno-exceptions, so a throw from a
+    // malformed argument is std::terminate.
+    char *end = nullptr;
+    long want = strtol(argv[1], &end, 10);
+    if (end == argv[1] || *end != '\0')
+    {
+        printf("baud: not a number: %s\r\n", argv[1]);
+        return EXIT_FAILURE;
+    }
+    if (want < ESP32Console::BAUD_MIN || want > ESP32Console::BAUD_MAX)
+    {
+        printf("baud: %ld out of range (%d-%d)\r\n",
+               want, ESP32Console::BAUD_MIN, ESP32Console::BAUD_MAX);
+        return EXIT_FAILURE;
+    }
+
+    const int now = ESP32Console::consoleBaudGet();
+
+    // The notice goes out at the OLD rate, which is what makes it readable.
+    // From the TCP console the reply never crosses the UART at all, so there is
+    // nothing to reconnect -- and that path is the documented recovery route,
+    // so telling a remote caller to reconnect would be plainly false.
+    if (console.execOrigin() == ESP32Console::Console::ORIGIN_REMOTE)
+        printf("serial console baud %d -> %ld\r\n", now, want);
+    else
+        printf("console baud %d -> %ld, reconnect now\r\n", now, want);
+
+    esp_err_t err = ESP32Console::consoleBaudSet((int)want);
+    if (err != ESP_OK)
+    {
+        printf("baud: failed, still %d (%s)\r\n",
+               ESP32Console::consoleBaudGet(), esp_err_to_name(err));
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+
 static int reboot(int argc, char **argv)
 {
     Serial.println("Saving configuration...");
@@ -200,6 +256,12 @@ namespace ESP32Console::Commands
     const ConsoleCommand getRunCommand()
     {
         return ConsoleCommand("run", &run, "Run the test suite, or a \".sh\" script of console commands", "test | <script.sh>");
+    }
+
+    const ConsoleCommand getBaudCommand()
+    {
+        return ConsoleCommand("baud", &baud,
+                              "Show or set the serial console baud rate (300-4000000)");
     }
 
     const ConsoleCommand getRebootCommand()
