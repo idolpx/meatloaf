@@ -663,6 +663,93 @@ gitignored.
 
 ## Recent Changes (September 17, 2026)
 
+### An IPv6-only name was dialled as a garbage IPv4 address
+
+`MeatSocket::open()` resolved with `gethostbyname()` and **never read
+`h_addrtype`**, casting whatever came back to an `ip4_addr`. `CONFIG_LWIP_IPV6`
+is enabled on these boards and lwIP's resolution order falls through to AAAA
+when a host has no A record, so an IPv6-only name had the **first four bytes of
+a sixteen-byte address** used as an IPv4 address. For
+`2607:f8b0:4002:c02::66` that is `38.7.248.176` - a real, routable address
+belonging to somebody else.
+
+- **Nothing reported it, and that is the whole defect.** The dial either reached
+  an unrelated host or failed with EHOSTUNREACH, which the modem renders as
+  `NO ANSWER` - **indistinguishable from a host that is simply down**. Confirmed
+  by capturing a control on the pre-fix firmware: `ATDT"ipv6.google.com:80"`
+  produced `errno 113` and `NO ANSWER`, byte for byte the same shape as the
+  failure a user had reported against a completely different host.
+- **`getaddrinfo()` with an `AF_INET` hint, not a bare `h_addrtype` check.** The
+  hint is strictly better: a **dual-stack** host still resolves, because the
+  answer carries its A record rather than failing on the AAAA, while an
+  IPv6-only host fails cleanly and names itself. This socket is `AF_INET`
+  throughout - `sockaddr_in`, `AF_INET` socket, `sin_addr` - so it could never
+  have reached an IPv6 host however the address was obtained.
+- **The resolver now logs `resolved <name> to <addr>`, and that line is the
+  point.** A wrong answer here is otherwise invisible until it surfaces four
+  layers up as `NO ANSWER`, which is where this bug hid. It is also what makes
+  an intermittent dial failure diagnosable in one line from now on: **no resolve
+  line means resolution failed and TCP was never attempted; a resolve line
+  followed by an errno means the address was right and the connect failed.**
+  Those are different faults with different fixes and the log could not tell
+  them apart before.
+- **Shared code - `tcp://`, `telnet://` and `irc.h` all reach it** - so it was
+  hardware-verified in its own right rather than riding along with other work.
+  On a freenove-esp32-s3-wroom-1: `ipv6.google.com` and `ipv6.test-ipv6.com`
+  (both AAAA-only, independently operated) now fail by name in 0.07 s and
+  0.16 s where they previously answered `errno 113`; `commodoreserver.com`
+  connects over both `ATD` and `ATDT` logging the correct `50.112.163.22`; that
+  same address dialled literally connects; `bbs.fozztexx.com` connects with its
+  567-byte banner; a name that does not exist still fails cleanly; and **30
+  consecutive dials, 15 by name and 15 by literal IP, connected 30/30 at a
+  0.14 s median**. Native suite `test_modem_at` 83/83. Build RAM 31.0% /
+  Flash 40.7%.
+- **This does NOT explain the `commodoreserver.com` failure that prompted it.**
+  That host has no AAAA record, so it never took the broken path. It was a
+  genuine transient, and one **reproduced during this very verification**: a
+  single `ATD` to it failed at 6.37 s while an `ATDT` to the same host connected
+  0.18 s later, and 30 subsequent dials all succeeded. Two practical notes for
+  that host: `ping commodoreserver.com` always fails because it drops ICMP, and
+  port 1541 **sends no banner at all** (confirmed from a PC as well), so a blank
+  screen after `CONNECT` is normal V-1541 behaviour and not a hung connection.
+- **Two other pre-existing `MeatSocket` defects remain, deliberately** -
+  `close()` calling `closesocket()` before `shutdown()`, and `connect()` passing
+  `sizeof(struct sockaddr_in6)` as the addrlen for a `sockaddr_in`. Both change
+  teardown behaviour across all three consumers and want their own decision.
+
+### Driving this board over serial: it is NATIVE USB, not a UART bridge
+
+The freenove-esp32-s3-wroom-1 enumerates as `VID:PID 303A:1001` - Espressif's
+own USB peripheral. **Asserting DTR/RTS resets the chip, which tears down the
+USB device and re-enumerates it, leaving an already-open handle attached to a
+device that no longer exists.** pyserial asserts both by default, so
+`serial.Serial(PORT, BAUD)` reads **zero bytes forever** and the board looks
+dead or hung. It is not: the USB peripheral keeps enumerating even while the
+CPU is wedged, so the port being present proves nothing either.
+
+Open with both lines deasserted and the running firmware keeps its connection:
+
+```python
+ser = serial.Serial()
+ser.port, ser.baudrate, ser.timeout = "COM12", 2000000, 0.1
+ser.dtr = False
+ser.rts = False
+ser.open()
+```
+
+This **supersedes** the earlier note that closing the port reboots the board -
+that is a USB-UART bridge behaviour. Here the reset is a liability, not a
+convenience, and a whole measurement must still live inside one open port.
+
+**Wait for WiFi before believing any dial result.** Association is asynchronous
+and a dial before it completes answers `NO DIALTONE` in about 30 ms, which a
+test harness will happily record as a failure of code the dial never reached -
+an entire verification run was thrown away to this. Poll with
+`ATD"127.0.0.1:4131"`: it needs no external network, answers `NO DIALTONE`
+while WiFi is down and `errno 104` the moment it is up. `ifconfig` at the shell
+is the direct check, and it reports SSID, IP, gateway and DNS.
+
+
 ### Modem mode: S7 bounds the dial
 
 S7 is the Hayes "wait for carrier" register. It was settable, readable and
