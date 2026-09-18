@@ -73,14 +73,41 @@ gets.
 | function | contract |
 |---|---|
 | `bool consoleBaudSupported()` | Compile-time. True only when `CONFIG_ESP_CONSOLE_UART_DEFAULT` or `CONFIG_ESP_CONSOLE_UART_CUSTOM` is defined. |
-| `int consoleBaudGet()` | The rate now in effect. |
-| `esp_err_t consoleBaudRequest(int baud)` | Validates the range, writes `preferences.baud`, calls `mlConfig.save()`, records a pending rate. **Never touches the UART.** |
-| `void consoleBaudApplyPending()` | Called by the shell pump task and by nothing else. If a rate is pending: `fflush(stdout)`, `fsync`, `uart_wait_tx_done()`, `uart_set_baudrate()`, clear pending. |
+| `int consoleBaudGet()` | The rate now in effect, read from `uart_get_baudrate()` rather than a shadow copy that could desync. |
+| `esp_err_t consoleBaudSet(int baud)` | Validate the range, then `fflush(stdout)`, `fsync`, `uart_wait_tx_done()`, `uart_set_baudrate()`. **Only on success** write `preferences.baud` and `mlConfig.save()`. On failure restore the previous rate and persist nothing. |
+| `void consoleBaudSetPending(int baud)` | Validate and record a pending rate. Touches neither the UART nor the config. |
+| `void consoleBaudApplyPending()` | If a rate is pending, call `consoleBaudSet()` on it and clear it. |
 
-### Why the request/apply split exists
+**Apply before persisting, never the other way round.** `uart_set_baudrate()`
+returns an `esp_err_t`. Persisting first means a rate the driver rejects is
+still the rate the next boot reads, which is the one failure this design must
+not create.
+
+`mlConfig.save()` is called directly rather than through a new helper, because
+that is exactly what `Modem::saveConfig()` already does for `AT&W` and that path
+is hardware-proven to survive a power cycle.
+
+### Why there are two apply paths, not one
 
 This is the load-bearing part of the design, and the reason the obvious
-implementation is wrong.
+implementation is wrong. **The two modes genuinely differ and a single call site
+cannot serve both.**
+
+**Shell mode has no pump.** `console_repl` sits in `readLine()`, and while a
+command runs it is blocked inside `console.execute()`. There is no loop polling
+anything, so a pending flag set by `baud 9600` would never be applied. The
+notice is written by `console_exec` -- the same task running the command -- so
+that command applies the change **inline, at its end**, and needs no pending
+state at all.
+
+**Modem mode does have a pump**, `modem_shell_pump()` at `Console.cpp:124`,
+whose loop pops from `ModemPort::tx_` and writes to the fd. `AT+IPR` runs on the
+modem task, whose `OK` is still in `tx_` when the handler returns. That path
+records a pending rate and the pump applies it after its write, which is the
+only point at which the reply is known to be on the wire.
+
+So: `baud` calls `consoleBaudSet()`; `AT+IPR=` calls `consoleBaudSetPending()`
+and the pump calls `consoleBaudApplyPending()`.
 
 `lib/modem/modem_port.h` documents that **the modem task must never touch a
 console file descriptor** -- two tasks on one fd is the condition behind the NFS
@@ -104,13 +131,21 @@ be clocked out at the new rate.
 ### Shell command: `baud`
 
 - `baud` -- prints the rate in effect and whether this board supports changing it.
-- `baud <n>` -- validates, prints `console baud 2000000 -> 9600, reconnect now`
-  **at the old rate** so the user can read it, then calls `consoleBaudRequest()`.
+- `baud <n>` -- validates, prints its notice **at the old rate** so the user can
+  read it, then calls `consoleBaudSet()` inline.
 - On a USB board -- prints `this console is USB-Serial-JTAG, it has no baud rate`
   and returns non-zero.
 
-Registered with the other core commands. It runs on the console executor like
-every other command; the apply still happens on the shell task.
+**The wording depends on `console.execOrigin()`, and so does the urgency.** From
+a serial console the caller's own link is the one being retuned, so the notice
+is `console baud 2000000 -> 9600, reconnect now`. From the TCP console on port
+23 the reply never crosses the UART at all -- there is nothing to drain and
+nothing to reconnect -- so it reads `serial console baud 2000000 -> 9600`. This
+matters more than cosmetics: **the TCP console is the documented recovery route,
+so it has to be correct there**, and telling a remote caller to "reconnect now"
+would be simply false.
+
+Registered with the other core commands.
 
 ### Modem command: AT+IPR=<rate> and AT+IPR?
 
@@ -141,6 +176,17 @@ hide early boot, which is the last-resort recovery path on a board with no
 network. The cost is that a terminal set to a slow rate sees roughly a second of
 garbage before the switch.
 
+### Nothing else configures UART0 on a console build
+
+Worth stating because it looks like a conflict and is not. `FN_UART_DEBUG` is
+`UART_NUM_0` -- the same peripheral the console uses -- and `main.cpp:208` calls
+`Serial.begin(DEBUG_SPEED)`. But that line sits in the `#else` of
+`#ifdef ENABLE_CONSOLE`, so it never runs on a build that has a console, and
+`include/debug.h:27` maps `Serial` to `console` on those builds anyway.
+`fnUartDebug` owns UART0 only on builds with no console -- which are exactly the
+builds with no `baud` command. There is one owner of the rate in every
+configuration.
+
 ## Recovery
 
 In order of convenience: the TCP console on port 23; WebDAV editing of
@@ -157,6 +203,10 @@ that is the part with no ESP-IDF dependency:
 - `AT+IPR=` and `AT+IPR=abc` are rejected, with the error position reported
 - `AT+SHELL` is unchanged, and `ATE0+IPR=9600` applies both commands
 - Mutation check: the new cases must fail if the `=`/`?` handling is removed
+
+There is no native coverage of `console_baud` itself: `lib/console` is not
+compiled in the native environment, and the apply path needs a real UART. That
+half is hardware-verified only, exactly as the console file-channel work is.
 
 Both boards were connected on 2026-09-18 and the two legs can run back to back:
 
