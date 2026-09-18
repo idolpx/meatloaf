@@ -778,12 +778,8 @@ and a debug console on a board whose USB-serial bridge cannot reach 2 Mbps
   `xtensa-esp32-elf-size -A` on the flashed `firmware.elf` gives
   `.flash.text` = 3,297,793 bytes against the 3,342,304-byte `iram0_2_seg`
   window — **44,511 bytes free**, not re-measured without `ENABLE_MODEM` so
-  no delta is claimed, only that it fits now. `.iram0.vectors` +
-  `.iram0.text` = 128,279 bytes against the 131,072-byte real-IRAM
-  `iram0_0_seg` — **2,793 bytes free**, tighter than the ~4.8 KB the August
-  25 entry measured after its `CONFIG_SPI_MASTER_ISR_IN_IRAM=n` lever, and
-  with no further lever documented as available for that segment. No
-  `iram0_2_seg` (or `iram0_0_seg`) overflow message from either a full
+  no delta is claimed, only that it fits now. No
+  `iram0_2_seg` overflow message from either a full
   clean build or the final `-t upload` build — both would abort the link,
   and both produced a working `firmware.elf` that flashed and ran the
   entire rest of this task's verification. A separate, earlier build of
@@ -795,6 +791,24 @@ and a debug console on a board whose USB-serial bridge cannot reach 2 Mbps
   drove through the rest of the verification below. `freenove-esp32-s3-
   wroom-1` and `esp32-s3-devkitc-1` already carried `ENABLE_MODEM` from the
   original 2026-09-08 modem-mode work and needed no change.
+- **`iram0_0_seg` (real IRAM, 131,072 bytes) is now tighter on
+  `lolin-d32-pro` than the August 25 entry's warning about this segment
+  class suggests, and this is worth its own line because it will bite the
+  next person to touch this board, not just this feature.** With
+  `ENABLE_MODEM` on, `.iram0.vectors + .iram0.text` = 128,279 bytes —
+  **2,793 bytes free**. The August 25 entry measured ~4.8 KB free for this
+  segment on `fujiloaf-rev0` (a different WROVER board, without
+  `ENABLE_MODEM`) after spending its one documented lever
+  (`CONFIG_SPI_MASTER_ISR_IN_IRAM=n`); that entry states plainly there is
+  no further lever available for this segment. `lolin-d32-pro` was not
+  separately measured on August 25, so this is not a same-board delta —
+  but both are WROVER boards with the same 131,072-byte budget, and
+  `lolin-d32-pro` specifically has now spent roughly 2 KB of whatever
+  margin it had by linking in the modem subsystem's `RAMFUNC` code. The
+  next fastloader carrying a `RAMFUNC` codec, or an IDF bump that grows an
+  IRAM ISR, is the failure this is warning about — on THIS board, headroom
+  is measured in low thousands of bytes, not the ~4.8 KB a reader might
+  extrapolate from the August 25 entry.
 
 **Hardware-verified on both connected boards, 2026-09-18, each proving the
 half the other cannot:**
