@@ -118,11 +118,13 @@ StreamBuffer and the shell task drains them to the fd afterwards.
 An `AT+IPR=2400` handler that called `uart_set_baudrate()` itself would switch
 the line while its own `OK` was still sitting in `tx_`, unsent. The reply would
 go out at the new rate and arrive as garbage -- the user would see a failure and
-would not know whether the command had taken effect.
+would not know whether the command had taken effect. Deferring to the pump is
+what avoids that.
 
-Putting the apply in the task that owns the fd fixes that and has a second
-benefit: there is exactly one writer of the UART configuration, so the shell
-command and the AT command share one code path instead of racing each other.
+The two entry points differ, but they converge on one function: both
+`consoleBaudSet()` and `consoleBaudApplyPending()` end in the same validate,
+drain, switch, persist sequence, so there is still exactly one piece of code
+that reconfigures the UART.
 
 `uart_wait_tx_done()` is required as well as `fflush`/`fsync`: flushing moves
 bytes into the driver, not onto the wire, and the last character would otherwise
