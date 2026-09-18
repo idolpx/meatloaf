@@ -156,9 +156,9 @@ namespace ESP32Console
 
         ::printf("\r\nModem mode. AT+SHELL to return.\r\n");
 
-        while (port.attached() && modem.isRunning())
-        {
-            // Modem -> terminal.
+        // One writer for both the loop and the post-loop drain. The origin
+        // decides the transport; the modem task never touches either.
+        auto drainTx = [&](void) -> size_t {
             uint8_t out[128];
             size_t n = port.popTx(out, sizeof(out), 20);
             if (n > 0)
@@ -175,6 +175,13 @@ namespace ESP32Console
                 }
 #endif
             }
+            return n;
+        };
+
+        while (port.attached() && modem.isRunning())
+        {
+            // Modem -> terminal.
+            drainTx();
 
             // An AT+IPR could not switch the line itself -- its reply was still
             // in the port's buffer. It is on the wire now, so this is the first
@@ -219,6 +226,17 @@ namespace ESP32Console
             if (got > 0)
                 port.pushRx(in, got, 100);
         }
+
+        // The loop can exit with an AT+IPR's own reply still in the port:
+        // "AT+IPR=2400+SHELL" is a single line, and the SHELL detaches before
+        // the pump gets another pass. Drain what is left, then apply. Without
+        // this the pending rate outlives the session that asked for it and
+        // lands on whichever session next runs this pump -- which never asked.
+        // The port is not yet detached here, so bound the drain rather than
+        // trusting it to run dry.
+        for (int i = 0; i < 64 && drainTx() > 0; ++i)
+            ;
+        ESP32Console::consoleBaudApplyPending();
 
         // Same ordering rule for the modem task: detach() takes the Modem
         // mutex, so it waits out any in-flight broadcast()/toAttached() before
