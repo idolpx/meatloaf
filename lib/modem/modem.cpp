@@ -413,6 +413,13 @@ bool Modem::executeCommand(const AtCommand &cmd, bool &reported)
     {
         if (cmd.name == "SHELL")
         {
+            // Bare AT+SHELL only. The parser accepts "=<n>" and "?" for every
+            // plus command so that AT+IPR can take an argument; SHELL has no
+            // argument, and accepting one here would exit modem mode while
+            // reporting OK for what is really a typo.
+            if (cmd.query || cmd.assign)
+                return false;
+
             // Leaves modem mode. The modem, its settings and any connection
             // stay alive, which is what makes the shared model meaningful.
             // Detaching is the signal the shell pumps watch for.
