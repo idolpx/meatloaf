@@ -822,6 +822,24 @@ half the other cannot:**
   board (`AT` → `OK`, `AT+SHELL` → back to the shell prompt) — the refusal
   is scoped to the two baud commands only, nothing else in modem mode is
   affected by `ENABLE_MODEM` already being on for this board.
+- **The two things named as risks in the plan were then checked as literal
+  hardware inputs, not just by source inspection.** On COM12: `AT+SHELL?`
+  and `AT+SHELL=1` both answer `ERROR` and leave modem mode attached (a
+  following bare `AT` still answers `OK`), and a plain `AT+SHELL`
+  afterwards still exits correctly — six checks, all pass. On COM13: a
+  single BATCHED line `AT+IPR=2400+SHELL` (the exact shape `df4e3d17`
+  fixes) produces one `OK` readable at 2000000, the old rate; the SHELL
+  half's own detach happens inside the same pump pass that just applied the
+  pending rate, so the "Modem mode exited." text and the next prompt are
+  already on the wire at 2400 by the time they are sent — a naive capture
+  at 2000000 sees only NUL bytes for that part, which is **correct
+  behaviour, not a failure**: reopening at 2400 immediately afterward gets
+  a live `baud` response of `console baud 2400`, and `baud` is a
+  shell-only command unreachable from inside modem mode, so its very
+  presence proves both the rate change and the mode exit landed from one
+  line. This is stronger evidence than two separate commands would have
+  been, precisely because the readable-old-rate window is bounded by the
+  switch itself.
 - **Not verified**: `esp32-s3-devkitc-1` (also `ENABLE_MODEM`, also
   USB-Serial-JTAG) was not physically connected for this task and the
   refusal was exercised only on `freenove-esp32-s3-wroom-1`; the four other
