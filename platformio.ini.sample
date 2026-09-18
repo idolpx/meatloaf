@@ -349,6 +349,11 @@ build_flags =
     -D ENABLE_DISPLAY
     -D ENABLE_CONSOLE
     -D ENABLE_CONSOLE_TCP
+    ; Per-env, never in the shared [env] block: 22 boards have never been built
+    ; with this flag, and the iram0_0_seg headroom on this board class is tight.
+    ; Without it "baud" exists but AT+IPR and modem_shell_pump do not -- half
+    ; the feature, with no build error to say so.
+    -D ENABLE_MODEM
 
 [env:iec-nugget]
 extends = esp32_base

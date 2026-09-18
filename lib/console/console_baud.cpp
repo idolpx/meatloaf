@@ -26,6 +26,7 @@
 #include "driver/uart.h"
 
 #include "mlConfig.h"
+#include "../../include/debug.h"
 
 #if defined(CONFIG_ESP_CONSOLE_UART_DEFAULT) || defined(CONFIG_ESP_CONSOLE_UART_CUSTOM)
 #define CONSOLE_HAS_UART 1
@@ -140,6 +141,16 @@ namespace ESP32Console
             return; // 0 means "use the build's DEBUG_SPEED"
         if (baud == consoleBaudGet())
             return;
-        consoleBaudSet(baud);
+        esp_err_t err = consoleBaudSet(baud);
+        if (err != ESP_OK)
+        {
+            // Booting at DEBUG_SPEED is the safe outcome, but silence leaves a
+            // hand-edited preferences.baud (the documented WebDAV recovery
+            // route) looking as though it had been honoured. Say so: this line
+            // goes out at DEBUG_SPEED, which is where anyone reading the boot
+            // log already is.
+            Debug_printv("console baud %d from config refused (%s), staying at %d",
+                         baud, esp_err_to_name(err), consoleBaudGet());
+        }
     }
 }

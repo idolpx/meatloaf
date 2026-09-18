@@ -12,6 +12,10 @@
 #include "tcpsvr.h"
 #include "../console_baud.h"
 #include <cstdio>
+// strtol and EXIT_SUCCESS/EXIT_FAILURE. They reach this file transitively
+// today; naming the header is what stops an unrelated include change from
+// breaking the build here.
+#include <cstdlib>
 #include <getopt.h>
 #include "esp_console.h"
 
