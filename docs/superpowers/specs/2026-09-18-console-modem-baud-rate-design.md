@@ -158,9 +158,20 @@ that is the part with no ESP-IDF dependency:
 - `AT+SHELL` is unchanged, and `ATE0+IPR=9600` applies both commands
 - Mutation check: the new cases must fail if the `=`/`?` handling is removed
 
-**Hardware, on a UART board** -- lolin-d32-pro (connected 2026-09-18) or
-esp32-wroom32. This cannot be verified on freenove-esp32-s3-wroom-1, which has no
-UART console:
+Both boards were connected on 2026-09-18 and the two legs can run back to back:
+
+| port | board | console | what it proves |
+|---|---|---|---|
+| COM13 | lolin-d32-pro | UART0 via a CH340 bridge (1A86:7523) | the rate really changes |
+| COM12 | freenove-esp32-s3-wroom-1 | USB-Serial-JTAG (303A:1001) | it refuses where there is no UART |
+
+Note the CH340 on COM13 is itself an example of the problem: that bridge is
+marginal at 2 Mbps, which is the case the feature exists to relieve. Note also
+that DTR/RTS auto-reset behaves normally on COM13 and does NOT on COM12 -- see
+the native-USB entry in AGENTS.md before driving either.
+
+**Hardware, on a UART board** -- lolin-d32-pro on COM13. This cannot be verified
+on freenove-esp32-s3-wroom-1, which has no UART console:
 
 - `baud` reports the current rate
 - `baud 9600` prints its notice at 2000000, and the prompt is readable after
@@ -172,7 +183,7 @@ UART console:
 - `baud 50` and `baud 9000000` are refused
 - the TCP console on port 23 can still set the rate back
 
-**Hardware, on freenove-esp32-s3-wroom-1** -- `baud` and `AT+IPR` both refuse
+**Hardware, on freenove-esp32-s3-wroom-1 (COM12)** -- `baud` and `AT+IPR` both refuse
 with the USB message, and nothing else regresses.
 
 ## Out of scope
