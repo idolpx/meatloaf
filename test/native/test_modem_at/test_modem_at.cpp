@@ -154,6 +154,58 @@ void test_parse_ampersand_and_plus_prefixed_commands(void)
     TEST_ASSERT_EQUAL_STRING("SHELL", line[0].name.c_str());
 }
 
+void test_parse_plus_command_takes_an_assignment(void)
+{
+    AtLine line;
+    TEST_ASSERT_TRUE(at_parse("AT+IPR=9600", line, nullptr));
+    TEST_ASSERT_EQUAL_CHAR('+', line[0].prefix);
+    TEST_ASSERT_EQUAL_STRING("IPR", line[0].name.c_str());
+    TEST_ASSERT_TRUE(line[0].assign);
+    TEST_ASSERT_FALSE(line[0].query);
+    TEST_ASSERT_EQUAL_INT(9600, (int)line[0].value);
+}
+
+// read_number() clamped at 1000000, which would have turned the project's own
+// console rate into a different number and still answered OK.
+void test_parse_plus_assignment_survives_a_two_million_baud_value(void)
+{
+    AtLine line;
+    TEST_ASSERT_TRUE(at_parse("AT+IPR=2000000", line, nullptr));
+    TEST_ASSERT_EQUAL_INT(2000000, (int)line[0].value);
+}
+
+void test_parse_plus_command_takes_a_query(void)
+{
+    AtLine line;
+    TEST_ASSERT_TRUE(at_parse("AT+IPR?", line, nullptr));
+    TEST_ASSERT_TRUE(line[0].query);
+    TEST_ASSERT_FALSE(line[0].assign);
+    TEST_ASSERT_EQUAL_INT(-1, (int)line[0].value);
+}
+
+void test_parse_plus_command_with_no_argument_is_still_valid(void)
+{
+    AtLine line;
+    TEST_ASSERT_TRUE(at_parse("AT+SHELL", line, nullptr));
+    TEST_ASSERT_EQUAL_STRING("SHELL", line[0].name.c_str());
+    TEST_ASSERT_FALSE(line[0].assign);
+    TEST_ASSERT_FALSE(line[0].query);
+}
+
+void test_parse_plus_command_rejects_a_malformed_assignment(void)
+{
+    AtLine line;
+    size_t pos = 0;
+    TEST_ASSERT_FALSE(at_parse("AT+IPR=", line, &pos));
+    TEST_ASSERT_FALSE(at_parse("AT+IPR=abc", line, &pos));
+
+    // A plus command still composes with the rest of a line.
+    TEST_ASSERT_TRUE(at_parse("ATE0+IPR=9600", line, nullptr));
+    TEST_ASSERT_EQUAL_INT(2, (int)line.size());
+    TEST_ASSERT_EQUAL_CHAR('E', line[0].verb);
+    TEST_ASSERT_EQUAL_INT(9600, (int)line[1].value);
+}
+
 void test_parse_plus_command_name_is_uppercased(void)
 {
     AtLine line;
@@ -1502,6 +1554,11 @@ int main(int, char **)
     RUN_TEST(test_parse_s_register_assignment);
     RUN_TEST(test_parse_s_register_query);
     RUN_TEST(test_parse_ampersand_and_plus_prefixed_commands);
+    RUN_TEST(test_parse_plus_command_takes_an_assignment);
+    RUN_TEST(test_parse_plus_assignment_survives_a_two_million_baud_value);
+    RUN_TEST(test_parse_plus_command_takes_a_query);
+    RUN_TEST(test_parse_plus_command_with_no_argument_is_still_valid);
+    RUN_TEST(test_parse_plus_command_rejects_a_malformed_assignment);
     RUN_TEST(test_parse_plus_command_name_is_uppercased);
     RUN_TEST(test_parse_numeric_suffix_defaults_to_zero_when_absent);
     RUN_TEST(test_parse_whitespace_between_commands_is_ignored);

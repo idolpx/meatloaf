@@ -76,7 +76,13 @@ bool verb_takes_number(char prefix, char v)
 
 // Reads consecutive digits starting at i, advancing i. Returns -1 when there
 // are none, so the caller can tell "absent" from a literal 0.
-long read_number(const std::string &s, size_t &i)
+//
+// `limit` is a CLAMP, not a validity test -- the caller range-checks. It
+// defaults to the value every S-register caller has always used; AT+IPR passes
+// a larger one, because a baud rate is the first number here that legitimately
+// exceeds a million, and clamping 2000000 down to 1000000 would set a rate the
+// user never asked for and then report success.
+long read_number(const std::string &s, size_t &i, long limit = 1000000)
 {
     size_t start = i;
     long n = 0;
@@ -85,8 +91,8 @@ long read_number(const std::string &s, size_t &i)
         n = n * 10 + (s[i] - '0');
         ++i;
         // A modem's numbers are all small. Clamp rather than overflow.
-        if (n > 1000000)
-            n = 1000000;
+        if (n > limit)
+            n = limit;
     }
     return (i == start) ? -1 : n;
 }
@@ -144,7 +150,7 @@ bool at_parse(const std::string &line, AtLine &out, size_t *err_pos)
         AtCommand cmd;
         size_t cmd_start = i;
 
-        // ---- AT+NAME -------------------------------------------------------
+        // ---- AT+NAME, AT+NAME=<n>, AT+NAME? --------------------------------
         if (line[i] == '+')
         {
             cmd.prefix = '+';
@@ -157,6 +163,28 @@ bool at_parse(const std::string &line, AtLine &out, size_t *err_pos)
             }
             if (i == name_start)
                 return fail(cmd_start);
+
+            // The same three forms an S-register takes. A bare name stays
+            // valid -- AT+SHELL has no argument and must keep parsing exactly
+            // as it always did.
+            if (i < line.size() && line[i] == '=')
+            {
+                ++i;
+                cmd.assign = true;
+                // 10000000 comfortably clears the 4000000 ceiling the baud
+                // commands enforce, so the range check happens in one place
+                // rather than being half-done here by a clamp.
+                long v = read_number(line, i, 10000000);
+                if (v < 0)
+                    return fail(i);
+                cmd.value = v;
+            }
+            else if (i < line.size() && line[i] == '?')
+            {
+                ++i;
+                cmd.query = true;
+            }
+
             out.push_back(cmd);
             continue;
         }
