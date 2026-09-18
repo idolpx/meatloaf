@@ -49,6 +49,7 @@
 
 #ifdef ENABLE_CONSOLE
 #include "../lib/console/ESP32Console.h"
+#include "console_baud.h"
 #endif
 
 #ifdef ENABLE_DISPLAY
@@ -296,6 +297,14 @@ void main_setup()
     // Load our stored configuration
     Config.load();
     mlConfig.load();
+#ifdef ENABLE_CONSOLE
+    // The persisted rate can only be applied here: config lives on flash or SD
+    // and neither is mounted at console.begin(). The consequence is deliberate
+    // and is the last-resort recovery path -- everything printed above this
+    // line goes out at DEBUG_SPEED, so a wrong persisted rate can never hide
+    // early boot on a board with no network.
+    ESP32Console::consoleBaudRestore();
+#endif
     //log_heap_checkpoint("after config load");
 
     ps2Keyboard.start();
