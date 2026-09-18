@@ -17,6 +17,7 @@
 
 #include "console_baud.h"
 
+#include <atomic>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -34,14 +35,18 @@
 
 namespace ESP32Console
 {
-    // Written by whichever task runs an AT+IPR, read by the shell pump. A plain
-    // int is enough: it is a single aligned word, one writer at a time, and a
-    // missed pending rate would simply be applied on the next pass.
-    static volatile int s_pending = 0;
+    // Written by whichever task runs an AT+IPR, read by the shell pump. The
+    // read-and-clear in consoleBaudApplyPending() has to be one indivisible
+    // step -- a plain load followed by a plain store would let a writer land
+    // between them and have its rate silently overwritten by the clear. The
+    // exchange() makes it atomic as a unit, so a rate set while the pump is
+    // mid-apply is either taken by this pass or left for the next one, never
+    // dropped.
+    static std::atomic<int> s_pending{0};
 
     bool consoleBaudSupported()
     {
-        return CONSOLE_HAS_UART ? true : false;
+        return CONSOLE_HAS_UART;
     }
 
     const char *consoleBaudTransportName()
@@ -96,12 +101,11 @@ namespace ESP32Console
             return err;
         }
 
-        auto &root = mlConfig.data();
-        if (!root.is_object())
-            return ESP_OK;
-        if (!root.contains("preferences") || !root["preferences"].is_object())
-            root["preferences"] = psram_json::object();
-        root["preferences"]["baud"] = baud;
+        // json_object_at() replaces a "preferences" node an older firmware left
+        // as a non-object rather than indexing into it -- operator[] on a
+        // number or a string is type_error.305, the same abort() the rest of
+        // this file avoids on the read side.
+        json_object_at(mlConfig.data(), "preferences")["baud"] = baud;
         // The same call AT&W already makes through Modem::saveConfig(). save()
         // hashes the sections and writes nothing when nothing changed.
         mlConfig.save();
@@ -112,15 +116,14 @@ namespace ESP32Console
     void consoleBaudSetPending(int baud)
     {
         if (baud >= BAUD_MIN && baud <= BAUD_MAX)
-            s_pending = baud;
+            s_pending.store(baud);
     }
 
     void consoleBaudApplyPending()
     {
-        int baud = s_pending;
+        int baud = s_pending.exchange(0);
         if (baud == 0)
             return;
-        s_pending = 0;
         consoleBaudSet(baud);
     }
 
