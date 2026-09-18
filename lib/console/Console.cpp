@@ -36,6 +36,7 @@
 #include "tcpsvr.h"
 #include "mlConfig.h"
 #include "Esp.h"
+#include "console_baud.h"
 
 #ifdef ENABLE_MODEM
 #include <memory>
@@ -174,6 +175,11 @@ namespace ESP32Console
                 }
 #endif
             }
+
+            // An AT+IPR could not switch the line itself -- its reply was still
+            // in the port's buffer. It is on the wire now, so this is the first
+            // safe moment. A no-op on every other pass.
+            ESP32Console::consoleBaudApplyPending();
 
             // Terminal -> modem. Serial reads its own fd here; a TCP session's
             // bytes arrive via TCPServer::modemFeed() from session_task(), which

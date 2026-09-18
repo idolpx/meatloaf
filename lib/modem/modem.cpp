@@ -28,6 +28,7 @@
 #include "mlConfig.h"
 #include "fnWiFi.h"
 #include "fnSystem.h"
+#include "console_baud.h"
 #include "../../include/version.h"
 #include "../../include/debug.h"
 
@@ -429,6 +430,31 @@ bool Modem::executeCommand(const AtCommand &cmd, bool &reported)
                 if (ports_[i] != nullptr)
                     ports_[i]->setAttached(false);
             }
+            return true;
+        }
+        if (cmd.name == "IPR")
+        {
+            // 3GPP TS 27.007's DTE-rate command. There is one physical UART, so
+            // this is the same rate the shell's "baud" command sets.
+            if (!ESP32Console::consoleBaudSupported())
+                return false; // -> ERROR; this console is USB, it has no rate
+
+            // A bare AT+IPR reports, the same as AT+IPR?. Only an assignment
+            // sets anything.
+            if (!cmd.assign)
+            {
+                broadcast("\r\n" + std::to_string(ESP32Console::consoleBaudGet()) + "\r\n");
+                return true;
+            }
+
+            if (cmd.value < ESP32Console::BAUD_MIN || cmd.value > ESP32Console::BAUD_MAX)
+                return false;
+
+            // NOT applied here. This runs on the modem task, whose "OK" is
+            // still in a ModemPort StreamBuffer -- switching the line now would
+            // send that reply at the new rate as garbage. The shell pump
+            // applies it once the bytes are on the wire.
+            ESP32Console::consoleBaudSetPending((int)cmd.value);
             return true;
         }
         return false;
