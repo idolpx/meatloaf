@@ -764,8 +764,12 @@ void Modem::doInfo(long which)
         }
         break;
 
+    case 6:
+        out += fnWiFi.get_mac_str() + "\r\n";
+        break;
+
     default:
-        out += "Meatloaf " + std::string(FW_VERSION) + "\r\n";
+        out += "Meatloaf v" + std::string(FW_VERSION) + (mlConfig.data().contains("hardware") ? " (" + json_str(mlConfig.data(), "hardware") + ")" : "") + "\r\n";
         break;
     }
 

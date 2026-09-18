@@ -512,6 +512,7 @@ build_flags =
     -D ENABLE_DISPLAY
     -D ENABLE_CONSOLE
     -D ENABLE_CONSOLE_TCP
+    -D ENABLE_MODEM
 
 [env:lilygo-t-display-s3]
 extends = esp32_base
