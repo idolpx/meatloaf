@@ -147,15 +147,55 @@ public:
         dest_addr.sin_addr.s_addr = inet_addr(address);
         //Debug_printv("dest_addr.sin_addr.s_addr=%x", dest_addr.sin_addr.s_addr);
         if (dest_addr.sin_addr.s_addr == 0xffffffff) {
-            struct hostent *hp;
-            hp = gethostbyname(address);
-            if (hp == NULL) {
-                Debug_printv("TCP Client Error: Connect to %s", address);
+            // Resolve with an explicit AF_INET hint. This was gethostbyname(),
+            // whose answer carries the family it found in h_addrtype -- and the
+            // old code never read it, casting whatever came back to an
+            // ip4_addr. CONFIG_LWIP_IPV6 is enabled on these boards and lwIP's
+            // default resolution order falls through to AAAA when a host has no
+            // A record, so an IPv6-only name had the first FOUR bytes of a
+            // 16-byte address used as an IPv4 address. That is not a failure
+            // anything reports: it connects to an unrelated address, or fails
+            // with EHOSTUNREACH, which the modem shows as NO ANSWER --
+            // indistinguishable from a host that is simply down. Reproduced on
+            // hardware with ipv6.google.com, which answers AAAA only.
+            //
+            // The hint does better here than merely checking h_addrtype would:
+            // a DUAL-STACK host still resolves, because getaddrinfo returns its
+            // A record rather than failing on the AAAA. An IPv6-only host now
+            // fails cleanly and says so -- this socket is AF_INET throughout,
+            // so it could never have reached one anyway.
+            struct addrinfo hints;
+            memset(&hints, 0, sizeof(hints));
+            hints.ai_family = AF_INET;
+            hints.ai_socktype = SOCK_STREAM;
+
+            struct addrinfo *res = NULL;
+            int rc = getaddrinfo(address, NULL, &hints, &res);
+
+            struct sockaddr_in *found = NULL;
+            for (struct addrinfo *ai = res; ai != NULL; ai = ai->ai_next) {
+                if (ai->ai_family == AF_INET && ai->ai_addr != NULL) {
+                    found = (struct sockaddr_in *)ai->ai_addr;
+                    break;
+                }
+            }
+
+            if (rc != 0 || found == NULL) {
+                Debug_printv("TCP Client Error: no IPv4 address for %s (rc %d)",
+                             address, rc);
+                if (res != NULL)
+                    freeaddrinfo(res);
                 return false;
             }
-            struct ip4_addr *ip4_addr;
-            ip4_addr = (struct ip4_addr *)hp->h_addr;
-            dest_addr.sin_addr.s_addr = ip4_addr->addr;
+
+            dest_addr.sin_addr.s_addr = found->sin_addr.s_addr;
+            freeaddrinfo(res);
+
+            // Log what the name actually became. A wrong answer here is
+            // otherwise invisible -- it surfaces four layers up as NO ANSWER,
+            // which is where the whole of this bug hid.
+            Debug_printv("resolved %s to %s", address,
+                         inet_ntoa(dest_addr.sin_addr));
         }
         
         sock =	socket(AF_INET, SOCK_STREAM, IPPROTO_IP); // SCOK_STREAM = TCP/IP SOCK_DGRAM = UDP
