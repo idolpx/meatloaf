@@ -900,6 +900,25 @@ half the other cannot:**
   tested on hardware — only the lower bound (`baud 50`, `AT+IPR=50`) was —
   though it is the same branch and comparison in `console_baud.cpp` either
   way.
+- **The biggest untested thing here is not the UART half, it is
+  `Modem::executeLine()`'s staging.** Four behaviours landed there with no
+  executable coverage of any kind: a rate is STAGED by the handler and
+  promoted only after `sendResult()`, a staged rate is DISCARDED on the
+  `ERROR` path, there is a second promote on the ONLINE early return, and
+  `AT+SHELL` promotes inside `executeCommand()` before the detach. Every one
+  is pinned by hardware anecdote and by comments, and comments in this file's
+  own history have twice been wrong about code they sat next to — the
+  `broadcast()`/`attached()` claim in this very wave was one. **The native
+  suite cannot reach `executeLine()` at all**: `Modem` needs FreeRTOS,
+  `MFSOwner` and `mlConfig`, so closing this is not "add a test", it is
+  "build a seam first" — the console-baud calls would need to go through an
+  injectable interface before a native case could assert that
+  `consoleBaudSetPending` happens after `broadcast`, or that a failing line
+  publishes nothing. The ERROR-discard is the one that most deserves it: it
+  is a deliberate departure from this codebase's documented left-to-right
+  convention (`ATE1X9` applies `E1` before failing), justified because a baud
+  change destroys the channel the `ERROR` was reported on, and nothing
+  executable defends that decision against a future edit.
 - **One stray byte occasionally shows up at the very start of a fresh
   `pyserial.Serial()` session to COM13, merging with the next line typed
   (`"<glitch>AT"` fails to parse as `AT`).** Found while writing the
