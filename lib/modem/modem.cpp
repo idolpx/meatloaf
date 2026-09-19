@@ -397,15 +397,46 @@ void Modem::executeLine(const std::string &raw)
         {
             if (!reported)
                 sendResult(AtResult::ERROR);
+            // A rate staged earlier on a line that then failed is DISCARDED.
+            // This departs from the left-to-right convention ("ATE1X9" answers
+            // ERROR with E1 applied), and the reason it has to: every other
+            // setting is observable in band via ATI1, while a baud change
+            // retunes the channel the ERROR was just reported on. Apply it and
+            // the user reads ERROR at the old rate and then the line goes
+            // silent -- indistinguishable from a hung board. Discarding leaves
+            // them a recoverable ERROR and an unchanged line.
+            staged_ipr_ = -1;
             return;
         }
         // A successful dial has already emitted CONNECT and switched state;
         // anything after it on the line would be typed into the session.
         if (state_ == ModemState::ONLINE)
+        {
+            // CONNECT is already in tx_ (doDial emits it), so the ordering rule
+            // holds and "AT+IPR=2400DT<host>" is a legitimate combined intent:
+            // read CONNECT at the old rate, run the session at the new one.
+            promoteStagedBaud();
             return;
+        }
     }
 
     sendResult(AtResult::OK);
+    // AFTER sendResult, never before. consoleBaudSetPending() is what the shell
+    // pump watches, and the pump applies the rate as soon as it sees one. Doing
+    // this in the handler published the rate while the OK was still only a
+    // std::string about to be built -- if the pump's popTx() timed out in that
+    // gap it switched the line on an empty buffer and the OK went out at the
+    // new rate as garbage. Promoting here makes "a rate is pending" imply "the
+    // reply is already in every attached port's tx_".
+    promoteStagedBaud();
+}
+
+void Modem::promoteStagedBaud()
+{
+    if (staged_ipr_ <= 0)
+        return;
+    ESP32Console::consoleBaudSetPending((int)staged_ipr_);
+    staged_ipr_ = -1;
 }
 
 bool Modem::executeCommand(const AtCommand &cmd, bool &reported)
@@ -420,6 +451,37 @@ bool Modem::executeCommand(const AtCommand &cmd, bool &reported)
             // reporting OK for what is really a typo.
             if (cmd.query || cmd.assign)
                 return false;
+
+            // The one place a staged rate is promoted BEFORE the line's reply,
+            // and it is a deliberate trade rather than the general rule.
+            //
+            // Detaching is a DEADLINE. The pump can only leave its loop once
+            // attached_ is false; it then does one bounded drain, calls
+            // consoleBaudApplyPending() exactly once, and returns. A promotion
+            // landing after that is stranded in s_pending and applied by
+            // whichever session next runs the pump, which never asked for it --
+            // the leak the pump's own post-loop comment describes. Promoting
+            // before the detach makes that impossible by construction, since
+            // the pump cannot observe the detach before the store.
+            //
+            // The cost is that this one line -- "AT+IPR=2400+SHELL" -- gives up
+            // the reply-ordering guarantee the rest of Fix 1a establishes.
+            // broadcast() pushes to every OPEN port, NOT only attached ones
+            // (only toAttached() checks attached_), so the OK for this line IS
+            // still queued after the detach. What keeps it readable is the
+            // pump's post-loop drain: every drainTx() ends in a popTx(..., 20)
+            // that returns 0 only after waiting, so at least one 20 ms window
+            // separates the detach from applyPending(). Hardware-measured: the
+            // OK arrives at the OLD rate and "Modem mode exited." at the new
+            // one. Shortening that popTx timeout would erode this.
+            //
+            // Stranding is the worse failure of the two -- it silently retunes
+            // an unrelated later session -- so the deterministic guarantee goes
+            // there and the 20 ms-bounded, cosmetic one is accepted here.
+            //
+            // After the query/assign guard, so "AT+IPR=2400+SHELL=1" still
+            // answers ERROR and applies nothing.
+            promoteStagedBaud();
 
             // Leaves modem mode. The modem, its settings and any connection
             // stay alive, which is what makes the shared model meaningful.
@@ -450,11 +512,15 @@ bool Modem::executeCommand(const AtCommand &cmd, bool &reported)
             if (cmd.value < ESP32Console::BAUD_MIN || cmd.value > ESP32Console::BAUD_MAX)
                 return false;
 
-            // NOT applied here. This runs on the modem task, whose "OK" is
-            // still in a ModemPort StreamBuffer -- switching the line now would
-            // send that reply at the new rate as garbage. The shell pump
-            // applies it once the bytes are on the wire.
-            ESP32Console::consoleBaudSetPending((int)cmd.value);
+            // Neither applied NOR published here. Applying would switch the
+            // line while this command's own "OK" was still in a ModemPort
+            // StreamBuffer, and merely publishing it is barely better: the
+            // shell pump acts the instant it sees a pending rate, and the OK
+            // is not enqueued until sendResult() runs back in executeLine().
+            // Staging on the object closes that gap -- executeLine() promotes
+            // it after the reply, so the pump can never see a rate before the
+            // bytes it is meant to wait for exist.
+            staged_ipr_ = cmd.value;
             return true;
         }
         return false;

@@ -100,6 +100,11 @@ private:
     // reported to true so the caller does not add a second code.
     bool executeCommand(const AtCommand &cmd, bool &reported);
 
+    // Publishes a rate AT+IPR staged, for the shell pump to apply. Called only
+    // once the line's own reply is already in every attached port's TX buffer,
+    // which is what makes "a rate is pending" imply "the reply is on its way".
+    void promoteStagedBaud();
+
     bool doDial(const AtCommand &cmd, bool &reported);
     void doHangup();
 
@@ -135,6 +140,13 @@ private:
     std::shared_ptr<MStream> conn_;
     std::string              last_line_;   // for A/
     std::string              cmd_buf_;     // partial command-mode line
+
+    // A rate AT+IPR asked for, not yet handed to the console. -1 means none.
+    // Deliberately NOT guarded by mutex_: it is written and read only by
+    // executeCommand()/executeLine(), both of which run on the modem task.
+    // mutex_ guards ports_ against the shell tasks and is non-recursive, so
+    // taking it here would deadlock against the Lock in the AT+SHELL branch.
+    long                     staged_ipr_ = -1;
 
     // Bytes pushTx() could not take because a console's TX buffer stayed full
     // for the whole timeout. Counted rather than logged: both writers run on
