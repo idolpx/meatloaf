@@ -270,10 +270,28 @@ void TCPServer::start()
 
     // Create the persistent session worker now, while internal RAM is still
     // plentiful (task stacks are internal-DRAM only, no PSRAM fallback).
-    // 4 KB suffices: the session is a thin recv loop — commands themselves
-    // run on the console executor task's 16 KB stack.
+    //
+    // 6 KB, not the 4 KB this was. A thin recv loop is no longer all it runs:
+    // Console::execute() intercepts "at" before submitting to the executor, so
+    // modem_shell_pump(ORIGIN_REMOTE) runs HERE, and an AT+IPR from a TCP modem
+    // session therefore drives consoleBaudApplyPending() -> consoleBaudSet() ->
+    // mlConfig.save() -- a full JSON serialize, MD5 and LittleFS/SD write -- on
+    // this stack. Everything else a TCP command does still runs on the
+    // executor's 16 KB.
+    //
+    // Measured 2026-09-19 on lolin-d32-pro: console_repl, which runs that exact
+    // pump path for a SERIAL modem session, peaked at 2836 bytes of its 6144
+    // after "at" + AT+IPR=2400 + AT+SHELL, against 1488 idle. tcp_session idles
+    // at 756. 2836 against 4096 leaves ~1.2 KB, and mlConfig.save() is proven
+    // at 8 KB (the modem task, AT&W) and 6 KB (console_repl) but never at 4 KB.
+    // The TCP-origin path could not be measured directly -- this network puts
+    // the board and the host on isolated APs -- so the margin is a projection,
+    // and AGENTS.md's SessionBroker precedent is that too little here corrupts
+    // the FreeRTOS heap silently and surfaces in unrelated tasks. 2 KB of
+    // internal DRAM is the right price for that. Matching console_repl's proven
+    // 6144 keeps the two tasks that run this path on the same budget.
     if (_session_htask == NULL &&
-        xTaskCreatePinnedToCore(&TCPServer::session_task, "tcp_session", 4096, NULL, 5, &_session_htask, 0) != pdTRUE)
+        xTaskCreatePinnedToCore(&TCPServer::session_task, "tcp_session", 6144, NULL, 5, &_session_htask, 0) != pdTRUE)
     {
         Debug_printv("Could not start tcp session task!");
         _session_htask = NULL;
