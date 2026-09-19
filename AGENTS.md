@@ -915,6 +915,135 @@ half the other cannot:**
   the two ports fail in different, unrelated ways and neither assumption
   transfers to the other.
 
+### Final-review fixes to the baud work (2026-09-19)
+
+Four findings from the whole-branch review, plus two limitations recorded
+rather than engineered.
+
+- **The pending rate was published BEFORE the reply it exists to wait for.**
+  `Modem::executeCommand()` called `consoleBaudSetPending()` and returned;
+  `sendResult(AtResult::OK)` only runs afterwards, back in `executeLine()`
+  after the command loop. The pump acts the instant it sees a pending rate,
+  so if its `popTx(..., 20)` timed out in that gap it switched the line on an
+  empty buffer and the `OK` went out at the new rate as garbage — defeating
+  the entire two-path design. The gap spans a `std::string` allocation in
+  `at_format_result()` and a mutex acquisition in `broadcast()`, with the
+  modem task and both pumps at priority 5 on core 0, so it is not one
+  instruction. `AT+IPR` now stages on `Modem::staged_ipr_` and `executeLine()`
+  promotes after `sendResult()`. **A line that then FAILS discards the stage**,
+  which deliberately departs from the left-to-right convention this codebase
+  otherwise follows (`ATE1X9` answers `ERROR` with `E1` applied): every other
+  setting is observable in band via `ATI1`, while a baud change retunes the
+  channel the `ERROR` was just reported on, so applying it leaves the user
+  reading `ERROR` at the old rate and then silence — indistinguishable from a
+  hung board. `staged_ipr_` is deliberately **not** guarded by `mutex_`: both
+  writers are the modem task, and `mutex_` is non-recursive, so taking it
+  would deadlock against the `Lock` in the `AT+SHELL` branch.
+- **`AT+SHELL` is the one place that promotes BEFORE the reply, and knowing
+  why matters more than the rule.** Detaching is a DEADLINE: the pump leaves
+  its loop only once `attached_` is false, then drains once, calls
+  `consoleBaudApplyPending()` once and returns, so a promotion landing after
+  that is stranded in the process-global `s_pending` and retunes whichever
+  session next runs the pump. Promoting before the detach makes that
+  impossible by construction. **`broadcast()` gates on `isOpen()`, NOT on
+  `attached()`** — only `toAttached()` checks `attached_`, exactly as
+  `modem_port.h` says ("command-mode responses go to every open port; stream
+  data goes only to the attached one") — so the batched line's `OK` IS still
+  queued after the detach, and this one line therefore gives up the
+  reply-ordering guarantee. What keeps it readable is that every `drainTx()`
+  ends in a `popTx(..., 20)` which returns 0 only after waiting, so at least
+  one 20 ms window separates the detach from `applyPending()`. **Shortening
+  that timeout would erode it.** Measured: `AT+IPR=2400+SHELL` at 2000000
+  yields `OK` readable at the old rate and then `Modem mode exited.` as a run
+  of framing-error NULs, being clocked at 2400. Stranding is the worse
+  failure of the two — it silently retunes an unrelated later session — so
+  the deterministic guarantee goes there and the bounded, cosmetic one is
+  accepted here.
+- **`consoleBaudSet()` had no mutual exclusion, and the config file was the
+  thing at risk.** `s_pending.exchange()` decides which pump WINS a rate; it
+  says nothing about two tasks being inside the apply. `baud 9600` from the
+  TCP console runs on `console_exec` while a serial pump can concurrently
+  apply a pending rate, and both reach `json_object_at(mlConfig.data(),
+  "preferences")["baud"]` and `mlConfig.save()`. **`mlConfig` has no locking
+  of any kind**, so that is a concurrent mutate-and-serialize of one nlohmann
+  tree — a corrupted `config.json`, worse than the racing
+  `uart_set_baudrate()`. Now a function-local `std::mutex` (the pattern
+  `PWDHelpers.cpp` already uses) held across the WHOLE body including the
+  multi-second drain; narrowing it to the persist half would leave the two
+  `uart_set_baudrate()` calls racing, the same defect one layer down. The
+  header called this module "the one owner of the console UART rate" — it is
+  the one *place*, not the one *caller at a time*.
+- **The 200 ms `uart_wait_tx_done()` was far too short at the rates this
+  feature exists for, and its result was thrown away.**
+  `console_settings.c:63` installs the driver with **tx_buffer_size 0**, so
+  writes go straight into the 128-byte hardware FIFO and this wait is the
+  only thing that empties it. At 8N1 a full FIFO takes **4.27 s at 300 baud,
+  1.07 s at 1200, 533 ms at 2400, 133 ms at 9600** — the modem's advertised
+  range is 300-19200, precisely where 200 ms fails — so `baud 115200` typed
+  at 300 baud lost most of its own notice and clocked the tail out at the new
+  rate. Now `(UART_HW_FIFO_LEN * 10 * 1000) / previous + 100` ms, guarded
+  against a `previous` of 0. **Derived rather than a generous flat constant
+  on purpose**: the wait returns as soon as the FIFO is empty either way, but
+  derived a *timeout* means something specific — a full FIFO failed to drain
+  in the time a full FIFO takes — where a flat value makes it
+  uninterpretable. At BOOT the wait is harmless in the other direction, since
+  the old rate is always `DEBUG_SPEED`, where a full FIFO drains in 0.64 ms.
+- **`-D ENABLE_MODEM` for `lolin-d32-pro` now lives in
+  `platformio.ini.sample`**, scoped to that env. It was only in the gitignored
+  `platformio.ini`, so anyone copying the sample got `baud` with no `AT+IPR`
+  and no `modem_shell_pump()` — half a feature, no build error, nothing to
+  warn them. **Never add it to the shared `[env]` block**: 22 boards have
+  never been built with it and the `iram0_0_seg` headroom on this board class
+  is ~2.8 KB.
+- **`tcp_session` went from 4096 to 6144 bytes** (`lib/server/tcpsvr.cpp`).
+  `Console::execute()` intercepts `at` before submitting to the executor, so
+  `modem_shell_pump(ORIGIN_REMOTE)` runs on that task — and an `AT+IPR` from a
+  TCP modem session therefore drives a full JSON serialize, MD5 and
+  LittleFS/SD write there, on a stack whose comment said 4 KB sufficed because
+  "commands themselves run on the console executor task's 16 KB stack". That
+  is no longer true of every command. Measured 2026-09-19: **`console_repl`,
+  which runs that exact pump path for a serial modem session, peaked at 2836
+  bytes of its 6144** after `at` + `AT+IPR=2400` + `AT+SHELL`, against 1488
+  idle; **`tcp_session` idles at 756 of 4096**. 2836 against 4096 leaves
+  ~1.2 KB, and `mlConfig.save()` is proven at 8 KB (the modem task, `AT&W`)
+  and 6 KB (`console_repl`) but never at 4 KB. **The TCP-origin path could not
+  be measured directly** — see the network note below — so that margin is a
+  projection, and the `SessionBroker` precedent is that too little stack here
+  corrupts the FreeRTOS heap silently and surfaces in unrelated tasks.
+- **Known limitation, deliberately not engineered: two modem sessions at once
+  can retune the line under each other.** `Modem::broadcast()` pushes a reply
+  to every OPEN port and `MAX_PORTS` is 2, so with a serial modem session and
+  a TCP modem session attached simultaneously, whichever pump drains first
+  calls `consoleBaudApplyPending()` and can switch the UART while the other
+  port's copy of the same reply is still in its own StreamBuffer. A
+  cross-port barrier is real design work for a configuration that **has never
+  been attached on hardware at all**, so it is recorded rather than fixed.
+- **`Serial.begin(115200)` in the bus code is a latent clobber of the restored
+  rate.** `lib/bus/iec/IECFileDevice.cpp:131` and
+  `lib/bus/gpib/GPIBFileDevice.cpp:94` both call it. It is dead today because
+  `IECFileDevice.cpp:32` has a file-local `#define DEBUG 0` and the call sits
+  under `#if DEBUG>0` — but on an `ENABLE_CONSOLE` build `include/debug.h:27`
+  maps `Serial` to `console`, and `Console::begin(int baud, ...)` exists
+  (`Console.h:181`), so **flipping that flag for IEC debugging would call
+  `console.begin(115200)` from `IECFileDevice::begin()`**, which runs via
+  `SYSTEM_BUS.setup()` — AFTER `consoleBaudRestore()` — and would silently
+  reset the restored rate to 115200. This does not contradict the design's
+  "nothing else configures UART0 on a console build" audit, which correctly
+  covered `main.cpp:208`; it is a second, conditional owner that audit missed.
+  The IEC code is deliberately left unchanged.
+- **The network could not carry the TCP half of this verification, and the
+  board was not at fault.** Port 23 was unreachable from the host, and so was
+  ICMP — but the board pinged its gateway 5/5 at 1-7 ms, and ARP resolved the
+  board's MAC from the host, so L2 worked and the stack was healthy.
+  `netsh wlan show interfaces` gave the host BSSID `14:91:82:a5:b3:87` against
+  the board's `14:91:82:a5:b9:9d`: **two different APs of one mesh SSID, with
+  client isolation between them.** The ESP32 is 2.4 GHz only, so this will
+  recur whenever the host associates to the 5 GHz radio. The diagnostic that
+  separates it from a firmware fault in one step is `ping <gateway>` at the
+  board's own console: gateway up + host unreachable is the network, not the
+  board. This supersedes nothing in the September 16 entry's firewall note —
+  that was inbound to the host; this is blocked in both directions.
+
 ## Recent Changes (September 17, 2026)
 
 ### An IPv6-only name was dialled as a garbage IPv4 address
