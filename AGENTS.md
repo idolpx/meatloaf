@@ -1028,14 +1028,30 @@ rather than engineered.
   restore only runs at all when the persisted rate differs from the current one
   (`consoleBaudRestore()` returns early on `baud == consoleBaudGet()`), so a
   test that ends at 2000000 never exercises it.
-- **Known limitation: the ONLINE promote branch has no coverage.**
-  `AT+IPR=<n>DT"host"` stages a rate, dials, and promotes after `CONNECT` — the
-  native suite never reaches `executeLine()` and this was not dialled on
-  hardware. One consequence worth knowing before anyone does: in ONLINE state
-  the pump applies the rate mid-session, so `consoleBaudSet()` blocks that task
-  for the drain plus a flash write while it is not draining `tx_`, and at a low
-  rate `toAttached()`'s 500 ms `pushTx` can therefore drop stream bytes into
-  `tx_dropped_`. Recorded, not engineered.
+- **The ONLINE promote branch is hardware-verified, and it is the one path
+  where the rate changes underneath a live session.** `AT+IPR=<n>DT"host"` is a
+  single line: `+IPR` stages a rate, the dial succeeds and returns early from
+  `executeLine()`, and a second `promoteStagedBaud()` on that path publishes
+  the rate after `CONNECT` has been queued. Dialled three times against
+  `bbs.fozztexx.com:23` from 2000000 with `AT+IPR=2400DT`: **`CONNECT` is
+  readable at the OLD rate on every trial** — which is the ordering guarantee
+  the whole staging design exists for — and the session then runs at 2400,
+  confirmed in band by `AT+IPR?` answering `2400` after a `+++` escape, with
+  `ATI1`, `ATO` and `ATH` all behaving at the new rate and the shell usable
+  afterwards. The native suite still cannot reach `executeLine()`, so this
+  branch is hardware-verified only.
+  One consequence worth knowing: in ONLINE state the pump applies the rate
+  mid-session, so `consoleBaudSet()` blocks that task for the drain plus a
+  flash write while it is not draining `tx_`, and at a low rate
+  `toAttached()`'s 500 ms `pushTx` can therefore drop stream bytes into
+  `tx_dropped_`. The drain budget derives from the rate being left, so dialling
+  DOWN from 2000000 costs ~100 ms and is what was measured; dialling UP from a
+  slow rate is the expensive direction and was not.
+  **Driving this by hand has its own trap, unrelated to the feature: any AT
+  text typed while `state_` is ONLINE is forwarded to the remote as session
+  data**, which is correct Hayes behaviour and is exactly what it looks like
+  when a harness forgets `+++` first — the commands land in the BBS's login
+  prompt instead of the modem.
 - **Known limitation, deliberately not engineered: two modem sessions at once
   can retune the line under each other.** `Modem::broadcast()` pushes a reply
   to every OPEN port and `MAX_PORTS` is 2, so with a serial modem session and
