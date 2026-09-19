@@ -1175,6 +1175,15 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     isFriendlySkipper = false;
     _size = 0;
     _range_size = 0;
+    // UINT32_MAX, not 0: it is the sentinel for "no bounded range in force",
+    // tested by both the seek fast path and read()'s size cap.  Leaving a
+    // PREVIOUS file's bounded end here caps the next file's reads against an
+    // offset that means nothing for it -- a short read whose buffer tail is
+    // never written.  That is how a D81 directory sector came back with its
+    // next_track link holding a leftover text byte (0x58 'X'), and seekSector()
+    // rejected "track 88" on an 80-track disk.  _position has the same
+    // shared-client hazard and is already compensated for in HTTPMStream::seek().
+    _rangeEnd = UINT32_MAX;
 
     // Save POST response data before init() clears it
     // We want to return POST response data on subsequent GET operations
