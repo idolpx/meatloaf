@@ -36,6 +36,7 @@ private:
     static TaskHandle_t _htask;
     static TaskHandle_t _session_htask;
 
+
 public:
     void start();
     void stop();
@@ -51,6 +52,15 @@ public:
     // not reading the socket, so there is no second reader to race. Bytes that
     // are not ESC are discarded -- see console_cancel.h.
     static bool pollCancel();
+
+#ifdef ENABLE_MODEM
+    // Non-blocking read of whatever the client has sent, for a console sitting
+    // in modem mode. Safe from the task blocked inside console.execute() and
+    // ONLY from there -- exactly the same reasoning as pollCancel() above:
+    // session_task() is parked in that call and is not reading the socket, so
+    // there is no second reader to race.
+    static size_t modemRecv(uint8_t *buf, size_t n);
+#endif
 };
 
 extern TCPServer tcp_server;

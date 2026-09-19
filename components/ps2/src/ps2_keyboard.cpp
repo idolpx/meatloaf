@@ -74,11 +74,21 @@ void _taskfn_send_packet(void *arg)
                       pdMS_TO_TICKS(250)) == pdTRUE)
     {
       xSemaphoreTake(ps2dev->get_bus_mutex_handle(), portMAX_DELAY);
-      esp_rom_delay_us(BYTE_INTERVAL_MICROS);
       for (int i = 0; i < packet.len; i++)
       {
-        ps2dev->write_wait_idle(packet.data[i]);
-        esp_rom_delay_us(BYTE_INTERVAL_MICROS);
+        // Previously discarded: a bus that never goes IDLE (or a parity/ack
+        // mismatch) failed here on every byte with nothing surfaced to the
+        // caller -- keydown()/keyup() had already returned success at the
+        // enqueue step, so `ps2 type` reported OK while nothing reached
+        // the wire.
+        int wr = ps2dev->write_wait_idle(packet.data[i]);
+        if (wr != 0)
+          ESP_LOGW("ps2", "write_wait_idle failed byte[0x%02X] idx[%d/%d] clk[%d] data[%d]",
+                    packet.data[i], i, packet.len,
+                    gpio_get_level(ps2dev->clkPin()), gpio_get_level(ps2dev->dataPin()));
+        // KeyboardTwister's DTV-facing sender waits 15 ms after every
+        // scancode byte. The DTV misses the spec's much shorter 500 us gap.
+        vTaskDelay(pdMS_TO_TICKS(15));
       }
       xSemaphoreGive(ps2dev->get_bus_mutex_handle());
     }
@@ -105,9 +115,15 @@ void PS2Keyboard::begin()
   xTaskCreatePinnedToCore(_taskfn_send_packet, "send_packet", 4096, this, _config_task_priority - 1, &_task_send_packet, DEFAULT_TASK_CORE);
 
   xSemaphoreTake(_mutex_bus, portMAX_DELAY);
+  ESP_LOGI("ps2", "begin: mutex acquired, starting BAT");
   esp_rom_delay_us(BYTE_INTERVAL_MICROS);
   vTaskDelay(pdMS_TO_TICKS(200));
-  write(0xAA);
+  int bat_result = write(0xAA);
+  if (bat_result == 0)
+    ESP_LOGI("ps2", "sent BAT 0xAA");
+  else
+    ESP_LOGW("ps2", "BAT 0xAA failed clk[%d] data[%d]",
+             gpio_get_level(clkPin()), gpio_get_level(dataPin()));
   xSemaphoreGive(_mutex_bus);
 }
 void PS2Keyboard::end()

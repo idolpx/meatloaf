@@ -309,6 +309,10 @@ build_flags =
     -I components/zlib/zlib
     ; test_ps2_keys: scan_codes_set_2.h (stdint.h only, native-safe).
     -I components/ps2/src
+    ; test_modem_at: lib/modem's headers, included by name from the test file,
+    ; and libtelnet's header for the negotiation filter (Task 6).
+    -I lib/modem
+    -I lib/telnet
     -I test/native/test_archive_extract/host
     -include test/native/test_archive_extract/host/host_posix_compat.h
     ;-lgcov
@@ -345,6 +349,11 @@ build_flags =
     -D ENABLE_DISPLAY
     -D ENABLE_CONSOLE
     -D ENABLE_CONSOLE_TCP
+    ; Per-env, never in the shared [env] block: 22 boards have never been built
+    ; with this flag, and the iram0_0_seg headroom on this board class is tight.
+    ; Without it "baud" exists but AT+IPR and modem_shell_pump do not -- half
+    ; the feature, with no build error to say so.
+    -D ENABLE_MODEM
 
 [env:iec-nugget]
 extends = esp32_base
@@ -463,6 +472,7 @@ build_flags =
     -D ENABLE_DISPLAY
     -D ENABLE_CONSOLE
     -D ENABLE_CONSOLE_TCP
+    -D ENABLE_MODEM
 
 [env:esp32-s3-makemagazin]
 extends = esp32_base
@@ -507,6 +517,7 @@ build_flags =
     -D ENABLE_DISPLAY
     -D ENABLE_CONSOLE
     -D ENABLE_CONSOLE_TCP
+    -D ENABLE_MODEM
 
 [env:lilygo-t-display-s3]
 extends = esp32_base

@@ -83,6 +83,11 @@ MFile* MDNSMFileSystem::getFile(std::string path) {
                 std::string path;
                 if (host.empty()) {
                     Debug_printv("No host address for service: %s", service->getDisplayName().c_str());
+#ifndef DISABLE_AFP   // MEATLOAF-GATE
+                } else if (service->service_type == "_afpovertcp") {
+                    path = "afp://" + host + "/";
+                    file = new AFPMFile(path);
+#endif
 #ifndef DISABLE_NFS   // MEATLOAF-GATE
                 } else if (service->service_type == "_nfs") {
                     path = "nfs://" + host + "/";

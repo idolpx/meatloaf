@@ -2538,7 +2538,7 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                         // Persist the IANA name (not the resolved POSIX
                         // string) so mlConfig.load() re-resolves it the
                         // same way on the next boot.
-                        mlConfig.data()["preferences"]["timezone"] = command;
+                        json_object_at(mlConfig.data(), "preferences")["timezone"] = command;
                         mlConfig.save();
                     }
                 }
@@ -3254,7 +3254,10 @@ void iecDrive::unmount()
 // (mode, media_stack, ...) are preserved.
 void iecDrive::persistConfig()
 {
-    auto &entry = mlConfig.data()["devices"]["iec"][std::to_string(m_devnr)];
+    // json_object_at, not operator[]: indexing through a stale non-object
+    // node anywhere along this path is type_error.305, an abort().
+    auto &iec = json_object_at(json_object_at(mlConfig.data(), "devices"), "iec");
+    auto &entry = json_object_at(iec, std::to_string(m_devnr).c_str());
     entry["enabled"] = isActive() ? 1 : 0;
     if (!entry.contains("type"))
         entry["type"] = "drive";  // don't clobber subclass types (e.g. "meatloaf")
@@ -3276,13 +3279,16 @@ bool iecDrive::reloadConfig()
     if (!iec.contains(key))
         return false;
 
+    // json_int/json_str, not value(): a per-drive entry that is not an
+    // object, or an `enabled`/`url` of the wrong type, is an abort() under
+    // -fno-exceptions -- and this runs at boot from main_setup().
     const psram_json &entry = iec[key];
     bool wasActive = isActive();
-    setActive(entry.value("enabled", 1) != 0);
+    setActive(json_int(entry, "enabled", 1) != 0);
     if (isActive() != wasActive)
         notify_activity(activitySource(), isActive() ? "active" : "disabled");
 
-    std::string url = entry.value("url", "");
+    std::string url = json_str(entry, "url");
     if (!url.empty() && (m_cwd == nullptr || m_cwd->url != url))
     {
         // Network-scheme URLs (fsp://, http://, ...) need a live route. Attempting
@@ -3312,7 +3318,9 @@ void iecDrive::restoreActiveFromConfig()
         return;
 
     bool wasActive = isActive();
-    setActive(iec[key].value("enabled", 1) != 0);
+    // Same guard as reloadConfig(), and it matters more here: this one is
+    // reached from the real-time IEC bus task's RESET handling.
+    setActive(json_int(iec[key], "enabled", 1) != 0);
     if (isActive() != wasActive)
         notify_activity(activitySource(), isActive() ? "active" : "disabled");
 }

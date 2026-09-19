@@ -527,6 +527,7 @@ gitignored.
 - **Console baud rate**: `monitor_speed` is 2,000,000 baud. Every board sdkconfig must have `CONFIG_ESP_CONSOLE_UART_CUSTOM=y` and both baudrate keys set to 2000000 (modern block + legacy compat block). The console UART uses `UART_SCLK_DEFAULT` — never `UART_SCLK_REF_TICK`, which is limited to ~250 kbps.
 - **HAGL display guard**: HAGL is only compiled when `PIN_TFT_MOSI` is defined in the board's pinmap. Boards with `ENABLE_DISPLAY` but no wired display must have all six `CONFIG_MIPI_DISPLAY_PIN_*` values set to -1 in their sdkconfig to prevent GPIO conflicts at boot.
 - **`esp_ping_new_session()` OOM**: The ping task stack is allocated from internal DRAM by `xTaskCreate`. **There is no PSRAM fallback** — `CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM=y` is set on all PSRAM boards but is not an effective option on this IDF (see "Task stacks are internal-DRAM only" above), so creation genuinely fails when internal heap is too fragmented. Always check the `esp_err_t` return of `esp_ping_new_session` before calling `esp_ping_start` — a NULL handle causes a hard fault.
+- **Reading a config node with `value()` is an `abort()` waiting for a stale `devices.json`, and `contains()` does not prevent it.** ESP-IDF is `-fno-exceptions`, so every nlohmann type error terminates the device instead of throwing: `value()` on a node that is not an object is **type_error.306**, a field that will not convert to the default's type is **302**, a non-const `operator[]` writing through a node that is neither null nor an object is **305**, and `it.key()` on an iterator over a primitive is **207** — nlohmann iterates a primitive happily, yielding one element. `contains()` answers false for a non-object, so it guards the CONTAINER and says nothing about the type of the field it found; that is exactly what all five call sites had. Use **`json_int()` / `json_str()`** (`lib/config-ml/mlConfig.h`), which check `is_object()` and then the field's own type. `mlConfig["key"]` itself is already safe — it returns a static null on a miss. **Measured 2026-09-16**: a board whose flash `/.sys/devices.json` still held the older `"ps2": 0` shape (a number where `{"enabled": 0}` now goes) boot-looped inside `PS2KeyboardDevice::reloadConfig()`, which `main_setup()` calls at `src/main.cpp:301` **before the console exists** — so there was no way to intervene, and the only recovery was a reflash. The boot log now reads `ps2: config node is [number], not an object -- keyboard disabled`, which is what settled 306 against 302; the backtrace alone cannot, since `value<int>(char const(&)[8], int&&)` is the same frame for both. The shipped templates under `data/BUILD_IEC.*/` all carry the object shape, so **this is an upgrade-path defect** — only a board carrying a `devices.json` written by older firmware reaches it, which is every board that has ever saved config. The other four sites (`led_strip` ×2 in `DisplayLEDs::start()`/`reloadConfig()`, `iec.<devnr>` ×2 in `iecDrive::reloadConfig()`/`restoreActiveFromConfig()`) read SIBLING keys of that same object and were fixed together: fixing only ps2 would have flashed a board that boot-looped in `led_strip.cpp` instead, and `restoreActiveFromConfig()` runs on the real-time IEC bus task's RESET path. `PS2KeyboardDevice::persistConfig()` had the 305 form of it, so the very config that aborted the boot would also have aborted the first save.
 - **`nlohmann::json` and internal heap**: `nlohmann::json` default-allocates all node objects (map entries, string objects, array slots) from `malloc`, which on PSRAM boards falls into internal DRAM for small objects. Use `psram_json` (defined in `lib/config-ml/mlConfig.h`) for any long-lived JSON trees. ESP-IDF compiles with `-fno-exceptions` — do not use `throw` in allocators; use `abort()` instead. For the same reason never use `std::stoi`/`std::stof` on input from the C64 or the network: they throw on malformed input, which becomes `std::terminate`. Use `strtol` and validate `*end == '\0'`.
 - **`MFile::exists()` for local paths**: Uses `stat()` when `scheme` is empty. Media filesystem subclasses (D64, archive, etc.) that set `_exists = true` in their constructors are overridden for local paths — only actual on-disk existence matters. Network paths (non-empty scheme) still use `_exists` since `stat()` doesn't apply to remote resources.
 - **Existence checks: use `exists()`, never a trial stream open**: network stream `open` can be lazy — `fsp_fopen` succeeds for ANY name (only `fsp_stat` tells the truth), so `getSourceStream()!=null && isOpen()` is NOT proof a file exists. Filesystems that can check for real must override `exists()` (FSPMFile stats `path` — NOT `pathInStream`, which is empty for plain files).
@@ -659,6 +660,981 @@ gitignored.
 - **Never request more from an open range than it can serve.** `MeatHttpClient::read()` caps `size` to `_rangeEnd - _position + 1`, which turns an over-long request into a SHORT read that re-pages, instead of a full count whose tail the response never carried and whose bytes the caller therefore never wrote. **The re-page test must compare against the CALLER's original size, not the capped one** — capped, a full read looks complete and never re-pages.
 - **A Range request must ask for exactly what is wanted.** `rangeEnd` was `position + size + 5`, over-fetching 6 bytes on every request. That existed only to guarantee a short read, because the re-page test was `bytesRead > 0 && bytesRead < size` and a range consumed EXACTLY returns 0 next time, which was indistinguishable from real EOF. The margin left 6 unconsumed bytes in every response, so a caller that seeks rather than reading straight through slid 6 bytes further out of alignment per request. Fixed at the cause: a 0-byte read now means "range exhausted" whenever the total size is known and `_position` has not reached it, and it re-reads from the newly opened range rather than reporting EOF.
 - **`patch_framework.py` must be enabled in `platformio.ini`, and it is gitignored so nothing warns when it is not.** It was commented out locally while `platformio.ini.sample` had it on, so esp-idf#18359 was unpatched on framework-espidf@3.50503.0 and a D64 over HTTP aborted with `assert failed: http_on_body esp_http_client.c:318 (res_buffer->orig_raw_data == res_buffer->raw_data)` — body bytes arriving during `fetch_headers` on a handle whose previous response was left partly consumed. Still required at this version: 3.50503.0 is IDF 5.5.3 and upstream's own fix (`esp_http_client_clear_response_buffer()`, which `openAndFetchHeaders()` already has an `ESP_IDF_VERSION`-guarded call waiting for) lands in 5.5.5. **Check for the `MEATLOAF-PATCH` marker in the framework's `esp_http_client.c` before debugging any stale-buffer HTTP symptom.**
+
+## Recent Changes (September 18, 2026)
+
+### Console and modem mode share one serial baud rate, changeable at runtime
+
+There was no way to change the console UART's rate without a reflash. Two
+callers needed it: a terminal or real Commodore driving **modem mode** at
+300-19200 baud, which cannot talk to a port fixed at `DEBUG_SPEED` (2000000),
+and a debug console on a board whose USB-serial bridge cannot reach 2 Mbps
+(AGENTS.md already notes CP2102 maxes near 1 Mbps). Design in
+`docs/superpowers/specs/2026-09-18-console-modem-baud-rate-design.md`.
+
+- **One rate, shared by both modes.** There is one physical UART0, so a
+  separate "console rate" and "modem rate" would be a fiction. `baud <n>` at
+  the shell and `AT+IPR=<n>` in modem mode both end at the same
+  `consoleBaudSet()`.
+- **Five boards have no UART console and must refuse, not silently
+  succeed.** Surveyed across the **26 per-board sdkconfigs** (`ls
+  sdkconfig.*` lists 28; `sdkconfig.defaults` and
+  `sdkconfig.defaults.esp32s3` are shared base templates, not boards, and
+  are excluded — both carry `CONFIG_ESP_CONSOLE_UART_CUSTOM=y`, which is
+  exactly what inflates a naive count of all 28 files by two; watch for
+  this on any future re-count): **21** use
+  `CONFIG_ESP_CONSOLE_UART_CUSTOM`, four (`esp32-s3-devkitc-1`,
+  `esp32-s3-makemagazin`, `freenove-esp32-s3-wroom-1`, `pocket-dongle-s3`) use
+  `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG`, and one (`esp32-s3-super-mini`) uses
+  `CONFIG_ESP_CONSOLE_USB_CDC`. On those five `CONFIG_ESP_CONSOLE_UART_NUM` is
+  -1 and a rate set there is simply discarded by the USB stack — exactly why a
+  pyserial session can open `freenove-esp32-s3-wroom-1` at 2000000 and work
+  regardless of what `baud`/`AT+IPR` are told. `consoleBaudSupported()` gates
+  both entry points and both refuse with `this console is <transport>, it has
+  no baud rate` / `ERROR` rather than accepting a value and reporting success
+  for a rate that was never applied — the same "a register that accepts a
+  value and does nothing is worse than a refusal" rule the S7 finding
+  established.
+- **Apply before persist, never the reverse.** `consoleBaudSet()` calls
+  `uart_set_baudrate()` and only on `ESP_OK` writes `preferences.baud` and
+  calls `mlConfig.save()`; on failure it restores the previous rate and
+  persists nothing. Persisting first would make a rate the driver rejects the
+  rate the next boot reads — unrecoverable without a reflash or an SD/flash
+  edit, which is the one failure this design exists to rule out.
+- **Two apply paths exist because one call site genuinely cannot serve
+  both modes, not from a lack of refactoring.** Shell mode has no pump —
+  `console_exec` is blocked inside the command for the command's whole
+  duration, so `baud <n>` calls `consoleBaudSet()` inline, at the end of the
+  command, after its own notice has been printed. Modem mode does have a
+  pump (`modem_shell_pump()`, `Console.cpp:125`): `AT+IPR=<n>` runs on the
+  modem task, whose `OK` reply is still sitting in the `ModemPort` `tx_`
+  StreamBuffer when the handler returns — switching the UART there would
+  clock that very reply out at the new rate as garbage. So `AT+IPR=<n>` only
+  calls `consoleBaudSetPending()`, and the shell-task pump applies it with
+  `consoleBaudApplyPending()` **after** it has drained `tx_` to the fd, the
+  first point the reply is known to be on the wire. (The modem task cannot
+  write the fd itself either way — `lib/modem/modem_port.h` documents that
+  two tasks touching one console fd is the condition behind the NFS `0x6400`
+  heap corruption.) Both paths converge on the same validate/drain/switch/
+  persist sequence inside `consoleBaudSet()`, so there is still exactly one
+  piece of code that reconfigures the UART.
+- **`read_number()` was clamped at 1,000,000**, a limit every existing
+  S-register caller was happy with because no register needs a seven-digit
+  value. `AT+IPR=2000000` — this project's own console rate — would have
+  silently become 1000000 and answered `OK` for a rate the user never asked
+  for. Fixed with a defaulted third parameter (`limit = 1000000`); the
+  `AT+IPR` call site passes `10000000`, comfortably clearing the 4,000,000
+  ceiling `BAUD_MAX` enforces, so the range check happens in exactly one
+  place instead of being half-done by a silent clamp. Every existing caller
+  is unchanged.
+- **Widening the parser to accept `+NAME=<n>` and `+NAME?` for `AT+IPR` also
+  made `AT+SHELL?` and `AT+SHELL=1` parse**, where before they failed the
+  whole line. The unchanged `SHELL` handler would then have exited modem mode
+  while reporting `OK` for what is really a typo. Guarded: `cmd.query ||
+  cmd.assign` on the `SHELL` branch now returns false (`ERROR`) before doing
+  anything, so a stray `?` or `=1` is reported rather than silently accepted
+  — the same rule the accepted-verb list in the September 17 Hayes-compat
+  entry above already establishes for this codebase.
+- **The pending-rate handoff was a plain `volatile int` read-then-clear in
+  two separate steps**, which let a rate set by one `AT+IPR=<n>` land in the
+  gap between the pump's read and its clear and be silently dropped. Replaced
+  with `std::atomic<int>::exchange(0)`, making the read-and-clear one
+  indivisible step: a rate set while the pump is mid-apply is either taken by
+  this pass or left intact for the next one, never lost.
+- **A batched `AT+IPR=<n>+SHELL` on one line could strand the pending rate
+  past its own session and apply it to whichever session's pump ran next** —
+  possibly the OTHER console entirely, since `s_pending` is process-global.
+  `SHELL` detaches the ports and returns from the pump loop before the
+  pump's own per-pass `consoleBaudApplyPending()` (called after each write)
+  gets another chance to run against that iteration's reply. Closed by a
+  second, unconditional `consoleBaudApplyPending()` after the pump's
+  post-loop bounded drain (`for (i<64 && drainTx()>0...)`) and before
+  `modem.detach()` — by the time that runs, the reply is provably on the wire
+  and there is no more modem-side work left that a rate switch could corrupt.
+- **The `DEBUG_SPEED` boot window is the documented no-network recovery
+  path, by design, not by accident.** The persisted rate is restored only
+  after `mlConfig.load()` (config lives on flash/SD, not mounted until line
+  267 of `main_setup()`), never at `console.begin()`. Every line before that
+  point — shutdown-sequence messages on a reboot, then the fresh ROM
+  bootloader and early `app_main()` startup — is always emitted at
+  `DEBUG_SPEED` (2000000) regardless of what is persisted, so a wrong or
+  forgotten persisted rate can never hide the one log a user with no network
+  and no working terminal still has.
+- **`lolin-d32-pro` did not define `ENABLE_MODEM`** before this task, so
+  `AT+IPR` and all of `modem_shell_pump()` were not compiled on the only
+  connected board with a UART console — the shell half (`baud`) worked, the
+  modem half was unreachable. Added `-D ENABLE_MODEM` beside
+  `-D ENABLE_CONSOLE_TCP` in `[env:lolin-d32-pro]`. (`platformio.ini` is
+  gitignored, so at the time this entry was written it was the only record
+  of the change; the 2026-09-19 review fixed that — the flag is now in
+  `platformio.ini.sample` for that env, so a fresh checkout gets it.) This is an
+  ESP32-WROVER with the small ~3.3 MB `iram0_2_seg` flash-text window and
+  `EXTRA_FASTLOADERS` already consuming most of its margin (see the August
+  25 entry — 87,271 bytes free at the time, in that SAME `.flash.text`
+  budget); enabling the whole modem subsystem there for the first time was
+  the real risk in this task, not a formality. **Two different budgets, do
+  not conflate them** (the August 25 entry itself warns of exactly this):
+  the app-partition figures below are `Flash:`/`RAM:` from the build
+  summary, a different denominator from `iram0_2_seg`. It fit both: app
+  partition RAM 32.4% (106,020/327,680, Task 5's figure, same HEAD, not
+  re-measured here) → 32.5% (106,500/327,680), Flash 41.7%
+  (4,374,568/10,485,760) → 42.0% (4,409,192/10,485,760) — **+480 bytes RAM,
+  +34,624 bytes flash on the app partition**. Separately, and this is the
+  figure that actually answers the brief's overflow question,
+  `xtensa-esp32-elf-size -A` on the flashed `firmware.elf` gives
+  `.flash.text` = 3,297,793 bytes against the 3,342,304-byte `iram0_2_seg`
+  window — **44,511 bytes free**, not re-measured without `ENABLE_MODEM` so
+  no delta is claimed, only that it fits now. No
+  `iram0_2_seg` overflow message from either a full
+  clean build or the final `-t upload` build — both would abort the link,
+  and both produced a working `firmware.elf` that flashed and ran the
+  entire rest of this task's verification. A separate, earlier build of
+  this same board+flags (found already in the scratchpad, of uncertain
+  provenance, not reproduced or trusted as evidence) reported Flash
+  4,373,444 — 35,748 bytes BELOW this task's own measured figure. Not
+  investigated further since it is not this task's build; the numbers
+  reported above are from a build this task performed, flashed, and then
+  drove through the rest of the verification below. `freenove-esp32-s3-
+  wroom-1` and `esp32-s3-devkitc-1` already carried `ENABLE_MODEM` from the
+  original 2026-09-08 modem-mode work and needed no change.
+- **`iram0_0_seg` (real IRAM, 131,072 bytes) is now tighter on
+  `lolin-d32-pro` than the August 25 entry's warning about this segment
+  class suggests, and this is worth its own line because it will bite the
+  next person to touch this board, not just this feature.** With
+  `ENABLE_MODEM` on, `.iram0.vectors + .iram0.text` = 128,279 bytes —
+  **2,793 bytes free**. The August 25 entry measured ~4.8 KB free for this
+  segment on `fujiloaf-rev0` (a different WROVER board, without
+  `ENABLE_MODEM`) after spending its one documented lever
+  (`CONFIG_SPI_MASTER_ISR_IN_IRAM=n`); that entry states plainly there is
+  no further lever available for this segment. `lolin-d32-pro` was not
+  separately measured on August 25, so this is not a same-board delta —
+  but both are WROVER boards with the same 131,072-byte budget, and
+  `lolin-d32-pro` specifically has now spent roughly 2 KB of whatever
+  margin it had by linking in the modem subsystem's `RAMFUNC` code. The
+  next fastloader carrying a `RAMFUNC` codec, or an IDF bump that grows an
+  IRAM ISR, is the failure this is warning about — on THIS board, headroom
+  is measured in low thousands of bytes, not the ~4.8 KB a reader might
+  extrapolate from the August 25 entry.
+
+**Hardware-verified on both connected boards, 2026-09-18, each proving the
+half the other cannot:**
+
+- **`lolin-d32-pro` (COM13, CH340 bridge) — the rate genuinely changes and
+  both apply paths work.** `baud` reports 2000000; `baud 50` and
+  `baud 9600x` are refused with the range/not-a-number messages; `baud 9600`
+  prints its notice **readable at 2000000** (captured before switching the
+  listener), and reopening at 9600 reads a live prompt and `baud` reporting
+  9600 — proving the shell path's inline apply. `AT` then `AT+IPR?` (9600),
+  `AT+IPR=2400` (`OK`, captured readable at 9600 — the check the whole
+  pending/apply design exists for), then reopening at 2400 still gets `OK`
+  from `AT` and `NO CARRIER`/`OK` from a real dial-connect-hangup cycle
+  against the board's own web server (`ATD"127.0.0.1:80"` → `CONNECT`, a
+  real HTTP response read back, `+++`, `ATH`) — proving the modem path
+  survives the switch and the pump's apply-on-write is correct. A full
+  reboot cycle was captured with two continuous timed passes rather than
+  short fixed-length drains (the first attempt's ~3.5s windows missed the
+  actual reset entirely): listening at 2400 across a reboot shows the
+  shutdown sequence readable, then ~2.1s of silence (the persisted-rate
+  listener cannot decode the DEBUG_SPEED window at all — UART framing
+  errors at a ~833:1 rate mismatch, not garbage bytes), then readable text
+  resumes once restore switches the line back; listening at 2000000 across
+  a second, independent reboot shows the mirror image — garbled/NUL bytes
+  during the shutdown phase (transmitted at 2400, misread at 2000000), then
+  a clean, fully readable boot banner (`MEATLOAF CBM ...`, `LittleFS
+  mounted.`, `fnConfig::load read 811 bytes from FLASH config file`) for
+  about 460ms, then NUL bytes again the instant `consoleBaudRestore()`
+  switches back to 2400 — precisely pinning the restore point to
+  immediately after config load, as designed. `baud` after that reboot still
+  reports 2400 (persistence proven). The TCP console on port 23 was checked
+  separately (`192.168.1.164:23`): `baud 9600` there answers exactly
+  `serial console baud 2000000 -> 9600` with no "reconnect now" wording
+  (`execOrigin() == ORIGIN_REMOTE`), confirming the documented recovery
+  route reads correctly for a caller whose own link is not the one being
+  retuned. Board left at 2000000 (`baud 2000000` over both the serial and,
+  redundantly, the TCP console) and reconfirmed reachable at that rate
+  before finishing.
+- **`freenove-esp32-s3-wroom-1` (COM12, native USB-Serial-JTAG,
+  `303A:1001`) — the refusal is real and nothing else regresses.** Opened
+  with `dtr = rts = False` per the native-USB entry above (asserting either
+  resets the chip and orphans the handle). `baud` answers `this console is
+  USB-Serial-JTAG, it has no baud rate`, and esp_console's own
+  `Command returned non-zero error code: 0x1 (ERROR)` line confirms the
+  handler's `EXIT_FAILURE`. `AT+IPR=9600` and, checked as a bonus, bare
+  `AT+IPR?` both answer `ERROR` (`consoleBaudSupported()` gates both the
+  same way). Modem mode itself and `AT+SHELL` still work normally on this
+  board (`AT` → `OK`, `AT+SHELL` → back to the shell prompt) — the refusal
+  is scoped to the two baud commands only, nothing else in modem mode is
+  affected by `ENABLE_MODEM` already being on for this board.
+- **The two things named as risks in the plan were then checked as literal
+  hardware inputs, not just by source inspection.** On COM12: `AT+SHELL?`
+  and `AT+SHELL=1` both answer `ERROR` and leave modem mode attached (a
+  following bare `AT` still answers `OK`), and a plain `AT+SHELL`
+  afterwards still exits correctly — six checks, all pass. On COM13: a
+  single BATCHED line `AT+IPR=2400+SHELL` (the exact shape `df4e3d17`
+  fixes) produces one `OK` readable at 2000000, the old rate; the switch to
+  2400 and the SHELL detach have both already happened by the time the
+  next bytes go out — this is consistent with either of `df4e3d17`'s two
+  apply sites (the per-pass apply at `Console.cpp:189`, or the post-loop
+  drain-then-apply at `:239` that is the actual fix under test) and the
+  hardware evidence here does not distinguish which one fired, only that
+  one of them did. The "Modem mode exited." text and the next prompt are
+  already on the wire at 2400 by the time they are sent — a naive capture
+  at 2000000 sees only NUL bytes for that part, which is **correct
+  behaviour, not a failure**: reopening at 2400 immediately afterward gets
+  a live `baud` response of `console baud 2400`, and `baud` is a
+  shell-only command unreachable from inside modem mode, so its very
+  presence proves both the rate change and the mode exit landed from one
+  line. This is stronger evidence than two separate commands would have
+  been, precisely because the readable-old-rate window is bounded by the
+  switch itself.
+- **Not verified**: `esp32-s3-devkitc-1` (also `ENABLE_MODEM`, also
+  USB-Serial-JTAG) was not physically connected for this task and the
+  refusal was exercised only on `freenove-esp32-s3-wroom-1`; the four other
+  USB-Serial-JTAG boards and `esp32-s3-super-mini` (USB-CDC) are covered
+  only by the `consoleBaudSupported()` compile-time gate and the sdkconfig
+  survey above, not by hardware. `console_baud` itself has no native test —
+  `lib/console` is not compiled in the native environment and the apply path
+  needs a real UART — so this feature is hardware-verified only, the same
+  limitation the console file-channel work carries. The upper bound of the
+  range (`baud 9000000` / `AT+IPR=9000000`, above `BAUD_MAX`) was not
+  tested on hardware — only the lower bound (`baud 50`, `AT+IPR=50`) was —
+  though it is the same branch and comparison in `console_baud.cpp` either
+  way.
+- **The biggest untested thing here is not the UART half, it is
+  `Modem::executeLine()`'s staging.** Four behaviours landed there with no
+  executable coverage of any kind: a rate is STAGED by the handler and
+  promoted only after `sendResult()`, a staged rate is DISCARDED on the
+  `ERROR` path, there is a second promote on the ONLINE early return, and
+  `AT+SHELL` promotes inside `executeCommand()` before the detach. Every one
+  is pinned by hardware anecdote and by comments, and comments in this file's
+  own history have twice been wrong about code they sat next to — the
+  `broadcast()`/`attached()` claim in this very wave was one. **The native
+  suite cannot reach `executeLine()` at all**: `Modem` needs FreeRTOS,
+  `MFSOwner` and `mlConfig`, so closing this is not "add a test", it is
+  "build a seam first" — the console-baud calls would need to go through an
+  injectable interface before a native case could assert that
+  `consoleBaudSetPending` happens after `broadcast`, or that a failing line
+  publishes nothing. The ERROR-discard is the one that most deserves it: it
+  is a deliberate departure from this codebase's documented left-to-right
+  convention (`ATE1X9` applies `E1` before failing), justified because a baud
+  change destroys the channel the `ERROR` was reported on, and nothing
+  executable defends that decision against a future edit.
+- **One stray byte occasionally shows up at the very start of a fresh
+  `pyserial.Serial()` session to COM13, merging with the next line typed
+  (`"<glitch>AT"` fails to parse as `AT`).** Found while writing the
+  hardware harness (`state_probe3.py`/`state_probe4.py`). **The exact
+  source is not pinned down** — the probe that hit it had just written a
+  bare `\r` at three DIFFERENT, mostly-mismatched baud rates immediately
+  before, so the stray byte could equally be a genuine CH340 open-time
+  glitch or a leftover partial line sitting in the FIRMWARE's own AT-line
+  buffer from one of those earlier mismatched writes; the confound was not
+  isolated. The remedy is unaffected either way: send a throwaway `\r`
+  immediately after every reopen to flush whatever is pending, before
+  sending a real command — every script for this task does so. Confirmed
+  separately that a plain reopen on COM13 (CH340) does **not** reset the
+  board (no boot banner reappears), unlike the DTR/RTS hazard on COM12 —
+  the two ports fail in different, unrelated ways and neither assumption
+  transfers to the other.
+
+### Final-review fixes to the baud work (2026-09-19)
+
+Four findings from the whole-branch review, plus two limitations recorded
+rather than engineered.
+
+- **The pending rate was published BEFORE the reply it exists to wait for.**
+  `Modem::executeCommand()` called `consoleBaudSetPending()` and returned;
+  `sendResult(AtResult::OK)` only runs afterwards, back in `executeLine()`
+  after the command loop. The pump acts the instant it sees a pending rate,
+  so if its `popTx(..., 20)` timed out in that gap it switched the line on an
+  empty buffer and the `OK` went out at the new rate as garbage — defeating
+  the entire two-path design. The gap spans a `std::string` allocation in
+  `at_format_result()` and a mutex acquisition in `broadcast()`, with the
+  modem task and both pumps at priority 5 on core 0, so it is not one
+  instruction. `AT+IPR` now stages on `Modem::staged_ipr_` and `executeLine()`
+  promotes after `sendResult()`. **A line that then FAILS discards the stage**,
+  which deliberately departs from the left-to-right convention this codebase
+  otherwise follows (`ATE1X9` answers `ERROR` with `E1` applied): every other
+  setting is observable in band via `ATI1`, while a baud change retunes the
+  channel the `ERROR` was just reported on, so applying it leaves the user
+  reading `ERROR` at the old rate and then silence — indistinguishable from a
+  hung board. `staged_ipr_` is deliberately **not** guarded by `mutex_`: both
+  writers are the modem task, and `mutex_` is non-recursive, so taking it
+  would deadlock against the `Lock` in the `AT+SHELL` branch.
+- **`AT+SHELL` is the one place that promotes BEFORE the reply, and knowing
+  why matters more than the rule.** Detaching is a DEADLINE: the pump leaves
+  its loop only once `attached_` is false, then drains once, calls
+  `consoleBaudApplyPending()` once and returns, so a promotion landing after
+  that is stranded in the process-global `s_pending` and retunes whichever
+  session next runs the pump. Promoting before the detach makes that
+  impossible by construction. **`broadcast()` gates on `isOpen()`, NOT on
+  `attached()`** — only `toAttached()` checks `attached_`, exactly as
+  `modem_port.h` says ("command-mode responses go to every open port; stream
+  data goes only to the attached one") — so the batched line's `OK` IS still
+  queued after the detach, and this one line therefore gives up the
+  reply-ordering guarantee. What keeps it readable is that every `drainTx()`
+  ends in a `popTx(..., 20)` which returns 0 only after waiting, so at least
+  one 20 ms window separates the detach from `applyPending()`. **Shortening
+  that timeout would erode it.** Measured: `AT+IPR=2400+SHELL` at 2000000
+  yields `OK` readable at the old rate and then `Modem mode exited.` as a run
+  of framing-error NULs, being clocked at 2400. Stranding is the worse
+  failure of the two — it silently retunes an unrelated later session — so
+  the deterministic guarantee goes there and the bounded, cosmetic one is
+  accepted here.
+- **`consoleBaudSet()` had no mutual exclusion, and the config file was the
+  thing at risk.** `s_pending.exchange()` decides which pump WINS a rate; it
+  says nothing about two tasks being inside the apply. `baud 9600` from the
+  TCP console runs on `console_exec` while a serial pump can concurrently
+  apply a pending rate, and both reach `json_object_at(mlConfig.data(),
+  "preferences")["baud"]` and `mlConfig.save()`. **`mlConfig` has no locking
+  of any kind**, so that is a concurrent mutate-and-serialize of one nlohmann
+  tree — a corrupted `config.json`, worse than the racing
+  `uart_set_baudrate()`. Now a function-local `std::mutex` (the pattern
+  `PWDHelpers.cpp` already uses) held across the WHOLE body including the
+  multi-second drain; narrowing it to the persist half would leave the two
+  `uart_set_baudrate()` calls racing, the same defect one layer down. The
+  header called this module "the one owner of the console UART rate" — it is
+  the one *place*, not the one *caller at a time*.
+- **The 200 ms `uart_wait_tx_done()` was far too short at the rates this
+  feature exists for, and its result was thrown away.**
+  `console_settings.c:63` installs the driver with **tx_buffer_size 0**, so
+  writes go straight into the 128-byte hardware FIFO and this wait is the
+  only thing that empties it. At 8N1 a full FIFO takes **4.27 s at 300 baud,
+  1.07 s at 1200, 533 ms at 2400, 133 ms at 9600** — the modem's advertised
+  range is 300-19200, precisely where 200 ms fails — so `baud 115200` typed
+  at 300 baud lost most of its own notice and clocked the tail out at the new
+  rate. Now `(UART_HW_FIFO_LEN * 10 * 1000) / previous + 100` ms, guarded
+  against a `previous` of 0. **Derived rather than a generous flat constant
+  on purpose**: the wait returns as soon as the FIFO is empty either way, but
+  derived a *timeout* means something specific — a full FIFO failed to drain
+  in the time a full FIFO takes — where a flat value makes it
+  uninterpretable. At BOOT the wait is harmless in the other direction, since
+  the old rate is always `DEBUG_SPEED`, where a full FIFO drains in 0.64 ms.
+- **`-D ENABLE_MODEM` for `lolin-d32-pro` now lives in
+  `platformio.ini.sample`**, scoped to that env. It was only in the gitignored
+  `platformio.ini`, so anyone copying the sample got `baud` with no `AT+IPR`
+  and no `modem_shell_pump()` — half a feature, no build error, nothing to
+  warn them. **Never add it to the shared `[env]` block**: 22 boards have
+  never been built with it and the `iram0_0_seg` headroom on this board class
+  is ~2.8 KB.
+- **`tcp_session` went from 4096 to 6144 bytes** (`lib/server/tcpsvr.cpp`).
+  `Console::execute()` intercepts `at` before submitting to the executor, so
+  `modem_shell_pump(ORIGIN_REMOTE)` runs on that task — and an `AT+IPR` from a
+  TCP modem session therefore drives a full JSON serialize, MD5 and
+  LittleFS/SD write there, on a stack whose comment said 4 KB sufficed because
+  "commands themselves run on the console executor task's 16 KB stack". That
+  is no longer true of every command. Measured 2026-09-19: **`console_repl`,
+  which runs that exact pump path for a serial modem session, peaked at 2836
+  bytes of its 6144** after `at` + `AT+IPR=2400` + `AT+SHELL`, against 1488
+  idle; **`tcp_session` idles at 756 of 4096**. 2836 against 4096 leaves
+  ~1.2 KB, and `mlConfig.save()` is proven at 8 KB (the modem task, `AT&W`)
+  and 6 KB (`console_repl`) but never at 4 KB. **The TCP-origin path could not
+  be measured directly** — see the network note below — so that margin is a
+  projection, and the `SessionBroker` precedent is that too little stack here
+  corrupts the FreeRTOS heap silently and surfaces in unrelated tasks.
+- **The `DEBUG_SPEED` boot window was re-measured after these fixes, and the
+  number is worth keeping because it is small.** With `preferences.baud = 2400`
+  persisted, listening at 2000000 across a `reboot` gives **999 bytes / 26
+  readable lines** — from the `MEATLOAF CBM` banner through RAM/HIMEM, the SD
+  mount attempts and `fnConfig::load read 811 bytes from FLASH config file` —
+  and then the line switches and everything after is framing-error NULs at
+  2000000. That last readable line is exactly where `consoleBaudRestore()` runs
+  (immediately after `mlConfig.load()`), so the window is as designed. **Two
+  traps when measuring this**: a `reboot` typed at 2400 leaves the ROM
+  bootloader talking at the inherited rate, so the capture opens with ~1.8 KB of
+  garbage BEFORE the readable app log — splitting the capture at the first run
+  of NULs hides the readable middle entirely and reads as "the boot log is not
+  at DEBUG_SPEED", which is wrong. Scan for readable RUNS instead. And the
+  restore only runs at all when the persisted rate differs from the current one
+  (`consoleBaudRestore()` returns early on `baud == consoleBaudGet()`), so a
+  test that ends at 2000000 never exercises it.
+- **The ONLINE promote branch is hardware-verified, and it is the one path
+  where the rate changes underneath a live session.** `AT+IPR=<n>DT"host"` is a
+  single line: `+IPR` stages a rate, the dial succeeds and returns early from
+  `executeLine()`, and a second `promoteStagedBaud()` on that path publishes
+  the rate after `CONNECT` has been queued. Dialled three times against
+  `bbs.fozztexx.com:23` from 2000000 with `AT+IPR=2400DT`: **`CONNECT` is
+  readable at the OLD rate on every trial** — which is the ordering guarantee
+  the whole staging design exists for — and the session then runs at 2400,
+  confirmed in band by `AT+IPR?` answering `2400` after a `+++` escape, with
+  `ATI1`, `ATO` and `ATH` all behaving at the new rate and the shell usable
+  afterwards. The native suite still cannot reach `executeLine()`, so this
+  branch is hardware-verified only.
+  One consequence worth knowing: in ONLINE state the pump applies the rate
+  mid-session, so `consoleBaudSet()` blocks that task for the drain plus a
+  flash write while it is not draining `tx_`, and at a low rate
+  `toAttached()`'s 500 ms `pushTx` can therefore drop stream bytes into
+  `tx_dropped_`. The drain budget derives from the rate being left, so dialling
+  DOWN from 2000000 costs ~100 ms and is what was measured; dialling UP from a
+  slow rate is the expensive direction and was not.
+  **Driving this by hand has its own trap, unrelated to the feature: any AT
+  text typed while `state_` is ONLINE is forwarded to the remote as session
+  data**, which is correct Hayes behaviour and is exactly what it looks like
+  when a harness forgets `+++` first — the commands land in the BBS's login
+  prompt instead of the modem.
+- **Known limitation, deliberately not engineered: two modem sessions at once
+  can retune the line under each other.** `Modem::broadcast()` pushes a reply
+  to every OPEN port and `MAX_PORTS` is 2, so with a serial modem session and
+  a TCP modem session attached simultaneously, whichever pump drains first
+  calls `consoleBaudApplyPending()` and can switch the UART while the other
+  port's copy of the same reply is still in its own StreamBuffer. A
+  cross-port barrier is real design work for a configuration that **has never
+  been attached on hardware at all**, so it is recorded rather than fixed.
+- **`Serial.begin(115200)` in the bus code is a latent clobber of the restored
+  rate.** `lib/bus/iec/IECFileDevice.cpp:131` and
+  `lib/bus/gpib/GPIBFileDevice.cpp:94` both call it. It is dead today because
+  `IECFileDevice.cpp:32` has a file-local `#define DEBUG 0` and the call sits
+  under `#if DEBUG>0` — but on an `ENABLE_CONSOLE` build `include/debug.h:27`
+  maps `Serial` to `console`, and `Console::begin(int baud, ...)` exists
+  (`Console.h:181`), so **flipping that flag for IEC debugging would call
+  `console.begin(115200)` from `IECFileDevice::begin()`**, which runs via
+  `SYSTEM_BUS.setup()` — AFTER `consoleBaudRestore()` — and would silently
+  reset the restored rate to 115200. This does not contradict the design's
+  "nothing else configures UART0 on a console build" audit, which correctly
+  covered `main.cpp:208`; it is a second, conditional owner that audit missed.
+  The IEC code is deliberately left unchanged.
+- **The network could not carry the TCP half of this verification, and the
+  board was not at fault.** Port 23 was unreachable from the host, and so was
+  ICMP — but the board pinged its gateway 5/5 at 1-7 ms, and ARP resolved the
+  board's MAC from the host, so L2 worked and the stack was healthy.
+  `netsh wlan show interfaces` gave the host BSSID `14:91:82:a5:b3:87` against
+  the board's `14:91:82:a5:b9:9d`: **two different APs of one mesh SSID, with
+  client isolation between them.** The ESP32 is 2.4 GHz only, so this will
+  recur whenever the host associates to the 5 GHz radio. The diagnostic that
+  separates it from a firmware fault in one step is `ping <gateway>` at the
+  board's own console: gateway up + host unreachable is the network, not the
+  board. This supersedes nothing in the September 16 entry's firewall note —
+  that was inbound to the host; this is blocked in both directions.
+
+## Recent Changes (September 17, 2026)
+
+### An IPv6-only name was dialled as a garbage IPv4 address
+
+`MeatSocket::open()` resolved with `gethostbyname()` and **never read
+`h_addrtype`**, casting whatever came back to an `ip4_addr`. `CONFIG_LWIP_IPV6`
+is enabled on these boards and lwIP's resolution order falls through to AAAA
+when a host has no A record, so an IPv6-only name had the **first four bytes of
+a sixteen-byte address** used as an IPv4 address. For
+`2607:f8b0:4002:c02::66` that is `38.7.248.176` - a real, routable address
+belonging to somebody else.
+
+- **Nothing reported it, and that is the whole defect.** The dial either reached
+  an unrelated host or failed with EHOSTUNREACH, which the modem renders as
+  `NO ANSWER` - **indistinguishable from a host that is simply down**. Confirmed
+  by capturing a control on the pre-fix firmware: `ATDT"ipv6.google.com:80"`
+  produced `errno 113` and `NO ANSWER`, byte for byte the same shape as the
+  failure a user had reported against a completely different host.
+- **`getaddrinfo()` with an `AF_INET` hint, not a bare `h_addrtype` check.** The
+  hint is strictly better: a **dual-stack** host still resolves, because the
+  answer carries its A record rather than failing on the AAAA, while an
+  IPv6-only host fails cleanly and names itself. This socket is `AF_INET`
+  throughout - `sockaddr_in`, `AF_INET` socket, `sin_addr` - so it could never
+  have reached an IPv6 host however the address was obtained.
+- **The resolver now logs `resolved <name> to <addr>`, and that line is the
+  point.** A wrong answer here is otherwise invisible until it surfaces four
+  layers up as `NO ANSWER`, which is where this bug hid. It is also what makes
+  an intermittent dial failure diagnosable in one line from now on: **no resolve
+  line means resolution failed and TCP was never attempted; a resolve line
+  followed by an errno means the address was right and the connect failed.**
+  Those are different faults with different fixes and the log could not tell
+  them apart before.
+- **Shared code - `tcp://`, `telnet://` and `irc.h` all reach it** - so it was
+  hardware-verified in its own right rather than riding along with other work.
+  On a freenove-esp32-s3-wroom-1: `ipv6.google.com` and `ipv6.test-ipv6.com`
+  (both AAAA-only, independently operated) now fail by name in 0.07 s and
+  0.16 s where they previously answered `errno 113`; `commodoreserver.com`
+  connects over both `ATD` and `ATDT` logging the correct `50.112.163.22`; that
+  same address dialled literally connects; `bbs.fozztexx.com` connects with its
+  567-byte banner; a name that does not exist still fails cleanly; and **30
+  consecutive dials, 15 by name and 15 by literal IP, connected 30/30 at a
+  0.14 s median**. Native suite `test_modem_at` 83/83. Build RAM 31.0% /
+  Flash 40.7%.
+- **This does NOT explain the `commodoreserver.com` failure that prompted it.**
+  That host has no AAAA record, so it never took the broken path. It was a
+  genuine transient, and one **reproduced during this very verification**: a
+  single `ATD` to it failed at 6.37 s while an `ATDT` to the same host connected
+  0.18 s later, and 30 subsequent dials all succeeded. Two practical notes for
+  that host: `ping commodoreserver.com` always fails because it drops ICMP, and
+  port 1541 **sends no banner at all** (confirmed from a PC as well), so a blank
+  screen after `CONNECT` is normal V-1541 behaviour and not a hung connection.
+- **Two other pre-existing `MeatSocket` defects remain, deliberately** -
+  `close()` calling `closesocket()` before `shutdown()`, and `connect()` passing
+  `sizeof(struct sockaddr_in6)` as the addrlen for a `sockaddr_in`. Both change
+  teardown behaviour across all three consumers and want their own decision.
+
+### Driving this board over serial: it is NATIVE USB, not a UART bridge
+
+The freenove-esp32-s3-wroom-1 enumerates as `VID:PID 303A:1001` - Espressif's
+own USB peripheral. **Asserting DTR/RTS resets the chip, which tears down the
+USB device and re-enumerates it, leaving an already-open handle attached to a
+device that no longer exists.** pyserial asserts both by default, so
+`serial.Serial(PORT, BAUD)` reads **zero bytes forever** and the board looks
+dead or hung. It is not: the USB peripheral keeps enumerating even while the
+CPU is wedged, so the port being present proves nothing either.
+
+Open with both lines deasserted and the running firmware keeps its connection:
+
+```python
+ser = serial.Serial()
+ser.port, ser.baudrate, ser.timeout = "COM12", 2000000, 0.1
+ser.dtr = False
+ser.rts = False
+ser.open()
+```
+
+This **supersedes** the earlier note that closing the port reboots the board -
+that is a USB-UART bridge behaviour. Here the reset is a liability, not a
+convenience, and a whole measurement must still live inside one open port.
+
+**Wait for WiFi before believing any dial result.** Association is asynchronous
+and a dial before it completes answers `NO DIALTONE` in about 30 ms, which a
+test harness will happily record as a failure of code the dial never reached -
+an entire verification run was thrown away to this. Poll with
+`ATD"127.0.0.1:4131"`: it needs no external network, answers `NO DIALTONE`
+while WiFi is down and `errno 104` the moment it is up. `ifconfig` at the shell
+is the direct check, and it reports SSID, IP, gateway and DNS.
+
+
+### Modem mode: S7 bounds the dial
+
+S7 is the Hayes "wait for carrier" register. It was settable, readable and
+printed by `ATI`, and bounded nothing - referenced exactly once in all of
+`lib/modem`, by the line that prints it. That mattered more than a cosmetic
+gap: a dial blocks the modem task completely, so until the network chose to
+answer there was no way to get the modem back.
+
+`MeatSocket::open()` now takes a timeout in milliseconds. Non-zero switches the
+connect to non-blocking and bounds it with `select()`; **zero is unbounded**,
+which is exactly what every caller got before, and is what `irc.h` and every
+other consumer still gets - only the modem passes anything else.
+
+- **Four things in the bounded connect are load-bearing and each fails
+  quietly on its own.** (1) The deadline is ABSOLUTE and `select()` is
+  **re-armed with the time that is left**; `select()` can return early, so
+  treating one call as the bound silently shortens it to whenever the first
+  wake happened. (2) `nfds` is `sock + 1` - passing `sock` alone never reports
+  ready, which presents as the bound always firing rather than as an error.
+  (3) The descriptor is restored to BLOCKING on every exit, success included:
+  `write()` calls `send()` with no flags, so one left `O_NONBLOCK` answers
+  EAGAIN, and *only on dials that set a bound* - the worst shape of divergence,
+  because the default path stays correct and nobody notices. (4) A `connect()`
+  returning non-zero with errno other than `EINPROGRESS` has already failed and
+  is NOT waited on - a refused port answers immediately (loopback, errno 104),
+  and waiting out the bound would turn a 0.05 s failure into a slow one and
+  replace its errno with whatever `SO_ERROR` reports.
+- **`SessionBroker::obtain()` both CREATES and CONNECTS, so a timeout set on
+  the session it hands back is applied after the connect it was meant to
+  bound.** This is the trap in the whole change and it cost a hardware round
+  trip: the plumbing looked right and did nothing, because `TCPMStream::open()`
+  sets the value on `_session` *after* `obtain()` returns. The bound is
+  therefore a parameter on `obtain()` itself, applied between construction and
+  `connect()`. Both it and `MSession::connect_timeout_ms` are defaulted to 0,
+  so no other call site changes. **The probe that settled it printed at each
+  hop**: `TCPMStream::setConnectTimeout(3000)` ran, `TCPMStream::open applying`
+  never did, and `TCPMSession::connect timeout=0` did - which says the connect
+  happened somewhere `open()` never reached.
+- **`MSession::connect_timeout_ms` is a member, not a parameter on
+  `connect()`.** That virtual is implemented by every protocol here (FTP, HTTP,
+  SMB, NFS, AFP, ...) and widening its signature to serve one of them would
+  touch all of them.
+- **`MStream::setConnectTimeout()` is a no-op virtual**, not a cast at the call
+  site: the dial path holds a `shared_ptr<MStream>` and this build has no RTTI,
+  so it cannot narrow to the concrete stream to ask. `TelnetMStream` forwards
+  it to its inner stream; streams that connect to nothing ignore it correctly.
+  It must be called BEFORE `open()`, since that is where the session is
+  obtained and connected.
+- **Hardware-verified** on a freenove-esp32-s3-wroom-1 against `192.0.2.1:23`
+  (TEST-NET-1), 11 checks, 0 failed, reproduced across two runs.
+  **`ATS7=3` ends the dial at 3.07 s with errno 116 (ETIMEDOUT)** - the bound
+  firing - while **`ATS7=10` ends at 9.22 s with errno 113 (EHOSTUNREACH)**,
+  the network answering inside the bound. Differing in BOTH the time and the
+  errno is what makes this evidence: it shows a real ceiling rather than a
+  fixed timeout elsewhere, and that a generous S7 leaves the ordinary failure
+  path untouched. A reachable host under `ATS7=3` still connects in 0.05 s and
+  carries 4567 bytes with `+++` / `ATO` / `ATH` intact - the check that catches
+  a descriptor left non-blocking, which no native test can reach. A refused
+  port still answers at 0.05 s with errno 104, and 41 bounded dials produced
+  no errno 23, so the socket-leak fix holds through the new early returns.
+- **`ATDT` is bounded too, and was checked separately.** Every other leg above
+  used `ATD`, which builds `tcp://`; `ATDT` builds `telnet://` and reaches the
+  socket only through `TelnetMStream`'s forward to its inner stream - the one
+  part of this with no evidence behind it until it was dialled. `ATS7=3` against
+  the same black hole ends at 3.06 s with errno 116 on BOTH `ATDT` and `ATD`.
+  Worth the extra dial: `ATDT` and `S62` are what terminal software actually
+  sends, so an unbounded telnet path would have left the common case broken.
+- **S7 only governs a dial that actually opens a socket.** `obtain()` applies it
+  on the create path, so redialling the same host:port inside the SessionBroker
+  window reuses the session, `connect()` returns early on `connected`, and a new
+  S7 governs nothing - correct, since there is no connect to bound, but it means
+  a changed S7 does not necessarily take effect on the very next dial.
+- **Still not done: a dial cannot be INTERRUPTED from the keyboard.** Nothing
+  services the ports while it blocks, so S7 ends a dial by itself and the
+  keyboard still cannot. `drainRx()` continues to discard what was typed.
+
+**The native baseline is now FIVE erroring suites, not the three recorded
+earlier**: `test_arc_read` and `test_ps2_keys` join `test_EdUrlParser`,
+`test_hdd_read` and `test_strings`. Both were confirmed pre-existing by
+stashing and re-running, and neither is related to any modem work -
+`test_arc_read` has a test-source bug (`Known` has no member `data`, `media`
+not declared at `test_arc_read.cpp:178`) and `test_ps2_keys` is missing the
+header `scan_codes_set_2.h`. Full suite: 403 cases, 388 succeeded, 10 skipped.
+
+### Modem mode: a terminal's init string no longer answers ERROR
+
+A terminal program configures the modem before it dials, and what it sends
+describes HARDWARE - carrier detect, DTR, flow control, speaker volume. None of
+that can exist over a socket, and every one of those verbs failed the whole line
+with `ERROR`. Some terminal software reads that as "there is no modem here" and
+gives up, so a perfectly good connection was unreachable for a reason that had
+nothing to do with the connection.
+
+Thirteen verbs are now accepted and ignored - `B` `L` `M` `N` `W` `Y` and `&C`
+`&D` `&K` `&G` `&Q` `&R` `&T` - `ATDP` (pulse) is accepted as a dial modifier,
+and `AT&V` is aliased to the `ATI1` settings report.
+
+- **The accept list is EXPLICIT, never "anything unrecognised is OK".** A typo
+  must still be reported, or a mistyped command silently answers OK and the user
+  is left wondering why nothing happened. `ATG` and `AT&Z1` both answer `ERROR`.
+  `verb_is_accepted_and_ignored()` in `at_parser.cpp` is the list, and
+  `executeCommand()` carries the matching no-op cases in both switches.
+  **The native suite pins this with a mutation check**: making that function
+  return true unconditionally fails
+  `test_parse_still_rejects_a_verb_that_means_nothing` and NOTHING else - the
+  pre-existing unknown-verb test uses `ATE0@`, a non-alpha character, so it
+  cannot reach a widened letter list. That is exactly the "a suite that cannot
+  reach the defect it exists for" trap the g64 and nib entries document.
+- **`ATDP`'s `P` is accepted and DROPPED, not stored in `mods`.** `doDial()`
+  falls back to a phonebook entry's own modifiers only when the dial line
+  carried none (`modem.cpp:548`), so a retained `P` would have suppressed a
+  stored `T` and dialled a telnet entry as raw `tcp://`. The parser skips it in
+  the modifier loop, which keeps `cmd.mods` meaning "modifiers that do
+  something" and leaves the phonebook fallback intact.
+- **The ignored verbs do NOT range-check their numeric suffix** - `AT&D9` is
+  accepted - because nothing reads the number. `ATX` still range-checks its
+  `0..4`, since there the value selects behaviour. The asymmetry is deliberate;
+  `ATE`/`ATQ`/`ATV` accept any number and coerce to bool, which is pre-existing
+  and was left alone.
+- **`AT&V` reports only the settings that exist.** The ignored verbs are
+  deliberately NOT echoed back as though they had been stored - a register that
+  accepts a value and reports it back while doing nothing is worse than one that
+  refuses, which is the rule the S7 finding already established.
+- **A line that fails to PARSE is rejected whole and applies nothing**, which is
+  stricter than a real Hayes modem and is the documented intent ("stops a line
+  like `AT&S62=1DT"bad"` from half-applying silently"). The left-to-right stop
+  is a different layer: it applies to commands that parse and then fail at
+  EXECUTION. Both were checked separately on hardware, because a test that
+  conflates them reads as a regression when it is not - `ATE1&C1J&D2` answers
+  `parse error at 7` and leaves `E0` in force, while `ATE1X9` answers `ERROR`
+  with `E1` applied and `X` still 4.
+- **Hardware-verified on a freenove-esp32-s3-wroom-1** over serial, driven with
+  pyserial directly (the capture daemon strips the CR the modem needs): the init
+  string `ATE0V1&C1&D2&K3S0=0` answers `OK` as ONE line with `ATI1` afterwards
+  confirming `E0 Q0 V1 X4` and `S0=0`; each of the thirteen verbs answers `OK`
+  alone; `ATG` and `AT&Z1` answer `ERROR`; `AT&V` prints the settings;
+  `ATDP"127.0.0.1:4131"` dials, is refused with errno 104 and answers
+  `NO ANSWER`; and `AT+SHELL` returns to a usable shell. Native suite
+  `test_modem_at` 83/83. Build unchanged at RAM 31.0% / Flash 40.6%.
+- **Still not done, and each is its own decision**: `ATA` stays stubbed (phase 3
+  owns it); the dial modifiers `;` `,` `W` `@` `!` `$` are still refused, and
+  `;` in particular is NOT a no-op - it means "return to command mode after
+  dialling", which is real behaviour and not something to accept and ignore;
+  `CONNECT` still carries no speed; `ATDL` (redial) does not exist; and `S41` is
+  still declared and referenced nowhere.
+
+## Recent Changes (September 16, 2026)
+
+### Modem mode tasks 9-12: independent review and hardware verification
+
+Tasks 1-8 each had an independent reviewer; tasks 9-12 (phonebook, telnet
+negotiation, `waitReadable()`, and the plan's final integration work) were written
+and self-reviewed by the same author, so they were reviewed again from scratch and
+then driven on hardware. Board: `freenove-s3-wroom` at 192.168.1.187, dialling
+`bbs.fozztexx.com`, console over both serial and TCP (port 23).
+
+**What the hardware run closed.** Eight of the ten prioritised tests passed
+outright, and two of the three "Not verified" items in the 2026-09-13 entry above
+are now verified:
+
+- **The TCP console path (`ORIGIN_REMOTE`) works end to end** - `at`, a dial, the
+  BBS banner, `+++`, `ATI`, `ATH` and `AT+SHELL` all over port 23, and the shell
+  is still usable afterwards. This was the most important unverified fix.
+- **`AT&W` survives a reboot.** Settings and phonebook entries written with `AT&W`
+  came back after a power cycle.
+- **A malformed `config.json` no longer aborts the boot.** A file carrying seven
+  distinct malformed phonebook shapes plus two malformed settings was written over
+  WebDAV, and the board booted clean with exactly the three well-formed entries
+  surviving. ESP-IDF is `-fno-exceptions`, so a nlohmann `get<>` type mismatch is
+  an `abort()`, not a throw - the `is_object()`/`is_string()`/`is_number_integer()`
+  guards in `Modem::loadConfig()` are what make a hand-edited config safe.
+- **No starvation at the current task priorities.** The reviewer recommended
+  dropping the modem task below `console_repl`; the measurement supersedes it.
+  With `modem` at priority 5 and `console_repl` at 4 on core 0, a 4000-byte
+  transfer arrived 4000/4000 bytes intact with `modem` Blocked, `console_repl`
+  Running and the heap flat. Leave the priorities alone.
+
+**`mlConfig` writes to SD when `fnSDFAT.running()`**, so on a board with a card the
+config is at `/sd/.sys/config.json`, not `/.sys/config.json` - the boot log prints
+the latter and `cat` of it answers ENOENT. WebDAV is registered at `/`, so a PUT to
+`http://<ip>/sd/.sys/config.json` is the way to install a test config.
+
+**Fixed here: `tcp://` never reported a peer hangup, while `telnet://` did.**
+`ATDT` builds a `telnet://` URL, whose `TelnetMStream` records the peer's FIN in
+its own `eof_` flag from `pump()`, so a remote hangup fired `NO CARRIER`
+correctly. `ATD` builds `tcp://`, and `TCPMStream::isOpen()` was
+`_session && _session->isConnected() && _session->socket()->isOpen()` - the local
+descriptor stays valid after a remote FIN, so nothing anywhere recorded the
+hangup and the modem's two carrier-loss checks (`modem.cpp:246` and `:305`, both
+keyed on `conn_->isOpen()`) never fired.
+
+- **The hangup is only observable in `read()`.** `MeatSocket::read()` returns
+  exactly 0 for an orderly remote shutdown, `_MEAT_NO_DATA_AVAIL` (0xFFFFFFFE)
+  for a would-block and -100 for not-open, so a 0 is the one unambiguous proof
+  the peer is gone. `TCPMStream` now carries `eof_`, set there and cleared only
+  by `open()`/`close()`, and `isOpen()` answers false once it is set - the same
+  shape `TelnetMStream` already had.
+- **`read()`/`write()` must guard on a separate `open_` flag, not on `isOpen()`.**
+  Once `eof_` makes `isOpen()` false, the old `if (!isOpen() && !open(...))` guard
+  would re-obtain the session and re-connect on every later call: an endless
+  redial on a connection the peer has finished with. `TelnetMStream::read()`
+  documents the identical trap.
+- **There was a second symptom, worse than the missing `NO CARRIER`: `ATO`
+  answered `CONNECT` on a dead socket.** `serviceCommandMode`'s `ONLINE_COMMAND`
+  branch gates on `conn_->isOpen()` too, so a resumed connection reported success
+  and then went silent. Measured before the fix (peer closed 12 s earlier, `ATO`
+  → `CONNECT`); after it, the unsolicited `NO CARRIER` arrives ~80 ms after the
+  peer's FIN, the session is torn down to `Active sessions: 0` on its own, and
+  `ATO` answers `ERROR`.
+- **Verified on hardware after the fix**, all three on the freenove S3: a killed
+  `tcp://` peer produces `NO CARRIER` unprompted; a live `tcp://` connection still
+  reads, writes, suspends on `+++`, resumes on `ATO` with `CONNECT` and carries
+  data afterwards; and `ATDT bbs.fozztexx.com` still connects, shows the banner
+  with negotiation stripped, and hangs up cleanly. Native suite `test_modem_at`
+  77/77. **`irc.h` is the only other `TCPMStream` consumer** (`tcpFS`/`telnetFS`
+  are registered only under `ENABLE_MODEM`); its `isOpen()` now also reports a
+  peer hangup, which is correct there too, but that path was not exercised.
+- **A redial inside the SessionBroker window reuses the session OBJECT and
+  reconnects it - it does not resurrect a corpse.** This was the one hazard the
+  fix could have introduced, and it is the reason to check: `obtain<TCPMSession>()`
+  keys on host:port, `TCPMSession::connect()` is `if (connected) return true;`,
+  and `keep_alive()` clears `connected` only when the socket object reports
+  closed - which a post-FIN descriptor does not. So a second `ATD` landing
+  before `service()` disposes the first dial's session could in principle get a
+  no-op `connect()` on a dead socket. It cannot, because `conn_.reset()` on
+  carrier loss destroys the stream, `~TCPMStream()` calls `close()`, and that
+  calls `_session->disconnect()` - `connected` is already false by the time any
+  redial asks. **Measured**: the redial has to be fired ON the `NO CARRIER`,
+  since the 1 Hz sweep disposed the session 0.1 s after it in one run and 0.7 s
+  in another; a blind delay misses. Firing 12 ms after `NO CARRIER` produced no
+  `TCPMSession created` line and no `Removing session` line - the existing
+  object was reused - followed by `After connect for socket`, `CONNECT`, and a
+  second real HTTP response. The absence of the `created` line is what proves
+  the window was hit; `After connect for socket` is what proves the socket is
+  new.
+- **Hardened while confirming that: `TelnetMStream::isOpen()` tests `rx_` before
+  the inner stream.** Its drain grace ("keep answering true until rx_ has
+  drained") was written against a `TCPMStream` that never reported a hangup, so
+  the `!inner_->isOpen()` test in front of it short-circuited the grace the
+  moment the fix above made the inner stream honest. Nothing is stranded through
+  the modem - `pump()` only runs when `rx_` is empty, and the modem reads 512
+  bytes against `CHUNK` 512, so `rx_` is always fully drained - but any caller
+  reading in smaller pieces than the chunk that carried the FIN loses the tail.
+- **The test double had stopped modelling the thing it doubles, and that is what
+  hid this.** `FakeMStream::isOpen()` was `opened && !closed`, faithful to
+  `TCPMStream` before the fix above and wrong after it, so all four assertions
+  the suite makes *at* drained EOF were being made against an inner stream that
+  behaves as no real one does - and the reordered line was unreachable from the
+  suite entirely. The fake now closes when a `read()` returns 0, exactly as
+  `TCPMStream` does; all 77 existing cases still pass, so those four were sound.
+  `test_telnet_stream_buffered_bytes_outlive_a_closed_inner_stream` is the case
+  that was missing: `rx_` non-empty while the inner stream reports closed. It
+  fails against the old ordering and passes against the new one, which is the
+  mutation check that makes it worth keeping. **Whenever a real class's
+  observable behaviour changes, re-check the double before trusting the green.**
+
+**A local Python listener is no longer reachable from the board.** Windows
+Firewall answers the board's SYN with an ICMP administratively-prohibited, which
+lwIP reports as **EHOSTUNREACH (errno 113) after ~9 s** - indistinguishable in
+the log from a genuinely absent host, and it worked earlier the same day, so it
+is a firewall-state change rather than anything in the code. ICMP echo still
+succeeds (`ping 192.168.1.165` from the console: 5/5, 17-30 ms), which is what
+separates the two. An HTTP/1.0 request to a public server is the substitute that
+needs no inbound rule: it answers and then CLOSES, which is a peer-initiated FIN
+on demand.
+
+**Findings still open**, none of them fixed by this review:
+- **S7 was settable, readable and reported by `ATI`, and did nothing. FIXED
+  2026-09-17 - see the September 17 entry above.** It was referenced exactly once
+  in all of `lib/modem`, by the line that prints it. No dial was bounded by it,
+  and a dial in progress still cannot be interrupted: commands typed during one
+  are queued, not serviced. The "wedge on an unreachable host"
+  half of this could not be reproduced here - every unreachable destination on this
+  network answers EHOSTUNREACH (errno 113) in about 9 s - so it is a network fact,
+  not evidence the code is safe. **What the queued commands then do is worse than
+  being ignored: they are executed as command lines after the dial returns.**
+  Measured during the redial runs, across two ~9 s dials - `PING two`, `+++` and
+  `ATH` typed while a dial was in flight came back afterwards as
+  `executeLine(): modem: parse error at 0 in [PING two]` and
+  `... in [+++ATH]`, each answering `ERROR`. So a user who tries to abort a long
+  dial gets their abort attempt replayed as garbage once the dial finishes. That
+  is the argument for bounding the dial with S7 rather than having `ATS7=` merely
+  warn. A register that accepts a value and reports it back while doing nothing is
+  worse than one that refuses. **The replay half is FIXED and hardware-verified**
+  (2026-09-17): `doDial()` calls `drainRx()` once the connect has settled, on both
+  the `CONNECT` and `NO ANSWER` paths, so those bytes are discarded instead of
+  being re-read as command lines. It is a DISCARD, not an abort - the dial still
+  runs to completion and still cannot be interrupted. **The control is what makes
+  that evidence**: the same `PING two` / `+++ATH` typed at the modem prompt with no
+  dial in flight still produces 2 `parse error at 0 in [...]` lines and 2 `ERROR`s,
+  while typed during a dial it now produces zero of each - same firmware, same
+  input, same mode, the only difference being whether a dial was in flight. Without
+  that control a clean run proves nothing, since it is equally consistent with the
+  input never arriving. **Only ATTACHED ports are drained**, matching the two read
+  loops: an unattached port's buffer is not being consumed by anyone, so what sits
+  in it did not arrive during this dial. The `BUSY`/`NO_DIALTONE`/phonebook-miss/
+  bad-host:port early returns all precede the blocking work and need no drain.
+  **Bounding the dial with S7 is now DONE** (2026-09-17): a non-blocking connect
+  in `MeatSocket::open()` plus a timeout threaded through
+  `MStream`/`MSession`/`SessionBroker::obtain()`, defaulted to 0 so `irc.h` and
+  every other consumer are unchanged. The claim here that it "cannot be
+  reproduced on this network" was wrong and worth correcting: the ~9 s
+  EHOSTUNREACH is a CEILING to measure against, not an obstacle - `ATS7=3`
+  against a host that takes 9 s is a perfectly clean test, and it is the one
+  that proved the fix.
+- **`MeatSocket::open()` leaked the descriptor on every failed connect. FIXED, and
+  the leak was worse than a slow drip - eleven failed dials bricked the board's
+  networking.** `open()` returned false with `sock` still >= 0 and never closed, and
+  nothing downstream closed it either: `TCPMSession::disconnect()` returns early
+  unless `connected` is set, which a failed `connect()` never sets, so
+  `~TCPMSession()` did not clean it up. **Measured** on a freenove-esp32-s3-wroom-1
+  dialling a refused port on loopback - `ATD"127.0.0.1:4131"`, which answers errno
+  104 immediately and so costs about a second per dial rather than the ~9 s an
+  unreachable host on this network takes: the **12th** dial could not create a socket
+  at all (`errno 23`), all 16 of `CONFIG_LWIP_MAX_SOCKETS` having gone, leaving the
+  device unable to open any connection until rebooted. It failed at exactly that
+  dial on both runs. After the fix, **40** consecutive failed dials were all errno
+  104 with no errno 23. **Resetting `sock` to -1 matters as much as closing it**:
+  `isOpen()` is `sock != -1`, so the object otherwise reported itself OPEN on a dead
+  descriptor - and with it back to -1, `disconnect()`'s early return is merely
+  redundant rather than a leak, which is why that function needs no change.
+  `closesocket()` is called directly rather than through the member `close()`,
+  because `shutdown()` is meaningless on a connection that was never established.
+  Note the loopback target is what makes this measurable at all; a firewall-refused
+  LAN host takes ~9 s per dial and would turn the same run into six minutes.
+- **Two OTHER pre-existing `MeatSocket` defects remain, deliberately.** `close()`
+  calls `closesocket(sock)` and only then `shutdown(sock, 0)`, which is a shutdown
+  on an already-closed descriptor - correcting the order would start sending a FIN
+  where today it is a no-op, a real change to teardown across `tcp://`, `telnet://`
+  and `irc.h`, so it wants its own decision. And `connect()` passes
+  `sizeof(struct sockaddr_in6)` as the addrlen for a `sockaddr_in`.
+- **`ATZ` and `ATH` emit `NO CARRIER` *and* `OK`.** Confirmed on hardware. A real
+  Hayes `ATH` answers `OK` alone and uses `NO CARRIER` as the unsolicited
+  loss report - but scripts key off `NO CARRIER` to learn a call ended, so emitting
+  both is defensible and removing it could hang a caller. Left as it is,
+  deliberately.
+- **`+++` typed in COMMAND mode is buffered into the command line**, so the next
+  command is prefixed with it and answers `ERROR`. Noticed during this run and
+  deliberately left alone: a real Hayes modem accumulates the same characters and
+  errors on the line for the same reason. The negative case that does matter is
+  covered - `+++` embedded mid-burst with no guard silence is forwarded to the
+  remote as data. Measured: 120 bytes of filler, `+++`, then `ZZZ` arrived at the
+  far end as exactly 126 bytes in order, with no `OK` emitted.
+- **F8, the `attached` doc/behaviour mismatch, was not tested.** None of the ten
+  hardware tests reaches it; it needs two consoles attached at once.
+
+**A `Debug_printv` line can interleave mid-line with modem output** on the serial
+console, which makes a transfer look like it dropped a line when every byte is
+present. An integrity check over a captured log must re-join lines before counting,
+or it will report a loss that did not happen.
+
+**Modem mode cannot be driven through the debug skill's capture daemon, and the
+reason is one line of Python.** `serial_capture.py` does
+`cmd_text = cmd_data.decode(...).strip()` and then writes `cmd_text + "\n"`, so a
+trailing CR can never reach the board - and the modem's command terminator is S3,
+which is CR. The shell is unaffected because the console driver translates RX CR to
+LF for it, but modem mode installs `ConsoleRawIOGuard`, which turns that translation
+off. The symptom is precise and easy to misread: the modem ECHOES `AT` and then
+answers nothing at all, because it is still waiting for the end of the line. Drive
+modem mode with pyserial directly instead, writing `b"AT\r"`.
+
+**Closing the port from pyserial REBOOTS the board**, via the DTR/RTS auto-reset
+circuit. That is convenient for a measurement wanting a clean slate each run - it is
+why the socket-exhaustion figure above reproduced exactly - but it means a script
+cannot close the port and re-open it to check that some state PERSISTED: the state
+is gone either way, and a "recovered" reading proves nothing. Do the whole of such a
+measurement inside one open port.
+
+## Recent Changes (September 13, 2026)
+
+### Console modem mode: `at` turns either console into a Hayes modem
+
+Typing `at` on the serial or TCP console enters modem mode; `AT+SHELL` leaves it.
+Phase 1 is the AT engine, a single dialled connection, telnet negotiation, a
+phonebook and S-register settings. Design is in
+`docs/superpowers/specs/2026-09-08-console-modem-mode-design.md`, the 12-task
+plan in `docs/superpowers/plans/2026-09-08-console-modem-mode-phase-1.md`.
+
+**Hardware-verified on an esp32-s3-devkitc-1 against bbs.fozztexx.com**: `CONNECT`
+and the full BBS banner with telnet negotiation stripped, `+++` returning `OK`
+with the carrier still up, `ATI` answering while suspended, `ATO` returning
+`CONNECT`, the BBS's own login prompt arriving after the resume - which is what
+proves the connection survived the escape rather than being re-dialled - then
+`ATH` giving `NO CARRIER` with the session torn down to `Active sessions: 0`, and
+`AT+SHELL` returning to the shell. Internal heap 64,203 bytes free with a session
+up. Flash 4,249,905 = 81.1%, RAM 101,492 = 31.0%.
+
+- **The modem task never touches a console fd.** Two tasks on one socket is the
+  condition behind the NFS `0x6400` heap corruption. The shell task stays the
+  sole reader and writer of its own fd and pumps bytes through a `ModemPort`
+  pair of FreeRTOS StreamBuffers, which are single-writer/single-reader by
+  design, so with exactly one task on each end no mutex is needed.
+- **`ONLINE` and `ONLINE_COMMAND` are deliberately different states.** `+++`
+  leaves the connection UP; that is what makes `ATO` meaningful and is the
+  distinction Zimodem blurs.
+- **`pdMS_TO_TICKS()` truncates, and `CONFIG_FREERTOS_HZ` is 100 on every board
+  here - so `pdMS_TO_TICKS(5)` is ZERO ticks and `vTaskDelay(0)` yields only to
+  tasks of equal or higher priority, never to a lower one.** The modem task is
+  priority 5 and the console shells are priority 4 on the same core, so a
+  five-millisecond idle delay made the modem task spin and starve the very task
+  that feeds it. The symptom is the trap: the session looks hung with the
+  connection still up and the remote still live, output keeps working (a burst
+  fills the port's TX buffer, blocking the modem task in `pushTx` long enough for
+  the shell to run) while **nothing typed ever arrives**. Command mode was
+  unaffected only by luck - its idle path asks for 20 ms, which is 2 real ticks.
+  Any idle delay under 10 ms anywhere in this codebase is a no-op; floor it at
+  one tick.
+- **A lazily-opened stream cannot be probed with `isOpen()`.** `TelnetMStream` is
+  constructed CLOSED and opens on its first `read()`/`write()`, so a freshly
+  created one always answers `isOpen() == false` however well the transport
+  underneath it connected. `doDial()` tested that and reported `NO ANSWER` for
+  every telnet dial with the socket already established. A dial has to settle
+  `CONNECT` versus `NO ANSWER` immediately, so it opens eagerly; `eos()` and
+  `waitReadable()` lazy-open for the same reason, which means calling either on a
+  never-read stream DIALS. Do not call them from a status or hang-up path.
+- **`tcp://` is now a registered filesystem.** It was declared but commented out
+  of every registration site, and `MFSOwner::findParentFS()` ends
+  `auto fs = *availableFS.begin(); return fs;` - it returns `defaultFS`, never
+  `nullptr`, so an unregistered scheme silently resolves to a flash path instead
+  of failing.
+- **`lib/modem` must stay in `src/CMakeLists.txt`'s hand-maintained INCLUDES and
+  SOURCES lists.** `lib_ldf_mode = off`, so nothing else compiles that directory;
+  removing the line gives `undefined reference to TelnetFilter::transmit`.
+- **`ConsoleRawIOGuard` moved to `lib/console/console_rawio.h`.** It was
+  file-local to `Commands/XFERCommands.cpp` and unreachable from modem mode, which
+  needs the same raw byte mode - the driver's CR/LF translation corrupts a BBS
+  stream and the modem emits its own S3/S4 terminators.
+- **Gated behind `ENABLE_MODEM`**, set only for `esp32-s3-devkitc-1`. On a board
+  without it every modem object compiles to nothing: `modem.cpp.o` is 1,548 bytes
+  on `lolin-d32-pro` against 3.33 MB on the S3.
+- **Native coverage is the pure units only** - AT parser, S-registers, result
+  codes, the `+++` escape detector, phonebook, the telnet filter, and
+  `TelnetMStream` itself through a `FakeMStream`: 77 cases in
+  `test/native/test_modem_at`. **The dial path, `ModemPort`, the modem task and
+  both `at` intercepts have NO regression test** and are hardware-verified only -
+  they need FreeRTOS, `MFSOwner`, `mlConfig` and a real socket. Both bugs above
+  were found only on hardware.
+- **Not verified**: nothing has been driven from a real C64 - this is a console
+  feature by design; no SSH dialling, no file transfer, no incoming connections
+  (those are later phases). The TCP console path (`ORIGIN_REMOTE`) and `AT&W`
+  persistence across a reboot were closed on 2026-09-16 - see that entry.
 
 ## Recent Changes (September 5-6, 2026)
 

@@ -1,5 +1,6 @@
 #include "PS2Commands.h"
 
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -8,6 +9,9 @@
 #include "../dos_encode.h"
 #include "string_utils.h"
 #include "SerialCompat.h"
+#include "driver/gpio.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 using ESP32Console::encodeAsciiCommand;
 
@@ -83,6 +87,34 @@ namespace
         if (sub == "disable") { ps2Keyboard.disable(); printStatus(); return EXIT_SUCCESS; }
         if (sub == "release") { ps2Keyboard.releaseAll(); return EXIT_SUCCESS; }
 
+        if (sub == "speed")
+        {
+#ifdef PIN_KB_CLK
+            // Spec-legal half-period is 30-50us (38 default). A host that
+            // can't keep up with spec-legal timing -- e.g. a soft-polled
+            // receiver rather than an interrupt-driven one -- may need this
+            // slower to be read at all.
+            if (argc < 3)
+            {
+                Serial.printf("ps2: clock half-period is %u us (default 38, spec range 30-50)\r\n",
+                              (unsigned)ps2dev::CLK_HALF_PERIOD_MICROS);
+                return EXIT_SUCCESS;
+            }
+            uint32_t v = (uint32_t)strtoul(argv[2], nullptr, 10);
+            if (v == 0)
+            {
+                Serial.printf("usage: ps2 speed <half-period-us>\r\n");
+                return EXIT_FAILURE;
+            }
+            ps2dev::set_clk_half_period_us(v);
+            Serial.printf("ps2: clock half-period now %u us (~%.1f kHz)\r\n",
+                          (unsigned)v, 500.0 / v);
+#else
+            Serial.printf("ps2: not supported on this board\r\n");
+#endif
+            return EXIT_SUCCESS;
+        }
+
         if (sub == "keys")
         {
             std::vector<const char *> names;
@@ -104,6 +136,52 @@ namespace
                 Serial.printf("ps2: type failed (disabled, not started, or non-ASCII)\r\n");
                 return EXIT_FAILURE;
             }
+            return EXIT_SUCCESS;
+        }
+
+        if (sub == "wiggle")
+        {
+#ifdef PIN_KB_CLK
+            // Raw GPIO toggling, bypassing PS2Device entirely -- lets CLK/DATA
+            // be confirmed with a plain multimeter when no scope/logic
+            // analyzer is available. Must not race the background tasks, so
+            // it refuses while they're still holding the pins.
+            if (ps2Keyboard.isRunning())
+            {
+                Serial.printf("ps2: run `ps2 disable` first -- wiggle drives "
+                              "CLK/DATA directly and must not race the running device\r\n");
+                return EXIT_FAILURE;
+            }
+
+            gpio_config_t io_conf = {};
+            io_conf.mode = GPIO_MODE_OUTPUT_OD;
+            io_conf.pin_bit_mask = (1ULL << PIN_KB_CLK) | (1ULL << PIN_KB_DATA);
+            io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+            io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+            gpio_config(&io_conf);
+            gpio_set_level(PIN_KB_CLK, 1);
+            gpio_set_level(PIN_KB_DATA, 1);
+
+            Serial.printf("ps2: wiggle -- probe CLK[%d] and DATA[%d] with a meter now\r\n",
+                          (int)PIN_KB_CLK, (int)PIN_KB_DATA);
+            for (int i = 0; i < 5; i++)
+            {
+                Serial.printf("  [%d] CLK low  / DATA high\r\n", i);
+                gpio_set_level(PIN_KB_CLK, 0);
+                gpio_set_level(PIN_KB_DATA, 1);
+                vTaskDelay(pdMS_TO_TICKS(1500));
+
+                Serial.printf("  [%d] CLK high / DATA low\r\n", i);
+                gpio_set_level(PIN_KB_CLK, 1);
+                gpio_set_level(PIN_KB_DATA, 0);
+                vTaskDelay(pdMS_TO_TICKS(1500));
+            }
+            gpio_set_level(PIN_KB_CLK, 1);
+            gpio_set_level(PIN_KB_DATA, 1);
+            Serial.printf("ps2: wiggle done -- run `ps2 enable` (or `ps2 start`) to resume\r\n");
+#else
+            Serial.printf("ps2: not supported on this board\r\n");
+#endif
             return EXIT_SUCCESS;
         }
 
@@ -137,7 +215,7 @@ namespace
         }
 
         Serial.printf("ps2 {status|start|enable|disable|type <text>|key <a>[+<b>]|"
-                      "down <name>|up <name>|release|keys}\r\n");
+                      "down <name>|up <name>|release|keys|wiggle|speed [us]}\r\n");
         return EXIT_FAILURE;
     }
 }

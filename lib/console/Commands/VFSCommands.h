@@ -42,9 +42,9 @@ namespace ESP32Console::Commands
 
     const ConsoleCommand getPartitionCommand();
 
+#ifndef MIN_CONFIG
     const ConsoleCommand getGzipCommand();
 
-#ifndef MIN_CONFIG
     const ConsoleCommand getUnzipxCommand();
 #endif
 

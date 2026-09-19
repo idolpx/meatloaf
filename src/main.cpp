@@ -49,6 +49,7 @@
 
 #ifdef ENABLE_CONSOLE
 #include "../lib/console/ESP32Console.h"
+#include "console_baud.h"
 #endif
 
 #ifdef ENABLE_DISPLAY
@@ -87,6 +88,10 @@
 
 #include "bus.h"
 #include "meat_session.h"
+
+#ifdef ENABLE_MODEM
+#include "modem.h"
+#endif
 //#include "ml_tests.h"
 
 std::string statusMessage;
@@ -292,7 +297,17 @@ void main_setup()
     // Load our stored configuration
     Config.load();
     mlConfig.load();
+#ifdef ENABLE_CONSOLE
+    // The persisted rate can only be applied here: config lives on flash or SD
+    // and neither is mounted at console.begin(). The consequence is deliberate
+    // and is the last-resort recovery path -- everything printed above this
+    // line goes out at DEBUG_SPEED, so a wrong persisted rate can never hide
+    // early boot on a board with no network.
+    ESP32Console::consoleBaudRestore();
+#endif
     //log_heap_checkpoint("after config load");
+
+    ps2Keyboard.start();
 
     // Setup IEC Bus
     SYSTEM_BUS.setup();
@@ -339,11 +354,6 @@ void main_setup()
     printf( ANSI_GREEN_BOLD "Parallel Bus Initialized" ANSI_RESET "\r\n" );
 #endif
 
-    // Reads devices.ps2 only -- allocates nothing, touches no GPIO, does no
-    // network work, so it has none of the ordering hazards a drive's
-    // reloadConfig() has.  A no-op on boards without PIN_KB_CLK.
-    ps2Keyboard.start();
-
 #ifdef ENABLE_DISPLAY
     LEDS.start();
     LCD.show_image( (char *)WWW_ROOT "/assets/logo.160x80.jpg" );
@@ -378,6 +388,15 @@ void main_setup()
     // Start SessionBroker service task on CPU0
     SessionBroker::setup();
     //log_heap_checkpoint("after SessionBroker::setup()");
+
+#ifdef ENABLE_MODEM
+    // Created at boot, not on the first `at`: task stacks are internal-DRAM only
+    // with no PSRAM fallback and can fail from fragmentation, so the stack is
+    // claimed while contiguous internal RAM is still available. The task idles
+    // on its ports until a console enters modem mode.
+    if (!modem.start())
+        Debug_printv("modem: failed to start; `at` will be unavailable");
+#endif
 
     // Restore each drive's persisted mlConfig state (enabled flag, mounted URL).
     // Must happen after fnWiFi.start(): reloadConfig() may mount a network URL

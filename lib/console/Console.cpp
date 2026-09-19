@@ -36,6 +36,14 @@
 #include "tcpsvr.h"
 #include "mlConfig.h"
 #include "Esp.h"
+#include "console_baud.h"
+
+#ifdef ENABLE_MODEM
+#include <memory>
+#include "console_rawio.h"
+#include "../modem/modem.h"
+#include "../modem/modem_port.h"
+#endif
 
 // Defined in SystemCommands.cpp; do_reboot() below needs ESP.restart().
 extern EspClass ESP;
@@ -109,6 +117,136 @@ using namespace ESP32Console::Commands;
 
 namespace ESP32Console
 {
+#ifdef ENABLE_MODEM
+    // Runs one console's side of a modem session. The shell task stays the sole
+    // reader and writer of its own fd and pumps bytes to and from the modem task
+    // through a ModemPort. Two tasks on one fd is the condition behind the NFS
+    // 0x6400 heap corruption; see modem_port.h.
+    static void modem_shell_pump(Console::Origin origin)
+    {
+        if (!modem.isRunning())
+        {
+            ::printf("modem: not running\r\n");
+            return;
+        }
+
+        ModemPort port;
+        if (!port.begin())
+        {
+            ::printf("modem: could not allocate port buffers\r\n");
+            return;
+        }
+
+        if (!modem.attach(&port))
+        {
+            ::printf("modem: no free port (in use from another console)\r\n");
+            return;
+        }
+        port.setAttached(true);
+
+        // Raw byte mode for the session: the console driver's interactive
+        // line-end translation (RX CR -> LF, TX LF -> CRLF) corrupts a BBS
+        // stream, and the modem emits its own S3/S4 terminators. It configures
+        // the UART, so it is meaningful only for a serial session -- applying
+        // it for a TCP one would reconfigure the serial console out from under
+        // whoever is sitting at it, including another modem session.
+        std::unique_ptr<ConsoleRawIOGuard> raw_guard;
+        if (origin == Console::ORIGIN_SERIAL)
+            raw_guard.reset(new ConsoleRawIOGuard());
+
+        ::printf("\r\nModem mode. AT+SHELL to return.\r\n");
+
+        // One writer for both the loop and the post-loop drain. The origin
+        // decides the transport; the modem task never touches either.
+        auto drainTx = [&](void) -> size_t {
+            uint8_t out[128];
+            size_t n = port.popTx(out, sizeof(out), 20);
+            if (n > 0)
+            {
+                if (origin == Console::ORIGIN_SERIAL)
+                {
+                    fwrite(out, 1, n, stdout);
+                    fflush(stdout);
+                }
+#ifdef ENABLE_CONSOLE_TCP
+                else
+                {
+                    tcp_server.send(std::string((const char *)out, n));
+                }
+#endif
+            }
+            return n;
+        };
+
+        while (port.attached() && modem.isRunning())
+        {
+            // Modem -> terminal.
+            drainTx();
+
+            // An AT+IPR could not switch the line itself -- its reply was still
+            // in the port's buffer. It is on the wire now, so this is the first
+            // safe moment. A no-op on every other pass.
+            ESP32Console::consoleBaudApplyPending();
+
+            // Terminal -> modem. Serial reads its own fd here; a TCP session's
+            // bytes arrive via TCPServer::modemFeed() from session_task(), which
+            // must stay the only reader of that socket.
+            uint8_t in[64];
+            size_t got = 0;
+            if (origin == Console::ORIGIN_SERIAL)
+            {
+                int fd = fileno(stdin);
+                int fl = fcntl(fd, F_GETFL, 0);
+                fcntl(fd, F_SETFL, fl | O_NONBLOCK);
+                while (got < sizeof(in))
+                {
+                    int c = fgetc(stdin);
+                    if (c == EOF)
+                        break;
+                    in[got++] = (uint8_t)c;
+                }
+                fcntl(fd, F_SETFL, fl);
+                // A transport that signals "no data" with a 0-byte read would
+                // leave newlib's sticky EOF flag set and wedge every later
+                // fgetc. ESP-IDF's VFS returns -1/EWOULDBLOCK here, which sets
+                // the error flag instead, but clearing costs nothing and makes
+                // the loop independent of that detail.
+                clearerr(stdin);
+            }
+#ifdef ENABLE_CONSOLE_TCP
+            else
+            {
+                // Read the client socket directly. session_task() is parked
+                // inside console.execute() for as long as this loop runs, so
+                // it is not reading the socket and cannot hand bytes over --
+                // anything that relied on it to do so could never run at all.
+                got = TCPServer::modemRecv(in, sizeof(in));
+            }
+#endif
+            if (got > 0)
+                port.pushRx(in, got, 100);
+        }
+
+        // The loop can exit with an AT+IPR's own reply still in the port:
+        // "AT+IPR=2400+SHELL" is a single line, and the SHELL detaches before
+        // the pump gets another pass. Drain what is left, then apply. Without
+        // this the pending rate outlives the session that asked for it and
+        // lands on whichever session next runs this pump -- which never asked.
+        // The port is not yet detached here, so bound the drain rather than
+        // trusting it to run dry.
+        for (int i = 0; i < 64 && drainTx() > 0; ++i)
+            ;
+        ESP32Console::consoleBaudApplyPending();
+
+        // Same ordering rule for the modem task: detach() takes the Modem
+        // mutex, so it waits out any in-flight broadcast()/toAttached() before
+        // the slot is cleared. end() may only run once that has returned.
+        modem.detach(&port);
+        port.end();
+        ::printf("\r\nModem mode exited.\r\n");
+    }
+#endif // ENABLE_MODEM
+
     /**
      * @brief Register the given command, using the raw ESP-IDF structure.
      *
@@ -172,6 +310,7 @@ namespace ESP32Console
         registerCommand(getEnvCommand());
         registerCommand(getDeclareCommand());
         registerCommand(getRunCommand());
+        registerCommand(getBaudCommand());
         registerCommand(getRebootCommand());
         registerCommand(getExitCommand());
     }
@@ -849,6 +988,22 @@ namespace ESP32Console
                 break;
             }
 
+#ifdef ENABLE_MODEM
+            // "at" enters modem mode. Intercepted as a raw line, before
+            // esp_console_run()'s splitter: that splitter drops arguments past
+            // CONSOLE_MAX_CMDLINE_ARGS and only strips a leading quote, so a
+            // line like AT&S62=1DT"host:23" would not survive it.
+            {
+                std::string lowered = raw_line;
+                mstr::toLower(lowered);
+                if (lowered == "at")
+                {
+                    modem_shell_pump(ORIGIN_SERIAL);
+                    continue;
+                }
+            }
+#endif
+
             //Interpolate the input line
             std::string interpolated_line = interpolateLine(raw_line.c_str());
 
@@ -957,6 +1112,18 @@ namespace ESP32Console
         {
             tcp_server.disconnect();
             return;
+        }
+#endif
+
+#ifdef ENABLE_MODEM
+        {
+            std::string lowered = command_str;
+            mstr::toLower(lowered);
+            if (lowered == "at")
+            {
+                modem_shell_pump(ORIGIN_REMOTE);
+                return;
+            }
         }
 #endif
 
