@@ -764,8 +764,10 @@ and a debug console on a board whose USB-serial bridge cannot reach 2 Mbps
   `AT+IPR` and all of `modem_shell_pump()` were not compiled on the only
   connected board with a UART console — the shell half (`baud`) worked, the
   modem half was unreachable. Added `-D ENABLE_MODEM` beside
-  `-D ENABLE_CONSOLE_TCP` in `[env:lolin-d32-pro]` (`platformio.ini` is
-  gitignored, so this is the only record of the change). This is an
+  `-D ENABLE_CONSOLE_TCP` in `[env:lolin-d32-pro]`. (`platformio.ini` is
+  gitignored, so at the time this entry was written it was the only record
+  of the change; the 2026-09-19 review fixed that — the flag is now in
+  `platformio.ini.sample` for that env, so a fresh checkout gets it.) This is an
   ESP32-WROVER with the small ~3.3 MB `iram0_2_seg` flash-text window and
   `EXTRA_FASTLOADERS` already consuming most of its margin (see the August
   25 entry — 87,271 bytes free at the time, in that SAME `.flash.text`
@@ -1010,6 +1012,30 @@ rather than engineered.
   be measured directly** — see the network note below — so that margin is a
   projection, and the `SessionBroker` precedent is that too little stack here
   corrupts the FreeRTOS heap silently and surfaces in unrelated tasks.
+- **The `DEBUG_SPEED` boot window was re-measured after these fixes, and the
+  number is worth keeping because it is small.** With `preferences.baud = 2400`
+  persisted, listening at 2000000 across a `reboot` gives **999 bytes / 26
+  readable lines** — from the `MEATLOAF CBM` banner through RAM/HIMEM, the SD
+  mount attempts and `fnConfig::load read 811 bytes from FLASH config file` —
+  and then the line switches and everything after is framing-error NULs at
+  2000000. That last readable line is exactly where `consoleBaudRestore()` runs
+  (immediately after `mlConfig.load()`), so the window is as designed. **Two
+  traps when measuring this**: a `reboot` typed at 2400 leaves the ROM
+  bootloader talking at the inherited rate, so the capture opens with ~1.8 KB of
+  garbage BEFORE the readable app log — splitting the capture at the first run
+  of NULs hides the readable middle entirely and reads as "the boot log is not
+  at DEBUG_SPEED", which is wrong. Scan for readable RUNS instead. And the
+  restore only runs at all when the persisted rate differs from the current one
+  (`consoleBaudRestore()` returns early on `baud == consoleBaudGet()`), so a
+  test that ends at 2000000 never exercises it.
+- **Known limitation: the ONLINE promote branch has no coverage.**
+  `AT+IPR=<n>DT"host"` stages a rate, dials, and promotes after `CONNECT` — the
+  native suite never reaches `executeLine()` and this was not dialled on
+  hardware. One consequence worth knowing before anyone does: in ONLINE state
+  the pump applies the rate mid-session, so `consoleBaudSet()` blocks that task
+  for the drain plus a flash write while it is not draining `tx_`, and at a low
+  rate `toAttached()`'s 500 ms `pushTx` can therefore drop stream bytes into
+  `tx_dropped_`. Recorded, not engineered.
 - **Known limitation, deliberately not engineered: two modem sessions at once
   can retune the line under each other.** `Modem::broadcast()` pushes a reply
   to every OPEN port and `MAX_PORTS` is 2, so with a serial modem session and
