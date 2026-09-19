@@ -84,6 +84,18 @@ public:
     void saveConfig();
 
 private:
+    // The native suite drives executeLine() directly. It is private because
+    // nothing in the firmware may call it off the modem task, and widening it
+    // to public to be testable would invite exactly that. The four behaviours
+    // that need covering are all about the ORDER in which executeLine()
+    // publishes a staged baud rate relative to the line's own reply, so a test
+    // has to reach the real function -- asserting on the end state alone
+    // passes against code that promotes in the handler, which is the bug the
+    // staging exists to prevent.
+#ifdef TEST_NATIVE
+    friend struct ModemTestAccess;
+#endif
+
     static void taskEntry(void *arg);
     void run();
 

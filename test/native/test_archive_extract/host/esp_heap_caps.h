@@ -9,4 +9,5 @@ static inline void *heap_caps_malloc(size_t sz, unsigned caps) { (void)caps; ret
 static inline void heap_caps_free(void *p) { free(p); }
 static inline size_t heap_caps_get_free_size(unsigned caps) { (void)caps; return 1u<<20; }
 static inline void *heap_caps_realloc(void *p, size_t sz, unsigned caps) { (void)caps; return realloc(p, sz); }
+static inline size_t heap_caps_get_largest_free_block(unsigned caps) { (void)caps; return 1u<<20; }
 #endif

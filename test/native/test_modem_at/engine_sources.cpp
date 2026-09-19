@@ -52,6 +52,21 @@
 // same trio, for exactly the same underlying reason (a concrete MStream/MFile
 // subclass drags in its inherited virtuals' default bodies), is already
 // proven native-safe by test/native/test_mstream_seek/engine_sources.cpp.
+// The engine itself (AT+IPR staging coverage). Unlike everything above,
+// modem.cpp genuinely does need FreeRTOS, a config tree, a radio and a UART --
+// which is why executeLine()'s baud staging had no executable coverage at all
+// until now. It is reachable here because every one of those is a small host
+// stub in test/native/test_archive_extract/host (freertos/, esp_timer.h,
+// fnWiFi.h, fnSystem.h) or a body supplied by modem_host_stubs.cpp, while the
+// DECLARATIONS come from the real mlConfig.h and console_baud.h. So the code
+// under test is the shipped code, not a transcription of it.
+//
+// modem_port.cpp comes along because the test asserts on what is in a port's
+// TX buffer at the moment a rate is published, and a fake port would not prove
+// the reply had really been queued.
+#include "../../../lib/modem/modem_port.cpp"
+#include "../../../lib/modem/modem.cpp"
+
 #include "../../../lib/utils/punycode.cpp"
 // punycode.cpp #define's a bare `min(a,b)` macro with no matching #undef.
 #undef min

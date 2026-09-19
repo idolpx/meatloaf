@@ -908,17 +908,11 @@ half the other cannot:**
   `AT+SHELL` promotes inside `executeCommand()` before the detach. Every one
   is pinned by hardware anecdote and by comments, and comments in this file's
   own history have twice been wrong about code they sat next to — the
-  `broadcast()`/`attached()` claim in this very wave was one. **The native
-  suite cannot reach `executeLine()` at all**: `Modem` needs FreeRTOS,
-  `MFSOwner` and `mlConfig`, so closing this is not "add a test", it is
-  "build a seam first" — the console-baud calls would need to go through an
-  injectable interface before a native case could assert that
-  `consoleBaudSetPending` happens after `broadcast`, or that a failing line
-  publishes nothing. The ERROR-discard is the one that most deserves it: it
-  is a deliberate departure from this codebase's documented left-to-right
-  convention (`ATE1X9` applies `E1` before failing), justified because a baud
-  change destroys the channel the `ERROR` was reported on, and nothing
-  executable defends that decision against a future edit.
+  `broadcast()`/`attached()` claim in this very wave was one. At the time of
+  writing the native suite could not reach `executeLine()` at all — `Modem`
+  needs FreeRTOS, `MFSOwner` and `mlConfig` — so closing it was not "add a
+  test" but "build a seam first". **That seam now exists and three of the
+  four behaviours are covered; see the 2026-09-19 residuals entry below.**
 - **One stray byte occasionally shows up at the very start of a fresh
   `pyserial.Serial()` session to COM13, merging with the next line typed
   (`"<glitch>AT"` fails to parse as `AT`).** Found while writing the
@@ -1027,10 +1021,11 @@ rather than engineered.
   bytes of its 6144** after `at` + `AT+IPR=2400` + `AT+SHELL`, against 1488
   idle; **`tcp_session` idles at 756 of 4096**. 2836 against 4096 leaves
   ~1.2 KB, and `mlConfig.save()` is proven at 8 KB (the modem task, `AT&W`)
-  and 6 KB (`console_repl`) but never at 4 KB. **The TCP-origin path could not
-  be measured directly** — see the network note below — so that margin is a
-  projection, and the `SessionBroker` precedent is that too little stack here
-  corrupts the FreeRTOS heap silently and surfaces in unrelated tasks.
+  and 6 KB (`console_repl`) but never at 4 KB. The `SessionBroker` precedent
+  is that too little stack here corrupts the FreeRTOS heap silently and
+  surfaces in unrelated tasks. **The TCP-origin path was projected when this
+  was written and has since been measured directly — see the 2026-09-19
+  residuals entry below. The projection was accurate to 32 bytes.**
 - **The `DEBUG_SPEED` boot window was re-measured after these fixes, and the
   number is worth keeping because it is small.** With `preferences.baud = 2400`
   persisted, listening at 2000000 across a `reboot` gives **999 bytes / 26
@@ -1104,6 +1099,88 @@ rather than engineered.
   board's own console: gateway up + host unreachable is the network, not the
   board. This supersedes nothing in the September 16 entry's firewall note —
   that was inbound to the host; this is blocked in both directions.
+  **Re-measured 2026-09-19 and no longer true: TCP 23 now reaches the board
+  (ICMP is still blocked, which is what made the original check read as
+  "unreachable" — `Test-NetConnection` gives `Ping: False, TCP23: True`). A
+  host that cannot reach port 23 should therefore be re-tested with TCP
+  rather than with `ping`, which answers a different question.**
+
+### Both residuals closed (2026-09-19)
+
+The baud work was merged with two items parked: `Modem::executeLine()`'s
+staging had no executable coverage, and the TCP-origin `AT+IPR` stack cost was
+known only by projection. Both are now closed.
+
+**Residual 2 — the TCP-origin cost, measured.** Board `lolin-d32-pro` at
+192.168.1.164, `tcp_session` stack 6144 bytes, driven over port 23 in one
+socket because `modem_shell_pump()` runs on the `tcp_session` task serving
+that connection. The control matters more than the reading: a modem session
+with no `AT+IPR` leaves the high-water mark exactly where a fresh connection
+does, so the delta is attributable to `AT+IPR` and not to entering modem mode.
+
+| reading | bytes free | bytes used |
+|---|---|---|
+| fresh connection after a reboot | 4348 | 1796 |
+| a modem session with **no** `AT+IPR` (control) | 4348 — unchanged | 1796 |
+| after `AT+IPR=9600`, including `Saved config.json` | 3276 | 2868 |
+
+So `AT+IPR` itself costs **1072 bytes** on `tcp_session`, peaking at 2868 of
+6144. A separate non-rebooted run carrying more AT traffic peaked at 3160 used
+/ 2984 free, which is the conservative figure to plan against. The projection
+recorded above was 2836 used, derived from `console_repl` — accurate to **32
+bytes**, so the 4096 → 6144 raise is confirmed, and 4096 would have left
+roughly 900 bytes of margin on a path that writes config to flash.
+
+**Residual 1 — the seam, and what it does and does not cover.** The suite now
+compiles `lib/modem/modem.cpp` and `modem_port.cpp` natively and drives
+`executeLine()` directly. The one production change is a
+`friend struct ModemTestAccess` under `#ifdef TEST_NATIVE` in `modem.h`:
+`executeLine()` stays private, because nothing in the firmware may call it off
+the modem task and widening it to public to be testable would invite exactly
+that.
+
+- **`modem.cpp` is reachable natively because its dependencies are stubs, not
+  because it was refactored.** `test/native/test_archive_extract/host` is on
+  every native suite's include path, so the FreeRTOS StreamBuffer API,
+  `esp_timer`, `esp_err`, `fnWiFi` and `fnSystem` land there as small host
+  headers; `modem_host_stubs.cpp` supplies bodies only. The DECLARATIONS come
+  from the real `mlConfig.h` and `console_baud.h` — `mlConfig.h` is
+  header-only apart from three out-of-line functions, and `console_baud.h`
+  depends on nothing but `esp_err.h` while `modem.cpp` calls exactly four
+  things from it. That is what makes the code under test the shipped code
+  rather than a transcription of it.
+- **The assertion has to fire from INSIDE `consoleBaudSetPending()`, and this
+  is the whole point of the exercise.** The staging invariant is about ORDER,
+  not end state: a test asserting "after `executeLine`, pending == 2400"
+  passes against the pre-fix code that promoted inside the handler — the
+  exact defect the staging replaced. So the fake exposes an `on_promote`
+  callback that snapshots the world at the moment of the promote, and the
+  test asserts the port's TX buffer already holds `OK` at that instant.
+- **Five cases**, all in `test/native/test_modem_at`: the promote happens only
+  after the reply is queued; a line that fails after staging publishes nothing
+  (`AT+IPR=2400X9`, where `X9` fails its own 0..4 range check); `AT+SHELL`
+  promotes while the ports are still attached; a console with no UART stages
+  nothing; and `AT+IPR?` reports without staging. The failing-line case
+  follows up with a bare `AT` and re-asserts `promote_count == 0` — that
+  second half is the discriminating one, since a stage left behind would
+  surface on the next line rather than on its own.
+- **Mutation-checked, each mutation killing exactly its own case and nothing
+  else.** Moving `consoleBaudSetPending()` back into the `AT+IPR` handler
+  fails two (the ordering case and the discard case — publishing in the
+  handler also defeats the discard); deleting `staged_ipr_ = -1` from the
+  ERROR path fails the discard case; moving `promoteStagedBaud()` after the
+  `AT+SHELL` detach loop fails the detach case. A mutation that kills nothing
+  would mean the test cannot reach the defect it exists for.
+- **The ONLINE promote branch remains hardware-verified only.** Reaching it
+  needs `doDial()` to succeed, which needs a socket; the native suite has
+  none. Its evidence is the three dials recorded in the 2026-09-19 entry
+  above, where `CONNECT` was readable at the old rate on every trial.
+
+Native suite after the seam: 413 cases, 398 succeeded, 10 skipped, the same
+five pre-existing errored suites (`test_arc_read`, `test_EdUrlParser`,
+`test_hdd_read`, `test_ps2_keys`, `test_strings`). `test_modem_at` went 88 to
+93; nothing else moved, which is the check that matters given the new host
+shims sit on every native suite's include path.
 
 ## Recent Changes (September 17, 2026)
 

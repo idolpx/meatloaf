@@ -313,6 +313,16 @@ build_flags =
     ; and libtelnet's header for the negotiation filter (Task 6).
     -I lib/modem
     -I lib/telnet
+    ; test_modem_at also compiles lib/modem/modem.cpp itself, to cover
+    ; executeLine()'s AT+IPR staging. It includes mlConfig.h (which includes
+    ; <json.hpp>) and console_baud.h. These are the REAL headers on purpose:
+    ; the suite supplies only the BODIES (modem_host_stubs.cpp), so a change to
+    ; either contract breaks the build instead of leaving the test asserting
+    ; against a contract the firmware no longer has. Nothing else in lib/console
+    ; or lib/config-ml is compiled natively.
+    -I lib/config-ml
+    -I lib/console
+    -I components/nlohmann
     -I test/native/test_archive_extract/host
     -include test/native/test_archive_extract/host/host_posix_compat.h
     ;-lgcov

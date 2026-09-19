@@ -42,6 +42,14 @@
 
 #include "at_parser.h"
 
+// The engine itself, for the AT+IPR staging tests at the bottom of this file.
+// modem.h is only declarations here; the definitions come from modem.cpp,
+// compiled into this suite by engine_sources.cpp. modem_baud_fake.h is the
+// seam those tests observe through.
+#include "modem.h"
+#include "modem_port.h"
+#include "modem_baud_fake.h"
+
 void setUp(void) {}
 void tearDown(void) {}
 
@@ -1540,6 +1548,180 @@ void test_telnet_stream_waitreadable_does_not_hot_spin_on_an_instant_inner(void)
         "waitReadable() spun without yielding -- the per-slice sleep remainder is missing");
 }
 
+// ------------------------------------------------- executeLine baud staging
+//
+// The one part of lib/modem that needs the engine itself, not a pure unit.
+// modem.cpp is compiled into this suite (see engine_sources.cpp) against host
+// stubs for FreeRTOS, the radio and the config filesystem, with the REAL
+// lib/console/console_baud.h declarations and test-supplied bodies
+// (modem_host_stubs.cpp).
+//
+// All four behaviours below are about ORDER, so each asserts from INSIDE
+// consoleBaudSetPending() via ModemBaudFake::on_promote. An assertion made
+// after executeLine() returns would pass against the very code this staging
+// replaced -- the version that published the rate inside the AT+IPR handler,
+// leaving the pump free to retune the line while the reply was still an
+// unbuilt std::string.
+
+struct ModemTestAccess
+{
+    static void reset(Modem &m)
+    {
+        m.state_ = ModemState::COMMAND;
+        m.staged_ipr_ = -1;
+        m.settings_.factory();
+        m.last_line_.clear();
+        m.cmd_buf_.clear();
+        m.conn_.reset();
+    }
+
+    static void line(Modem &m, const std::string &s) { m.executeLine(s); }
+    static long staged(const Modem &m) { return m.staged_ipr_; }
+};
+
+static std::string modem_drain_tx(ModemPort &p)
+{
+    std::string out;
+    uint8_t buf[256];
+    size_t n;
+    while ((n = p.popTx(buf, sizeof(buf), 0)) > 0)
+        out.append(reinterpret_cast<const char *>(buf), n);
+    return out;
+}
+
+// RAII, so a failed assertion cannot leave the process-wide `modem` object
+// holding a pointer to a port that is about to go out of scope.
+class ModemTestPort
+{
+public:
+    ModemTestPort()
+    {
+        port_.begin();
+        modem.attach(&port_);
+        port_.setAttached(true);
+        ModemTestAccess::reset(modem);
+        ModemBaudFake::reset();
+    }
+    ~ModemTestPort()
+    {
+        ModemBaudFake::on_promote = nullptr;
+        modem.detach(&port_);
+    }
+
+    ModemPort &port() { return port_; }
+
+private:
+    ModemPort port_;
+};
+
+void test_ipr_publishes_the_rate_only_after_the_reply_is_queued(void)
+{
+    ModemTestPort fixture;
+
+    std::string tx_at_promote;
+    ModemBaudFake::on_promote = [&]() { tx_at_promote = modem_drain_tx(fixture.port()); };
+
+    ModemTestAccess::line(modem, "AT+IPR=2400");
+
+    TEST_ASSERT_EQUAL_INT(1, ModemBaudFake::promote_count);
+    TEST_ASSERT_EQUAL_INT(2400, ModemBaudFake::pending);
+    TEST_ASSERT_TRUE_MESSAGE(
+        tx_at_promote.find("OK") != std::string::npos,
+        "the rate was published before this line's own OK reached the port. "
+        "modem_shell_pump() applies a pending rate as soon as it sees one, so "
+        "the OK would be clocked out at the new rate as garbage");
+}
+
+void test_a_line_that_fails_after_staging_a_rate_never_publishes_it(void)
+{
+    ModemTestPort fixture;
+
+    // +IPR stages, then X9 fails its 0..4 range check, so the line answers
+    // ERROR. A baud change is the one setting that must NOT half-apply: every
+    // other one is observable in band via ATI1, while this one retunes the
+    // channel the ERROR was just reported on, leaving the user reading ERROR
+    // at the old rate and then silence.
+    ModemTestAccess::line(modem, "AT+IPR=2400X9");
+
+    TEST_ASSERT_EQUAL_INT(0, ModemBaudFake::promote_count);
+    TEST_ASSERT_EQUAL_INT(-1, (int)ModemTestAccess::staged(modem));
+
+    std::string reply = modem_drain_tx(fixture.port());
+    TEST_ASSERT_TRUE(reply.find("ERROR") != std::string::npos);
+
+    // The discriminating half. Dropping `staged_ipr_ = -1` from the failure
+    // path leaves the rate on the object rather than publishing it here -- so
+    // the assertions above still pass, and the rate is published by the NEXT
+    // line instead. A bare AT is what a user types after reading ERROR.
+    ModemTestAccess::line(modem, "AT");
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+        0, ModemBaudFake::promote_count,
+        "a rate staged by a line that FAILED was published by the next "
+        "successful line -- the discard on the error path is missing");
+}
+
+void test_at_shell_publishes_the_rate_before_it_detaches_the_ports(void)
+{
+    ModemTestPort fixture;
+
+    bool still_attached_at_promote = false;
+    ModemBaudFake::on_promote =
+        [&]() { still_attached_at_promote = fixture.port().attached(); };
+
+    // The one line that must promote BEFORE its reply, and the reason is the
+    // pump's shape rather than the reply's: the pump leaves its loop only once
+    // attached_ is false, then drains once, calls consoleBaudApplyPending()
+    // once, and returns. A promotion landing after that is stranded in the
+    // process-global pending slot and applied by whichever session next runs a
+    // pump -- one that never asked for it.
+    ModemTestAccess::line(modem, "AT+IPR=2400+SHELL");
+
+    TEST_ASSERT_EQUAL_INT(1, ModemBaudFake::promote_count);
+    TEST_ASSERT_EQUAL_INT(2400, ModemBaudFake::pending);
+    TEST_ASSERT_TRUE_MESSAGE(
+        still_attached_at_promote,
+        "AT+SHELL published the staged rate after detaching the ports. The "
+        "pump has already made its one applyPending() call by then, so the "
+        "rate strands and retunes an unrelated later session");
+
+    // And the detach did still happen -- otherwise the assertion above would
+    // also pass for a build where AT+SHELL simply stopped working.
+    TEST_ASSERT_FALSE(fixture.port().attached());
+}
+
+void test_ipr_stages_nothing_on_a_console_that_has_no_uart(void)
+{
+    ModemTestPort fixture;
+    ModemBaudFake::supported = false;   // USB-Serial-JTAG or USB-CDC board
+
+    ModemTestAccess::line(modem, "AT+IPR=2400");
+
+    TEST_ASSERT_EQUAL_INT(0, ModemBaudFake::promote_count);
+    TEST_ASSERT_EQUAL_INT(-1, (int)ModemTestAccess::staged(modem));
+
+    std::string reply = modem_drain_tx(fixture.port());
+    TEST_ASSERT_TRUE_MESSAGE(
+        reply.find("ERROR") != std::string::npos,
+        "a console with no UART must refuse, not accept a rate it will "
+        "silently discard");
+}
+
+void test_a_bare_ipr_query_reports_the_rate_and_stages_nothing(void)
+{
+    ModemTestPort fixture;
+    ModemBaudFake::current = 9600;
+
+    ModemTestAccess::line(modem, "AT+IPR?");
+
+    TEST_ASSERT_EQUAL_INT(0, ModemBaudFake::promote_count);
+    TEST_ASSERT_EQUAL_INT(-1, (int)ModemTestAccess::staged(modem));
+
+    std::string reply = modem_drain_tx(fixture.port());
+    TEST_ASSERT_TRUE(reply.find("9600") != std::string::npos);
+    TEST_ASSERT_TRUE(reply.find("OK") != std::string::npos);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1638,6 +1820,12 @@ int main(int, char **)
     RUN_TEST(test_telnet_stream_eos_lazy_opens_a_fresh_stream);
     RUN_TEST(test_telnet_stream_waitreadable_lazy_opens_a_fresh_stream);
     RUN_TEST(test_telnet_stream_waitreadable_does_not_hot_spin_on_an_instant_inner);
+
+    RUN_TEST(test_ipr_publishes_the_rate_only_after_the_reply_is_queued);
+    RUN_TEST(test_a_line_that_fails_after_staging_a_rate_never_publishes_it);
+    RUN_TEST(test_at_shell_publishes_the_rate_before_it_detaches_the_ports);
+    RUN_TEST(test_ipr_stages_nothing_on_a_console_that_has_no_uart);
+    RUN_TEST(test_a_bare_ipr_query_reports_the_rate_and_stages_nothing);
 
     return UNITY_END();
 }
