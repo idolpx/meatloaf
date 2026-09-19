@@ -56,7 +56,12 @@ systemBus::systemBus() :
                 0xFF,
 #endif
                 0xFF,
+#ifdef IEC_SPLIT_SRQ
+                PIN_IEC_SRQ_IN==GPIO_NUM_NC  ? 0xFF : PIN_IEC_SRQ_IN,
+                PIN_IEC_SRQ_OUT==GPIO_NUM_NC ? 0xFF : PIN_IEC_SRQ_OUT)
+#else
                 PIN_IEC_SRQ==GPIO_NUM_NC   ? 0xFF : PIN_IEC_SRQ)
+#endif
 {
 #ifdef IEC_SUPPORT_PARALLEL
 #ifdef IEC_SUPPORT_PARALLEL_XRA1405
