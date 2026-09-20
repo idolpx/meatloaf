@@ -94,6 +94,7 @@ public:
     const char * get_current_detail_str();
     int get_current_bssid(uint8_t bssid[6]);
     std::string get_current_bssid_str();
+    int get_current_rssi(int8_t &rssi);
     int get_mac(uint8_t mac[6]);
     std::string get_mac_str();
     uint8_t scan_networks(uint8_t maxresults = FNWIFI_SCAN_RESULTS_MAX);

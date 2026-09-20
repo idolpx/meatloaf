@@ -181,6 +181,11 @@ protected:
     void net_get_wifi_status_basic();
     void net_get_wifi_status_raw();
 
+    // Meatloaf-only, no raw/FUJICMD opcode (BASIC command channel only, like wifienable/wifidisable)
+    void net_wifi_connect_basic();
+    void net_wifi_disconnect_basic();
+    void net_wifi_rssi_basic();
+
     // 0xF9
     bool mount_host(int hs);
     void mount_host_basic();
