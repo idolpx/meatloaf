@@ -282,6 +282,12 @@ void iecFuji::process_basic_commands()
         { Config.store_wifi_enabled(false); Config.save(); }
     else if (payload.find("wifistatus") != std::string::npos)
         net_get_wifi_status_basic();
+    else if (payload.find("wifirssi") != std::string::npos)
+        net_wifi_rssi_basic();
+    else if (payload.find("wifidisconnect") != std::string::npos)
+        net_wifi_disconnect_basic();
+    else if (payload.find("wificonnect") != std::string::npos)
+        net_wifi_connect_basic();
     else if (payload.find("mounthost") != std::string::npos)
         mount_host_basic();
     else if (payload.find("unmountdrive") != std::string::npos)
@@ -788,6 +794,43 @@ void iecFuji::net_get_wifi_status_basic()
 {
     response = net_get_wifi_status() == 3 ? "connected" : "disconnected";
     set_fuji_iec_status(0, "ok");
+}
+
+void iecFuji::net_wifi_connect_basic()
+{
+    // Reconnect using whatever SSID/password is already stored (Config), same as
+    // the "connect" command on the serial debug console with no arguments.
+    Debug_println("Fuji cmd: WIFI CONNECT");
+    int e = fnWiFi.connect();
+    response = (e == 0) ? "connected" : "failed";
+    set_fuji_iec_status(e == 0 ? 0 : NETWORK_ERROR_NOT_CONNECTED, response);
+}
+
+void iecFuji::net_wifi_disconnect_basic()
+{
+    Debug_println("Fuji cmd: WIFI DISCONNECT");
+    fnWiFi.stop();
+    response = "disconnected";
+    set_fuji_iec_status(0, response);
+}
+
+void iecFuji::net_wifi_rssi_basic()
+{
+    // Signal strength (dBm) of the AP we're currently associated with.
+    // Typical range is about -30 (excellent) to -90 (unusable).
+    int8_t rssi = 0;
+    int e = fnWiFi.connected() ? fnWiFi.get_current_rssi(rssi) : -1;
+
+    if (e == 0)
+    {
+        response = std::to_string((int)rssi);
+        set_fuji_iec_status(0, "ok");
+    }
+    else
+    {
+        response = "not connected";
+        set_fuji_iec_status(NETWORK_ERROR_NOT_CONNECTED, response);
+    }
 }
 
 void iecFuji::net_get_wifi_enabled_raw()

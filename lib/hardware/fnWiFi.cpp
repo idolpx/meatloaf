@@ -657,6 +657,17 @@ int WiFiManager::get_current_bssid(uint8_t bssid[6])
     return e;
 }
 
+int WiFiManager::get_current_rssi(int8_t &rssi)
+{
+    wifi_ap_record_t apinfo;
+    esp_err_t e = esp_wifi_sta_get_ap_info(&apinfo);
+
+    if (ESP_OK == e)
+        rssi = apinfo.rssi;
+
+    return e;
+}
+
 std::string WiFiManager::get_current_bssid_str()
 {
     wifi_ap_record_t apinfo;
