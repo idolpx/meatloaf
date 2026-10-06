@@ -14,6 +14,8 @@ namespace ESP32Console::Commands
 
     const ConsoleCommand getRunCommand();
 
+    const ConsoleCommand getBaudCommand();
+
     const ConsoleCommand getRebootCommand();
 
     const ConsoleCommand getExitCommand();

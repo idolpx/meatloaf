@@ -25,6 +25,9 @@
 #include "lwip/sockets.h"
 #include "lwip/netdb.h"
 
+#include <fcntl.h>
+#include <esp_timer.h>
+
 #include "meatloaf.h"
 #include "meat_session.h"
 
@@ -38,13 +41,105 @@ class MeatSocket {
     uint8_t iecPort = 0;
     bool blocking = false;
 
+private:
+    // A connect bounded by timeout_ms. Returns 0 on success and -1 on failure
+    // with errno set to something worth logging (ETIMEDOUT when the bound
+    // expired), so the caller's existing failure path reads the same either way.
+    //
+    // The descriptor is restored to BLOCKING on every exit, success included.
+    // write() calls send() with no flags, so a descriptor left O_NONBLOCK would
+    // answer EAGAIN instead of blocking -- and only on dials that set a bound,
+    // which is the worst shape of divergence: the default path stays correct
+    // and nobody notices.
+    int connectBounded(struct sockaddr_in &dest_addr, uint32_t timeout_ms)
+    {
+        int flags = fcntl(sock, F_GETFL, 0);
+        if (flags < 0 || fcntl(sock, F_SETFL, flags | O_NONBLOCK) < 0)
+        {
+            // Cannot go non-blocking. Dial unbounded rather than refuse to dial
+            // at all -- an unbounded connect is what this did before.
+            return connect(sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
+        }
+
+        int err = connect(sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
+        if (err == 0)
+        {
+            fcntl(sock, F_SETFL, flags);
+            return 0;
+        }
+
+        // A refused port answers HERE, immediately, not through select() --
+        // loopback does exactly that with errno 104. Only EINPROGRESS means
+        // "ask again later"; anything else is the real answer already, and
+        // waiting out the bound would turn a one-second failure into a slow one
+        // and replace its errno with whatever SO_ERROR reports.
+        if (errno != EINPROGRESS)
+        {
+            int saved = errno;
+            fcntl(sock, F_SETFL, flags);
+            errno = saved;
+            return -1;
+        }
+
+        // An ABSOLUTE deadline, because select() may return early: one call is
+        // not the bound, it has to be re-armed with the time that is left.
+        int64_t deadline = esp_timer_get_time() + (int64_t)timeout_ms * 1000;
+        for (;;)
+        {
+            int64_t left = deadline - esp_timer_get_time();
+            if (left <= 0)
+            {
+                fcntl(sock, F_SETFL, flags);
+                errno = ETIMEDOUT;
+                return -1;
+            }
+
+            struct timeval tv;
+            tv.tv_sec = (time_t)(left / 1000000);
+            tv.tv_usec = (suseconds_t)(left % 1000000);
+
+            fd_set wfds;
+            FD_ZERO(&wfds);
+            FD_SET(sock, &wfds);
+
+            // nfds is the highest descriptor PLUS ONE. Passing sock alone never
+            // reports ready, which presents as the bound always firing.
+            int r = select(sock + 1, NULL, &wfds, NULL, &tv);
+            if (r > 0)
+            {
+                int so_err = 0;
+                socklen_t len = sizeof(so_err);
+                if (getsockopt(sock, SOL_SOCKET, SO_ERROR, &so_err, &len) < 0)
+                    so_err = errno;
+                fcntl(sock, F_SETFL, flags);
+                if (so_err != 0)
+                {
+                    errno = so_err;
+                    return -1;
+                }
+                return 0;
+            }
+            if (r == 0 || errno == EINTR)
+                continue;  // expired or woken early: re-arm with what is left
+
+            int saved = errno;
+            fcntl(sock, F_SETFL, flags);
+            errno = saved;
+            return -1;
+        }
+    }
+
 public:
     MeatSocket() {};
     MeatSocket(int s, uint8_t iecp) : sock(s), iecPort(iecp) {
         // for socket created by our server
     }
 
-    bool open(const char *address, u16_t port) {
+    // timeout_ms bounds the connect. Zero means UNBOUNDED, which is exactly
+    // what every caller got before this parameter existed -- real modems split
+    // on what S7=0 should mean, and preserving the old behaviour is the reading
+    // that cannot regress anything. Only the modem passes a non-zero value.
+    bool open(const char *address, u16_t port, uint32_t timeout_ms = 0) {
         struct sockaddr_in dest_addr;
         memset(&dest_addr, 0, sizeof(dest_addr));
         dest_addr.sin_family = AF_INET;
@@ -52,15 +147,55 @@ public:
         dest_addr.sin_addr.s_addr = inet_addr(address);
         //Debug_printv("dest_addr.sin_addr.s_addr=%x", dest_addr.sin_addr.s_addr);
         if (dest_addr.sin_addr.s_addr == 0xffffffff) {
-            struct hostent *hp;
-            hp = gethostbyname(address);
-            if (hp == NULL) {
-                Debug_printv("TCP Client Error: Connect to %s", address);
+            // Resolve with an explicit AF_INET hint. This was gethostbyname(),
+            // whose answer carries the family it found in h_addrtype -- and the
+            // old code never read it, casting whatever came back to an
+            // ip4_addr. CONFIG_LWIP_IPV6 is enabled on these boards and lwIP's
+            // default resolution order falls through to AAAA when a host has no
+            // A record, so an IPv6-only name had the first FOUR bytes of a
+            // 16-byte address used as an IPv4 address. That is not a failure
+            // anything reports: it connects to an unrelated address, or fails
+            // with EHOSTUNREACH, which the modem shows as NO ANSWER --
+            // indistinguishable from a host that is simply down. Reproduced on
+            // hardware with ipv6.google.com, which answers AAAA only.
+            //
+            // The hint does better here than merely checking h_addrtype would:
+            // a DUAL-STACK host still resolves, because getaddrinfo returns its
+            // A record rather than failing on the AAAA. An IPv6-only host now
+            // fails cleanly and says so -- this socket is AF_INET throughout,
+            // so it could never have reached one anyway.
+            struct addrinfo hints;
+            memset(&hints, 0, sizeof(hints));
+            hints.ai_family = AF_INET;
+            hints.ai_socktype = SOCK_STREAM;
+
+            struct addrinfo *res = NULL;
+            int rc = getaddrinfo(address, NULL, &hints, &res);
+
+            struct sockaddr_in *found = NULL;
+            for (struct addrinfo *ai = res; ai != NULL; ai = ai->ai_next) {
+                if (ai->ai_family == AF_INET && ai->ai_addr != NULL) {
+                    found = (struct sockaddr_in *)ai->ai_addr;
+                    break;
+                }
+            }
+
+            if (rc != 0 || found == NULL) {
+                Debug_printv("TCP Client Error: no IPv4 address for %s (rc %d)",
+                             address, rc);
+                if (res != NULL)
+                    freeaddrinfo(res);
                 return false;
             }
-            struct ip4_addr *ip4_addr;
-            ip4_addr = (struct ip4_addr *)hp->h_addr;
-            dest_addr.sin_addr.s_addr = ip4_addr->addr;
+
+            dest_addr.sin_addr.s_addr = found->sin_addr.s_addr;
+            freeaddrinfo(res);
+
+            // Log what the name actually became. A wrong answer here is
+            // otherwise invisible -- it surfaces four layers up as NO ANSWER,
+            // which is where the whole of this bug hid.
+            Debug_printv("resolved %s to %s", address,
+                         inet_ntoa(dest_addr.sin_addr));
         }
         
         sock =	socket(AF_INET, SOCK_STREAM, IPPROTO_IP); // SCOK_STREAM = TCP/IP SOCK_DGRAM = UDP
@@ -70,10 +205,28 @@ public:
         }
         //Debug_printv("Socket created, connecting to %s:%d (%x)", address, port, dest_addr.sin_addr.s_addr);
 
-        int err = connect(sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
+        int err = (timeout_ms == 0)
+                      ? connect(sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6))
+                      : connectBounded(dest_addr, timeout_ms);
 
         if (err != 0) {
             Debug_printv("Socket unable to connect: errno %d", errno);
+            // Close it here, because nothing else will. TCPMSession::disconnect()
+            // returns early unless `connected` is set, and a failed connect()
+            // never sets it -- so the session destructor does not clean this up
+            // and every failed dial cost a descriptor permanently. Measured on a
+            // freenove-esp32-s3-wroom-1: eleven refused dials exhausted all 16
+            // sockets (CONFIG_LWIP_MAX_SOCKETS) and the twelfth could not create
+            // one at all (errno 23), leaving the board unable to open any
+            // connection until it was rebooted.
+            //
+            // Resetting sock matters as much as closing it: isOpen() is
+            // `sock != -1`, so the object would otherwise report itself OPEN on a
+            // dead descriptor. closesocket() directly rather than the member
+            // close(), because shutdown() is meaningless on a connection that was
+            // never established.
+            closesocket(sock);
+            sock = -1;
             return false;
         }
         Debug_printv("After connect for socket");
@@ -145,7 +298,7 @@ public:
             return false;
         }
 
-        if (!_socket.open(host.c_str(), port)) {
+        if (!_socket.open(host.c_str(), port, connect_timeout_ms)) {
             Debug_printv("TCPMSession connect failed for %s:%d", host.c_str(), port);
             connected = false;
             return false;
@@ -304,6 +457,10 @@ public:
     TCPMStream(std::string path): MStream(path) {
         //url = path;
     };
+
+    // Bounds the connect this stream is about to make. It has to be set
+    // BEFORE open(), because the session is obtained and connected inside it.
+    void setConnectTimeout(uint32_t ms) override { connect_timeout_ms_ = ms; }
     ~TCPMStream() {
         close();
     };
@@ -332,10 +489,18 @@ public:
             _session->disconnect();
             _session.reset();
         }
+        open_ = false;
+        eof_ = false;
     }
 
     bool open(std::ios_base::openmode mode) override {
-        if (isOpen()) {
+        // `open_`, not `isOpen()`. Once the remote has hung up isOpen() answers
+        // false for good, and guarding on it here would make every later read()
+        // re-obtain the session and re-connect -- an endless redial on a
+        // connection the peer has finished with. open_ is true from the first
+        // successful open until an explicit close(), which is exactly when
+        // lazy-opening is wanted. Same reasoning as TelnetMStream::read().
+        if (open_) {
             return true;
         }
 
@@ -346,11 +511,20 @@ public:
         }
 
         uint16_t tcp_port = p->getPort();
-        _session = SessionBroker::obtain<TCPMSession>(p->host, tcp_port);
+        _session = SessionBroker::obtain<TCPMSession>(p->host, tcp_port,
+                                                      connect_timeout_ms_);
         if (!_session) {
             Debug_printv("TCPMStream: failed to obtain session for %s:%d", p->host.c_str(), tcp_port);
             return false;
         }
+
+        // The session is shared per host:port, so this is set every time rather
+        // than once at construction: a later dial with a different S7 must get
+        // its own bound, not the one the first caller happened to leave.
+        // Also set on the session object itself. obtain() already applied it to
+        // a session it CREATED; this covers one it returned from the repo,
+        // which is already connected now but may reconnect later.
+        _session->connect_timeout_ms = connect_timeout_ms_;
 
         if (!_session->connect()) {
             Debug_printv("TCPMStream: failed to connect to %s:%d", p->host.c_str(), tcp_port);
@@ -360,29 +534,59 @@ public:
 
         _session->acquireIO();
 
+        open_ = true;
+        eof_ = false;
+
         return true;
     }
 
     // MStream methods
     uint32_t read(uint8_t* buf, uint32_t size) override {
-        if (!isOpen() && !open(std::ios_base::in)) {
+        if (!open_ && !open(std::ios_base::in)) {
             return 0;
         }
-        return _session->socket()->read(buf, size);
+        if (eof_) {
+            return 0;
+        }
+
+        int got = _session->socket()->read(buf, size);
+
+        // recv(2) returning exactly 0 is an orderly shutdown by the remote --
+        // genuine EOF, not "no data right now", which comes back as
+        // _MEAT_NO_DATA_AVAIL instead. The local descriptor stays valid after a
+        // remote FIN, so isOpen() below cannot tell on its own: this is the only
+        // place the hangup is observable. Without it a dialled tcp:// connection
+        // never reported NO CARRIER and ATO answered CONNECT on a dead socket.
+        if (got == 0 && size > 0) {
+            eof_ = true;
+        }
+
+        return (uint32_t)got;
     }
     uint32_t write(const uint8_t *buf, uint32_t size) override {
-        if (!isOpen() && !open(std::ios_base::out)) {
+        if (!open_ && !open(std::ios_base::out)) {
             return 0;
         }
         return _session->socket()->write(buf, size);
     }
 
     bool isOpen() {
-        return _session && _session->isConnected() && _session->socket()->isOpen();
+        return open_ && !eof_ && _session && _session->isConnected() &&
+               _session->socket()->isOpen();
     }
 
 protected:
     std::shared_ptr<TCPMSession> _session;
+
+    // True from the first successful open() until close(); see open().
+    bool open_ = false;
+    // The remote performed an orderly shutdown. Set by read() and never
+    // cleared except by open()/close() -- a closed TCP connection never
+    // produces another byte.
+    bool eof_ = false;
+    // Bound for the connect open() makes. 0 = unbounded, which is what every
+    // consumer that never calls setConnectTimeout() keeps getting.
+    uint32_t connect_timeout_ms_ = 0;
 };
 
 

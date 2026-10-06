@@ -19,10 +19,11 @@
 namespace ps2dev
 {
 
-  // Time per clock should be 60 to 100 microseconds according to PS/2 specifications.
-  // Thus, half period should be 30 to 50 microseconds.
-  const uint32_t CLK_HALF_PERIOD_MICROS = 40;
-  const uint32_t CLK_QUATER_PERIOD_MICROS = CLK_HALF_PERIOD_MICROS / 2;
+  // KeyboardTwister's DTV-proven bit cell is 15us setup, 38us CLK low and
+  // 15us recovery. `ps2 speed` scales that waveform at runtime.
+  extern uint32_t CLK_HALF_PERIOD_MICROS;
+  extern uint32_t CLK_QUATER_PERIOD_MICROS;
+  void set_clk_half_period_us(uint32_t half_period_us);
   // I could not find any specification of time between bytes from the PS/2 specification.
   // Based on observation of the mouse signal waveform using an oscilloscope, there appears to be an interval of 1 to 2 clock cycles.
   // ref. https://youtu.be/UqRDLWGLCEk

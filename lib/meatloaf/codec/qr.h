@@ -48,7 +48,7 @@ class QRMStream: public MStream
         uint8_t version = 0; // default version
         uint8_t ecc = ECC_HIGH;     // default ecc
 
-        Debug_printv("data[%s]", data.c_str());
+        //Debug_printv("data[%s]", data.c_str());
         auto d = util_tokenize(data, '/');
         if ( d.size() > 1 ) {
             if (mstr::isNumeric(d[0]))
@@ -66,7 +66,7 @@ class QRMStream: public MStream
             }
         }
 
-        Debug_printv("qrcode version[%d] ecc[%d] data[%s]", version, (qr_ecc_t)ecc, data.c_str());
+        //Debug_printv("qrcode version[%d] ecc[%d] data[%s]", version, (qr_ecc_t)ecc, data.c_str());
         // uint16_t len = data.size();
         // void *b45data = malloc(len * 3);
         // void *b45data_len = malloc(sizeof(uint16_t));
@@ -94,6 +94,7 @@ public:
         //url = path;
         path = mstr::drop(path, 4); // drop "QR:/"
         _size = generate(path);
+        Debug_printv("Generated QR code of size[%d]", _size);
     }
 
      // MStream methods

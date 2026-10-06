@@ -25,6 +25,7 @@
 #include "led_strip.h"
 #include "ps2.h"
 #endif
+#include "ps2.h"
 
 class iecMeatloaf : public iecDrive, public iecFuji
 {

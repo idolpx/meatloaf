@@ -12,12 +12,15 @@ PS2KeyboardDevice::PS2KeyboardDevice()
 {
 }
 
-// Boot: read config and nothing else.  Allocating here would defeat the
-// point of the lazy start -- the two tasks cost ~8 KB of INTERNAL DRAM,
-// which is the scarce kind on this platform.
+// Boot: read config, then bring the device up immediately if config says
+// enabled -- a host wired directly to CLK/DATA (no adapter reset pulse) has
+// no other way to make us start talking, so waiting for the first `ps2
+// type`/`ps2 start` left it stuck at running[0] after every reboot.
 void PS2KeyboardDevice::start()
 {
     reloadConfig();
+    if (_enabled)
+        ensureStarted();
 }
 
 void PS2KeyboardDevice::reloadConfig()
@@ -33,13 +36,18 @@ void PS2KeyboardDevice::reloadConfig()
     // nlohmann's value() THROWS when the node is not an object, and ESP-IDF
     // builds -fno-exceptions, so a throw here is abort() -- which is exactly
     // how this crashed on boot. Never call value()/operator[] on a config node
-    // without checking its type first.
+    // without checking its type first. This runs from main_setup() before the
+    // console exists, so an abort here leaves nothing able to intervene.
+    //
+    // The legacy scalar is READ, not merely tolerated: a board that had the
+    // keyboard switched on under older firmware carries "ps2": 1, and treating
+    // every non-object as disabled would silently turn it off on upgrade.
     const psram_json &ps2 = devices["ps2"];
     bool want = false;
 
     if (ps2.is_object())
     {
-        want = ps2.value("enabled", 0) != 0;
+        want = json_int(ps2, "enabled", 0) != 0;
     }
     else if (ps2.is_number_integer() || ps2.is_boolean())
     {
@@ -47,19 +55,30 @@ void PS2KeyboardDevice::reloadConfig()
     }
     else
     {
-        Debug_printv("ps2: devices.ps2 has unexpected type; treating as disabled");
+        Debug_printv("ps2: config node is [%s], neither an object nor a number -- keyboard disabled",
+                     ps2.type_name());
     }
 
     // The DTV's scancode-to-C64-key table is a bench finding, so C64 names
     // (runstop, restore, commodore...) are bound here from config rather
     // than guessed in the built-in table.  Only the object form can carry one.
     _overrides.clear();
-    if (ps2.is_object() && ps2.contains("keymap") && ps2["keymap"].is_object())
+    if (ps2.is_object() && ps2.contains("keymap"))
     {
-        const psram_json &km = ps2["keymap"];
-        for (auto it = km.begin(); it != km.end(); ++it)
-            if (it.value().is_string())
-                _overrides[it.key()] = it.value().get<std::string>();
+        // nlohmann iterates a primitive happily, yielding one element -- and
+        // key() on that iterator is type_error.207, another abort. So the
+        // keymap has to BE an object, not merely be present.
+        const psram_json &km = ps2.at("keymap");
+        if (km.is_object())
+        {
+            for (auto it = km.begin(); it != km.end(); ++it)
+                if (it.value().is_string())
+                    _overrides[it.key()] = it.value().get<std::string>();
+        }
+        else
+        {
+            Debug_printv("ps2: keymap is [%s], not an object -- ignored", km.type_name());
+        }
     }
 
     if (!want && _started)
@@ -69,12 +88,12 @@ void PS2KeyboardDevice::reloadConfig()
 
 void PS2KeyboardDevice::persistConfig()
 {
-    auto &entry = mlConfig.data()["devices"]["ps2"];
-    // Same trap as reloadConfig(): subscripting a scalar node throws, and a
-    // throw is abort() here.  Upgrade a legacy "ps2": 0 to the object form
-    // before writing into it.
-    if (!entry.is_object())
-        entry = psram_json::object();
+    // json_object_at, not operator[]: the stale "ps2": 0 node that used to
+    // abort the boot would abort this save too (type_error.305). Chaining it
+    // guards the "devices" node as well, which a bare subscript does not --
+    // so a legacy scalar is upgraded to the object form before it is written
+    // into, at both levels.
+    auto &entry = json_object_at(json_object_at(mlConfig.data(), "devices"), "ps2");
     entry["enabled"] = _enabled ? 1 : 0;
 }
 
@@ -101,6 +120,11 @@ bool PS2KeyboardDevice::startDevice()
     if (_started)
     {
         ok = (_kb.write_wait_idle(0xAA) == 0);
+        if (ok)
+            ESP_LOGI("ps2", "sent BAT 0xAA (re-announce)");
+        else
+            ESP_LOGW("ps2", "BAT 0xAA failed (re-announce) clk[%d] data[%d]",
+                     gpio_get_level(PIN_KB_CLK), gpio_get_level(PIN_KB_DATA));
         Debug_printv("ps2: re-announced BAT, ok[%d]", ok ? 1 : 0);
     }
     else

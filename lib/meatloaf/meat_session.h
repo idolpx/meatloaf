@@ -191,6 +191,12 @@ public:
         // Derived classes should call disconnect() in their destructors
     }
 
+    // Bound for the connect, in milliseconds; 0 means unbounded. A plain
+    // member rather than a parameter on connect(): that virtual is implemented
+    // by every protocol here (FTP, HTTP, SMB, NFS, AFP, ...) and widening its
+    // signature to serve one of them would touch all of them.
+    uint32_t connect_timeout_ms = 0;
+
     // Establish connection to the server
     virtual bool connect() = 0;
 
@@ -504,8 +510,14 @@ public:
     }
 
     // Obtain a session (creates if doesn't exist, returns existing if found)
+    // connect_timeout_ms bounds the connect this call may make, in
+    // milliseconds; 0 (the default, so every existing caller is unchanged)
+    // leaves it unbounded. It has to be a parameter HERE rather than something
+    // the caller sets on the returned session, because obtain() both creates
+    // AND connects: by the time it returns, the connect has already happened.
     template<class T>
-    static std::shared_ptr<T> obtain(std::string host, uint16_t port = 0) {
+    static std::shared_ptr<T> obtain(std::string host, uint16_t port = 0,
+                                     uint32_t connect_timeout_ms = 0) {
         // Construct key directly from scheme, host, and port to avoid creating temporary session
         std::string scheme = T::getScheme();  // e.g., "tnfs", "csip", "ftp"
         std::string key = scheme + "://" + host + ":" + std::to_string(port);
@@ -518,6 +530,7 @@ public:
 
         // Create and connect new session
         auto newSession = std::make_shared<T>(host, port);
+        newSession->connect_timeout_ms = connect_timeout_ms;
         if (newSession->connect()) {
             add(key, newSession);
             return newSession;

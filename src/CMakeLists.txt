@@ -37,6 +37,7 @@ set(INCLUDES
     ${CMAKE_SOURCE_DIR}/lib/http
     ${CMAKE_SOURCE_DIR}/lib/meatloaf
     ${CMAKE_SOURCE_DIR}/lib/media
+    ${CMAKE_SOURCE_DIR}/lib/modem
     ${CMAKE_SOURCE_DIR}/lib/network-protocol
     ${CMAKE_SOURCE_DIR}/lib/printer-emulator
     ${CMAKE_SOURCE_DIR}/lib/qrcode
@@ -102,6 +103,7 @@ FILE(GLOB_RECURSE SOURCES
     ${CMAKE_SOURCE_DIR}/lib/meatloaf/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/media/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/media/**/*.cpp
+    ${CMAKE_SOURCE_DIR}/lib/modem/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/network-protocol/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/printer-emulator/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/qrcode/*.c

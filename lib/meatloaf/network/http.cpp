@@ -1811,6 +1811,16 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     if ( _http == nullptr )
         return 0;
 
+    // _error belongs to THIS attempt.  HTTP_EVENT_ERROR sets it from the event
+    // handler and nothing else ever cleared it — not init(), which resets
+    // _size/_position/lastRC and leaves _error alone.  So a keep-alive the
+    // server had already dropped (an EXPECTED condition that
+    // processRedirectsAndOpen() recovers from by reconnecting) left _error set
+    // straight through the successful retry, and the
+    // `lastRC > 399 || _error != 0` test there then failed a perfectly good
+    // 200.  The caller saw _is_open == 0 and the C64 got a zero-byte LOAD.
+    _error = 0;
+
     // Set URL and Method
     mstr::replaceAll(url, " ", "%20");
     //Debug_printv("method[%d] url[%s]", method, url.c_str());

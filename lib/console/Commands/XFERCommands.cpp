@@ -33,48 +33,7 @@ static inline void *psram_malloc(size_t sz) {
 #define ChunkSize              64   //bytes to send in chunk before ack
 #define ChunkAckChar          '+'   //char sent to ack chunk
 
-// rx/tx move raw binary data over the console, but the console driver is
-// configured (console_settings.c) for interactive terminal use: RX turns a
-// bare '\r' into '\n' (ESP_LINE_ENDINGS_CR), and TX expands '\n' to '\r\n'
-// (ESP_LINE_ENDINGS_CRLF). Both silently corrupt raw bytes that happen to
-// contain '\r'/'\n'. Disable both for the duration of the transfer and
-// restore the interactive defaults on scope exit, including early returns.
-static void set_console_rx_line_endings(esp_line_endings_t mode)
-{
-#if defined(CONFIG_ESP_CONSOLE_UART_DEFAULT) || defined(CONFIG_ESP_CONSOLE_UART_CUSTOM)
-    uart_vfs_dev_port_set_rx_line_endings(CONFIG_ESP_CONSOLE_UART_NUM, mode);
-#elif defined(CONFIG_ESP_CONSOLE_USB_CDC)
-    esp_vfs_dev_cdcacm_set_rx_line_endings(mode);
-#elif defined(CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG)
-    usb_serial_jtag_vfs_set_rx_line_endings(mode);
-#endif
-}
-
-static void set_console_tx_line_endings(esp_line_endings_t mode)
-{
-#if defined(CONFIG_ESP_CONSOLE_UART_DEFAULT) || defined(CONFIG_ESP_CONSOLE_UART_CUSTOM)
-    uart_vfs_dev_port_set_tx_line_endings(CONFIG_ESP_CONSOLE_UART_NUM, mode);
-#elif defined(CONFIG_ESP_CONSOLE_USB_CDC)
-    esp_vfs_dev_cdcacm_set_tx_line_endings(mode);
-#elif defined(CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG)
-    usb_serial_jtag_vfs_set_tx_line_endings(mode);
-#endif
-}
-
-class ConsoleRawIOGuard
-{
-public:
-    ConsoleRawIOGuard()
-    {
-        set_console_rx_line_endings(ESP_LINE_ENDINGS_LF);
-        set_console_tx_line_endings(ESP_LINE_ENDINGS_LF);
-    }
-    ~ConsoleRawIOGuard()
-    {
-        set_console_rx_line_endings(ESP_LINE_ENDINGS_CR);
-        set_console_tx_line_endings(ESP_LINE_ENDINGS_CRLF);
-    }
-};
+#include "../console_rawio.h"
 
 // Reads a single byte from the console's stdin, regardless of the underlying
 // transport (UART, USB-Serial-JTAG, USB-CDC) - unlike driver-specific calls
