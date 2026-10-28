@@ -209,7 +209,58 @@ def patch_esp_http_client_raw_len(idf_dir):
     print("patch_framework: applied raw_data-null-guard to esp_http_client.c")
 
 
+def patch_sdspi_crc_retry(idf_dir):
+    """Backport the ESP-IDF retry for cards which reject the first SPI CMD59."""
+    marker = "MEATLOAF-PATCH sdspi-crc-retry"
+    source_path = os.path.join(idf_dir, "components", "sdmmc", "sdmmc_sd.c")
+    header_path = os.path.join(
+        idf_dir, "components", "sdmmc", "include", "esp_private", "sdmmc_common.h"
+    )
+    if not os.path.isfile(source_path) or not os.path.isfile(header_path):
+        print("patch_framework: SDMMC sources not found, skipping SDSPI CRC retry")
+        return
+
+    src = _read(source_path)
+    header = _read(header_path)
+    if marker in src or "SDMMC_INIT_SPI_CRC_RETRY_DELAY_MS" in src:
+        return
+
+    delay_anchor = "#define SDMMC_IO_SEND_OP_COND_DELAY_MS      10\n"
+    old = (
+        "    esp_err_t err = sdmmc_send_cmd_crc_on_off(card, true);\n"
+        "    if (err != ESP_OK) {\n"
+    )
+    if delay_anchor not in header or old not in src:
+        print("patch_framework: SDMMC sources do not match the expected shape "
+              "- NOT patched. Check whether the fix is already upstream.")
+        return
+
+    header = header.replace(
+        delay_anchor,
+        delay_anchor + "#define SDMMC_INIT_SPI_CRC_RETRY_DELAY_MS   10\n",
+        1,
+    )
+    src = src.replace(
+        old,
+        "    esp_err_t err = sdmmc_send_cmd_crc_on_off(card, true);\n"
+        "    /* " + marker + ": mirror the bounded retry in current ESP-IDF. */\n"
+        "    if (err == ESP_ERR_NOT_SUPPORTED) {\n"
+        "        ESP_LOGD(TAG, \"%s: enabling CRC failed with 0x%x, trying again\", "
+        "__func__, err);\n"
+        "        vTaskDelay(SDMMC_INIT_SPI_CRC_RETRY_DELAY_MS / portTICK_PERIOD_MS);\n"
+        "        err = sdmmc_send_cmd_crc_on_off(card, true);\n"
+        "    }\n"
+        "    if (err != ESP_OK) {\n",
+        1,
+    )
+
+    _write(header_path, header)
+    _write(source_path, src)
+    print("patch_framework: applied SDSPI CRC retry to ESP-IDF SDMMC")
+
+
 idf = env.PioPlatform().get_package_dir("framework-espidf")
 if idf:
     patch_esp_http_client(idf)
     patch_esp_http_client_raw_len(idf)
+    patch_sdspi_crc_retry(idf)
