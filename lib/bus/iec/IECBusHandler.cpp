@@ -1148,6 +1148,7 @@ void RAMFUNC(IECBusHandler::atnRequest)()
   JDEBUG1();
 
   // falling edge on ATN detected (bus master addressing all devices)
+  m_atnClkLowSeen = false;
   m_flags |= P_ATN;
   m_flags &= ~P_DONE;
 
@@ -1651,6 +1652,16 @@ void IECBusHandler::handleFastLoadProtocols()
 }
 
 
+// We may have been too busy to see CLK low (the host then releases it after 1ms and
+// waits for us with DATA low, set in atnRequest), so don't wait for it indefinitely.
+#define IEC_ATN_CLK_LOW_TIMEOUT 5000
+
+bool IECBusHandler::atnHostReady()
+{
+  return m_atnClkLowSeen || (micros()-m_timeoutStart)>IEC_ATN_CLK_LOW_TIMEOUT;
+}
+
+
 void IECBusHandler::task()
 {
   if( m_hostMode )
@@ -1706,13 +1717,20 @@ void IECBusHandler::task()
       atnRequest();
     } 
 
+  // The host pulls ATN low and then CLK low. The VIC-20 kernal does this with
+  // interrupts enabled ($EE3D, $EE40), so an interrupt between the two leaves ATN
+  // low and CLK high for the length of the handler (measured up to 1.6ms with a
+  // key held down). That looks just like the host releasing CLK to send the first
+  // byte, so only accept CLK high once CLK has been seen low (see atnHostReady).
+  if( (m_flags & P_ATN)!=0 && !readPinCLK() ) m_atnClkLowSeen = true;
+
 #ifdef ESP_PLATFORM
   // see comment in atnRequest function
   if( (m_flags & P_ATN)!=0 && !readPinATN() &&
       (m_timeoutStart==0xFFFFFFFF ? (m_timeoutStart=micros(),false) : (micros()-m_timeoutStart)>100) &&
-      readPinCLK() )
+      readPinCLK() && atnHostReady() )
 #else
-  if( (m_flags & P_ATN)!=0 && !readPinATN() && (micros()-m_timeoutStart)>100 && readPinCLK() )
+  if( (m_flags & P_ATN)!=0 && !readPinATN() && (micros()-m_timeoutStart)>100 && readPinCLK() && atnHostReady() )
 #endif
     {
       // we are under ATN, have waited 100us and the host has released CLK
