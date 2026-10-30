@@ -1228,7 +1228,7 @@ void iecFuji::open_app_key_basic()
     appkey_mode mode = (appkey_mode)val;
 
     // Basic check for valid data
-    if (_current_appkey.creator == 0 || _current_appkey.mode == APPKEYMODE_INVALID)
+    if (creator == 0 || mode == APPKEYMODE_INVALID)
     {
         Debug_println("Invalid app key data");
         response = "invalid app key data";
