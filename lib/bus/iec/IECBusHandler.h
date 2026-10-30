@@ -179,6 +179,7 @@ class IECBusHandler
   void writePinCLK(bool v);
   void writePinDATA(bool v);
   void writePinCTRL(bool v);
+  bool atnHostReady();
   bool waitTimeout(uint16_t timeout, uint8_t cond = 0);
   bool waitPinDATA(bool state, uint16_t timeout = 1000);
   bool waitPinCLK(bool state, uint16_t timeout = 1000);
@@ -194,6 +195,7 @@ class IECBusHandler
   volatile uint16_t m_timeoutDuration;
   volatile uint32_t m_timeoutStart;
   volatile bool m_inTask;
+  volatile bool m_atnClkLowSeen;
   volatile bool m_hostMode;
   bool m_atnInterruptEnabled;
   volatile uint8_t m_flags;
