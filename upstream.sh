@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Usage: upstream.sh [target-branch-if-not-master-or-main]
 #
 # Fetch upstream changes, merge them in with ff-only to our main/master

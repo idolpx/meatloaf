@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/usr/bin/env bash -e
 
 # This script will build the platform target file for all targets found with name platform-<TARGET>
 # which the build.sh script will run a clean build against.
