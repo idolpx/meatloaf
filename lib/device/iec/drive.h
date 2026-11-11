@@ -267,6 +267,11 @@ public:
   void    setStatusCode(uint8_t code, const std::string &msg);
   bool    hasError();
   bool    hasMemExeError();
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+  // Called by the IEC task before FATFS is unmounted. The generation check
+  // keeps this idempotent and also covers a timed-out notification.
+  void handleSdMediaChange() { synchronizeSdMedia(); }
+#endif
 
   fujiHost *m_host;
 
@@ -344,6 +349,11 @@ protected:
   bool positionChannel(uint32_t chan, uint32_t pos, bool within_block);
 
   void set_cwd(std::string path, bool verified = false);
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+  // Returns true after discarding an SD-backed CWD/VDrive/channels because
+  // Card Detect announced a different physical medium.
+  bool synchronizeSdMedia();
+#endif
   void changePartition(int pnum);   // CMD "CP<n>" on a mounted DHD/D1M/D2M/D4M image
 #ifndef DISABLE_TAPE   // MEATLOAF-GATE
   void tapeCommand(std::string command);  // "T-C"/"T-I" on a mounted tape image
@@ -358,6 +368,9 @@ protected:
 //#endif
   uint32_t  m_byteCount;
   uint64_t  m_timeStart;
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+  uint32_t  m_sdMediaGeneration = 0;
+#endif
 
   driveMemory m_memory;
 

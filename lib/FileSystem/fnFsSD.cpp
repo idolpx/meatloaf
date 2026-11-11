@@ -20,11 +20,16 @@
 #include "compat_string.h"
 
 #include <algorithm>
+#include <atomic>
 #include <memory>
 #include <vector>
 
 #include "../../include/debug.h"
 #include "../../include/pinmap.h"
+
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+#include "freertos/semphr.h"
+#endif
 
 #include "utils.h"
 
@@ -54,6 +59,83 @@ FileSystemSDFAT fnSDFAT;
 */
 std::vector<fsdir_entry> _dir_entries;
 uint16_t _dir_entry_current = 0;
+
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+namespace
+{
+StaticSemaphore_t sd_directory_cache_mutex_storage;
+SemaphoreHandle_t sd_directory_cache_mutex =
+    xSemaphoreCreateMutexStatic(&sd_directory_cache_mutex_storage);
+StaticSemaphore_t sd_lifecycle_mutex_storage;
+SemaphoreHandle_t sd_lifecycle_mutex =
+    xSemaphoreCreateMutexStatic(&sd_lifecycle_mutex_storage);
+
+std::atomic<uint32_t> sd_media_generation{1};
+uint32_t sd_cache_generation = 0;
+bool sd_directory_cache_open = false;
+std::atomic<bool> sd_directory_media_mounted{false};
+
+class SdLock
+{
+public:
+    explicit SdLock(SemaphoreHandle_t mutex) : mutex(mutex)
+    {
+        xSemaphoreTake(mutex, portMAX_DELAY);
+    }
+
+    ~SdLock()
+    {
+        xSemaphoreGive(mutex);
+    }
+
+private:
+    SemaphoreHandle_t mutex;
+};
+
+void sd_directory_media_changed(bool mounted)
+{
+    // Publish removal before waiting for an active dir_open() to release the
+    // cache mutex. Its scan checks this state between entries and aborts; only
+    // then may stop() unmount FATFS and detach the SD device.
+    if (!mounted)
+        sd_directory_media_mounted.store(false, std::memory_order_release);
+
+    sd_media_generation.fetch_add(1, std::memory_order_acq_rel);
+
+    if (mounted)
+        sd_directory_media_mounted.store(true, std::memory_order_release);
+
+    SdLock cache_lock(sd_directory_cache_mutex);
+    sd_directory_cache_open = false;
+    sd_cache_generation = 0;
+    _dir_entry_current = 0;
+    _dir_entries.clear();
+}
+
+bool sd_directory_operation_is_current(uint32_t generation)
+{
+    return sd_directory_media_mounted.load(std::memory_order_acquire) &&
+           sd_media_generation.load(std::memory_order_acquire) == generation;
+}
+}
+#endif
+
+uint32_t FileSystemSDFAT::media_generation() const
+{
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    return sd_media_generation.load(std::memory_order_acquire);
+#else
+    return 0;
+#endif
+}
+
+void FileSystemSDFAT::invalidate_media()
+{
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    SdLock lifecycle_lock(sd_lifecycle_mutex);
+    sd_directory_media_changed(false);
+#endif
+}
 
 bool _fssd_fsdir_sort_name_ascend(fsdir_entry &left, fsdir_entry &right)
 {
@@ -127,11 +209,15 @@ time_t _fssd_fatdatetime_to_epoch(WORD ftime, WORD fdate)
 
 bool FileSystemSDFAT::is_dir(const char *path)
 {
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    if (!sd_directory_media_mounted.load(std::memory_order_acquire))
+        return false;
+#endif
     char * fpath = _make_fullpath(path);
     struct stat info;
-    stat(fpath, &info);
+    const int result = stat(fpath, &info);
     free(fpath);
-    return (info.st_mode == S_IFDIR) ? true: false;
+    return result == 0 && info.st_mode == S_IFDIR;
 }
 
 bool FileSystemSDFAT::mkdir(const char* path)
@@ -165,6 +251,17 @@ bool FileSystemSDFAT::rmdir(const char* path)
 bool FileSystemSDFAT::dir_open(const char * path, const char * pattern, uint16_t diropts)
 {
     // TODO: Add pattern and sorting options
+
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    SdLock cache_lock(sd_directory_cache_mutex);
+    if (!sd_directory_media_mounted.load(std::memory_order_acquire))
+        return false;
+
+    const uint32_t opening_generation =
+        sd_media_generation.load(std::memory_order_acquire);
+    sd_directory_cache_open = false;
+    sd_cache_generation = 0;
+#endif
 
 #ifndef ESP_PLATFORM
     Debug_printf("FileSystemSDFAT::dir_open \"%s\"\n", path);
@@ -213,7 +310,11 @@ bool FileSystemSDFAT::dir_open(const char * path, const char * pattern, uint16_t
 #ifdef ESP_PLATFORM
     FILINFO finfo;
 
-    while(f_readdir(&_dir, &finfo) == FR_OK)
+    while(
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+          sd_directory_operation_is_current(opening_generation) &&
+#endif
+          f_readdir(&_dir, &finfo) == FR_OK)
     {
         // An empty name indicates the end of the directory
         if(finfo.fname[0] == '\0')
@@ -258,6 +359,14 @@ bool FileSystemSDFAT::dir_open(const char * path, const char * pattern, uint16_t
         entry->size = finfo.fsize;
         entry->modified_time = _fssd_fatdatetime_to_epoch(finfo.ftime, finfo.fdate);
     }
+
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    if (!sd_directory_operation_is_current(opening_generation))
+    {
+        f_closedir(&_dir);
+        return false;
+    }
+#endif
 // ESP_PLATFORM
 #else
 // !ESP_PLATFORM
@@ -338,11 +447,24 @@ bool FileSystemSDFAT::dir_open(const char * path, const char * pattern, uint16_t
     closedir(_dir);
 #endif
 
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    // A cache is readable only after a complete scan of the currently mounted
+    // card. Card removal invalidates the generation before taking this mutex.
+    sd_cache_generation = opening_generation;
+    sd_directory_cache_open = true;
+#endif
+
     return true;
 }
 
 void FileSystemSDFAT::dir_close()
 {
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    SdLock cache_lock(sd_directory_cache_mutex);
+    sd_directory_cache_open = false;
+    sd_cache_generation = 0;
+#endif
+
     // Throw out any existing directory entry data
     _dir_entries.clear();
     _dir_entries.shrink_to_fit();
@@ -351,10 +473,25 @@ void FileSystemSDFAT::dir_close()
 
 fsdir_entry * FileSystemSDFAT::dir_read()
 {
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    SdLock cache_lock(sd_directory_cache_mutex);
+    if (!sd_directory_cache_open || !sd_directory_operation_is_current(sd_cache_generation))
+        return nullptr;
+#endif
+
     if(_dir_entry_current < _dir_entries.size())
     {
         //Debug_printf("#%d = \"%s\"\r\n", _dir_entry_current, _dir_entries[_dir_entry_current].filename);
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+        // Return the FileSystem-owned stable entry, not a pointer into the
+        // vector. Card removal may now clear the vector without invalidating
+        // an entry already handed to the caller. As with readdir(), callers
+        // must consume this value before their next dir_read() call.
+        _direntry = _dir_entries[_dir_entry_current++];
+        return &_direntry;
+#else
         return &_dir_entries[_dir_entry_current++];
+#endif
     }
     else
         return nullptr;
@@ -362,6 +499,12 @@ fsdir_entry * FileSystemSDFAT::dir_read()
 
 uint16_t FileSystemSDFAT::dir_tell()
 {
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    SdLock cache_lock(sd_directory_cache_mutex);
+    if (!sd_directory_cache_open || !sd_directory_operation_is_current(sd_cache_generation))
+        return FNFS_INVALID_DIRPOS;
+#endif
+
     if(_dir_entries.empty())
         return FNFS_INVALID_DIRPOS;
     else
@@ -370,6 +513,12 @@ uint16_t FileSystemSDFAT::dir_tell()
 
 bool FileSystemSDFAT::dir_seek(uint16_t pos)
 {
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    SdLock cache_lock(sd_directory_cache_mutex);
+    if (!sd_directory_cache_open || !sd_directory_operation_is_current(sd_cache_generation))
+        return false;
+#endif
+
     if(pos < _dir_entries.size())
     {
         _dir_entry_current = pos;
@@ -382,6 +531,10 @@ bool FileSystemSDFAT::dir_seek(uint16_t pos)
 
 FILE * FileSystemSDFAT::file_open(const char* path, const char* mode)
 {
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    if (!sd_directory_media_mounted.load(std::memory_order_acquire))
+        return nullptr;
+#endif
     //Debug_printf("sdfileopen1: task hwm %u, %p\r\n", uxTaskGetStackHighWaterMark(NULL), pxTaskGetStackStart(NULL));
     char * fpath = _make_fullpath(path);
     FILE * result = fopen(fpath, mode);
@@ -619,6 +772,9 @@ const char * FileSystemSDFAT::partition_type()
 #ifdef ESP_PLATFORM
 bool FileSystemSDFAT::start()
 {
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    SdLock lifecycle_lock(sd_lifecycle_mutex);
+#endif
     if(_started)
         return true;
 
@@ -741,6 +897,9 @@ bool FileSystemSDFAT::start()
         _started = true;
         _sdcard_info = sdcard_info;
         _card_capacity = (uint64_t)sdcard_info->csd.capacity * sdcard_info->csd.sector_size;
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+        sd_directory_media_changed(true);
+#endif
         Debug_println("SD mounted.");
 
     /*
@@ -766,6 +925,11 @@ bool FileSystemSDFAT::start()
 
 bool FileSystemSDFAT::stop()
 {
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    SdLock lifecycle_lock(sd_lifecycle_mutex);
+    if (sd_directory_media_mounted.load(std::memory_order_acquire))
+        sd_directory_media_changed(false);
+#endif
     if(!_started)
         return true;
 

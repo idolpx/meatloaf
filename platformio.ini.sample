@@ -153,6 +153,8 @@ build_flags =
     ;-D SD_CARD             ; if your hardware has an sd card slot
     ;-D CARD_DETECT_HIGH    ; SD card-detect line reads HIGH when a card is
                             ;  present (the default assumes active LOW)
+    ;-D MEATLOAF_CARD_DETECT_HOTPLUG ; IEC boards with working Card Detect:
+                                    ; unmount and remount SD without restarting
     ;-D PARALLEL_BUS        ; if your hardware has userport parallel interface
     ;-D ENABLE_PARALLEL     ; parallel CABLE (not the userport bus). Defines the
                             ;  PIN_PARALLEL_* pins in the board pinmap, which is

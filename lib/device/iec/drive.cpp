@@ -120,6 +120,30 @@ static bool isMatch(std::string name, std::string pattern)
     return found==1;
 }
 
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+static bool isSdPath(const std::string &url)
+{
+    return url == "sd:" || mstr::startsWith(url, "sd:/") ||
+           url == "/sd" || mstr::startsWith(url, "/sd/");
+}
+
+static bool isSdBacked(const MFile *file)
+{
+    // A media file can be several containers deep. The physical SD source is
+    // therefore not necessarily the outer object's own URL.
+    for (int depth = 0; file != nullptr && depth < 16; depth++)
+    {
+        if (file->scheme == "sd" || isSdPath(file->url))
+            return true;
+
+        if (file->sourceFile == file)
+            break;
+        file = file->sourceFile;
+    }
+    return false;
+}
+#endif
+
 
 // -------------------------------------------------------------------------------------------------
 
@@ -822,6 +846,9 @@ void iecDrive::begin()
     m_numOpenChannels = 0;
     for(int i=0; i<16; i++)
         m_channels[i] = nullptr;
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    m_sdMediaGeneration = fnSDFAT.media_generation();
+#endif
 
     // NOTE: reloadConfig() is NOT called here. begin() runs during bus attach
     // (main_setup() -> SYSTEM_BUS.setup()), which happens before fnWiFi.start().
@@ -834,6 +861,13 @@ void iecDrive::begin()
 bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
 {
     Debug_printv("iecDrive::open(#%d, %d, \"%s\")", m_devnr, channel, cname);
+
+    // A fresh OPEN after a card change must never reuse the previous card's
+    // D64/VDrive or directory channel. Continue the OPEN from root after the
+    // stale state has been discarded.
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    synchronizeSdMedia();
+#endif
 
 #ifdef ENABLE_DISPLAY
     LEDS.activity = true;
@@ -1354,6 +1388,14 @@ void iecDrive::close(uint8_t channel)
 
 uint8_t iecDrive::write(uint8_t channel, uint8_t *data, uint8_t dataLen, bool eoi)
 {
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    if (synchronizeSdMedia())
+    {
+        setStatusCode(ST_DRIVE_NOT_READY);
+        return 0;
+    }
+#endif
+
 //#ifdef USE_VDRIVE
     if( Meatloaf.use_vdrive && m_vdrive!=nullptr )
     {
@@ -1383,6 +1425,14 @@ uint8_t iecDrive::write(uint8_t channel, uint8_t *data, uint8_t dataLen, bool eo
 
 uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool *eoi)
 { 
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    if (synchronizeSdMedia())
+    {
+        setStatusCode(ST_DRIVE_NOT_READY);
+        return 0;
+    }
+#endif
+
     //Debug_printv("channel[%d] maxDataLen[%d]", channel, maxDataLen);
 //#ifdef USE_VDRIVE
     if( Meatloaf.use_vdrive && m_vdrive!=nullptr )
@@ -1638,6 +1688,12 @@ bool iecDrive::seekChannelToBlock(uint8_t channel_num, uint8_t track, uint8_t se
 // are all text-based, M-R and M-W commands passed on to the VDrive may contain binary data.
 void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
 {
+    // Commands issued after a swap operate from root, never in the image that
+    // belonged to the removed card.
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    synchronizeSdMedia();
+#endif
+
 #ifdef ENABLE_DISPLAY
     LEDS.activity = true;
 #endif
@@ -3072,6 +3128,10 @@ void iecDrive::changePartition(int pnum)
 
 void iecDrive::set_cwd(std::string path, bool verified)
 {
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    synchronizeSdMedia();
+#endif
+
     // Isolate path
     if ( mstr::startsWith(path, ":") || mstr::startsWith(path, " ") )
         path = mstr::drop(path, 1);
@@ -3189,7 +3249,61 @@ void iecDrive::set_cwd(std::string path, bool verified)
 
     if (m_cwd->url != old_url)
         notify_activity(activitySource(), "path", m_cwd->url);
+
 }
+
+
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+bool iecDrive::synchronizeSdMedia()
+{
+    const uint32_t currentGeneration = fnSDFAT.media_generation();
+
+    // Generation zero is used by boards without generation-aware Card Detect.
+    // Keeping this path inert preserves their existing behaviour.
+    if (currentGeneration == 0)
+        return false;
+
+    if (m_sdMediaGeneration == currentGeneration)
+        return false;
+
+    m_sdMediaGeneration = currentGeneration;
+    const bool sdDirectory = isSdBacked(m_cwd.get());
+
+    // Absolute SD paths can be opened while the drive is in another directory.
+    // Close those channels too, while preserving channels on other media.
+    for (auto &channel : m_channels)
+    {
+        if (channel == nullptr || !isSdPath(channel->name()))
+            continue;
+
+        delete channel;
+        channel = nullptr;
+        if (m_numOpenChannels > 0)
+            --m_numOpenChannels;
+    }
+
+    if (!sdDirectory)
+        return false;
+
+    Debug_printf("SD medium changed: discarding drive #%d context [%s]\r\n",
+                 m_devnr, m_cwd->url.c_str());
+
+    if (m_vdrive != nullptr)
+    {
+        delete m_vdrive;
+        m_vdrive = nullptr;
+    }
+
+#ifdef IEC_SUPPORT_SECTOROPS
+    releaseSectorStream();
+#endif
+
+    m_cwd.reset(MFSOwner::File("/", true));
+    setStatusCode(ST_OK);
+    notify_activity(activitySource(), "path", "/");
+    return true;
+}
+#endif
 
 
 /* Mount Disk

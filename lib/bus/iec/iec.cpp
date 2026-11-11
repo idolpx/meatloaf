@@ -21,6 +21,9 @@
 
 #include "iec.h"
 #include "../../device/iec/meatloaf.h"
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+#include "../../meatloaf/meat_media.h"
+#endif
 
 #include <cstring>
 #include <memory>
@@ -151,8 +154,29 @@ void systemBus::setup()
 }
 
 
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+void systemBus::releaseSdMediaContexts()
+{
+  sdMediaCleanupPending.store(true, std::memory_order_release);
+  // Only the card-detect task calls this, one removal at a time. Keep
+  // FATFS mounted until the IEC task has released its open streams.
+  while( sdMediaCleanupPending.load(std::memory_order_acquire) )
+    vTaskDelay(1);
+}
+#endif
+
 void systemBus::service()
 {
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+  if( !inTransaction() && sdMediaCleanupPending.load(std::memory_order_acquire) )
+    {
+      for( int i = 0; i < MAX_DISK_DEVICES; i++ )
+        Meatloaf.get_disks(i)->disk_dev.handleSdMediaChange();
+      Meatloaf.handleSdMediaChange();
+      ImageBroker::disposeUnderPath("/sd");
+      sdMediaCleanupPending.store(false, std::memory_order_release);
+    }
+#endif
   task();
   
   bool error = false, memExeError = false, active = false;

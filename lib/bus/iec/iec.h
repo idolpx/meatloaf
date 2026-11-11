@@ -27,6 +27,7 @@
 #ifndef IEC_H
 #define IEC_H
 
+#include <atomic>
 #include <cstdint>
 #include <forward_list>
 #include <freertos/FreeRTOS.h>
@@ -107,7 +108,14 @@ public:
      */
     bool getShuttingDown() { return shuttingDown; }
 
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    void releaseSdMediaContexts();
+#endif
+
  private:
+#ifdef MEATLOAF_CARD_DETECT_HOTPLUG
+    std::atomic<bool> sdMediaCleanupPending{false};
+#endif
     /**
      * @brief is device shutting down?
      */
