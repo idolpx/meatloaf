@@ -400,6 +400,27 @@ public:
         dispose(key);
     }
 
+    // Drop cached media streams whose physical source lives at or below a
+    // local filesystem path. This is deliberately narrower than clear(): an
+    // SD-card swap must not disturb unrelated network-backed media caches.
+    static void disposeUnderPath(const std::string& prefix) {
+        std::vector<std::string> stale;
+        for (const auto& pair : image_repo) {
+            if (pair.second == nullptr)
+                continue;
+
+            const std::string& streamUrl = pair.second->url;
+            if (streamUrl == prefix ||
+                (streamUrl.size() > prefix.size() &&
+                 streamUrl.compare(0, prefix.size(), prefix) == 0 &&
+                 streamUrl[prefix.size()] == '/')) {
+                stale.push_back(pair.first);
+            }
+        }
+        for (const auto& key : stale)
+            dispose(key);
+    }
+
     static void validate() {
         // Collect first: dispose() erases from image_repo, which would
         // invalidate the iterator if done while iterating.

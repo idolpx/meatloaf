@@ -74,6 +74,13 @@ public:
     uint16_t dir_tell() override;
     bool dir_seek(uint16_t) override;
 
+    // Changes whenever hotplug mounts or removes an SD medium. Zero means
+    // that this build has no generation-aware card detection.
+    uint32_t media_generation() const;
+    // Publish removal and invalidate directory state before higher layers
+    // release their SD-backed objects and stop() unmounts FATFS.
+    void invalidate_media();
+
     bool create_path(const char *path);
     
     uint64_t card_size();

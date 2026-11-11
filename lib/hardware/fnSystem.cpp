@@ -112,6 +112,9 @@ static void card_detect_intr_task(void *arg)
 {
     // Assert valid initial card status
     vTaskDelay(1);
+#if defined(MEATLOAF_CARD_DETECT_HOTPLUG) && defined(BUILD_IEC)
+    constexpr TickType_t debounceTicks = pdMS_TO_TICKS(50);
+#endif
     // Set card status before we enter the infinite loop
 #ifdef CARD_DETECT_HIGH
     int card_detect_status = !gpio_get_level((gpio_num_t)(int)arg);
@@ -122,6 +125,10 @@ static void card_detect_intr_task(void *arg)
     for (;;) {
         gpio_num_t gpio_num;
         if(xQueueReceive(card_detect_evt_queue, &gpio_num, portMAX_DELAY)) {
+#if defined(MEATLOAF_CARD_DETECT_HOTPLUG) && defined(BUILD_IEC)
+            // Wait for a quiet interval after the last queued edge.
+            while (xQueueReceive(card_detect_evt_queue, &gpio_num, debounceTicks)) {}
+#endif
 #ifdef CARD_DETECT_HIGH
             int level = !gpio_get_level(gpio_num);
 #else
@@ -131,8 +138,15 @@ static void card_detect_intr_task(void *arg)
                 printf("SD Card detect ignored (debounce)\r\n");
             }
             else if (level == 1) {
+#if defined(MEATLOAF_CARD_DETECT_HOTPLUG) && defined(BUILD_IEC)
+                fnSDFAT.invalidate_media();
+                SYSTEM_BUS.releaseSdMediaContexts();
+                if (!fnSDFAT.stop())
+                    Debug_println("SD card unmount failed");
+#else
                 printf("SD Card Ejected, REBOOT!\r\n");
                 fnSystem.reboot();
+#endif
             }
             else {
                 printf("SD Card Inserted\r\n");
@@ -146,13 +160,28 @@ static void card_detect_intr_task(void *arg)
 static void setup_card_detect(gpio_num_t pin)
 {
     if (PIN_CARD_DETECT != GPIO_NUM_NC) {
-        // Create a queue to handle card detect event from ISR
+#if defined(MEATLOAF_CARD_DETECT_HOTPLUG) && defined(BUILD_IEC)
+        if (card_detect_evt_queue != nullptr)
+            return;
+        // Configure the input before the task samples its initial level.
+        fnSystem.set_pin_mode(pin, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_NONE);
+        constexpr uint32_t stackSize = 8192;
+#else
+        constexpr uint32_t stackSize = 2048;
+#endif
         card_detect_evt_queue = xQueueCreate(10, sizeof(gpio_num_t));
-        // Start card detect task
-        xTaskCreate(card_detect_intr_task, "card_detect_intr_task", 2048, (void *)pin, 10, NULL);
+        if (card_detect_evt_queue == nullptr)
+            return;
+
+        if (xTaskCreate(card_detect_intr_task, "card_detect_intr_task", stackSize, (void *)pin, 10, NULL) != pdPASS)
+        {
+            vQueueDelete(card_detect_evt_queue);
+            card_detect_evt_queue = nullptr;
+            return;
+        }
+
         // Enable interrupt for card detection
         fnSystem.set_pin_mode(pin, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_NONE, GPIO_INTR_ANYEDGE);
-        // Add the card detect handler
         gpio_isr_handler_add(pin, card_detect_isr_handler, (void *)pin);
     } else
     {
