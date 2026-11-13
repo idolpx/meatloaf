@@ -40,6 +40,7 @@
 #include <esp_heap_caps.h>
 //#include "esp_log.h"
 #include <esp_http_server.h>
+#include <esp_netif.h>
 #include <esp_log.h>
 #include <sys/socket.h>
 #include <fcntl.h>
@@ -174,15 +175,27 @@ static esp_err_t httpd_open_fn(httpd_handle_t hd, int sockfd)
     return ESP_OK;
 }
 
-httpd_handle_t HttpServer::start_server(serverstate &state)
+static bool has_ipv4(esp_netif_t *netif)
+{
+    esp_netif_ip_info_t ip_info{};
+    return netif != nullptr && esp_netif_is_netif_up(netif) &&
+           esp_netif_get_ip_info(netif, &ip_info) == ESP_OK && ip_info.ip.addr != 0;
+}
+
+static bool web_network_ready()
 {
 #ifdef ENABLE_ETHERNET
-    if (!ethernet.connected() || !fnWiFi.connected())
-#else
-    if (!fnWiFi.connected())
+    if (ethernet.connected() && has_ipv4(ethernet.get_adapter_handle()))
+        return true;
 #endif
+    return fnWiFi.connected() && has_ipv4(fnWiFi.get_adapter_handle());
+}
+
+httpd_handle_t HttpServer::start_server(serverstate &state)
+{
+    if (!web_network_ready())
     {
-        Debug_println("WiFi not connected - aborting web server startup");
+        Debug_println("No active interface with an IPv4 address - aborting web server startup");
         return nullptr;
     }
 
@@ -533,6 +546,19 @@ void HttpServer::send_http_error(httpd_req_t *req, int errnum)
     }
 
     send_file_parsed(req, error_path.c_str());
+}
+
+void HttpServer::updateNetworkState()
+{
+    if (web_network_ready())
+    {
+        if (!running())
+            start();
+    }
+    else
+    {
+        stop();
+    }
 }
 
 void HttpServer::start()

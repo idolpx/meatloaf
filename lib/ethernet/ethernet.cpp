@@ -1,5 +1,6 @@
 #ifdef ENABLE_ETHERNET
 #include "ethernet.h"
+#include "web_server.h"
 
 #include <cstdlib>
 
@@ -27,6 +28,7 @@ esp_eth_mac_t *w5500_mac = nullptr;
 esp_eth_phy_t *w5500_phy = nullptr;
 esp_event_handler_instance_t eth_handler = nullptr;
 esp_event_handler_instance_t ip_handler = nullptr;
+esp_event_handler_instance_t lost_ip_handler = nullptr;
 bool owns_spi_bus = false;
 bool start_attempted = false;
 bool mac_lowlevel_active = false;
@@ -170,6 +172,8 @@ void W5500Ethernet::start()
                           &eth_event_handler, nullptr, &eth_handler), fail, TAG, "Ethernet handler registration failed");
         ESP_GOTO_ON_ERROR(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_ETH_GOT_IP,
                           &ip_event_handler, nullptr, &ip_handler), fail, TAG, "IP handler registration failed");
+        ESP_GOTO_ON_ERROR(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_ETH_LOST_IP,
+                          &ip_event_handler, nullptr, &lost_ip_handler), fail, TAG, "Lost-IP handler registration failed");
 
         // Without this the driver is installed and attached but never brought up,
         // so no link is ever established.  stop() has the matching esp_eth_stop().
@@ -195,6 +199,12 @@ void W5500Ethernet::stop()
     // A failed SDK teardown may already have changed the driver state.
     // Block retries unless all resources were successfully released.
     teardown_incomplete = true;
+    if (lost_ip_handler)
+    {
+        ESP_RETURN_VOID_ON_ERROR(esp_event_handler_instance_unregister(
+            IP_EVENT, IP_EVENT_ETH_LOST_IP, lost_ip_handler), TAG, "Lost-IP handler removal failed");
+        lost_ip_handler = nullptr;
+    }
     if (ip_handler)
     {
         ESP_RETURN_VOID_ON_ERROR(esp_event_handler_instance_unregister(
@@ -208,6 +218,9 @@ void W5500Ethernet::stop()
         eth_handler = nullptr;
     }
     _connected = false;
+#ifndef MIN_CONFIG
+    httpServer.updateNetworkState();
+#endif
 
     // Retain the dependent objects if any teardown step fails. In particular,
     // a partially started IDF driver may reject stop if its timer never ran.
@@ -264,6 +277,9 @@ void W5500Ethernet::eth_event_handler(void *ctx, esp_event_base_t event_base, in
             case ETHERNET_EVENT_DISCONNECTED:
                 ESP_LOGW(TAG, "Ethernet link down");
                 _connected = false;
+#ifndef MIN_CONFIG
+                httpServer.updateNetworkState();
+#endif
                 break;
                 
             case ETHERNET_EVENT_START:
@@ -272,6 +288,10 @@ void W5500Ethernet::eth_event_handler(void *ctx, esp_event_base_t event_base, in
                 
             case ETHERNET_EVENT_STOP:
                 ESP_LOGI(TAG, "Ethernet stopped");
+                _connected = false;
+#ifndef MIN_CONFIG
+                httpServer.updateNetworkState();
+#endif
                 break;
                 
             default:
@@ -291,10 +311,16 @@ void W5500Ethernet::ip_event_handler(void *ctx, esp_event_base_t event_base, int
                 ESP_LOGI(TAG, "IP:      " IPSTR, IP2STR(&ip_info->ip));
                 ESP_LOGI(TAG, "Netmask: " IPSTR, IP2STR(&ip_info->netmask));
                 ESP_LOGI(TAG, "Gateway: " IPSTR, IP2STR(&ip_info->gw));
+#ifndef MIN_CONFIG
+                httpServer.updateNetworkState();
+#endif
                 break;
             }
             case IP_EVENT_ETH_LOST_IP:
                 ESP_LOGI(TAG, "Lost IP address");
+#ifndef MIN_CONFIG
+                httpServer.updateNetworkState();
+#endif
                 break;
             default:
                 break;

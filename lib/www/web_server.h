@@ -48,6 +48,7 @@ public:
     static httpd_handle_t s_server;
     static void send_http_error(httpd_req_t *req, int errnum);
 
+    void updateNetworkState();
     void start();
     void startOnDemand();
     void stop();
