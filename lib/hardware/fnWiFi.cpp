@@ -706,7 +706,7 @@ void WiFiManager::handle_station_stop()
     _connected = false;
     fnLedManager.set(eLed::LED_WIFI, false);
 #ifndef MIN_CONFIG
-    httpServer.stop();
+    httpServer.updateNetworkState();
 #endif
     fnSystem.Net.stop_sntp_client();
 #ifdef ENABLE_CONSOLE_TCP
@@ -758,7 +758,7 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             // this is the same lesson as console_exec and the updatedb task:
             // claim big stacks at boot, while the heap is still unfragmented,
             // never on demand.
-            httpServer.start();
+            httpServer.updateNetworkState();
 
             // Give the interface an IPv6 link-local address BEFORE mDNS starts.
             // Resolvers (macOS getaddrinfo, and so Finder) query A and AAAA
@@ -790,6 +790,9 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
 #endif
             break;
         case IP_EVENT_STA_LOST_IP:
+#ifndef MIN_CONFIG
+            httpServer.updateNetworkState();
+#endif
             Debug_println("IP_EVENT_STA_LOST_IP");
             break;
         case IP_EVENT_ETH_GOT_IP:
