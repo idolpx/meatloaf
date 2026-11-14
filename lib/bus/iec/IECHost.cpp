@@ -91,15 +91,33 @@ void IECHost::exitHostMode()
 
 void IECHost::hAssertATN()
 {
+#ifdef IEC_SPLIT_ATN
+    if (m_bus.m_pinATNout == 0xFF) return;
+#if defined(IEC_USE_INVERTED_LINE_DRIVERS)
+    digitalWrite(m_bus.m_pinATNout, HIGH);
+#else
+    digitalWrite(m_bus.m_pinATNout, LOW);
+#endif
+#else
     digitalWrite(m_bus.m_pinATN, LOW);
     pinMode(m_bus.m_pinATN, OUTPUT);
+#endif
     m_bus.m_flags |= HOST_P_ATN;
     delayMicroseconds(10);
 }
 
 void IECHost::hReleaseATN()
 {
+#ifdef IEC_SPLIT_ATN
+    if (m_bus.m_pinATNout == 0xFF) return;
+#if defined(IEC_USE_INVERTED_LINE_DRIVERS)
+    digitalWrite(m_bus.m_pinATNout, LOW);
+#else
+    digitalWrite(m_bus.m_pinATNout, HIGH);
+#endif
+#else
     pinMode(m_bus.m_pinATN, INPUT);
+#endif
     m_bus.m_flags &= ~HOST_P_ATN;
     delayMicroseconds(20);   // Tbb: ≥20 µs before first CLK transition
 }
@@ -113,6 +131,10 @@ void IECHost::hReleaseATN()
 
 bool IECHost::hBeginATN()
 {
+#ifdef IEC_SPLIT_ATN
+    if (m_bus.m_pinATNout == 0xFF)
+        return false;
+#endif
     // If ATN or CLK is already asserted by someone else (e.g. a real C64 also on the
     // bus, mid-transaction), don't drive our own ATN on top of it -- abort
     // instead of taking over a bus another master is already using.
@@ -806,12 +828,27 @@ bool IECHost::closeChannel(uint8_t devnr, uint8_t channel)
 
 void IECHost::resetBus()
 {
+#ifdef IEC_SPLIT_RESET
+    if (m_bus.m_pinRESETout == 0xFF) return;
+#if defined(IEC_USE_INVERTED_LINE_DRIVERS)
+    digitalWrite(m_bus.m_pinRESETout, HIGH);
+#else
+    digitalWrite(m_bus.m_pinRESETout, LOW);
+#endif
+    delayMicroseconds(500);
+#if defined(IEC_USE_INVERTED_LINE_DRIVERS)
+    digitalWrite(m_bus.m_pinRESETout, LOW);
+#else
+    digitalWrite(m_bus.m_pinRESETout, HIGH);
+#endif
+#else
     if (m_bus.m_pinRESET == 0xFF) return;
 
     digitalWrite(m_bus.m_pinRESET, LOW);
     pinMode(m_bus.m_pinRESET, OUTPUT);
     delayMicroseconds(500);
     pinMode(m_bus.m_pinRESET, INPUT);
+#endif
     for (int i = 0; i < 500; i++)
         delayMicroseconds(1000);  // 500 ms re-init wait
 }

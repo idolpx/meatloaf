@@ -47,13 +47,20 @@
 systemBus IEC;
 
 systemBus::systemBus() : 
-  IECBusHandler(PIN_IEC_ATN, 
+  IECBusHandler(
+#ifdef IEC_SPLIT_ATN
+                PIN_IEC_ATN_IN,
+#else
+                PIN_IEC_ATN,
+#endif
 #ifdef IEC_USE_LINE_DRIVERS
                 PIN_IEC_CLK_IN, PIN_IEC_CLK_OUT, PIN_IEC_DATA_IN, PIN_IEC_DATA_OUT,
 #else
                 PIN_IEC_CLK_OUT, PIN_IEC_DATA_OUT,
 #endif
-#ifdef IEC_HAS_RESET
+#ifdef IEC_SPLIT_RESET
+                PIN_IEC_RESET_IN,
+#elif defined(IEC_HAS_RESET)
                 PIN_IEC_RESET==GPIO_NUM_NC ? 0xFF : PIN_IEC_RESET,
 #else
                 0xFF,
@@ -61,10 +68,17 @@ systemBus::systemBus() :
                 0xFF,
 #ifdef IEC_SPLIT_SRQ
                 PIN_IEC_SRQ_IN==GPIO_NUM_NC  ? 0xFF : PIN_IEC_SRQ_IN,
-                PIN_IEC_SRQ_OUT==GPIO_NUM_NC ? 0xFF : PIN_IEC_SRQ_OUT)
+                PIN_IEC_SRQ_OUT==GPIO_NUM_NC ? 0xFF : PIN_IEC_SRQ_OUT
 #else
-                PIN_IEC_SRQ==GPIO_NUM_NC   ? 0xFF : PIN_IEC_SRQ)
+                PIN_IEC_SRQ==GPIO_NUM_NC   ? 0xFF : PIN_IEC_SRQ
 #endif
+#ifdef IEC_SPLIT_ATN
+                , PIN_IEC_ATN_OUT
+#endif
+#ifdef IEC_SPLIT_RESET
+                , PIN_IEC_RESET_OUT
+#endif
+                )
 {
 #ifdef IEC_SUPPORT_PARALLEL
 #ifdef IEC_SUPPORT_PARALLEL_XRA1405

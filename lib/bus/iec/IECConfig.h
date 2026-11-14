@@ -33,6 +33,26 @@
 #define IEC_USE_INVERTED_LINE_DRIVERS
 #endif
 
+#ifdef IEC_SPLIT_ATN
+#if !defined(PIN_IEC_ATN_IN) || !defined(PIN_IEC_ATN_OUT)
+#error "IEC_SPLIT_ATN requires PIN_IEC_ATN_IN and PIN_IEC_ATN_OUT"
+#else
+static_assert(PIN_IEC_ATN_IN != GPIO_NUM_NC && PIN_IEC_ATN_OUT != GPIO_NUM_NC &&
+              PIN_IEC_ATN_IN != PIN_IEC_ATN_OUT,
+              "IEC_SPLIT_ATN requires distinct, connected input and output pins");
+#endif
+#endif
+
+#ifdef IEC_SPLIT_RESET
+#if !defined(PIN_IEC_RESET_IN) || !defined(PIN_IEC_RESET_OUT)
+#error "IEC_SPLIT_RESET requires PIN_IEC_RESET_IN and PIN_IEC_RESET_OUT"
+#else
+static_assert(PIN_IEC_RESET_IN != GPIO_NUM_NC && PIN_IEC_RESET_OUT != GPIO_NUM_NC &&
+              PIN_IEC_RESET_IN != PIN_IEC_RESET_OUT,
+              "IEC_SPLIT_RESET requires distinct, connected input and output pins");
+#endif
+#endif
+
 #ifdef IEC_SPLIT_SRQ
 #if !defined(PIN_IEC_SRQ_IN)
 #error "IEC_SPLIT_SRQ requires PIN_IEC_SRQ_IN"

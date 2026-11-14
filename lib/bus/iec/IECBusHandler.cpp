@@ -278,6 +278,12 @@ IECBusHandler::IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinDATA, ui
 #ifdef IEC_SPLIT_SRQ
                              , uint8_t pinSRQout
 #endif
+#ifdef IEC_SPLIT_ATN
+                             , uint8_t pinATNout
+#endif
+#ifdef IEC_SPLIT_RESET
+                             , uint8_t pinRESETout
+#endif
                              )
 #if defined(IEC_SUPPORT_PARALLEL)
 #if defined(IEC_SUPPORT_PARALLEL_XRA1405)
@@ -361,6 +367,12 @@ IECBusHandler::IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinDATA, ui
 #endif
 #ifdef IEC_SPLIT_SRQ
   m_pinSRQout    = pinSRQout;
+#endif
+#ifdef IEC_SPLIT_ATN
+  m_pinATNout    = pinATNout;
+#endif
+#ifdef IEC_SPLIT_RESET
+  m_pinRESETout  = pinRESETout;
 #endif
 
 #if defined(IEC_SUPPORT_FASTLOAD)
@@ -454,6 +466,30 @@ void IECBusHandler::begin()
   if( m_pinSRQ<0xFF ) pinMode(m_pinSRQ, INPUT);
 #endif
 
+#ifdef IEC_SPLIT_ATN
+  if( m_pinATNout<0xFF )
+    {
+#if defined(IEC_USE_INVERTED_LINE_DRIVERS)
+      digitalWrite(m_pinATNout, LOW);
+#else
+      digitalWrite(m_pinATNout, HIGH);
+#endif
+      pinMode(m_pinATNout, OUTPUT);
+    }
+#endif
+
+#ifdef IEC_SPLIT_RESET
+  if( m_pinRESETout<0xFF )
+    {
+#if defined(IEC_USE_INVERTED_LINE_DRIVERS)
+      digitalWrite(m_pinRESETout, LOW);
+#else
+      digitalWrite(m_pinRESETout, HIGH);
+#endif
+      pinMode(m_pinRESETout, OUTPUT);
+    }
+#endif
+
   pinMode(m_pinATN,   INPUT);
   pinMode(m_pinCLK,   INPUT);
   pinMode(m_pinDATA,  INPUT);
@@ -513,6 +549,22 @@ void IECBusHandler::end()
   writePinCLK(HIGH);
   writePinDATA(HIGH);
   writePinCTRL(HIGH);  // disable ATN->DATA hardware coupling, if present
+#ifdef IEC_SPLIT_ATN
+  if( m_pinATNout<0xFF )
+#if defined(IEC_USE_INVERTED_LINE_DRIVERS)
+    digitalWrite(m_pinATNout, LOW);
+#else
+    digitalWrite(m_pinATNout, HIGH);
+#endif
+#endif
+#ifdef IEC_SPLIT_RESET
+  if( m_pinRESETout<0xFF )
+#if defined(IEC_USE_INVERTED_LINE_DRIVERS)
+    digitalWrite(m_pinRESETout, LOW);
+#else
+    digitalWrite(m_pinRESETout, HIGH);
+#endif
+#endif
 }
 
 

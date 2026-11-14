@@ -61,6 +61,12 @@ class IECBusHandler
 #ifdef IEC_SPLIT_SRQ
                 , uint8_t pinSRQout = 0xFF
 #endif
+#ifdef IEC_SPLIT_ATN
+                , uint8_t pinATNout = 0xFF
+#endif
+#ifdef IEC_SPLIT_RESET
+                , uint8_t pinRESETout = 0xFF
+#endif
                 );
 
   // must be called once at startup before the first call to "task", devnr
@@ -165,6 +171,12 @@ class IECBusHandler
 #endif
 #ifdef IEC_SPLIT_SRQ
   uint8_t m_pinSRQout;
+#endif
+#ifdef IEC_SPLIT_ATN
+  uint8_t m_pinATNout;
+#endif
+#ifdef IEC_SPLIT_RESET
+  uint8_t m_pinRESETout;
 #endif
 
   // IECHost acts as bus master and needs direct access to the low-level
