@@ -35,6 +35,9 @@
 #include "../../include/debug.h"
 #include "../../include/pinmap.h"
 #include "../../hardware/led.h"
+#ifdef IEC_ROOT_BUTTON
+#include "../../config-ml/mlConfig.h"
+#endif
 
 // 20 KB: ps HWM showed <1 KB used at idle; deep use (C64 LOAD through the
 // MFile/stream chain) is the same class as console commands, which fit in
@@ -189,6 +192,24 @@ void systemBus::service()
       Meatloaf.handleSdMediaChange();
       ImageBroker::disposeUnderPath("/sd");
       sdMediaCleanupPending.store(false, std::memory_order_release);
+    }
+#endif
+#ifdef IEC_ROOT_BUTTON
+  // Run DOS commands on the IEC task, outside an active bus transaction.
+  if( !inTransaction() && driveRootPending.exchange(false) )
+    {
+      for( int i = 0; i < MAX_DISK_DEVICES; ++i )
+        {
+          auto &drive = Meatloaf.get_disks(i)->disk_dev;
+          if( drive.id() != 8 || !drive.isActive() )
+            continue;
+
+          bool failed = false;
+          drive.consoleExecDos("CD:^", &failed);
+          if( !failed )
+            mlConfig.save();
+          break;
+        }
     }
 #endif
   task();

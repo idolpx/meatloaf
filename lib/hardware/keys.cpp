@@ -15,6 +15,10 @@
 
 #include "led.h"
 
+#if defined(BUILD_IEC) && defined(IEC_ROOT_BUTTON)
+#include "../bus/bus.h"
+#endif
+
 #ifndef PIN_BUTTON_A
 #define PIN_BUTTON_A GPIO_NUM_NC
 #endif
@@ -267,6 +271,10 @@ void KeyManager::_keystate_task(void *param)
 
         case eKeyStatus::SHORT_PRESS:
             Debug_println("BUTTON_A: SHORT PRESS");
+#if defined(BUILD_IEC) && defined(IEC_ROOT_BUTTON)
+            SYSTEM_BUS.requestDriveRoot();
+            break;
+#endif
 #ifdef PARALLEL_BUS
             // Reset the Commodore via Userport, GPIO 13
             fnSystem.set_pin_mode(GPIO_NUM_13, gpio_mode_t::GPIO_MODE_OUTPUT, SystemManager::pull_updown_t::PULL_UP);
