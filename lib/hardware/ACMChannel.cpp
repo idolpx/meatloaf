@@ -4,14 +4,15 @@
 
 #include <usb/usb_host.h>
 
-#include "../../include/debug.h"
+#include "fnUsbHost.h"
 
-#define USB_HOST_PRIORITY   (20)
+#include "../../include/debug.h"
 
 #define TX_TIMEOUT_MS       (1000)
 
 #include <inttypes.h> // debug
 #include <esp_log.h>
+#include <esp_system.h>
 
 #define DEBUG_TAG "ACMChannel"
 
@@ -20,22 +21,6 @@ typedef struct {
     size_t length;
     uint8_t data[MAX_FIFO_PAYLOAD];
 } FIFOPacket;
-
-static void usb_lib_task(void *arg)
-{
-    while (1) {
-        // Start handling system events
-        uint32_t event_flags;
-        usb_host_lib_handle_events(portMAX_DELAY, &event_flags);
-        if (event_flags & USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS) {
-            ESP_ERROR_CHECK(usb_host_device_free_all());
-        }
-        if (event_flags & USB_HOST_LIB_EVENT_FLAGS_ALL_FREE) {
-            Debug_printv("USB: All devices freed");
-            // Continue handling USB events to allow device reconnection
-        }
-    }
-}
 
 static bool rxForwarder(const uint8_t *data, size_t length, void *arg)
 {
@@ -78,6 +63,7 @@ void ACMChannel::eventReceived(const cdc_acm_host_dev_event_data_t *event)
     case CDC_ACM_HOST_DEVICE_DISCONNECTED:
         Debug_printv("Device suddenly disconnected");
         ESP_ERROR_CHECK(cdc_acm_host_close(event->data.cdc_hdl));
+        cdc_dev = NULL;
         xSemaphoreGive(device_disconnected_sem);
         break;
     case CDC_ACM_HOST_SERIAL_STATE:
@@ -110,6 +96,14 @@ void ACMChannel::newDevice(usb_device_handle_t usb_dev)
         if (iad->bFunctionClass == USB_CLASS_COMM &&
             iad->bFunctionSubClass == USB_CDC_SUBCLASS_ACM)
         {
+            if ((_expected_vid && dev_desc->idVendor != _expected_vid) ||
+                (_expected_pid && dev_desc->idProduct != _expected_pid))
+            {
+                ESP_LOGW(DEBUG_TAG, "Ignoring CDC-ACM device %04X:%04X, expected %04X:%04X",
+                         dev_desc->idVendor, dev_desc->idProduct, _expected_vid, _expected_pid);
+                return;
+            }
+
             found_vid = dev_desc->idVendor;
             found_pid = dev_desc->idProduct;
             found_interface = iad->bFirstInterface;
@@ -127,23 +121,66 @@ static void newDevForwarder(usb_device_handle_t usb_dev)
     return;
 }
 
+bool ACMChannel::openDevice()
+{
+    esp_err_t err = cdc_acm_host_open_vendor_specific(found_vid, found_pid,
+                                                      found_interface,
+                                                      &dev_config, &cdc_dev);
+    if (err != ESP_OK)
+        return false;
+
+    //cdc_acm_host_desc_print(cdc_dev);
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    // Test Line Coding commands: Get current line coding, change
+    // it 9600 7N1 and read again
+
+    cdc_acm_line_coding_t line_coding;
+    ESP_ERROR_CHECK(cdc_acm_host_line_coding_get(cdc_dev, &line_coding));
+
+    line_coding.dwDTERate = 9600;
+    line_coding.bDataBits = 7;
+    line_coding.bParityType = 1;
+    line_coding.bCharFormat = 1;
+    ESP_ERROR_CHECK(cdc_acm_host_line_coding_set(cdc_dev, &line_coding));
+    ESP_ERROR_CHECK(cdc_acm_host_line_coding_get(cdc_dev, &line_coding));
+    ESP_ERROR_CHECK(cdc_acm_host_set_control_line_state(cdc_dev, true, false));
+    return true;
+}
+
+void ACMChannel::reconnectTask()
+{
+    while (true) {
+        xSemaphoreTake(device_connected_sem, portMAX_DELAY);
+        openDevice();
+        // If this failed, we just go back to waiting -- another
+        // device_connected_sem will arrive if/when something reattaches.
+    }
+}
+
+static void reconnectTaskForwarder(void *arg)
+{
+    ((ACMChannel *)arg)->reconnectTask();
+}
+
 void ACMChannel::begin()
 {
+    // The transport underpins the whole bus and begin() must not return without
+    // it; explicit checks instead of assert() so NDEBUG builds still stop here.
     rxQueue = xQueueCreate(1024 / MAX_FIFO_PAYLOAD, sizeof(FIFOPacket));
     device_disconnected_sem = xSemaphoreCreateBinary();
     device_connected_sem = xSemaphoreCreateBinary();  // <-- new
-    assert(device_disconnected_sem);
-    assert(device_connected_sem);
+    if (rxQueue == nullptr || device_disconnected_sem == nullptr || device_connected_sem == nullptr)
+    {
+        Debug_printv("could not create ACM queue/semaphores, free internal/total heap: %lu/%lu",
+                     esp_get_free_internal_heap_size(), esp_get_free_heap_size());
+        abort();
+    }
 
-    usb_host_config_t host_config = {};
-    host_config.skip_phy_setup = false;
-    host_config.intr_flags = ESP_INTR_FLAG_LEVEL1;
-    ESP_ERROR_CHECK(usb_host_install(&host_config));
-
-    BaseType_t task_created = xTaskCreate(usb_lib_task, "usb_lib", 4096,
-                                          xTaskGetCurrentTaskHandle(),
-                                          USB_HOST_PRIORITY, NULL);
-    assert(task_created == pdTRUE);
+    // False means something else already brought the host up -- on a
+    // Fujiversal board, PicoUpdater, which runs before the bus so it can
+    // flash the companion MCU while nothing else owns the port.
+    bool host_was_already_up = !usbHostEnsureInstalled(_service_priority);
 
     ndc_instance = this;
 
@@ -151,12 +188,12 @@ void ACMChannel::begin()
     // devices that were already connected at boot
     cdc_acm_host_driver_config_t driver_config = {};
     driver_config.driver_task_stack_size = 4096;
-    driver_config.driver_task_priority = USB_HOST_PRIORITY;
+    driver_config.driver_task_priority = _service_priority;
     driver_config.xCoreID = 0;
     driver_config.new_dev_cb = newDevForwarder;
     ESP_ERROR_CHECK(cdc_acm_host_install(&driver_config));
 
-    cdc_acm_host_device_config_t dev_config = {};
+    dev_config = {};
     dev_config.connection_timeout_ms = 1000;
     dev_config.out_buffer_size = 512;
     dev_config.in_buffer_size = 512;
@@ -164,35 +201,42 @@ void ACMChannel::begin()
     dev_config.event_cb = eventForwarder;
     dev_config.data_cb = rxForwarder;
 
+    if (host_was_already_up)
+    {
+        // The comment above ("so we don't miss devices that were already
+        // connected at boot") only holds when we are the ones who started
+        // the host. NEW_DEV is sent at the instant a device enumerates and
+        // is never replayed, and the CDC-ACM driver raises new_dev_cb from
+        // that event alone -- so a companion that enumerated while
+        // PicoUpdater had the port (including the reboot right after a
+        // reflash) has already announced itself to nobody, and the wait
+        // below would never end. Make it announce itself again.
+        Debug_printv("USB host was already running -- recycling the root port "
+                     "so already-enumerated devices are re-announced");
+        usbHostRecycleRootPort();
+    }
+
     while (true) {
         // Wait for newDevCallback to find a CDC-ACM device
         xSemaphoreTake(device_connected_sem, portMAX_DELAY);
 
-        esp_err_t err = cdc_acm_host_open_vendor_specific(found_vid, found_pid,
-                                                          found_interface,
-                                                          &dev_config, &cdc_dev);
-
-        if (err != ESP_OK) {
+        if (!openDevice())
             continue;
-        }
-        //cdc_acm_host_desc_print(cdc_dev);
-        vTaskDelay(pdMS_TO_TICKS(100));
-
-        // Test Line Coding commands: Get current line coding, change
-        // it 9600 7N1 and read again
-
-        cdc_acm_line_coding_t line_coding;
-        ESP_ERROR_CHECK(cdc_acm_host_line_coding_get(cdc_dev, &line_coding));
-
-        line_coding.dwDTERate = 9600;
-        line_coding.bDataBits = 7;
-        line_coding.bParityType = 1;
-        line_coding.bCharFormat = 1;
-        ESP_ERROR_CHECK(cdc_acm_host_line_coding_set(cdc_dev, &line_coding));
-        ESP_ERROR_CHECK(cdc_acm_host_line_coding_get(cdc_dev, &line_coding));
-        ESP_ERROR_CHECK(cdc_acm_host_set_control_line_state(cdc_dev, true, false));
         break;
     }
+
+    // begin() only blocks for this first connection -- callers
+    // (systemBus::setup()) depend on it not returning until a device is
+    // actually up. From here on, keep watching for (re)connect events on a
+    // background task so a disconnect/replug (e.g. the RP2040 resetting)
+    // can recover without a full ESP32 reboot. Previously nothing ever
+    // consumed device_connected_sem again after this point, so a
+    // reattach was silently never noticed.
+    // Survivable: the bus is up, only replug recovery is lost.
+    BaseType_t reconnect_task_created = xTaskCreate(reconnectTaskForwarder, "ACM-reconnect", 4096,
+                                                     this, _service_priority, NULL);
+    if (reconnect_task_created != pdTRUE)
+        Debug_printv("could not create ACM-reconnect task, USB replug recovery disabled");
 
     return;
 }
@@ -218,6 +262,8 @@ void ACMChannel::updateFIFO()
 
 size_t ACMChannel::dataOut(const void *buffer, size_t length)
 {
+    if (!cdc_dev)
+        return 0; // link down
     cdc_acm_host_data_tx_blocking(cdc_dev,
                                   (const uint8_t *) buffer,
                                   length,
@@ -238,7 +284,8 @@ bool ACMChannel::getDTR()
 void ACMChannel::setDSR(bool state)
 {
     _dsr = state;
-    cdc_acm_host_set_control_line_state(cdc_dev, _dsr, _cts);
+    if (cdc_dev)
+        cdc_acm_host_set_control_line_state(cdc_dev, _dsr, _cts);
 }
 
 bool ACMChannel::getRTS()
@@ -249,7 +296,8 @@ bool ACMChannel::getRTS()
 void ACMChannel::setCTS(bool state)
 {
     _cts = state;
-    cdc_acm_host_set_control_line_state(cdc_dev, _dsr, _cts);
+    if (cdc_dev)
+        cdc_acm_host_set_control_line_state(cdc_dev, _dsr, _cts);
 }
 
 bool ACMChannel::getDCD()
@@ -260,6 +308,19 @@ bool ACMChannel::getDCD()
 bool ACMChannel::getRI()
 {
     return _serial_state.bRingSignal;
+}
+
+void ACMChannel::setServicePriority(UBaseType_t priority)
+{
+    _service_priority = priority;
+
+    // Apply immediately if the worker tasks are already running. "usb_lib" is
+    // created here; "USB-CDC" is the cdc_acm host driver task.
+    TaskHandle_t h;
+    if ((h = xTaskGetHandle("usb_lib")) != NULL)
+        vTaskPrioritySet(h, priority);
+    if ((h = xTaskGetHandle("USB-CDC")) != NULL)
+        vTaskPrioritySet(h, priority);
 }
 
 #endif /* CONFIG_USB_CDC_ACM_HOST_ENABLED */
