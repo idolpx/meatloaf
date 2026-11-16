@@ -112,7 +112,14 @@ public:
     void releaseSdMediaContexts();
 #endif
 
+#ifdef IEC_ROOT_BUTTON
+    void requestDriveRoot() { driveRootPending.store(true); }
+#endif
+
  private:
+#ifdef IEC_ROOT_BUTTON
+    std::atomic<bool> driveRootPending{false};
+#endif
 #ifdef MEATLOAF_CARD_DETECT_HOTPLUG
     std::atomic<bool> sdMediaCleanupPending{false};
 #endif
