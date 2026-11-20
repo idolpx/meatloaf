@@ -54,6 +54,9 @@ void LedManager::setup()
 void LedManager::set(eLed led, bool on)
 {
 #ifdef ESP_PLATFORM
+    // Tracked for the LED strip too: LedStripManager keeps no per-LED state,
+    // so toggle() and blink() work from this.
+    mLedState[led] = on;
     if(fnSystem.ledstrip())
     {
         switch (led)
@@ -73,7 +76,6 @@ void LedManager::set(eLed led, bool on)
     }
     else
     {
-        mLedState[led] = on;
 #if defined(PINMAP_A2_REV0) || defined(PINMAP_FUJIAPPLE_IEC) || defined(PINMAP_MAC_REV0)
         // FujiApple Rev 0 BUS LED has reverse logic
         if (led == LED_BUS)
@@ -91,60 +93,20 @@ void LedManager::set(eLed led, bool on)
 void LedManager::toggle(eLed led)
 {
 #ifdef ESP_PLATFORM
-    if(fnSystem.ledstrip())
-    {
-        switch (led)
-        {
-        case eLed::LED_BUS:
-            fnLedStrip.toggle(LedStripManager::LED_STRIP_BUS);
-            break;
-        case eLed::LED_BT:
-            fnLedStrip.toggle(LedStripManager::LED_STRIP_BT);
-            break;
-        case eLed::LED_WIFI:
-            fnLedStrip.toggle(LedStripManager::LED_STRIP_WIFI);
-            break;
-        default:
-            break;
-        }
-    }
-    else
-    {
-        set(led, !mLedState[led]);
-    }
+    set(led, !mLedState[led]);
 #endif // ESP_PLATFORM
 }
 
 void LedManager::blink(eLed led, int count)
 {
 #ifdef ESP_PLATFORM
-    if(fnSystem.ledstrip())
+    for(int i = 0; i < count; i++)
     {
-        switch (led)
-        {
-        case eLed::LED_BUS:
-            fnLedStrip.blink(LedStripManager::LED_STRIP_BUS, count);
-            break;
-        case eLed::LED_BT:
-            fnLedStrip.blink(LedStripManager::LED_STRIP_BT, count);
-            break;
-        case eLed::LED_WIFI:
-            fnLedStrip.blink(LedStripManager::LED_STRIP_WIFI, count);
-            break;
-        default:
-            break;
-        }
-    }
-    else
-    {
-        for(int i = 0; i < count; i++)
-        {
-            toggle(led);
+        toggle(led);
+        fnSystem.delay(BLINKING_TIME);
+        toggle(led);
+        if(i < count - 1)
             fnSystem.delay(BLINKING_TIME);
-            toggle(led);
-            if(i < count - 1)
-                fnSystem.delay(BLINKING_TIME);
-        }
     }
 #endif // ESP_PLATFORM
 }
