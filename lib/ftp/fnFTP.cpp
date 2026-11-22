@@ -1179,6 +1179,9 @@ int32_t fnFTP::get_file_size(string path)
         return (size_t)-1;
     }
 
+    // Drop any stray reply first, so the one parsed below answers THIS SIZE.
+    control->flush();
+
     // Send SIZE command
     SIZE(path);
 

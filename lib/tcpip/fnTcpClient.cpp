@@ -35,7 +35,6 @@
 
 #define FNTCP_MAX_WRITE_RETRY (10)
 #define FNTCP_SELECT_TIMEOUT_US (1000000)
-#define FNTCP_FLUSH_BUFFER_SIZE (1024)
 
 // Most bytes updateFIFO() will pull out of the socket in one call. FIONREAD
 // reports everything the stack has buffered, which during a fast transfer is
@@ -485,32 +484,17 @@ size_t fnTcpClient::available()
     return _rxBuffer.size();
 }
 
-// Send all pending data and clear receive buffer
+// Discard everything received so far: what available() has already pulled
+// into _rxBuffer AND what is still waiting in the socket. This used to recv()
+// the socket directly for available()'s count - but available() had just MOVED
+// those bytes into _rxBuffer, so the buffered bytes survived the flush and the
+// recv either ate a later reply or, on an empty socket, failed with EAGAIN and
+// stop()ped the connection. On the FTP control channel that left a stale reply
+// in front of every command, and each one read its predecessor's answer.
 void fnTcpClient::flush()
 {
-    int res;
-    size_t a = available(), toRead = 0;
-    if (!a)
-        return; // Nothing to flush
-
-    uint8_t *buf = (uint8_t *)malloc(FNTCP_FLUSH_BUFFER_SIZE);
-    if (!buf)
-        return; // Memory error
-
-    while (a)
-    {
-        toRead = (a > FNTCP_FLUSH_BUFFER_SIZE) ? FNTCP_FLUSH_BUFFER_SIZE : a;
-        res = recv(fd(), (char *)buf, toRead, MSG_DONTWAIT);
-        if (res < 0)
-        {
-            Debug_printf("fail on fd %d, errno: %d, \"%s\"\r\n",
-                fd(), compat_getsockerr(), compat_sockstrerror(compat_getsockerr()));
-            stop();
-            break;
-        }
-        a -= res;
-    }
-    free(buf);
+    while (available())
+        _rxBuffer.clear();
 }
 
 uint8_t fnTcpClient::connected()

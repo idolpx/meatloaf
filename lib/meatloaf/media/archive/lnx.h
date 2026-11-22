@@ -57,7 +57,7 @@ protected:
 
     std::vector<Entry> entries;
     int8_t loadEntries();
-    void skipBasicLoader();
+    bool skipBasicLoader();
 
     // Parse the index once per stream: readHeader() then loadEntries(), which
     // must run in that order and from that stream position. entry_count is the

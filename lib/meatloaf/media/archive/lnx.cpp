@@ -28,7 +28,7 @@ static constexpr uint32_t LNX_BLOCK_SIZE = 254;
  * Streams
  ********************************************************/
 
-void LNXMStream::skipBasicLoader()
+bool LNXMStream::skipBasicLoader()
 {
     // Skip the BASIC loader program (typically 94 bytes)
     // We'll search for the LNX header signature "LYNX" instead of hardcoding offset
@@ -37,26 +37,36 @@ void LNXMStream::skipBasicLoader()
     uint8_t buffer[254];
     uint32_t bytesRead = readContainer(buffer, 254);
 
+    // A source that failed to open reads 0 bytes, and `bytesRead - 4` is
+    // unsigned: it wraps to ~4 billion and the scan walks off the stack.
+    if (bytesRead < 4)
+    {
+        Debug_printv("Error: container read returned %u bytes, not a LNX file?", bytesRead);
+        return false;
+    }
+
     // Search for "LYNX" signature in first 254 bytes
-    for (uint32_t i = 0; i < bytesRead - 4; i++)
+    for (uint32_t i = 0; i <= bytesRead - 4; i++)
     {
         if (buffer[i] == 'L' && buffer[i+1] == 'Y' && buffer[i+2] == 'N' && buffer[i+3] == 'X')
         {
             // Found LYNX signature, position stream at start of header
             containerStream->seek(i);
             Debug_printv("Found LYNX signature at offset[%d]", i);
-            return;
+            return true;
         }
     }
 
     // If not found, assume typical offset
     Debug_printv("LYNX signature not found, using default offset");
     containerStream->seek(0x5E);  // Typical offset after BASIC loader
+    return true;
 }
 
 bool LNXMStream::readHeader()
 {
-    skipBasicLoader();
+    if (!skipBasicLoader())
+        return false;
 
     // Read signature line (contains "LYNX")
     header.signature = readUntil(0x0D);  // Read until CR
