@@ -224,3 +224,47 @@ record data, plus a record length (1-254). It owns everything that is the same e
   gaps, validate differences), written into the spec's follow-up section.
 - Naming and file layout inside `drive/dos/`.
 - The callers (if any) of today's text-form `P` command.
+
+## Follow-up: remaining VDrive-only features
+
+Inventory of `lib/vdrive/vdrive-command.c` (and `vdrive-iec.c` for OPEN-level behaviour) against
+`CbmDos` + `iecDrive` as of the end of Task 4. "Stub" means `CbmDos` recognises the command and logs
+it but does nothing. These are what must be written natively before VDrive can be removed.
+
+- `vdrive_command_copy` (C:new=old[,old2...], file concatenation) -- stub in `CbmDos::cmdCbm`.
+- `vdrive_command_lockunlock` (L) -- no `case 'L'` in `CbmDos`; falls through to 31.
+- `vdrive_command_renameheader` (R-H) -- not present; `R` always takes the file-rename path.
+- `vdrive_command_renamepart` (R-P, CMD partition rename) -- not present.
+- `vdrive_command_getpartinfo` (G-P) -- stub in `cmdSd2iec`.
+- `vdrive_command_deletepart` (D-P) -- not present (`D` is a "duplicate" stub).
+- `vdrive_command_chcmdpart` / `vdrive_command_chpart` (CP on 1581/native, `/` partition change inside
+  a disk) -- `/` is an empty case in `cmdSd2iec`; `CP` works only through `hdpart::` on CMD/CFS images.
+- `vdrive_command_switchtraverse`, `vdrive_command_switch`, `vdrive_command_return` (partition
+  traversal for paths like `1581part/file`) -- no native equivalent beyond `D64MFile` sub-partition paths.
+- `vdrive_command_chdir` / `mkdir` / `rmdir` on 1581 and native images (`CD:`, `MD:`, `RD:`) -- native
+  `MD`/`RD` exist via `MFile`; `CD` is handled by `cmdMeatloafPrefix`; semantic parity with VDrive
+  (header-block entry, error codes 39/62/63) is unverified.
+- `vdrive_command_validate` / `vdrive_command_validate_worker` (V) -- native `V` calls
+  `validateBAM()`; VDrive's GEOS-aware validate and its status codes differ.
+- `vdrive_command_format_internal` / `vdrive_command_format_worker` (N:name,id) -- native N: exists;
+  VDrive-only: 1541/1571/1581/native-specific layout options.
+- `vdrive_command_initialize` (I) -- native `I` is `dosReset()` only (no BAM reload).
+- `vdrive_command_position` (P, binary form `P<ch><lo><hi><rec><pos>`) -- native `P` is the text form
+  only and is a plain `seek()`; record positioning is Phase 2 (REL).
+- `vdrive_command_time` (T-R/T-W) -- native has its own RTC `T-` handling.
+- `vdrive_command_memory`, `vdrive_command_memory_write/_exec/_read` (M-R/M-W/M-E) -- native
+  `driveMemory`; the 1541/1581 job-queue and ROM-specific behaviour is not emulated.
+- `vdrive_command_block` (B-R/B-W/B-A/B-F/B-E/B-P, U1/U2/UA/UB/UI/UJ and user jumps U3-U8) -- native
+  B-R/B-W/U1/U2/B-P/B-A/B-F are present as seeks; U3-U8 jumps and UI/U9 are not.
+- `vdrive_command_allocate_chain` (internal to validate) -- no native counterpart.
+- `vdrive_command_set_error` status table -- native status codes are a subset; DOS-version-specific
+  messages (73 text per drive type) are not.
+- OPEN-level (`vdrive-iec.c`): REL create (`,L,<len>`) and REL read/write/expand live in
+  `vdrive-rel.c` (Phase 2), `@:` replace, `,A` append, wildcard `$` filters (`$:*=P`, `$=T`), the
+  `#` buffer allocation with buffer number, and the per-channel error `60/61/64` coverage.
+
+Callers of the old text-form `P` (`p<ch> <hi> <mid> <lo>`) found:
+
+- `.claude/skills/commodore64-meatloaf/SKILL.md:457` -- `print#15,"p 2,0,1,0"` documentation example.
+- `docs/superpowers/plans/2026-11-23-dos-split-and-rel.md:45` -- hardware baseline script mention.
+- No callers in `lib/console/` or other `docs/` (console `f-p`/`b-p` are separate commands).

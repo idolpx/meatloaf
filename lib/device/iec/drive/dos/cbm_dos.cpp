@@ -977,8 +977,18 @@ bool CbmDos::cmdSd2iec(std::string& command, size_t colon_position)
 }
 
 
-// CP<n> (text) and C{Shift-P}<byte> (binary).
+// CP / C{Shift-P} on media with no partition table (anything but a CMD or CFS
+// image): "31 INVALID COMMAND", exactly what iecDrive::changePartition() answers
+// when hdpart::targetFor() finds no table. CmdHdDos and Ide64Dos override this.
 bool CbmDos::cmdChangePartition(const std::string& command)
+{
+    (void) command;
+    m_host.dosSetStatus(ST_SYNTAX_INVALID);
+    return true;
+}
+
+// CP<n> (text) and C{Shift-P}<byte> (binary), for media that have partitions.
+bool CbmDos::partitionFromCommand(const std::string& command)
 {
     if ( command[1] == 'P') // Change Partition text: CP<n>
     {

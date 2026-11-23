@@ -23,7 +23,8 @@ protected:
   virtual bool cmdMeatloafPrefix(std::string& command);                        // CD, E?+/-, Dolphin M-R hack
   virtual bool cmdCbm(std::string& command, uint8_t media, size_t colon);     // first switch
   virtual bool cmdSd2iec(std::string& command, size_t colon);                 // second switch
-  virtual bool cmdChangePartition(const std::string& command);                // CP / C<shift-P>, see Task 4
+  virtual bool cmdChangePartition(const std::string& command);                // CP / C<shift-P>: 31 here, media DOSes override
+  bool partitionFromCommand(const std::string& command);                      // parses the partition number, asks the host to select it
   virtual void cmdMeatloafExtended(std::string& command);                     // auth:, else 31
 };
 

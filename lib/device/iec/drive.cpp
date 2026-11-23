@@ -21,6 +21,8 @@
 #include "drive.h"
 #include "drive_filename.h"
 #include "drive/dos/cbm_dos.h"
+#include "drive/dos/cmd_dos.h"
+#include "drive/dos/ide64_dos.h"
 #include "drive/dos/open_spec.h"
 
 #include <algorithm>
@@ -1410,9 +1412,6 @@ uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool 
     }
 }
 
-// we override the "executeData" because some commands may include NUL or CR characters which 
-
-
 // Move a channel's pointer, for B-P and F-P.
 //
 //   B-P (within_block)  the pointer WITHIN the block B-R/U1 selected, 0-255.
@@ -2143,8 +2142,13 @@ void iecDrive::ensureDos()
     if ( m_dos != nullptr && m_dos->kind() == m_dosKind )
         return;
 
-    // Every kind is served by CbmDos until the media-specific DOSes exist.
-    CbmDos *dos = new (std::nothrow) CbmDos(*this);
+    CbmDos *dos = nullptr;
+    switch ( m_dosKind )
+    {
+        case hdpart::Kind::CMD: dos = new (std::nothrow) CmdHdDos(*this); break;
+        case hdpart::Kind::CFS: dos = new (std::nothrow) Ide64Dos(*this); break;
+        default:                dos = new (std::nothrow) CbmDos(*this);   break;
+    }
     if ( dos == nullptr )
     {
         Debug_printv("Error: could not allocate DOS");
