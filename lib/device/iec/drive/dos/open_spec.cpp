@@ -14,7 +14,7 @@ OpenRequest parseOpenSpec(uint8_t channel, const std::string& rawIn)
     std::string name = raw.substr(0, c1);
     std::string f1, f2;
     bool have_f2 = false;
-    if (c1 != std::string::npos && c1 + 1 < raw.size() + 0)
+    if (c1 != std::string::npos && c1 + 1 < raw.size())
         f1 = raw.substr(c1 + 1, c2 == std::string::npos ? std::string::npos : c2 - c1 - 1);
     if (c2 != std::string::npos && c2 + 1 < raw.size())
     {
