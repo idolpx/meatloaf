@@ -20,8 +20,11 @@
 
 #include "drive.h"
 #include "drive_filename.h"
+#include "drive/dos/cbm_dos.h"
+#include "drive/dos/open_spec.h"
 
 #include <algorithm>
+#include <new>
 #include <cstring>
 #include <ctime>
 #include <sstream>
@@ -103,22 +106,6 @@ static const char *getCStringLog(std::string s)
 #endif
 
 
-static bool isMatch(std::string name, std::string pattern)
-{
-    signed char found = -1;
-    
-    for(uint8_t i=0; found<0; i++)
-    {
-        if( pattern[i]=='*' )
-            found = 1;
-        else if( pattern[i]==0 || name[i]==0 )
-            found = (pattern[i]==name[i]) ? 1 : 0;
-        else if( pattern[i]!='?' && pattern[i]!=name[i] && !(name[i]=='~' && (pattern[i] & 0xFF)==0xFF) )
-            found = 0;
-    }
-
-    return found==1;
-}
 
 #ifdef MEATLOAF_CARD_DETECT_HOTPLUG
 static bool isSdPath(const std::string &url)
@@ -869,6 +856,10 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
     synchronizeSdMedia();
 #endif
 
+    // The DOS is never swapped while it is executing; this is one of the two
+    // points where a pending change of media kind is applied.
+    ensureDos();
+
 #ifdef ENABLE_DISPLAY
     LEDS.activity = true;
 #endif
@@ -896,74 +887,11 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
 
 //#endif
     {
-        // TODO: Use CBM DOS command parser here
-        // determine file name
-        std::string name;
-        std::vector<std::string> pt = util_tokenize(std::string(cname), ',');
-        if( pt.size()>0 ) name = pt[0];
-
-        // determine file mode (read/write)
-        bool overwrite = false;
-        std::ios_base::openmode mode = std::ios_base::in;
-        if( channel==1 ) mode = std::ios_base::out;
-        if( pt.size() >= 3 )
-        {
-            if( pt[2]=="R" )
-                mode = std::ios_base::in;
-            else if( pt[2]=="W" )
-                mode = std::ios_base::out;
-        }
-
-        // Network URLs (http://, ftp://, etc.) need read-write mode for
-        // full-mode HTTP protocol: PRINT# writes commands, GET# reads responses.
-        // Must override channel 1's default-out assignment.
-        // Only force for channel >= 2 (OPEN for PRINT#/GET#).  Channel 0 LOAD
-        // must stay read-only so it performs the HTTP GET directly.
-        if ( name.find("://") != std::string::npos && channel >= 2 && mode != (std::ios_base::in | std::ios_base::out) ) {
-            mode = std::ios_base::in | std::ios_base::out;
-        }
-
-        if( mstr::startsWith(name, "@") )
-        {
-            overwrite = true;
-            name = mstr::drop(name, 1);
-        }
-
-        if( mstr::startsWith(name, ":") )
-        {
-            overwrite = true;
-            name = mstr::drop(name, 1);
-        }
-
-        if( mstr::startsWith(name, "0:") )
-            name = mstr::drop(name, 2);
-
-        // A CBM file spec names its path relative to the current directory:
-        // "/SETTINGS/:COMPONENTS.T" descends from here, while "//DIR/:FILE"
-        // starts at the root of the image (cd() handles that form). Drop the
-        // single leading '/' so it is not read as a host-absolute path.
-        //
-        // Keyed on the CBM name separator "/:" because Meatloaf also accepts
-        // real host paths from the C64 - LOAD"/sd/games/x.d64",8 must still
-        // resolve at the SD root, and it never carries that separator.
-        if( name.size() > 1 && name[0] == '/' && name[1] != '/' &&
-            name.find("/:") != std::string::npos )
-        {
-            name = mstr::drop(name, 1);
-        }
-
-        if( mstr::startsWith(name, "CD") )
-        {
-            if ( name.size() > 2 )
-                // Handle CD command in LOAD but filename could start with CD,
-                // so only treat it as CD if it's followed by a separator character, back, up, or path
-                if (name[2] == ':' || name[2] == '_' || name[2] == '^' || name[2] == '/')
-                    name = mstr::drop(name, 2);
-        }
-
-        // file name officially ends at first "shifted space" (0xA0) character
-        size_t i = name.find('\xa0');
-        if( i != std::string::npos ) name = name.substr(0, i);
+        // determine file name, mode (read/write) and overwrite flag
+        OpenRequest req = parseOpenSpec(channel, std::string(cname));
+        std::string name = req.name;
+        const std::ios_base::openmode mode = req.mode;
+        const bool overwrite = req.overwrite;
 
         if ( m_cwd == nullptr )
         {
@@ -994,8 +922,7 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
             // whole image. A real drive takes a buffer number ("#3"); there is
             // one stream per channel here, so a trailing number is accepted
             // and ignored. Anything else after the '#' is a filename.
-            if( name[0] == '#' &&
-                name.find_first_not_of("0123456789", 1) == std::string::npos )
+            if( req.direct_access )
             {
                 if( m_cwd == nullptr )
                 {
@@ -1484,22 +1411,6 @@ uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool 
 }
 
 // we override the "executeData" because some commands may include NUL or CR characters which 
-// Parse one decimal DOS command argument.  strtoul, never stoi/stol: ESP-IDF
-// builds -fno-exceptions, so a throwing parser on a string that came off the
-// IEC bus is std::terminate.  Rejects an empty string and any trailing
-// rubbish rather than accepting a prefix, so a malformed argument is a syntax
-// error instead of a silently different number.
-static bool dosParseUint(const std::string &s, uint32_t *out)
-{
-    if ( s.empty() ) return false;
-
-    char *end = nullptr;
-    unsigned long value = strtoul(s.c_str(), &end, 10);
-    if ( end == s.c_str() || *end != '\0' ) return false;
-
-    *out = (uint32_t) value;
-    return true;
-}
 
 
 // Move a channel's pointer, for B-P and F-P.
@@ -1767,920 +1678,11 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
     }
 //#endif
 
-    if( mstr::startsWith(command, "CD") )
-    {
-        command = mstr::toUTF8(command);
-        set_cwd(mstr::drop(command, 2));
+    // Everything from here on is the DOS: CBM 2.6, SD2IEC and Meatloaf commands.
+    ensureDos();
+    if ( m_dos == nullptr )
         return;
-    }
-#ifdef IEC_FP_JIFFY
-    else if( command=="EJ+" || command=="EJ-" )
-    {
-        enableFastLoader(IEC_FP_JIFFY, command[2]=='+');
-        return;
-    }
-#endif  
-#ifdef IEC_FP_EPYX
-    else if( command=="EE+" || command=="EE-" )
-    {
-        enableFastLoader(IEC_FP_EPYX, command[2]=='+');
-        return;
-    }
-#endif  
-#ifdef IEC_FP_AR6
-    else if( command=="EA+" || command=="EA-" )
-    {
-        enableFastLoader(IEC_FP_AR6, command[2]=='+');
-        return;
-    }
-#endif
-#ifdef IEC_FP_FC3
-    else if( command=="EF+" || command=="EF-" )
-    {
-        enableFastLoader(IEC_FP_FC3, command[2]=='+');
-        return;
-    }
-#endif
-#ifdef IEC_FP_DOLPHIN
-    else if( command=="ED+" || command=="ED-" )
-    {
-        enableFastLoader(IEC_FP_DOLPHIN, command[2]=='+');
-        return;
-    }
-    else if( command == "M-R\xfa\x02\x03" )
-    {
-        // hack: DolphinDos' MultiDubTwo copy program reads 02FA-02FC to determine
-        // number of free blocks => pretend we have 664 (0298h) blocks available
-        m_statusCode = ST_OK;
-        uint8_t data[3] = {0x98, 0, 0x02};
-        setStatus((char *) data, 3);
-        return;
-    }
-#endif
-    // else
-    // {
-    //   setStatusCode(ST_SYNTAX_INVALID);
-    //   //Debug_printv("Invalid command");
-    // }
-
-    // Drive level commands
-    // CBM DOS 2.6
-    uint8_t media = 0; 
-    // N:, NEW:, N0:, NEW0:, S:, S0, I:, I0:, etc
-    size_t colon_position = command.find_first_of(':');
-    if (colon_position == std::string::npos)
-        colon_position = 0;
-
-    if (colon_position > 1)
-    {
-        media = atoi((char *) &command[colon_position - 1]);
-    }
-    Debug_printv("media[%d] colon_position[%d] command[%s]", media, colon_position, command.c_str());
-
-    switch ( command[0] )
-    {
-        case 'B':
-            if (command[1] == '-')
-            {
-                // B-P buffer pointer
-                if (command[2] == 'P')
-                {
-                    command = mstr::drop(command, 3);
-                    mstr::trim(command);
-                    mstr::replaceAll(command, "  ", " ");
-
-                    std::vector<std::string> pt = util_tokenize(command, ' ');
-                    uint32_t chan = 0, pos = 0;
-                    if ( pt.size() < 2 || !dosParseUint(pt[0], &chan) || !dosParseUint(pt[1], &pos) )
-                    {
-                        setStatusCode(ST_SYNTAX_UNKNOWN);
-                        return;
-                    }
-
-                    Debug_printv("B-P channel[%lu] position-in-block[%lu]",
-                                 (unsigned long) chan, (unsigned long) pos);
-
-                    positionChannel( chan, pos, true );
-                    return;
-                }
-                // B-R read block / B-W write block
-                else if (command[2] == 'R' || command[2] == 'W')
-                {
-                    bool for_write = (command[2] == 'W');
-                    Debug_printv("%s block", for_write ? "write" : "read");
-
-                    command = mstr::drop(command, 3);
-                    mstr::trim(command);
-                    mstr::replaceAll(command, "  ", " ");
-                    std::vector<uint8_t> pti = util_tokenize_uint8(command);
-                    if ( pti.size() < 4 )
-                    {
-                        setStatusCode(ST_SYNTAX_UNKNOWN);
-                        return;
-                    }
-                    Debug_printv("command[%s] channel[%d] media[%d] track[%d] sector[%d]", command.c_str(), pti[0], pti[1], pti[2], pti[3]);
-
-                    // CBM keeps byte 0 of a B-R/B-W block as the count of
-                    // valid bytes, so both land on byte 1; U1/U2 give the
-                    // whole 256.
-                    seekChannelToBlock( pti[0], pti[2], pti[3], 1, for_write );
-                    return;
-                }
-                // B-A allocate block in BAM
-                else if (command[2] == 'A')
-                {
-                    Debug_printv("allocate block in BAM");
-
-                    command = mstr::drop(command, 3);
-                    mstr::trim(command);
-                    mstr::replaceAll(command, "  ", " ");
-                    std::vector<uint8_t> pti = util_tokenize_uint8(command);
-                    if (pti.size() < 3)
-                    {
-                        setStatusCode(ST_SYNTAX_UNKNOWN);
-                        return;
-                    }
-                    Debug_printv("track[%d] sector[%d]", pti[0], pti[1]);
-
-                    std::unique_ptr<MFile> image(MFSOwner::File(m_cwd->url));
-                    auto stream = image ? image->getSourceStream() : nullptr;
-                    if (stream == nullptr || !stream->isOpen() || !image || !image->isWritable)
-                    {
-                        setStatusCode(ST_DRIVE_NOT_READY);
-                        return;
-                    }
-
-                    // B-A allocates: true = allocate (mark as used)
-                    if (!stream->setBlockAllocation(pti[0], pti[1], true))
-                    {
-                        setStatusCode(ST_NO_BLOCK, pti[0], pti[1]);
-                        return;
-                    }
-                    setStatusCode(ST_OK);
-                    return;
-                }
-                // B-F free block in BAM
-                else if (command[2] == 'F')
-                {
-                    Debug_printv("free block in BAM");
-
-                    command = mstr::drop(command, 3);
-                    mstr::trim(command);
-                    mstr::replaceAll(command, "  ", " ");
-                    std::vector<uint8_t> pti = util_tokenize_uint8(command);
-                    if (pti.size() < 3)
-                    {
-                        setStatusCode(ST_SYNTAX_UNKNOWN);
-                        return;
-                    }
-                    Debug_printv("track[%d] sector[%d]", pti[0], pti[1]);
-
-                    std::unique_ptr<MFile> image(MFSOwner::File(m_cwd->url));
-                    auto stream = image ? image->getSourceStream() : nullptr;
-                    if (stream == nullptr || !stream->isOpen() || !image || !image->isWritable)
-                    {
-                        setStatusCode(ST_DRIVE_NOT_READY);
-                        return;
-                    }
-
-                    // B-F frees: false = deallocate (mark as free)
-                    if (!stream->setBlockAllocation(pti[0], pti[1], false))
-                    {
-                        setStatusCode(ST_NO_BLOCK, pti[0], pti[1]);
-                        return;
-                    }
-                    setStatusCode(ST_OK);
-                    return;
-                }
-                // B-E block execute
-                else if (command[2] == 'E')
-                {
-                    Debug_printv( "block execute");
-                }
-            }
-            //Error(ERROR_31_SYNTAX_ERROR);
-            Debug_printv( "block/buffer");
-        break;
-        case 'C':
-            if ( command[1] != 'D' && colon_position)
-            {
-                //Copy(); // Copy File
-                Debug_printv( "copy file");
-            }
-        break;
-        case 'D':
-            Debug_printv( "duplicate disk");
-            //Error(ERROR_31_SYNTAX_ERROR);	// DI, DR, DW not implemented yet
-        break;
-        case 'F':
-            if (command[1] == '-')
-            {
-                // F-P file position
-                if (command[2] == 'P')
-                {
-                    command = mstr::drop(command, 3);
-                    mstr::trim(command);
-                    mstr::replaceAll(command, "  ", " ");
-
-                    // Parsed as 32-bit, not through util_tokenize_uint8():
-                    // F-P's argument is an absolute offset in the file and a
-                    // uint8_t silently WRAPS it -- 300 became 44, answering OK.
-                    std::vector<std::string> pt = util_tokenize(command, ' ');
-                    uint32_t chan = 0, pos = 0;
-                    if ( pt.size() < 2 || !dosParseUint(pt[0], &chan) || !dosParseUint(pt[1], &pos) )
-                    {
-                        setStatusCode(ST_SYNTAX_UNKNOWN);
-                        return;
-                    }
-
-                    Debug_printv("F-P channel[%lu] position[%lu]",
-                                 (unsigned long) chan, (unsigned long) pos);
-
-                    positionChannel( chan, pos, false );
-                    return;
-                }
-            }
-            // Without this an unmatched F-* falls straight into 'I' and
-            // resets the drive.
-        break;
-        case 'I':
-            // Initialize
-            Debug_printv( "initialize");
-            reset();
-            return;
-        break;
-        case 'M':
-            if ( command[1] == '-' ) // Memory
-            {
-                if (command[2] == 'R') // M-R memory read
-                {
-                    command = mstr::drop(command, 3); // Drop M-R
-                    std::string code = mstr::toHex(command);
-                    uint16_t address = (command[0] | command[1] << 8);
-                    uint8_t size = command[2];
-                    Debug_printv("Memory Read [%s]", code.c_str());
-                    Debug_printv("address[%04X] size[%d]", address, size);
-
-                    // size is uint8_t, so 255 is the most that can be asked for.
-                    uint8_t data[256] = { 0 };
-                    // read() answers with what it could actually supply --
-                    // publishing `size` bytes regardless would hand the caller
-                    // buffer contents for an address that is not mapped.
-                    size_t got = m_memory.read(address, data, size);
-                    setStatus((char *) data, got);
-                    Debug_printv("address[%04X] data[%s]", address, mstr::toHex(data, got).c_str());
-                }
-                else if (command[2] == 'W') // M-W memory write
-                {
-                    command = mstr::drop(command, 3); // Drop M-W
-                    uint16_t address = (command[0] | command[1] << 8);
-                    size_t size = command[2]; // Limited to 34 data bytes per command
-
-                    command = mstr::drop(command, 3); // Drop address, size
-
-                    if (size > command.size())
-                        size = command.size();
-
-                    Debug_printv("Memory Write address[%04X] size[%d] data[%s]", address, size,
-                                 mstr::toHex((const uint8_t *)command.c_str(), size).c_str());
-
-                    m_memory.write(address, (const uint8_t *)command.c_str(), size);
-                }
-                else if (command[2] == 'E') // M-E memory execute
-                {
-                    command = mstr::drop(command, 3); // Drop M-E
-                    std::string code = mstr::toHex(command);
-                    uint16_t address = (command[0] | command[1] << 8);
-                    Debug_printv("Memory Execute address[%04X][%s]", address, code.c_str());
-
-                    // Fast loader detection happens earlier, in
-                    // IECFileDevice::isFastLoaderRequest -- an M-E only reaches
-                    // here when no loader claimed it.
-                    m_memory.execute(address);
-                }
-                //setStatusCode(ST_OK);
-                return;
-            }
-        break;
-        case 'N':
-        {
-//#ifdef USE_VDRIVE
-            if ( Meatloaf.use_vdrive )
-                {
-                string params = command.substr(colon_position+1);
-                size_t dot = params.find('.');
-
-                if( dot==string::npos )
-                {
-                    // must have extension to determine image type
-                    setStatusCode(ST_SYNTAX_INVALID);
-                }
-                else
-                {
-                    string filename, diskname, ext;
-                    size_t comma = params.find(',');
-                    if( comma==string::npos )
-                    {
-                        filename = mstr::toUTF8(params);
-                        diskname = params.substr(0,dot);
-                    }
-                    else
-                    {
-                        filename = mstr::toUTF8(params.substr(0, comma));
-                        diskname = params.substr(comma+1);
-                    }
-
-                    fnLedManager.set(eLed::LED_BUS, true);
-                    Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Changing directory to [%s][%s]", m_cwd->url.c_str(), filename.c_str());
-                    MFile *f = m_cwd->cd(filename);
-                    if( f->exists() )
-                        setStatusCode(ST_FILE_EXISTS);
-                    else if( !f->isWritable )
-                        setStatusCode(ST_WRITE_PROTECT_ON);
-                    else if( !VDrive::createDiskImage(f->url.c_str(), NULL, diskname.c_str(), false) )
-                        setStatusCode(ST_WRITE_VERIFY);
-                    else
-                        setStatusCode(ST_OK);
-                    fnLedManager.set(eLed::LED_BUS, false);
-                }
-            }
-            else
-            {
-//#else
-                //New();
-                Debug_printv( "new (format)");
-                command = mstr::toUTF8(command.substr(colon_position + 1));
-                if (!m_cwd->format(command))
-                    setStatusCode(ST_WRITE_VERIFY);
-
-                return;
-            }
-//#endif
-        }
-        break;
-        case 'R':
-            if ( command[1] != 'D' && colon_position ) // Rename
-            {
-                Debug_printv( "rename file");
-                // Rename();
-                command = command.substr(colon_position + 1);
-                command = mstr::toUTF8(command);
-                auto parts = mstr::split(command, '=');
-
-                if( parts.size() != 2 )
-                {
-                setStatusCode(ST_SYNTAX_INVALID);
-                return;
-                }
-
-                uint8_t n = 0;
-                MFile *dir = MFSOwner::File(m_cwd->url);
-                if( dir!=nullptr )
-                {
-                    if( dir->isDirectory() )
-                        {
-                        std::unique_ptr<MFile> entry;
-                        while( (entry=std::unique_ptr<MFile>(m_cwd->getNextFileInDir()))!=nullptr )
-                            {
-                            if( isMatch(entry->name, parts[1]) )
-                                {
-                                entry->rename(parts[0]);
-                                Debug_printv("Renamed '%s' to '%s'", parts[1].c_str(), parts[0].c_str());
-                                n++;
-                                break;
-                                }
-                            }
-                        }
-                    delete dir;
-                }
-
-                if ( n == 0 )
-                    setStatusCode(ST_FILE_NOT_FOUND);
-
-                return;
-            }
-        break;
-        case 'S': // Scratch
-            if ( colon_position )
-            {
-                Debug_printv( "scratch");
-                //Scratch();
-                // SCRATCH (delete)
-                uint8_t n = 0;
-
-                // Everything between the command letter and the colon is a
-                // PATH ("S/TEMPORARY/:*" scratches inside TEMPORARY), and it
-                // used to be discarded - the pattern was then matched against
-                // the CURRENT directory, so C64 OS clearing its temp directory
-                // instead matched os/BOOTER. Nothing was lost only because
-                // MFile::remove() refuses a container-hosted entry; on a
-                // writable image it would have deleted the wrong files.
-                std::string dirPath = command.substr(1, colon_position - 1);
-                std::string pattern = command.substr(colon_position + 1);
-
-                // drive number prefix ("S0:...")
-                while( !dirPath.empty() && isdigit((unsigned char)dirPath.front()) )
-                    dirPath.erase(0, 1);
-
-                // As in open(): one leading '/' descends from the current
-                // directory, "//" starts at the root of the image.
-                if( dirPath.size() > 1 && dirPath[0] == '/' && dirPath[1] != '/' )
-                    dirPath.erase(0, 1);
-                while( !dirPath.empty() && dirPath.back() == '/' )
-                    dirPath.pop_back();
-
-                std::unique_ptr<MFile> dir(dirPath.empty()
-                                           ? MFSOwner::File(m_cwd->fullUrl())
-                                           : m_cwd->cd(dirPath));
-                if( dir!=nullptr && dir->isDirectory() )
-                {
-                    std::unique_ptr<MFile> entry;
-                    while( (entry=std::unique_ptr<MFile>(dir->getNextFileInDir()))!=nullptr )
-                        {
-                        if( !entry->isDirectory() && isMatch(mstr::toPETSCII2(entry->name), pattern) )
-                            {
-                            Debug_printv("DELETING %s", entry->name.c_str());
-                            if( entry->remove() ) n++;
-                            }
-                        //else Debug_printv("NOT DELETING %s", entry->name.c_str());
-                        }
-                }
-
-                setStatusCode(ST_SCRATCHED, n);
-                return;
-            }
-        break;
-        case 'U':
-            if (command[1] == '1' || command[1] == '2' || command[1] == 'A' || command[1] == 'B') // U1/UA, U2/UB
-            {
-                // Block Read if 1/A, Write if 2/B
-                bool read = (command[1] == '1' || command[1] == 'A');
-                command = mstr::drop(command, 3);
-                mstr::trim(command);
-                mstr::replaceAll(command, "  ", " ");
-                std::vector<uint8_t> pti = util_tokenize_uint8(command);
-                if ( pti.size() < 4 )
-                {
-                    setStatusCode(ST_SYNTAX_UNKNOWN);
-                    return;
-                }
-                Debug_printv("command[%s] channel[%d] media[%d] track[%d] sector[%d]", command.c_str(), pti[0], pti[1], pti[2], pti[3]);
-
-                // TODO: Check for C128 Auto boot and if track/sector is 1/0
-
-                // Unlike B-R/B-W, U1/U2 give the WHOLE block -- there is no
-                // count byte -- so they land on byte 0.
-                //
-                // The seek matters beyond the data: some fast loaders expect
-                // the drive's track/sector registers to be updated here and
-                // then issue reads that do not name a block.
-                Debug_printv("Block-%s", read ? "Read" : "Write");
-                seekChannelToBlock( pti[0], pti[2], pti[3], 0, !read );
-                return;
-            }
-            else if ((command[1] >= '3' && command[1] <= '9') || (command[1] >= 'C' && command[1] <= 'H')) // U3-U9, UC-UH
-            {
-                uint8_t offset = command[1] - '3';
-                if (offset > 5)
-                {
-                    //Debug_printv("U%C [%02x] C[%02x]", command[1], command[1], 'C');
-                    offset = command[1] - 'C';
-                }
-                offset = (offset * 3);
-                //Debug_printv( "U%c, offset %02x", command[1], offset);
-                m_memory.execute(0x0500 + offset);
-                return;
-            }
-            else if ((command[1] == '9' || command[1] == 'I') && command.size() == 2) // U9, UI
-            {
-                Debug_printv( "warm reset");
-                setStatusCode(ST_DOSVERSION);
-                m_memory.execute(0xFFFA);
-                return;
-            }
-            else if (command[1] == 'J') // UJ
-            {
-                Debug_printv( "cold reset");
-                reset();
-                return;
-            }
-            else if (command[1] == 0xCA) // U{Shift-J}
-            {
-                if ( command[2] == '+')
-                {
-                    Debug_printv( "reboot");
-                    fnSystem.reboot();
-                    return;
-                }
-                Debug_printv( "hard reset");
-                reset();
-                //m_cwd.reset(m_cwd->cd("^")); // reset to flash root
-                set_cwd("^");
-                return;
-            }
-            else if (command[1] == 'I' && command.size() == 3) // UI+/-
-            {
-                if (command[2] == '-')
-                {
-                    Debug_printv( "VIC-20 Bus Speed");
-                    // Set IEC Data Valid timing to 20us
-                }
-                else
-                {
-                    Debug_printv( "C64 Bus Speed");
-                    // Set IEC Data Valid timing to 60us
-                }
-                //setStatusCode(ST_OK);
-                return;
-            }
-        break;
-        case 'V':
-            {
-                Debug_printv( "validate bam");
-
-                std::unique_ptr<MFile> image(MFSOwner::File(m_cwd->url));
-                auto stream = image ? image->getSourceStream() : nullptr;
-                if (stream == nullptr || !stream->isOpen() || !image || !image->isWritable)
-                {
-                    setStatusCode(ST_DRIVE_NOT_READY);
-                    return;
-                }
-
-                if (!stream->validateBAM())
-                {
-                    setStatusCode(ST_DRIVE_NOT_READY);
-                    return;
-                }
-                return;
-            }
-        break;
-        default:
-            //Error(ERROR_31_SYNTAX_ERROR);
-        break;
-    }
-
-    // SD2IEC Commands
-    // http://www.n2dvm.com/UIEC.pdf
-    switch ( command[0] )
-    {
-        case 'C':
-            if ( command[1] == 'P') // Change Partition text: CP<n>
-            {
-                // Digits must start right after "CP" - find_first_of over the
-                // whole string would let "CPX5" parse as partition 5. strtol
-                // (not atoi) per the project rule against atoi/std::stoi on
-                // C64-sourced input; leave pnum = -1 on any parse failure so
-                // hdpart::select() (called via changePartition()) rejects it,
-                // range-checking per format.
-                int pnum = -1;
-                char *end = nullptr;
-                const char *start = command.c_str() + 2;
-                long v = strtol(start, &end, 10);
-                if ( end != start )
-                {
-                    while ( *end == ' ' || *end == '\r' )
-                        end++;
-                    if ( *end == '\0' )
-                        pnum = (int)v;
-                }
-                changePartition(pnum);
-                return;
-            }
-            else if ( command[1] == 'p') // Change Partition binary: C{Shift-P}<byte>
-            {
-                changePartition(command.size() > 2 ? (uint8_t)command[2] : -1);
-                return;
-            }
-            // else if ( command[1] == 'D') // Change Directory
-            // {
-            //     set_cwd(mstr::drop(command, 2));
-            // }
-        break;
-        case 'E':
-            if (command[1] == '-')
-            {
-                Debug_printv( "eeprom");
-            }
-        break;
-        case 'G':
-            Debug_printv( "get partition info");
-            //Error(ERROR_31_SYNTAX_ERROR);	// G-P not implemented yet
-        break;
-        case 'M':
-            if ( command[1] == 'D') // Make Directory
-            {
-                string path = mstr::toUTF8(command.substr(colon_position + 1));
-                Debug_printv( "make directory path[%s]", path.c_str());
-                MFile *f = m_cwd->cd( path );
-                if( f!=nullptr )
-                {
-                    bool created = false;
-                    if( f->sourceFile!=nullptr )
-                    {
-                        if( f->sourceFile->exists() )
-                        {
-                            Debug_printv("directory exists");
-                            setStatusCode(ST_FILE_EXISTS);
-                        }
-                        else if( !f->sourceFile->isWritable )
-                        {
-                            Debug_printv("not writable");
-                            setStatusCode(ST_WRITE_PROTECT_ON);
-                        }
-                        else if( f->format("meatloaf,01") )
-                        {
-                            Debug_printv("format ok");
-                            created = true;
-                        }
-                    }
-
-                    if ( !created )
-                    {
-                        if( f->exists() )
-                        {
-                            Debug_printv("directory exists");
-                            setStatusCode(ST_FILE_EXISTS);
-                        }
-                        else if( !f->isWritable )
-                        {
-                            Debug_printv("not writable");
-                            setStatusCode(ST_WRITE_PROTECT_ON);
-                        }
-                        else if( f->mkDir() )
-                        {
-                            Debug_printv("mkdir ok");
-                        }
-                        else
-                        {
-                            Debug_printv("make directory failed");
-                            setStatusCode(ST_WRITE_VERIFY);
-                        }
-                    }
-
-                    delete f;
-                }
-                else
-                {
-                    Debug_printv("make directory failed");
-                    setStatusCode(ST_WRITE_VERIFY);
-                }
-                return;
-            }
-        break;
-        case 'P':
-            {
-                // PWD - print working directory
-                if ( command[1] == 'W' && command[2] == 'D' )
-                {
-                    Debug_printv( "print working directory");
-                    std::string path = mstr::toPETSCII2(m_cwd->url);
-                    path += "\r";
-                    SystemFileDevice::setStatus((const char *) path.c_str(), path.length());
-                    return;
-                }
-
-                // Position channel pointer
-                command = mstr::drop(command, 1);
-                std::vector<uint8_t> pti = util_tokenize_uint8(command);
-                if ( pti.size() < 4 )
-                {
-                    setStatusCode(ST_SYNTAX_UNKNOWN);
-                    return;
-                }
-                Debug_printv("position channel[%d] hi[%d] mid[%d] low[%d]", pti[0], pti[1], pti[2], pti[3]);
-                auto channel = m_channels[(uint8_t)pti[0]];
-                if ( channel != nullptr )
-                {
-                    auto stream = channel->getStream();
-                    uint32_t pos = (pti[1] * 65536) + (pti[2] * 256) + pti[3];
-                    stream->seek( pos );
-                }
-                else
-                {
-                    setStatusCode(ST_NO_CHANNEL);
-                }
-                return;
-            }
-        break;
-        case 'R':
-            if ( command[1] == 'D') // Remove Directory
-            {
-                Debug_printv( "remove directory");
-                string path = mstr::toUTF8(command.substr(colon_position + 1));
-                MFile *f = m_cwd->cd( path );
-                if( f!=nullptr )
-                    {
-                    if( !f->exists() )
-                        setStatusCode(ST_FILE_NOT_FOUND);
-                    else if( !f->isWritable )
-                        setStatusCode(ST_WRITE_PROTECT_ON);
-                    else if( !f->rmDir() )
-                        setStatusCode(ST_WRITE_VERIFY);
-
-                    delete f;
-                    }
-                return;
-            }
-        break;
-        case 'S':
-            if (command[1] == '-')
-            {
-                if (command[2] == 'D' || mstr::isNumeric(&command[2])) // Swap Drive
-                {
-                    // Swap drive number 
-                    Debug_printv( "swap drive number [%c]", command[2]);
-                    return;
-                }
-                else if (command[2] == 'C') // Send SCSI Command
-                {
-                    // Set partition number
-                    Debug_printv( "send scsi command");
-                    return;
-                }
-            }
-        break;
-        case 'T':
-            if (command[1] == '-')
-            {
-                // Tape image commands (current directory is a mounted tape):
-                // T-C <ms|MMM:SS> - set the tape counter (read position)
-                // T-I             - scan the tape and generate its .idx file
-#ifndef DISABLE_TAPE   // MEATLOAF-GATE
-                if (command[2] == 'C' || command[2] == 'I')
-                {
-                    tapeCommand(command);
-                    return;
-                }
-#endif
-
-                time_t tt = time(nullptr);
-                struct tm *tinfo = localtime(&tt);
-
-                uint8_t buf[IECFILEDEVICE_STATUS_BUFFER_SIZE];
-                size_t len = 0;
-
-                //Error(ERROR_31_SYNTAX_ERROR);	// T-R and T-W not implemented yet
-                if (command[2] == 'R')
-                {
-                    if(command[3] == 'A')
-                    {
-                        Debug_printv("read ascii format");
-                        len = TimeConverter::toAsciiTime(tinfo, buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
-                    }
-                    else if(command[3] == 'I')
-                    {
-                        Debug_printv("read ISO-8601 format");
-                        len = TimeConverter::toIsoTime(tinfo, buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
-                    }
-                    else if(command[3] == 'D')
-                    {
-                        Debug_printv("read decimal format");
-                        len = TimeConverter::toDecimalTime(tinfo, buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
-                    }
-                    else if(command[3] == 'B')
-                    {
-                        Debug_printv("read BCD format");
-                        len = TimeConverter::toBcdTime(tinfo, buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
-                    }
-                    else if(command[3] == 'Z')
-                    {
-                        std::string tz;
-                        char* tz_value = getenv("TZ");
-                        if (tz_value != nullptr) {
-                            tz = tz_value;
-                        } else {
-                            tz = "UTC"; // Set a default value
-                        }
-                        Debug_printv("read TIMEZONE [%s]", tz.c_str());
-                        tz = mstr::toPETSCII2(tz);
-                        len = tz.size();
-                        memcpy(buf, tz.data(), len);
-                    }
-                    SystemFileDevice::setStatus((const char *) buf, len);
-                }
-                else if (command[2] == 'W')
-                {
-                    if(command[3] == 'A')
-                    {
-                        Debug_printv("write ascii format");
-                    }
-                    else if(command[3] == 'I')
-                    {
-                        Debug_printv("write ISO-8601 format");
-                    }
-                    else if(command[3] == 'D')
-                    {
-                        Debug_printv("write decimal format");
-                    }
-                    else if(command[3] == 'B')
-                    {
-                        Debug_printv("write BCD format");
-                    }
-                    else if(command[3] == 'Z')
-                    {
-                        if (colon_position)
-                            command = command.substr(colon_position + 1);
-                        else
-                            command = mstr::drop(command, 4);
-                        command = mstr::toUTF8(command);
-                        mstr::trim(command);
-                        mstr::replaceAll(command, " ", "_");
-                        Debug_printv("write TIMEZONE [%s]", command.c_str());
-
-                        const char *posix_tz = iana_to_posix_tz(command);
-                        setenv("TZ", posix_tz ? posix_tz : command.c_str(), 1);
-                        tzset();
-
-                        // Persist the IANA name (not the resolved POSIX
-                        // string) so mlConfig.load() re-resolves it the
-                        // same way on the next boot.
-                        json_object_at(mlConfig.data(), "preferences")["timezone"] = command;
-                        mlConfig.save();
-                    }
-                }
-                return;
-            }
-        break;
-        case 'W':
-            if (command[1] == '-') // Write Protect
-            {
-                if (command[2] == '0') // W-0 disable write protect
-                {
-                    Debug_printv( "write protect disabled");
-                    return;
-                }
-                else if (command[2] == '1') // W-1 enable write protect
-                {
-                    Debug_printv( "write protect enabled");
-                    return;
-                }
-            }
-        break;
-        case 'X':
-            Debug_printv( "xtended commands");
-            // X{0-4}
-            // XE+ / XE-
-            // XB+ / XB-
-            // X{0-7}={0-15}
-            // XD?
-            // XJ+ / XJ-
-            // XF+ / XF-
-            // X
-            // XR:{name}
-            if (command[1] == 'R' && colon_position)
-            {
-                command = command.substr(colon_position + 1);
-                Debug_printv("rom[%s]", command.c_str());
-                command = mstr::toUTF8(command);
-                if (!m_memory.setROM(command))
-                {
-                    setStatusCode(ST_FILE_NOT_FOUND);
-                    break;
-                }
-                //setStatusCode(ST_OK);
-                return;
-            }
-            // XS:{name} / XS
-            // XW
-            // X?
-            //Extended();
-        break;
-        case '/':
-
-        break;
-        default:
-            //Error(ERROR_31_SYNTAX_ERROR);
-        break;
-    }
-
-    // Meatloaf Extended Commands
-    command = mstr::toUTF8(command);
-    auto pt = util_tokenize(command, ':');
-
-    // util_tokenize() yields NO tokens for an empty command, and the C64 does
-    // send one - a lone 0x00 on the command channel arrives here as "". Reading
-    // pt[0] then faults (LoadProhibited comparing a std::string at address 0).
-    if ( pt.empty() )
-        return;
-
-    if ( pt[0] == "auth" )
-    {
-        if( pt.size() == 2 )
-        {
-            auto creds = util_tokenize(pt[1], ',');
-            if( creds.size() == 2 )
-            {
-                Debug_printv("Setting authorization for url[%s] user[%s] pass[%s]", m_cwd->url.c_str(), creds[0].c_str(), creds[1].c_str());
-                m_cwd->user = creds[0];
-                m_cwd->password = creds[1];
-                m_cwd->rebuildUrl();
-                //setStatusCode(ST_OK);
-                return;
-            }
-        }
-    }
-
-    setStatusCode(ST_SYNTAX_INVALID);
+    m_dos->execute(command, data, dataLen);
 }
 
 
@@ -3126,6 +2128,54 @@ void iecDrive::changePartition(int pnum)
     }
 }
 
+// Records which DOS the working directory wants. Never swaps it: this runs
+// from set_cwd(), which the DOS itself calls (CD, CP), so the swap is left to
+// ensureDos() at the next point where no DOS code is on the stack.
+void iecDrive::selectDos()
+{
+    m_dosKind = hdpart::targetFor(m_cwd != nullptr ? m_cwd->url : "").kind;
+}
+
+// The only place m_dos is created or replaced. Called at the top of open() and
+// in executeData() before the DOS runs.
+void iecDrive::ensureDos()
+{
+    if ( m_dos != nullptr && m_dos->kind() == m_dosKind )
+        return;
+
+    // Every kind is served by CbmDos until the media-specific DOSes exist.
+    CbmDos *dos = new (std::nothrow) CbmDos(*this);
+    if ( dos == nullptr )
+    {
+        Debug_printv("Error: could not allocate DOS");
+        return;   // keep the current one, if any
+    }
+    m_dos.reset(dos);
+}
+
+void iecDrive::dosSetStatus(uint8_t code, uint8_t trk, uint8_t sec) { setStatusCode(code, trk, sec); }
+void iecDrive::dosSetStatusMessage(uint8_t code, const std::string &msg) { setStatusCode(code, msg); }
+void iecDrive::dosSetStatusData(const char *data, uint8_t len) { SystemFileDevice::setStatus(data, len); }
+uint8_t iecDrive::dosStatusCode() { return m_statusCode; }
+MFile *iecDrive::dosCwd() { return m_cwd.get(); }
+void iecDrive::dosSetCwd(const std::string &path) { set_cwd(path); }
+iecChannelHandler *iecDrive::dosChannel(uint32_t n) { return n < 16 ? m_channels[n] : nullptr; }
+void iecDrive::dosClearReadBuffer(uint8_t channel) { clearReadBuffer(channel); }
+bool iecDrive::dosPositionChannel(uint32_t ch, uint32_t pos, bool within_block) { return positionChannel(ch, pos, within_block); }
+bool iecDrive::dosSeekChannelToBlock(uint8_t ch, uint8_t t, uint8_t s, uint8_t extra, bool for_write) { return seekChannelToBlock(ch, t, s, extra, for_write); }
+void iecDrive::dosChangePartition(int pnum) { changePartition(pnum); }
+#ifndef DISABLE_TAPE   // MEATLOAF-GATE
+void iecDrive::dosTapeCommand(const std::string &command) { tapeCommand(command); }
+#else
+void iecDrive::dosTapeCommand(const std::string &command) { (void) command; }
+#endif
+driveMemory &iecDrive::dosMemory() { return m_memory; }
+void iecDrive::dosEnableFastLoader(uint8_t family, bool enable) { enableFastLoader(family, enable); }
+void iecDrive::dosReset() { reset(); }
+uint8_t iecDrive::dosDeviceNumber() { return m_devnr; }
+bool iecDrive::dosUseVDrive() { return Meatloaf.use_vdrive; }
+bool iecDrive::dosCreateDiskImage(const std::string &url, const std::string &diskname) { return VDrive::createDiskImage(url.c_str(), NULL, diskname.c_str(), false); }
+
 void iecDrive::set_cwd(std::string path, bool verified)
 {
 #ifdef MEATLOAF_CARD_DETECT_HOTPLUG
@@ -3169,6 +2219,7 @@ void iecDrive::set_cwd(std::string path, bool verified)
         MFile *n = MFSOwner::File(path);
         if (n != nullptr) {
             m_cwd.reset(n);
+            selectDos();
             setStatusCode(ST_OK);
             persistConfig();
             notify_activity(activitySource(), "path", m_cwd->url);
@@ -3250,6 +2301,7 @@ void iecDrive::set_cwd(std::string path, bool verified)
     if (m_cwd->url != old_url)
         notify_activity(activitySource(), "path", m_cwd->url);
 
+    selectDos();
 }
 
 
@@ -3299,6 +2351,7 @@ bool iecDrive::synchronizeSdMedia()
 #endif
 
     m_cwd.reset(MFSOwner::File("/", true));
+    selectDos();
     setStatusCode(ST_OK);
     notify_activity(activitySource(), "path", "/");
     return true;
@@ -3354,6 +2407,8 @@ void iecDrive::unmount()
 #endif
 
     Debug_printv("DRIVE[#%d] UNMOUNT\r\n", m_devnr);
+
+    selectDos();
 
     // if (m_cwd != nullptr)
     // {

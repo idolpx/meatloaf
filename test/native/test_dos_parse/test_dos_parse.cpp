@@ -84,6 +84,17 @@ void test_types(void)
 }
 void test_empty(void) { TEST_ASSERT_EQUAL_STRING("", P(2, "").name.c_str()); }
 
+// Field splitting matches util_tokenize() (getline on ','): an empty middle
+// field still counts, and nothing follows a trailing comma.
+void test_tokenizer_parity(void)
+{
+    OpenRequest r = P(2, "A,,W");
+    TEST_ASSERT_TRUE(r.mode == ios_base::out);
+    TEST_ASSERT_EQUAL_STRING("A", r.name.c_str());
+    TEST_ASSERT_TRUE(P(2, "A,S,").mode == ios_base::in);
+    TEST_ASSERT_EQUAL_STRING("", P(2, ",X").name.c_str());
+}
+
 static bool PC(const char *s, size_t n, PositionCommand &o) { return parsePositionCommand((const uint8_t *)s, (uint8_t)n, o); }
 void test_p_full(void)
 {
@@ -128,6 +139,7 @@ int main(int, char **)
     RUN_TEST(test_shifted_space); RUN_TEST(test_direct_access); RUN_TEST(test_rel_length);
     RUN_TEST(test_rel_length_special_bytes); RUN_TEST(test_rel_no_length);
     RUN_TEST(test_rel_length_is_not_mode); RUN_TEST(test_types); RUN_TEST(test_empty);
+    RUN_TEST(test_tokenizer_parity);
     RUN_TEST(test_p_full); RUN_TEST(test_p_defaults); RUN_TEST(test_p_cr); RUN_TEST(test_p_bad);
     return UNITY_END();
 }

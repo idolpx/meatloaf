@@ -25,6 +25,7 @@
 #include <cstring>
 #include <unordered_map>
 #include <vector>
+#include <memory>
 #include <esp_heap_caps.h>
 
 #include "../../bus/iec/IECFileDevice.h"
@@ -32,6 +33,7 @@
 
 
 #include "drive/ram.h"
+#include "drive/dos/cbm_dos.h"
 #include "../../media/media.h"
 #include "../meatloaf/meatloaf.h"
 #include "../meatloaf/meat_buffer.h"
@@ -187,7 +189,7 @@ private:
 };
 
 
-class iecDrive : public SystemFileDevice
+class iecDrive : public SystemFileDevice, protected DosHost
 {
 public:
   iecDrive(uint8_t devnum = 0x00);
@@ -355,6 +357,35 @@ protected:
   bool synchronizeSdMedia();
 #endif
   void changePartition(int pnum);   // CMD "CP<n>" on a mounted DHD/D1M/D2M/D4M image
+
+  // The DOS behind the command channel. selectDos() only records which kind
+  // the working directory wants; ensureDos() makes the swap, and runs only
+  // where no DOS code is on the stack (top of open(), and executeData()
+  // before it delegates). Nothing else deletes m_dos.
+  void selectDos();
+  void ensureDos();
+  std::unique_ptr<CbmDos> m_dos;
+  hdpart::Kind m_dosKind = hdpart::Kind::None;
+
+  // DosHost: one-line forwards to the members above.
+  void     dosSetStatus(uint8_t code, uint8_t trk = 0, uint8_t sec = 0) override;
+  void     dosSetStatusMessage(uint8_t code, const std::string &msg) override;
+  void     dosSetStatusData(const char *data, uint8_t len) override;
+  uint8_t  dosStatusCode() override;
+  MFile   *dosCwd() override;
+  void     dosSetCwd(const std::string &path) override;
+  iecChannelHandler *dosChannel(uint32_t n) override;
+  void     dosClearReadBuffer(uint8_t channel) override;
+  bool     dosPositionChannel(uint32_t ch, uint32_t pos, bool within_block) override;
+  bool     dosSeekChannelToBlock(uint8_t ch, uint8_t t, uint8_t s, uint8_t extra, bool for_write) override;
+  void     dosChangePartition(int pnum) override;
+  void     dosTapeCommand(const std::string &command) override;
+  driveMemory &dosMemory() override;
+  void     dosEnableFastLoader(uint8_t family, bool enable) override;
+  void     dosReset() override;
+  uint8_t  dosDeviceNumber() override;
+  bool     dosUseVDrive() override;
+  bool     dosCreateDiskImage(const std::string &url, const std::string &diskname) override;
 #ifndef DISABLE_TAPE   // MEATLOAF-GATE
   void tapeCommand(std::string command);  // "T-C"/"T-I" on a mounted tape image
 #endif
