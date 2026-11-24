@@ -37,8 +37,11 @@ OpenRequest parseOpenSpec(uint8_t channel, const std::string& rawIn)
     }
 
     // determine file mode (read/write)
+    // A REL OPEN (,L) is never a write open, whatever the channel: the REL
+    // path picks read-write itself, and as 'out' a missing file on channel 1
+    // would be created as a plain file before the type check answered 64.
     std::ios_base::openmode mode = std::ios_base::in;
-    if (channel == 1) mode = std::ios_base::out;
+    if (channel == 1 && r.type != DosFileType::Rel) mode = std::ios_base::out;
     if (r.type == DosFileType::Rel)
     {
         // third field is the record-length byte, not a mode token
@@ -95,6 +98,12 @@ OpenRequest parseOpenSpec(uint8_t channel, const std::string& rawIn)
 
 bool parsePositionCommand(const uint8_t* data, uint8_t len, PositionCommand& out)
 {
+    // One trailing CR is always dropped first, as VICE's command dispatch does
+    // (vdrive-command.c) - PRINT# appends one, so BASIC's P"CHR$(98)CHR$(R)
+    // CHR$(0) arrives as 5 bytes whose last is the CR, not a position of 13.
+    if (data != nullptr && len > 0 && data[len - 1] == 0x0D)
+        len--;
+
     if (data == nullptr || len < 2 || data[0] != 'P')
         return false;
 
@@ -102,9 +111,7 @@ bool parsePositionCommand(const uint8_t* data, uint8_t len, PositionCommand& out
     out.record = 0;
     out.position = 1;
 
-    // A final CR is a terminator only when it is not itself a parameter byte.
-    // Parameters occupy bytes 2 (lo), 3 (hi), 4 (position): the 5th byte on
-    // (index >= 5) can only be a terminator; a CR at index 2-4 is data.
+    // Parameters: byte 2 record lo, byte 3 record hi, byte 4 position.
     if (len > 2) out.record = data[2];
     if (len > 3) out.record |= (uint16_t)data[3] << 8;
     if (len > 4) out.position = data[4];
