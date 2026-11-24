@@ -502,12 +502,16 @@ void iecChannelHandlerRel::endOfWrite()
 // -------------------------------------------------------------------------------------------------
 
 
-// preferences.x00_header_names: list and look up .p00/.s00/.u00/.r00 on a plain
+// settings.directory.x00_header_names: list and look up .p00/.s00/.u00/.r00 on a plain
 // filesystem by the CBM name in their P00 header. Read once per OPEN or listing,
 // before any header is read, so the default (off) costs one config lookup.
 static bool x00HeaderNamesEnabled()
 {
-    return json_int(mlConfig["preferences"], "x00_header_names", 0) != 0;
+    // const-safe: a missing or non-object node falls through to the static null
+    const psram_json &settings = mlConfig["settings"];
+    const psram_json &dir = (settings.is_object() && settings.contains("directory"))
+                                ? settings.at("directory") : mlConfig["_"];
+    return json_int(dir, "x00_header_names", 0) != 0;
 }
 
 // Header name (UTF-8) and type letter of a plain x00 entry; false for anything
@@ -720,7 +724,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
         // file entries
         std::unique_ptr<MFile> entry;
         bool skip = false;
-        // headers are only read when preferences.x00_header_names is on
+        // headers are only read when settings.directory.x00_header_names is on
         std::string x00_name;
         char x00_letter = 0;
         do 

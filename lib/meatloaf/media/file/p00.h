@@ -255,7 +255,7 @@ public:
 
 
 /********************************************************
- * x00 header names (preferences.x00_header_names)
+ * x00 header names (settings.directory.x00_header_names)
  ********************************************************/
 
 // Type letter of a PC64 container name: 'p', 's', 'u' or 'r' for a name ending
