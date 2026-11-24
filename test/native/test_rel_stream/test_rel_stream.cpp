@@ -199,6 +199,38 @@ void test_write_protect() {
     TEST_ASSERT_EQUAL_HEX8(0, data.bytes[0]);
 }
 
+// Review fix: read after write in the same record must not underflow
+// read_end_ - cursor_ nor return bytes beyond the record (vdrive_rel_read
+// ends a record at record_next).
+void test_read_after_partial_write_stays_in_record() {
+    auto s = make(2);
+    put(0, "AB", 2);
+    put(1, "ZZ", 2);
+    uint8_t b[64];
+    s->position(1, 1);
+    s->read(b, 1);                      // load record, read 'A'
+    const uint8_t w[5] = {'a', 'b', 'c', 'd', 'e'};
+    s->position(1, 1);
+    s->write(w, 5);
+    uint32_t n = s->read(b, sizeof b);
+    TEST_ASSERT_TRUE(n <= (uint32_t)(LEN - 5));
+}
+
+void test_read_after_full_length_write_is_record_end() {
+    auto s = make(2);
+    put(0, "AB", 2);
+    put(1, "ZZ", 2);
+    uint8_t b[64];
+    uint8_t w[LEN];
+    for (int i = 0; i < LEN; i++) w[i] = 'a' + i;
+    s->position(1, 1);
+    s->write(w, LEN);
+    TEST_ASSERT_EQUAL(0, s->read(b, sizeof b));
+    // continues in the next record afterwards, not past the buffer
+    TEST_ASSERT_EQUAL(2, s->read(b, sizeof b));
+    TEST_ASSERT_EQUAL('Z', b[0]);
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_position_zero_equals_one);
@@ -212,5 +244,7 @@ int main(int, char**) {
     RUN_TEST(test_end_record_pads_and_advances);
     RUN_TEST(test_grow_failure_leaves_count);
     RUN_TEST(test_write_protect);
+    RUN_TEST(test_read_after_partial_write_stays_in_record);
+    RUN_TEST(test_read_after_full_length_write_is_record_end);
     return UNITY_END();
 }
