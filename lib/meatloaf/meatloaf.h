@@ -112,7 +112,9 @@ public:
 /********************************************************
  * Universal stream
  ********************************************************/
-class MStream 
+// enable_shared_from_this lets a stream hand out objects (RELStorage) that keep it
+// alive; it only works for a stream owned by a shared_ptr.
+class MStream : public std::enable_shared_from_this<MStream>
 {
 protected:
     uint32_t _size = 0;
