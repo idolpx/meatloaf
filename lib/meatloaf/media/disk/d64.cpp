@@ -1560,7 +1560,9 @@ public:
     static constexpr uint32_t MAX_SIDE_SECTORS = MAX_GROUPS * PLAIN_SIDE_SECTORS;
     static constexpr uint32_t ENTRIES_PER_SIDE = 120;
 
-    explicit D64RelStorage(D64MStream* image) : img_(image) {}
+    // Owns a reference to the stream: the storage reads through it, and a
+    // RELMStream may well outlive every other holder of the stream.
+    explicit D64RelStorage(std::shared_ptr<D64MStream> image) : img_(std::move(image)) {}
     ~D64RelStorage() override { free(table_); }
 
     // Loads the side sectors and sizes the file. False if the image is
@@ -1670,7 +1672,7 @@ private:
         return true;
     }
 
-    D64MStream* img_;
+    std::shared_ptr<D64MStream> img_;
     uint8_t* table_ = nullptr;   // T/S pairs of every data block, heap
     uint32_t capacity_ = 0;
     uint32_t blocks_ = 0;
@@ -1689,7 +1691,11 @@ std::unique_ptr<RELStorage> D64MStream::relStorage()
     if (relRecordLength() == 0)
         return nullptr;
     // nothrow: plain new would abort on failure under -fno-exceptions.
-    D64RelStorage* st = new (std::nothrow) D64RelStorage(this);
+    // Needs a shared_ptr owner to pin; a stream not held by one cannot serve REL.
+    auto self = std::static_pointer_cast<D64MStream>(weak_from_this().lock());
+    if (!self)
+        return nullptr;
+    D64RelStorage* st = new (std::nothrow) D64RelStorage(std::move(self));
     if (st == nullptr)
         return nullptr;
     if (!st->load(entry.rel_start_track, entry.rel_start_sector))

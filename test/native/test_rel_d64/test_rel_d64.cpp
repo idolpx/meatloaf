@@ -90,7 +90,7 @@ void test_rel_d64_len10_three_records(void)
     if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
     auto data = pattern(3, 10);
     make_image("d64", kD64, data, 10);
-    D64MStream image(std::make_shared<FileContainerStream>(kD64));
+    auto image_p = std::make_shared<D64MStream>(std::make_shared<FileContainerStream>(kD64)); D64MStream& image = *image_p;
     check(image, kD64, data, 10);
 }
 
@@ -99,7 +99,7 @@ void test_rel_d64_len254_crosses_side_sector_group(void)
     if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
     auto data = pattern(130, 254);   // 130 data blocks > 120 per side sector
     make_image("d64", kD64, data, 254);
-    D64MStream image(std::make_shared<FileContainerStream>(kD64));
+    auto image_p = std::make_shared<D64MStream>(std::make_shared<FileContainerStream>(kD64)); D64MStream& image = *image_p;
     check(image, kD64, data, 254);
 }
 
@@ -108,7 +108,7 @@ void test_rel_d81_len100_needs_second_super_side_group(void)
     if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
     auto data = pattern(1900, 100);  // 190000 bytes = 748 blocks > 720 (6 side sectors)
     make_image("d81", kD81, data, 100);
-    D81MStream image(std::make_shared<FileContainerStream>(kD81));
+    auto image_p = std::make_shared<D81MStream>(std::make_shared<FileContainerStream>(kD81)); D64MStream& image = *image_p;
     check(image, kD81, data, 100);
 }
 
@@ -118,11 +118,32 @@ void test_rel_record_length_zero_for_non_rel(void)
     std::vector<uint8_t> data(300, 0x41);
     FILE* fp = fopen(kHost, "wb"); fwrite(data.data(), 1, data.size(), fp); fclose(fp);
     c1541_run("-format " + c1541_quote("t,01") + " d64 " + c1541_quote(kD64) + " -write " + c1541_quote(kHost) + " data");
-    D64MStream image(std::make_shared<FileContainerStream>(kD64));
+    auto image_p = std::make_shared<D64MStream>(std::make_shared<FileContainerStream>(kD64)); D64MStream& image = *image_p;
     image.mode = std::ios_base::in;
     TEST_ASSERT_TRUE(image.seekPath("data"));
     TEST_ASSERT_EQUAL_UINT8(0, image.relRecordLength());
     TEST_ASSERT_NULL(image.relStorage().get());
+}
+
+// The storage must keep the stream alive: drop every other reference and read.
+void test_rel_storage_outlives_stream_owner(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    auto data = pattern(3, 10);
+    make_image("d64", kD64, data, 10);
+    std::unique_ptr<RELStorage> st;
+    {
+        auto image = std::make_shared<D64MStream>(std::make_shared<FileContainerStream>(kD64));
+        image->mode = std::ios_base::in;
+        TEST_ASSERT_TRUE(image->seekPath("data"));
+        st = image->relStorage();
+        TEST_ASSERT_NOT_NULL(st.get());
+    }   // last external reference gone
+    RELMStream rel(std::move(st), 10);
+    uint8_t buf[10];
+    TEST_ASSERT_EQUAL_UINT8(0, rel.position(2, 1));
+    TEST_ASSERT_EQUAL_UINT32(10, rel.read(buf, 10));
+    TEST_ASSERT_EQUAL_MEMORY(&data[10], buf, 10);
 }
 
 int main(int, char**)
@@ -132,5 +153,6 @@ int main(int, char**)
     RUN_TEST(test_rel_d64_len254_crosses_side_sector_group);
     RUN_TEST(test_rel_d81_len100_needs_second_super_side_group);
     RUN_TEST(test_rel_record_length_zero_for_non_rel);
+    RUN_TEST(test_rel_storage_outlives_stream_owner);
     return UNITY_END();
 }
