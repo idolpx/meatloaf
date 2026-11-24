@@ -445,6 +445,45 @@ void test_rel_new_file_has_one_record(void)
     }
 }
 
+// Forwards to a real storage and counts the writes made through it.
+struct CountingStorage : public RELStorage {
+    std::unique_ptr<RELStorage> inner;
+    uint32_t writes = 0;
+    explicit CountingStorage(std::unique_ptr<RELStorage> s) : inner(std::move(s)) {}
+    uint32_t size() override { return inner->size(); }
+    uint32_t readAt(uint32_t o, uint8_t* b, uint32_t n) override { return inner->readAt(o, b, n); }
+    uint32_t writeAt(uint32_t o, const uint8_t* b, uint32_t n) override { writes++; return inner->writeAt(o, b, n); }
+    uint8_t grow(uint32_t n) override { return inner->grow(n); }
+    bool writable() override { return inner->writable(); }
+    bool fillsNewRecords() const override { return inner->fillsNewRecords(); }
+};
+
+// An image's grow writes the $FF,0... fill itself (writeDataBlocks), so
+// RELMStream::growTo must not write it a second time record by record - and
+// the records it grew must still read as $FF then zeros, across many blocks.
+void test_rel_grow_fill_is_written_once_by_the_image(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    for (const RelFmt& f : kFmts)
+    {
+        fresh_image(f);
+        {
+            auto img = open_rw(f);
+            auto st = img->createRel("data", 20);
+            TEST_ASSERT_NOT_NULL_MESSAGE(st.get(), f.name);
+            TEST_ASSERT_TRUE_MESSAGE(st->fillsNewRecords(), f.name);
+            auto counting = std::unique_ptr<CountingStorage>(new CountingStorage(std::move(st)));
+            CountingStorage* c = counting.get();
+            RELMStream rel(std::move(counting), 20);
+            TEST_ASSERT_EQUAL_UINT8_MESSAGE(ST_OK_, rel.growTo(300), f.name);
+            TEST_ASSERT_EQUAL_UINT32_MESSAGE(0, c->writes, f.name);
+            TEST_ASSERT_TRUE_MESSAGE(rel.recordCount() >= 300, f.name);
+            rel.close();
+        }
+        check_rel(f, filled(300, 20), 20);
+    }
+}
+
 int main(int, char**)
 {
     UNITY_BEGIN();
@@ -455,6 +494,7 @@ int main(int, char**)
     RUN_TEST(test_rel_storage_outlives_stream_owner);
     RUN_TEST(test_rel_create_and_write_five_records);
     RUN_TEST(test_rel_new_file_has_one_record);
+    RUN_TEST(test_rel_grow_fill_is_written_once_by_the_image);
     RUN_TEST(test_rel_grow_five_to_thousand);
     RUN_TEST(test_rel_grow_crosses_side_sector_groups);
     RUN_TEST(test_rel_scratch_frees_everything);

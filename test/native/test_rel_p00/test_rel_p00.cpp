@@ -197,6 +197,33 @@ void test_plain_p00_is_not_rel(void)
     TEST_ASSERT_EQUAL_UINT8(0x01, buf[0]);
 }
 
+// Byte 25 is the record length only in a .r00: a .p00 with a non-zero byte 25
+// is still a PRG, never opened as REL.
+void test_p00_with_byte25_set_is_not_rel(void)
+{
+    const char* path = "build_rel_p00_b25.p00";
+    FILE* fp = fopen(path, "wb");
+    TEST_ASSERT_NOT_NULL(fp);
+    uint8_t h[26] = {0};
+    memcpy(h, "C64File", 7);
+    h[25] = 20;
+    fwrite(h, 1, 26, fp);
+    fputs("\x01\x08PRG", fp);
+    fclose(fp);
+    auto src = std::make_shared<FileContainerStream>(path);
+    src->mode = std::ios_base::in;
+    P00MFile pf(path);
+    auto st = std::static_pointer_cast<P00MStream>(pf.getDecodedStream(src));
+    TEST_ASSERT_EQUAL_UINT8(0, st->relRecordLength());
+    TEST_ASSERT_NULL(st->relStorage().get());
+    uint8_t buf[16];
+    TEST_ASSERT_EQUAL_UINT32(5, st->read(buf, sizeof(buf)));
+    TEST_ASSERT_EQUAL_UINT8(0x01, buf[0]);
+    st.reset();
+    src.reset();
+    remove(path);
+}
+
 // vdrive_rel_open (newrelfile): a new REL file has one record at OPEN, $FF
 // then zeros - not zero records - both in the stream and on disk.
 void test_new_rel_has_one_record(void)
@@ -327,6 +354,7 @@ int main(int, char**) {
     RUN_TEST(test_existing_file_is_not_clobbered);
     RUN_TEST(test_non_writable_container_gives_write_protect);
     RUN_TEST(test_plain_p00_is_not_rel);
+    RUN_TEST(test_p00_with_byte25_set_is_not_rel);
     RUN_TEST(test_new_rel_has_one_record);
     RUN_TEST(test_read_only_rel_reads_and_refuses_writes);
     RUN_TEST(test_stream_reports_header_name);
