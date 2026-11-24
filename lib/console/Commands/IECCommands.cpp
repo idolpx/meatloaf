@@ -556,11 +556,19 @@ static int readChannel(int argc, char **argv)
 
     ESP32Console::cancel_begin();
 
+    // EOI ends the read as it ends an INPUT#: a REL channel raises it on each
+    // record's last byte and would otherwise run on into the next record.
     bool cancelled = false;
+    bool ended = false;
     size_t total = ESP32Console::dos_read_loop(
         limit,
-        [drive, channel](uint8_t *buf, uint8_t len) {
-            return drive->consoleRead(channel, buf, len);
+        [drive, channel, &ended](uint8_t *buf, uint8_t len) -> uint8_t {
+            if (ended)
+                return 0;
+            bool eoi = false;
+            uint8_t n = drive->consoleRead(channel, buf, len, &eoi);
+            ended = eoi;
+            return n;
         },
         [](const uint8_t *buf, size_t len, size_t offset) {
             printBytes(buf, len, offset);

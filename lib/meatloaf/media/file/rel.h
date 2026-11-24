@@ -50,10 +50,12 @@ public:
     uint32_t recordCount();                                  // storage size / record length
     uint8_t  position(uint16_t record, uint8_t pos);         // CBM P: 1-based, 0==1; returns ST_OK / 50 / 51
     uint32_t read(uint8_t* buf, uint32_t size) override;     // current record only; 0 = record end
+    uint32_t readRecord(uint8_t* buf, uint32_t size);        // read() without the 0 end marker: what a channel serves
     uint32_t write(const uint8_t* buf, uint32_t size) override;
     void     endRecord();                                    // end of a PRINT#: pad, advance
     bool     recordExhausted() const { return exhausted_; }
-    uint8_t  status() const { return status_; }              // last CBM status
+    bool     recordWritten() const { return written_; }       // bytes written since the record was entered
+    uint8_t  status() const { return status_; }              // CBM status of the last read/write/position
 
     bool isOpen() override { return open_; }
     bool open(std::ios_base::openmode m) override { mode = m; open_ = true; return true; }

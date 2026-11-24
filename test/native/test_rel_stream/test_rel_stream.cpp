@@ -249,6 +249,44 @@ void test_grow_fill_is_one_write_per_record() {
     TEST_ASSERT_EQUAL_UINT8('A', data.bytes[2 * LEN]);
 }
 
+// vdrive_rel_read hands the drive one byte at a time with SERIAL_EOF on a
+// record's last byte and the next record on the next call. readRecord() is
+// the channel's view of that: whole records, never the 0 end marker.
+void test_read_record_walks_records_without_end_marker() {
+    auto s = make(2);
+    put(0, "AB", 2);
+    put(1, "XYZ", 3);
+    uint8_t b[LEN];
+    TEST_ASSERT_EQUAL(2, s->readRecord(b, sizeof(b)));
+    TEST_ASSERT_EQUAL('A', b[0]);
+    TEST_ASSERT_EQUAL(3, s->readRecord(b, sizeof(b)));
+    TEST_ASSERT_EQUAL('X', b[0]);
+    TEST_ASSERT_EQUAL(ST_OK, s->status());
+    TEST_ASSERT_EQUAL(1, s->readRecord(b, sizeof(b)));   // past the end: CR, 50
+    TEST_ASSERT_EQUAL(0x0D, b[0]);
+    TEST_ASSERT_EQUAL(ST_RECORD_MISSING, s->status());
+}
+
+// status() describes the LAST call only: a 50 from reading past the end must
+// not be reported again by a later successful read.
+void test_status_is_reset_by_the_next_call() {
+    auto s = make(1);
+    put(0, "A", 1);
+    uint8_t b[LEN];
+    TEST_ASSERT_EQUAL(ST_RECORD_MISSING, s->position(2, 1));
+    s->read(b, sizeof(b));
+    TEST_ASSERT_EQUAL(ST_RECORD_MISSING, s->status());
+    TEST_ASSERT_EQUAL(ST_OK, s->position(1, 1));
+    TEST_ASSERT_EQUAL(1, s->read(b, sizeof(b)));
+    TEST_ASSERT_EQUAL(ST_OK, s->status());
+    TEST_ASSERT_EQUAL(ST_OK, s->position(1, 1));
+    s->write((const uint8_t*)"0123456789AB", 12);
+    TEST_ASSERT_EQUAL(ST_RECORD_OVERFLOW, s->status());
+    s->endRecord();
+    s->write((const uint8_t*)"Q", 1);
+    TEST_ASSERT_EQUAL(ST_OK, s->status());
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_position_zero_equals_one);
@@ -265,5 +303,7 @@ int main(int, char**) {
     RUN_TEST(test_read_after_partial_write_stays_in_record);
     RUN_TEST(test_read_after_full_length_write_is_record_end);
     RUN_TEST(test_grow_fill_is_one_write_per_record);
+    RUN_TEST(test_read_record_walks_records_without_end_marker);
+    RUN_TEST(test_status_is_reset_by_the_next_call);
     return UNITY_END();
 }

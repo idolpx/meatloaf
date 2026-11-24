@@ -437,6 +437,70 @@ uint8_t iecChannelHandlerFile::readBufferData()
 // -------------------------------------------------------------------------------------------------
 
 
+iecChannelHandlerRel::iecChannelHandlerRel(iecDrive *drive, std::shared_ptr<RELMStream> rel) : iecChannelHandler(drive)
+{
+    m_rel = rel;
+}
+
+
+iecChannelHandlerRel::~iecChannelHandlerRel()
+{
+    // pads a record left part-written, as vdrive_rel_close does
+    m_rel->close();
+}
+
+
+// One record, never more: the drive's read() raises EOI when it has been
+// handed out (atEOI()). Past the last record this is a single CR with 50
+// RECORD NOT PRESENT, which is still data - returning the status as an error
+// would make the base read() swallow the CR.
+uint8_t iecChannelHandlerRel::readBufferData()
+{
+    m_len = m_rel->readRecord(m_data, BUFFER_SIZE);
+    if( m_rel->status() != ST_OK )
+        m_drive->setStatusCode(m_rel->status());
+    return ST_OK;
+}
+
+
+// Unused: write() passes everything straight through.
+uint8_t iecChannelHandlerRel::writeBufferData()
+{
+    return ST_OK;
+}
+
+
+// Straight through: a record is written in place, and the buffered path would
+// hold bytes back past the EOI that ends the record.
+uint8_t iecChannelHandlerRel::write(uint8_t *data, uint8_t n)
+{
+    uint32_t written = m_rel->write(data, n);
+    if( m_rel->status() != ST_OK )
+        m_drive->setStatusCode(m_rel->status());
+    // whatever was read ahead of the write is no longer where the record is
+    m_ptr = 0;
+    m_len = 0;
+    m_eos = false;
+    m_position += written;
+    return (uint8_t) written;
+}
+
+
+// The EOI of a PRINT# ends the record: pad it and move to the next one. A
+// record nothing was written to is left alone, as vdrive_rel_listen only
+// advances when WRITTEN_RECORD is set.
+void iecChannelHandlerRel::endOfWrite()
+{
+    if( m_rel->recordWritten() )
+        m_rel->endRecord();
+    m_ptr = 0;
+    m_len = 0;
+    m_eos = false;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+
 iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecChannelHandler(drive)
 {
     m_dir = dir;
@@ -1120,8 +1184,11 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                     // opening a file
                     if( (mode == std::ios_base::in) && !f->exists() )
                     {
-                        Debug_printv("Error: file doesn't exist [%s]", f->url.c_str());
-                        setStatusCode(ST_FILE_NOT_FOUND);
+                        // A REL file on a plain filesystem is a .r00 under a
+                        // host name; ,L with a length creates one. Either way
+                        // the status is set, 62 when it is neither.
+                        if( !openMissingRel(channel, f, req.type == DosFileType::Rel, req.record_length) )
+                            Debug_printv("Error: file doesn't exist [%s]", f->url.c_str());
                     }
                     else if( (mode == std::ios_base::out) && f->media_image.size()>0 && (!f->isWritable || f->pathInStream.empty()) )
                     {
@@ -1158,7 +1225,10 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                         // Clear first so a reason left by an earlier request
                         // can't be attached to this failure.
                         http_clear_tls_error();
-                        std::shared_ptr<MStream> new_stream = f->getSourceStream(mode);
+                        // A REL channel reads and writes whatever the OPEN said,
+                        // so ,L opens read-write from the start.
+                        std::shared_ptr<MStream> new_stream = f->getSourceStream(
+                            req.type == DosFileType::Rel ? (std::ios_base::in | std::ios_base::out) : mode);
 
                         if( new_stream==nullptr )
                         {
@@ -1182,6 +1252,10 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                                 setStatusCode(ST_DRIVE_NOT_READY, http_last_tls_status());
                             else
                                 setStatusCode(ST_DRIVE_NOT_READY);
+                        }
+                        else if( new_stream->relRecordLength() != 0 || req.type == DosFileType::Rel )
+                        {
+                            openExistingRel(channel, f, new_stream, req.record_length);
                         }
                         else
                         {
@@ -1278,6 +1352,121 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
 }
 
 
+// The channel for a REL file. Stores the stream on the channel; status OK.
+bool iecDrive::openRelChannel(uint8_t channel, std::shared_ptr<RELMStream> rel, const std::string &name)
+{
+    m_channels[channel] = new iecChannelHandlerRel(this, rel);
+    m_channels[channel]->setName(name);
+    m_numOpenChannels++;
+    setStatusCode(ST_OK);
+    Debug_printv("REL channel[%d] [%s] record length[%d] records[%lu]", channel, name.c_str(),
+                 rel->recordLength(), (unsigned long) rel->recordCount());
+    return true;
+}
+
+
+// An existing file, opened. vdrive-iec.c:701-719 and vdrive_rel_open: ,L on a
+// REL file must name its record length or none (50 otherwise); a file that is
+// not REL is 62 for a bare ,L, as VICE's typed directory lookup misses it.
+// With a length VICE would make a second entry of the same name; createRel()
+// refuses duplicates, so this answers 64 FILE TYPE MISMATCH as a 1541 does.
+bool iecDrive::openExistingRel(uint8_t channel, MFile *f, std::shared_ptr<MStream> stream, uint8_t record_length)
+{
+    uint8_t len = stream->relRecordLength();
+    if( len == 0 )
+    {
+        setStatusCode(record_length ? ST_FILE_TYPE_MISMATCH : ST_FILE_NOT_FOUND);
+        return false;
+    }
+    if( record_length != 0 && record_length != len )
+    {
+        setStatusCode(ST_RECORD_MISSING);
+        return false;
+    }
+
+    // Opened for reading only (no ,L): the records are written in place too,
+    // and P00 storage refuses writes on a stream that is not read-write.
+    if( !(stream->mode & std::ios_base::out) )
+    {
+        stream.reset();
+        stream = f->getSourceStream(std::ios_base::in | std::ios_base::out);
+        if( stream == nullptr || !stream->isOpen() || stream->relRecordLength() != len )
+        {
+            setStatusCode(ST_DRIVE_NOT_READY);
+            return false;
+        }
+    }
+
+    // The storage pins this per-open stream, never the ImageBroker's.
+    auto storage = stream->relStorage();
+    if( storage == nullptr )
+    {
+        setStatusCode(ST_DRIVE_NOT_READY);
+        return false;
+    }
+    auto rel = std::make_shared<RELMStream>(std::move(storage), len);
+    return openRelChannel(channel, rel, f->fullUrl());
+}
+
+
+// The OPEN named nothing that exists. On a plain filesystem a REL file is a
+// .r00 under relHostFilename(); ,L with a record length creates one (in an
+// image, an entry; on a plain filesystem, the .r00). Sets the status: 62 when
+// there is nothing to open, as before.
+bool iecDrive::openMissingRel(uint8_t channel, MFile *f, bool as_rel, uint8_t record_length)
+{
+    // VDrive owns images while it is active; leave those to it.
+    bool in_image = !f->pathInStream.empty();
+    if( Meatloaf.use_vdrive && in_image )
+    {
+        setStatusCode(ST_FILE_NOT_FOUND);
+        return false;
+    }
+
+    std::unique_ptr<MFile> host;
+    if( !in_image )
+    {
+        std::string dir = f->base();
+        if( !dir.empty() && dir.back() == '/' )
+            dir.pop_back();
+        host.reset(MFSOwner::File(dir + "/" + relHostFilename(f->name)));
+        if( host != nullptr && host->exists() )
+        {
+            auto stream = host->getSourceStream(std::ios_base::in | std::ios_base::out);
+            if( stream == nullptr || !stream->isOpen() )
+            {
+                setStatusCode(ST_DRIVE_NOT_READY);
+                return false;
+            }
+            return openExistingRel(channel, host.get(), stream, as_rel ? record_length : 0);
+        }
+    }
+
+    // vdrive_rel_open: no file and no record length is 62.
+    if( !as_rel || record_length == 0 )
+    {
+        setStatusCode(ST_FILE_NOT_FOUND);
+        return false;
+    }
+
+    std::shared_ptr<MStream> created = f->createRelStream(record_length);
+    MFile *made = f;
+    if( created == nullptr && host != nullptr )
+    {
+        created = host->createRelStream(record_length);
+        made = host.get();
+    }
+    if( created == nullptr )
+    {
+        // vdrive_rel_open / vdrive_rel_open_new: read-only media, else no room
+        setStatusCode(f->isWritable ? ST_DISK_FULL : ST_WRITE_PROTECT_ON);
+        return false;
+    }
+    // createRelStream() always answers with a RELMStream
+    return openRelChannel(channel, std::static_pointer_cast<RELMStream>(created), made->fullUrl());
+}
+
+
 void iecDrive::close(uint8_t channel)
 {
     //Debug_printv("iecDrive::close(#%d, %d)", m_devnr, channel);
@@ -1347,7 +1536,13 @@ uint8_t iecDrive::write(uint8_t channel, uint8_t *data, uint8_t dataLen, bool eo
             return 0;
         }
         else
-            return handler->write(data, dataLen);
+        {
+            uint8_t n = handler->write(data, dataLen);
+            // The last byte of a PRINT# carries EOI: that ends a REL record.
+            if( eoi )
+                handler->endOfWrite();
+            return n;
+        }
     }
 }
 
@@ -1388,6 +1583,9 @@ uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool 
         else
         {
             uint8_t bytes_read = handler->read(data, maxDataLen);
+            // A REL channel ends each record with EOI on its last byte.
+            if( bytes_read > 0 && eoi != nullptr && handler->atEOI() )
+                *eoi = true;
             if( m_statusCode==ST_FILE_NOT_FOUND)
             {
                 // base() is the container's PARENT directory for anything
@@ -1820,12 +2018,14 @@ bool iecDrive::consoleOpen(uint8_t channel, const std::string &name)
 }
 
 
-uint8_t iecDrive::consoleRead(uint8_t channel, uint8_t *buffer, uint8_t bufferSize)
+uint8_t iecDrive::consoleRead(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, bool *eoi)
 {
-    // The non-VDrive path never writes eoi - end of file is a return of 0 -
-    // but read() takes the pointer, so give it somewhere real to write.
-    bool eoi = false;
-    return read(channel, buffer, bufferSize, &eoi);
+    // A file channel ends with a return of 0; a REL channel (and VDrive) ends
+    // each record with EOI on its last byte instead, reported through *eoi.
+    bool local = false;
+    if( eoi == nullptr ) eoi = &local;
+    *eoi = false;
+    return read(channel, buffer, bufferSize, eoi);
 }
 
 

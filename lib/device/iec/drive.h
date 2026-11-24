@@ -39,6 +39,7 @@
 #include "../meatloaf/meat_buffer.h"
 #include "../meatloaf/wrapper/iec_buffer.h"
 #include "../meatloaf/wrapper/directory_stream.h"
+#include "../meatloaf/media/file/rel.h"
 #include "utils.h"
 
 //#ifdef USE_VDRIVE
@@ -64,6 +65,17 @@ public:
   virtual uint8_t writeBufferData() = 0;
   virtual uint8_t readBufferData()  = 0;
   virtual std::shared_ptr<MStream> getStream() { return nullptr; };
+
+  // REL channels only (iecChannelHandlerRel); nullptr everywhere else. The
+  // drive asks this rather than casting, since the build has no RTTI.
+  virtual RELMStream *relStream() { return nullptr; }
+
+  // True once the bytes handed out so far end a unit the bus must close with
+  // EOI. A file channel signals its end by a 0 read instead, so never.
+  virtual bool atEOI() const { return false; }
+
+  // The bus write that just arrived carried EOI.
+  virtual void endOfWrite() {}
 
   // What this channel has open, for the console "channels" listing.  Set by
   // iecDrive::open() from the MFile's fullUrl(), because the stream cannot
@@ -171,6 +183,30 @@ private:
 };
 
 
+// A relative file: one record at a time. readBufferData() never reads ahead
+// past the current record, so EOI lands on every record's last byte as in
+// vdrive_rel_read, and an EOI on a write ends the record (pads, advances) as
+// the end of a PRINT# does.
+class iecChannelHandlerRel : public iecChannelHandler
+{
+public:
+  iecChannelHandlerRel(iecDrive *drive, std::shared_ptr<RELMStream> rel);
+  virtual ~iecChannelHandlerRel();
+
+  virtual uint8_t readBufferData() override;
+  virtual uint8_t writeBufferData() override;
+  virtual uint8_t write(uint8_t *data, uint8_t n) override;
+  virtual std::shared_ptr<MStream> getStream() override { return m_rel; }
+  virtual RELMStream *relStream() override { return m_rel.get(); }
+  virtual bool atEOI() const override { return m_len > 0 && m_ptr >= m_len; }
+  virtual void endOfWrite() override;
+
+private:
+  std::shared_ptr<RELMStream> m_rel;
+  bool m_written = false;   // bytes written to the current record
+};
+
+
 class iecChannelHandlerDir : public iecChannelHandler
 {
 public: 
@@ -249,7 +285,7 @@ public:
   std::vector<ChannelInfo> consoleChannels();
 
   bool    consoleOpen(uint8_t channel, const std::string &name);
-  uint8_t consoleRead(uint8_t channel, uint8_t *buffer, uint8_t bufferSize);
+  uint8_t consoleRead(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, bool *eoi = nullptr);
   uint8_t consoleWrite(uint8_t channel, const uint8_t *buffer, uint8_t bufferSize, bool eoi);
   void    consoleClose(uint8_t channel);
 
@@ -341,6 +377,12 @@ protected:
   // host uploaded -- see IECFileDevice::startFastLoader.
   virtual bool startFastLoader(uint8_t variant, uint8_t param, uint8_t rxtx, const uint8_t *cmd, uint8_t cmdLen, uint16_t crc);
 #endif
+
+  // REL files: the channel, an existing file's stream, and a name that
+  // resolved to nothing (host .r00 lookup, ,L creation).
+  bool openRelChannel(uint8_t channel, std::shared_ptr<RELMStream> rel, const std::string &name);
+  bool openExistingRel(uint8_t channel, MFile *f, std::shared_ptr<MStream> stream, uint8_t record_length);
+  bool openMissingRel(uint8_t channel, MFile *f, bool as_rel, uint8_t record_length);
 
   // Point a channel at a disk block for B-R/B-W and U1/U2 -- see the comment
   // on the definition for why a block command is a seek here.

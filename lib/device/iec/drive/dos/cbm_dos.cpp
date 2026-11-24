@@ -18,6 +18,7 @@
 #if defined(BUILD_IEC)
 
 #include "cbm_dos.h"
+#include "open_spec.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -76,8 +77,8 @@ static bool dosParseUint(const std::string &s, uint32_t *out)
 
 void CbmDos::execute(std::string command, const uint8_t* raw, uint8_t rawLen)
 {
-    (void) raw;
-    (void) rawLen;
+    m_raw = raw;
+    m_rawLen = rawLen;
 
     if ( cmdMeatloafPrefix(command) )
         return;
@@ -759,26 +760,33 @@ bool CbmDos::cmdSd2iec(std::string& command, size_t colon_position)
                     return true;
                 }
 
-                // Position channel pointer
-                command = mstr::drop(command, 1);
-                std::vector<uint8_t> pti = util_tokenize_uint8(command);
-                if ( pti.size() < 4 )
-                {
-                    m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
-                    return true;
-                }
-                Debug_printv("position channel[%d] hi[%d] mid[%d] low[%d]", pti[0], pti[1], pti[2], pti[3]);
-                auto channel = m_host.dosChannel(pti[0]);
-                if ( channel != nullptr )
-                {
-                    auto stream = channel->getStream();
-                    uint32_t pos = (pti[1] * 65536) + (pti[2] * 256) + pti[3];
-                    stream->seek( pos );
-                }
-                else
+                // Position a REL channel: P <$60+channel> <record lo> <record hi>
+                // <byte>, binary, as vdrive_command_position decodes it. The raw
+                // bytes are used: any parameter may be $0D, which the command
+                // string has already lost when it was the last byte.
+                PositionCommand pc;
+                if ( !parsePositionCommand(m_raw, m_rawLen, pc) )
                 {
                     m_host.dosSetStatus(ST_NO_CHANNEL);
+                    return true;
                 }
+                Debug_printv("position channel[%d] record[%d] byte[%d]", pc.channel, pc.record, pc.position);
+                auto channel = m_host.dosChannel(pc.channel);
+                RELMStream *rel = channel != nullptr ? channel->relStream() : nullptr;
+                if ( rel == nullptr )
+                {
+                    // vdrive_command_position: not a relative buffer
+                    m_host.dosSetStatus(ST_NO_CHANNEL);
+                    return true;
+                }
+                uint8_t st = rel->position(pc.record, pc.position);
+                if ( st != ST_OK )
+                    m_host.dosSetStatus(st);
+                // bytes already read ahead belong to the old record
+                m_host.dosClearReadBuffer(pc.channel);
+                uint32_t record = pc.record ? pc.record - 1 : 0;
+                uint32_t byte   = pc.position ? pc.position - 1 : 0;
+                channel->repositioned(record * rel->recordLength() + byte);
                 return true;
             }
         break;
