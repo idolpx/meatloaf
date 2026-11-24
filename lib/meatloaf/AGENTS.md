@@ -513,6 +513,17 @@ When implementing a new stream:
 6. Verify ImageBroker caching works correctly
 7. Check memory leaks with stream chains
 
+## Recent Changes (November 24, 2026)
+
+### RELMStream / RELStorage (`media/file/rel.h/.cpp`)
+
+REL (relative) files split into a record layer and a byte layer. See root `AGENTS.md` (2026-11-24) and `docs/superpowers/specs/2026-11-23-dos-split-and-rel-design.md`.
+
+- **`RELStorage`** is the byte layer (`readAt`/`writeAt`/`grow`/`writable`); `D64RelStorage` (in `d64.h/.cpp`, reached via `D64MStream::relStorage()`) and `P00RelStorage` (in `p00.h`, records start at offset 26, grow extends with zeros). **`RELMStream`** is the record layer on top: `position(record, offset)`, `read`, `write`, `endRecord`, `growTo` (public). It is the VICE `vdrive-rel.c` logic, ported with a test citing the C function per case.
+- **Lifetime:** storage owns a `shared_ptr` to its stream (`MStream : enable_shared_from_this`); `relStorage()` is nullptr unless `shared_ptr`-owned. Never give a REL channel the ImageBroker stream - open a private one - and `~D64RelStorage` calls `ImageBroker::disposeUnderPath(container url)` after a grow (matched by url because `disposeFor()` needs `MFSOwner`). No native test reaches that dispose (`image_repo` is only filled by `obtain()`).
+- **Side sectors:** `D64RelStorage` loads the side-sector table once (up to `MAX_GROUPS`; a REL beyond that must fail loudly rather than truncate) and `readAt` never walks the data chain. Super side sector is used above the six-side-sector limit. A grow claims all its blocks first, links them, and commits the BAM only on success, so a failure leaves the image byte-identical (VICE keeps partial growth; we do not). Scratch frees the super side sector too (VICE leaks it). `test_disk_write/image_invariants.h` walks a REL entry's side-sector chain as a second chain so side sectors are not reported as orphans.
+- **Gotchas:** `d64.cpp` references `RELMStream`, so `rel.cpp` is in the unity `engine_sources.cpp` of every suite that builds `d64.cpp` (disk_write, g64, g71, g81, p64, p81, nib). A new REL has one record. `MStream::x00Header(std::string&)` is a default-false virtual that `P00MStream` answers from its parsed header (used for header-name listing, including over the network). Native tests: `test_rel_stream`, `test_rel_d64`, `test_rel_p00`; the P00 suite needs a stub `MFile::MFile(std::string)`.
+
 ## Recent Changes (August 22, 2026)
 
 ### SPY containers, and Wraptor's LZSS
