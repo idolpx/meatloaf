@@ -1226,9 +1226,14 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                         // can't be attached to this failure.
                         http_clear_tls_error();
                         // A REL channel reads and writes whatever the OPEN said,
-                        // so ,L opens read-write from the start.
+                        // so ,L opens read-write from the start - unless the
+                        // media cannot be written, where it opens read-only and
+                        // a write answers 26, as on a write-protected disk.
+                        const bool rel_rw = req.type == DosFileType::Rel && f->isWritable;
                         std::shared_ptr<MStream> new_stream = f->getSourceStream(
-                            req.type == DosFileType::Rel ? (std::ios_base::in | std::ios_base::out) : mode);
+                            rel_rw ? (std::ios_base::in | std::ios_base::out) : mode);
+                        if( rel_rw && (new_stream == nullptr || !new_stream->isOpen()) )
+                            new_stream = f->getSourceStream(mode);
 
                         if( new_stream==nullptr )
                         {
@@ -1385,16 +1390,14 @@ bool iecDrive::openExistingRel(uint8_t channel, MFile *f, std::shared_ptr<MStrea
     }
 
     // Opened for reading only (no ,L): the records are written in place too,
-    // and P00 storage refuses writes on a stream that is not read-write.
-    if( !(stream->mode & std::ios_base::out) )
+    // and the storage refuses writes on a stream that is not read-write. Where
+    // the media cannot be written the read-only stream is kept: the file still
+    // opens and reads, and a write answers 26 WRITE PROTECT ON, as VICE does.
+    if( !(stream->mode & std::ios_base::out) && f->isWritable )
     {
-        stream.reset();
-        stream = f->getSourceStream(std::ios_base::in | std::ios_base::out);
-        if( stream == nullptr || !stream->isOpen() || stream->relRecordLength() != len )
-        {
-            setStatusCode(ST_DRIVE_NOT_READY);
-            return false;
-        }
+        auto rw = f->getSourceStream(std::ios_base::in | std::ios_base::out);
+        if( rw != nullptr && rw->isOpen() && rw->relRecordLength() == len )
+            stream = rw;
     }
 
     // The storage pins this per-open stream, never the ImageBroker's.
@@ -1432,7 +1435,13 @@ bool iecDrive::openMissingRel(uint8_t channel, MFile *f, bool as_rel, uint8_t re
         host.reset(MFSOwner::File(dir + "/" + relHostFilename(f->name)));
         if( host != nullptr && host->exists() )
         {
-            auto stream = host->getSourceStream(std::ios_base::in | std::ios_base::out);
+            // read-write where the media allows; read-only otherwise, and a
+            // write then answers 26
+            std::shared_ptr<MStream> stream;
+            if( host->isWritable )
+                stream = host->getSourceStream(std::ios_base::in | std::ios_base::out);
+            if( stream == nullptr || !stream->isOpen() )
+                stream = host->getSourceStream(std::ios_base::in);
             if( stream == nullptr || !stream->isOpen() )
             {
                 setStatusCode(ST_DRIVE_NOT_READY);

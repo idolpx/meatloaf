@@ -53,6 +53,7 @@ public:
     uint32_t readRecord(uint8_t* buf, uint32_t size);        // read() without the 0 end marker: what a channel serves
     uint32_t write(const uint8_t* buf, uint32_t size) override;
     void     endRecord();                                    // end of a PRINT#: pad, advance
+    uint8_t  growTo(uint32_t records);                       // grow storage; new records = $FF,0... (vdrive_rel_grow)
     bool     recordExhausted() const { return exhausted_; }
     bool     recordWritten() const { return written_; }       // bytes written since the record was entered
     uint8_t  status() const { return status_; }              // CBM status of the last read/write/position
@@ -66,7 +67,6 @@ private:
     bool loadRecord();                  // buffer_ <- current record; false if absent
     void computeReadEnd();              // trailing-zero scan
     void padRecord();                   // zero-fill rest of a written record
-    uint8_t growTo(uint32_t records);   // grow storage; new records = $FF,0...
 
     std::unique_ptr<RELStorage> storage_;
     uint8_t* buf_ = nullptr;            // one record, heap

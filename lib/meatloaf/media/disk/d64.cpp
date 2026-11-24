@@ -1641,7 +1641,17 @@ public:
         max_blocks_ = img_->relBlocksMax();
         super_ = img_->relHasSuper();
     }
-    ~D64RelStorage() override { free(table_); }
+    // A grow changed the BAM, the directory entry's block count and the
+    // file's blocks through THIS stream; a listing stream ImageBroker cached
+    // has its own handle on the container and would keep serving the old
+    // view, so it is dropped (as D64MFile::remove() does). Matched by the
+    // container url, which every stream decoded from it shares.
+    ~D64RelStorage() override
+    {
+        free(table_);
+        if (grew_ && !img_->url.empty())
+            ImageBroker::disposeUnderPath(img_->url);
+    }
 
     // Loads the side sectors and sizes the file. False if the image is
     // damaged (bad link, truncated list) or the file is larger than the
@@ -1750,6 +1760,7 @@ public:
             return ST_DISK_FULL;
         }
         free(claimed);
+        grew_ = true;
 
         uint32_t old_blocks = blocks_, old_sides = nsides_, old_size = size_;
         blocks_ = need;
@@ -1990,6 +2001,7 @@ private:
     uint32_t nsides_ = 0;
     uint8_t  super_t_ = 0, super_s_ = 0;          // 0: no super side sector
     uint8_t  new_super_t_ = 0, new_super_s_ = 0;
+    bool     grew_ = false;                       // the image was changed by grow()
 };
 
 uint8_t D64MStream::relRecordLength()
@@ -2380,7 +2392,12 @@ std::shared_ptr<MStream> D64MFile::createRelStream(uint8_t record_length)
 
     // The cached listing stream would not show the new entry.
     ImageBroker::disposeFor("d64", brokerUrl());
-    return std::make_shared<RELMStream>(std::move(storage), record_length);
+    auto rel = std::make_shared<RELMStream>(std::move(storage), record_length);
+    // vdrive_rel_open (newrelfile): a new REL file has one record at OPEN. A
+    // failure (no room for the first block) is ignored as VICE ignores it; the
+    // first write then answers the error.
+    rel->growTo(1);
+    return rel;
 }
 
 bool D64MFile::exists()

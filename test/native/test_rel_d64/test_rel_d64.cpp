@@ -421,6 +421,30 @@ void test_rel_d64_disk_full_is_72_and_leaks_nothing(void)
     check_rel(f, data, 254);
 }
 
+// vdrive_rel_open (newrelfile) -> vdrive_rel_grow(.., 0): what
+// D64MFile::createRelStream does after createRel(). Growing to one record
+// takes one data block, and a REL file is whole blocks of records (254 / 20 =
+// 12), each $FF then zeros; c1541 reads it the same way and validate leaves
+// it alone.
+void test_rel_new_file_has_one_record(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    for (const RelFmt& f : kFmts)
+    {
+        fresh_image(f);
+        {
+            auto img = open_rw(f);
+            auto st = img->createRel("data", 20);
+            TEST_ASSERT_NOT_NULL_MESSAGE(st.get(), f.name);
+            RELMStream rel(std::move(st), 20);
+            TEST_ASSERT_EQUAL_UINT8_MESSAGE(ST_OK_, rel.growTo(1), f.name);
+            TEST_ASSERT_EQUAL_UINT32_MESSAGE(254 / 20, rel.recordCount(), f.name);
+            rel.close();
+        }
+        check_rel(f, filled(254 / 20, 20), 20);
+    }
+}
+
 int main(int, char**)
 {
     UNITY_BEGIN();
@@ -430,6 +454,7 @@ int main(int, char**)
     RUN_TEST(test_rel_record_length_zero_for_non_rel);
     RUN_TEST(test_rel_storage_outlives_stream_owner);
     RUN_TEST(test_rel_create_and_write_five_records);
+    RUN_TEST(test_rel_new_file_has_one_record);
     RUN_TEST(test_rel_grow_five_to_thousand);
     RUN_TEST(test_rel_grow_crosses_side_sector_groups);
     RUN_TEST(test_rel_scratch_frees_everything);
