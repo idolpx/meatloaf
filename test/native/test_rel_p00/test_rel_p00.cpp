@@ -272,8 +272,16 @@ void test_x00_type_letter(void)
     TEST_ASSERT_EQUAL_CHAR(0, x00TypeLetter("game.p01"));
     TEST_ASSERT_EQUAL_CHAR(0, x00TypeLetter("p00"));
     TEST_ASSERT_EQUAL_CHAR(0, x00TypeLetter("x.d64"));
-    TEST_ASSERT_EQUAL_STRING("REL", x00TypeName('r'));
-    TEST_ASSERT_EQUAL_STRING("USR", x00TypeName('u'));
+    TEST_ASSERT_EQUAL_STRING("rel", x00TypeName('r'));
+    TEST_ASSERT_EQUAL_STRING("usr", x00TypeName('u'));
+    // after the IEC-boundary conversion: unshifted $50 $52 $47, not $D0.. graphics
+    std::string prg = mstr::toPETSCII2(x00TypeName('p'));
+    TEST_ASSERT_EQUAL_UINT32(3, prg.size());
+    TEST_ASSERT_EQUAL_UINT8(0x50, (uint8_t)prg[0]);
+    TEST_ASSERT_EQUAL_UINT8(0x52, (uint8_t)prg[1]);
+    TEST_ASSERT_EQUAL_UINT8(0x47, (uint8_t)prg[2]);
+    std::string seq = mstr::toPETSCII2(x00TypeName('s'));
+    TEST_ASSERT_EQUAL_UINT8(0x53, (uint8_t)seq[0]);
 }
 
 void test_x00_header_name(void)

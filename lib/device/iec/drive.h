@@ -220,6 +220,7 @@ private:
   
   MFile   *m_dir;
   uint8_t  m_headerLine;
+  bool     m_x00_names = false;
   std::vector<std::string> m_headers;
 };
 
