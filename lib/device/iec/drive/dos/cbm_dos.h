@@ -19,6 +19,8 @@ public:
   void execute(std::string command, const uint8_t* raw, uint8_t rawLen);  // command is CR-stripped and non-empty
 protected:
   DosHost& m_host;
+  const uint8_t* m_raw = nullptr;   // the command as received (binary P); valid only inside execute()
+  uint8_t m_rawLen = 0;
   // Each returns true if it consumed the command (old code's `return`), false to fall through (old `break`).
   virtual bool cmdMeatloafPrefix(std::string& command);                        // CD, E?+/-, Dolphin M-R hack
   virtual bool cmdCbm(std::string& command, uint8_t media, size_t colon);     // first switch

@@ -97,6 +97,7 @@ uint8_t RELMStream::position(uint16_t record, uint8_t pos)
 uint32_t RELMStream::read(uint8_t* out, uint32_t size)
 {
     if (!out || !size) return 0;
+    status_ = ST_OK;   // status() reports this call only
     if (exhausted_) {
         // end-of-record marker delivered; the next read continues in the next record
         exhausted_ = false;
@@ -133,6 +134,19 @@ uint32_t RELMStream::read(uint8_t* out, uint32_t size)
     return n;
 }
 
+// What a drive channel serves: the next bytes of the current record, moving on
+// to the next record when this one has been read out. read()'s 0 is only the
+// record-end marker (it has already advanced), so a channel never shows it -
+// the drive signals the record end with EOI on the last byte instead, as
+// vdrive_rel_read's SERIAL_EOF does.
+uint32_t RELMStream::readRecord(uint8_t* out, uint32_t size)
+{
+    uint32_t n = read(out, size);
+    if (n == 0 && out && size)
+        n = read(out, size);
+    return n;
+}
+
 // vdrive_rel_grow: new records are $FF followed by zeros.
 uint8_t RELMStream::growTo(uint32_t records)
 {
@@ -156,6 +170,7 @@ uint8_t RELMStream::growTo(uint32_t records)
 uint32_t RELMStream::write(const uint8_t* in, uint32_t size)
 {
     if (!in || !size) return 0;
+    status_ = ST_OK;   // status() reports this call only
     if (!storage_->writable()) {
         status_ = ST_WRITE_PROTECT_ON;
         return 0;
