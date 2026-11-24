@@ -158,7 +158,7 @@ record data, plus a record length (1-254). It owns everything that is the same e
     exact mapping is the builder's, but it must be deterministic so the same CBM name always maps to
     the same host file. Only the REL path changes.
   - **Optional — header name (SD2IEC style), off by default.** Enabled by a config option
-    (Claude's call: boolean `preferences.x00_header_names` in `config.json`, read through
+    (Claude's call: boolean `settings.directory.x00_header_names` in `config.json`, read through
     `json_int()`, default 0). When on, `.?00` files (`.p00/.s00/.u00/.r00`) on plain filesystems are
     looked up AND listed by the 16-character CBM name in their header rather than by host filename.
     This touches the directory layer of every plain filesystem (SD, flash, network), costs one header
@@ -185,7 +185,7 @@ record data, plus a record length (1-254). It owns everything that is the same e
    the pre-move build, plus the native suites.
 2. **Phase 2 — REL.** `RELMStream`, both storage kinds, `iecChannelHandlerRel`, binary `P`, `,L`
    OPEN.
-3. **Phase 3 — header-name option.** `preferences.x00_header_names` lookup and listing.
+3. **Phase 3 — header-name option.** `settings.directory.x00_header_names` lookup and listing.
 
 ## Verification
 
