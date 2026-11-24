@@ -49,6 +49,7 @@
 
 #include "meat_media.h"
 #include "media/hd/partition_select.h"
+#include "media/file/p00.h"
 #ifndef DISABLE_TAPE   // MEATLOAF-GATE
 #include "media/tape/tap.h"
 #endif
@@ -501,6 +502,66 @@ void iecChannelHandlerRel::endOfWrite()
 // -------------------------------------------------------------------------------------------------
 
 
+// preferences.x00_header_names: list and look up .p00/.s00/.u00/.r00 on a plain
+// filesystem by the CBM name in their P00 header. Read once per OPEN or listing,
+// before any header is read, so the default (off) costs one config lookup.
+static bool x00HeaderNamesEnabled()
+{
+    return json_int(mlConfig["preferences"], "x00_header_names", 0) != 0;
+}
+
+// Header name (UTF-8) and type letter of a plain x00 entry; false for anything
+// else (other extension, container, network, unreadable or no signature).
+static bool x00ReadHeader(MFile *entry, std::string &name, char &letter)
+{
+    if( entry == nullptr || !entry->pathInStream.empty() || !entry->scheme.empty() )
+        return false;
+    letter = x00TypeLetter(entry->name);
+    if( letter == 0 )
+        return false;
+    // default_fs: raw bytes, never re-wrapped in a P00 decoder
+    std::unique_ptr<MFile> raw( MFSOwner::File(entry->url, true) );
+    if( raw == nullptr )
+        return false;
+    std::shared_ptr<MStream> s = raw->getSourceStream(std::ios_base::in);
+    if( s == nullptr || !s->isOpen() )
+        return false;
+    uint8_t hdr[P00MStream::HEADER_SIZE];
+    uint32_t got = 0;
+    while( got < sizeof(hdr) )
+    {
+        uint32_t r = s->read(hdr + got, sizeof(hdr) - got);
+        if( r == 0 ) break;
+        got += r;
+    }
+    return x00HeaderName(hdr, got, name);
+}
+
+// First x00 file in f's directory whose header name matches f->name (wildcards
+// honoured). Caller owns the result; null when none matches.
+static MFile *x00FindByHeader(MFile *f)
+{
+    if( !f->pathInStream.empty() || !f->scheme.empty() )
+        return nullptr;
+    std::string dir = f->base();
+    if( !dir.empty() && dir.back() == '/' )
+        dir.pop_back();
+    std::unique_ptr<MFile> d( MFSOwner::File(dir) );
+    if( d == nullptr || !d->rewindDirectory() )
+        return nullptr;
+    std::string want = f->name;
+    bool wildcard = mstr::contains(want, "*") || mstr::contains(want, "?");
+    while( MFile *e = d->getNextFileInDir() )
+    {
+        std::string hname;
+        char letter;
+        if( x00ReadHeader(e, hname, letter) && mstr::compareFilename(hname, want, wildcard) )
+            return e;
+        delete e;
+    }
+    return nullptr;
+}
+
 iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecChannelHandler(drive)
 {
     m_dir = dir;
@@ -665,9 +726,14 @@ uint8_t iecChannelHandlerDir::readBufferData()
         // file entries
         std::unique_ptr<MFile> entry;
         bool skip = false;
+        // one config lookup per entry; headers are only read when it is on
+        const bool x00_names = x00HeaderNamesEnabled();
+        std::string x00_name;
+        char x00_letter = 0;
         do 
         { 
             skip = false;
+            x00_letter = 0;
             entry = std::unique_ptr<MFile>( m_dir->getNextFileInDir() ); 
             if( entry!=nullptr )
             {
@@ -683,6 +749,8 @@ uint8_t iecChannelHandlerDir::readBufferData()
                     skip = true;
                 else if ( mstr::isJunk(entry->name) )
                     skip = true;
+                else if ( x00_names && !x00ReadHeader(entry.get(), x00_name, x00_letter) )
+                    x00_letter = 0;
 
                 //Debug_printv("name[%s] skip[%d]", entry->name.c_str(), skip);
             }
@@ -709,6 +777,12 @@ uint8_t iecChannelHandlerDir::readBufferData()
             std::string ext = entry->extension;
             if ( !mstr::contains(entry->pathInStream, name.c_str()) && entry->pathInStream.size() )
                 name = entry->pathInStream;
+            if ( x00_letter )
+            {
+                // listed by the CBM name in its P00 header, with its CBM type
+                name = x00_name;
+                ext = x00TypeName(x00_letter);
+            }
             if ( ext[0] == '_' )
                 ext.clear();
 
@@ -721,7 +795,9 @@ uint8_t iecChannelHandlerDir::readBufferData()
                 // A host filename can hold characters PETSCII has no code for;
                 // ACE keeps them typable. Never do this to a CBM name - see
                 // the isCBM comment in meatloaf.h.
-                name = U8Char::encodeACE(name);
+                // (a header name is already a CBM name: round-trips, no ACE)
+                if ( !x00_letter )
+                    name = U8Char::encodeACE(name);
 
                 ext  = U8Char::encodeACE(ext);
                 ext  = mstr::toPETSCII2( ext );
@@ -1182,12 +1258,30 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                 if( f != nullptr )
                 {
                     // opening a file
+                    // x00_header_names: after a plain lookup misses, try the CBM
+                    // names inside .p00/.s00/.u00/.r00 headers. A .r00 goes to the
+                    // REL path below; the others replace f and open as ordinary files.
+                    MFile *x00_rel = nullptr;
+                    if( (mode == std::ios_base::in) && !f->exists() && x00HeaderNamesEnabled() )
+                    {
+                        MFile *hit = x00FindByHeader(f);
+                        if( hit != nullptr )
+                        {
+                            if( x00TypeLetter(hit->name) == 'r' )
+                                x00_rel = hit;
+                            else
+                            {
+                                delete f;
+                                f = hit;
+                            }
+                        }
+                    }
                     if( (mode == std::ios_base::in) && !f->exists() )
                     {
                         // A REL file on a plain filesystem is a .r00 under a
                         // host name; ,L with a length creates one. Either way
                         // the status is set, 62 when it is neither.
-                        if( !openMissingRel(channel, f, req.type == DosFileType::Rel, req.record_length) )
+                        if( !openMissingRel(channel, f, req.type == DosFileType::Rel, req.record_length, x00_rel) )
                             Debug_printv("Error: file doesn't exist [%s]", f->url.c_str());
                     }
                     else if( (mode == std::ios_base::out) && f->media_image.size()>0 && (!f->isWritable || f->pathInStream.empty()) )
@@ -1416,7 +1510,7 @@ bool iecDrive::openExistingRel(uint8_t channel, MFile *f, std::shared_ptr<MStrea
 // .r00 under relHostFilename(); ,L with a record length creates one (in an
 // image, an entry; on a plain filesystem, the .r00). Sets the status: 62 when
 // there is nothing to open, as before.
-bool iecDrive::openMissingRel(uint8_t channel, MFile *f, bool as_rel, uint8_t record_length)
+bool iecDrive::openMissingRel(uint8_t channel, MFile *f, bool as_rel, uint8_t record_length, MFile *header_match)
 {
     // VDrive owns images while it is active; leave those to it.
     bool in_image = !f->pathInStream.empty();
@@ -1432,7 +1526,10 @@ bool iecDrive::openMissingRel(uint8_t channel, MFile *f, bool as_rel, uint8_t re
         std::string dir = f->base();
         if( !dir.empty() && dir.back() == '/' )
             dir.pop_back();
-        host.reset(MFSOwner::File(dir + "/" + relHostFilename(f->name)));
+        if( header_match != nullptr )
+            host.reset(header_match);   // found by its P00 header name
+        else
+            host.reset(MFSOwner::File(dir + "/" + relHostFilename(f->name)));
         if( host != nullptr && host->exists() )
         {
             // read-write where the media allows; read-only otherwise, and a

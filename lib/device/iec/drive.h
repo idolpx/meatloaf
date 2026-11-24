@@ -381,7 +381,7 @@ protected:
   // resolved to nothing (host .r00 lookup, ,L creation).
   bool openRelChannel(uint8_t channel, std::shared_ptr<RELMStream> rel, const std::string &name);
   bool openExistingRel(uint8_t channel, MFile *f, std::shared_ptr<MStream> stream, uint8_t record_length);
-  bool openMissingRel(uint8_t channel, MFile *f, bool as_rel, uint8_t record_length);
+  bool openMissingRel(uint8_t channel, MFile *f, bool as_rel, uint8_t record_length, MFile *header_match = nullptr);
 
   // Point a channel at a disk block for B-R/B-W and U1/U2 -- see the comment
   // on the definition for why a block command is a seek here.

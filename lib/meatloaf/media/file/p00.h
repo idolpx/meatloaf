@@ -254,6 +254,46 @@ public:
 
 
 /********************************************************
+ * x00 header names (preferences.x00_header_names)
+ ********************************************************/
+
+// Type letter of a PC64 container name: 'p', 's', 'u' or 'r' for a name ending
+// .p00/.s00/.u00/.r00 (case-insensitive), else 0.
+inline char x00TypeLetter(const std::string& filename)
+{
+    size_t n = filename.size();
+    if (n < 4 || filename[n - 4] != '.' || filename[n - 2] != '0' || filename[n - 1] != '0')
+        return 0;
+    char c = filename[n - 3];
+    if (c >= 'A' && c <= 'Z') c = c - 'A' + 'a';
+    return (c == 'p' || c == 's' || c == 'u' || c == 'r') ? c : 0;
+}
+
+// CBM type name of an x00 type letter: "PRG", "SEQ", "USR", "REL".
+inline const char* x00TypeName(char letter)
+{
+    switch (letter) {
+        case 'p': return "PRG";
+        case 's': return "SEQ";
+        case 'u': return "USR";
+        case 'r': return "REL";
+    }
+    return "";
+}
+
+// A P00 header's CBM name as UTF-8 (PETSCII converted once, here). False when
+// the 26 bytes are not a "C64File\0" header.
+inline bool x00HeaderName(const uint8_t* hdr, size_t n, std::string& utf8_name)
+{
+    if (n < P00MStream::HEADER_SIZE || memcmp(hdr, "C64File\0", 8) != 0)
+        return false;
+    size_t len = 0;
+    while (len < 16 && hdr[8 + len] != 0) len++;
+    utf8_name = mstr::toUTF8(std::string((const char*)hdr + 8, len));
+    return true;
+}
+
+/********************************************************
  * FS
  ********************************************************/
 
