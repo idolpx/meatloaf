@@ -476,13 +476,20 @@ uint8_t iecChannelHandlerRel::writeBufferData()
 uint8_t iecChannelHandlerRel::write(uint8_t *data, uint8_t n)
 {
     uint32_t written = m_rel->write(data, n);
-    if( m_rel->status() != ST_OK )
-        m_drive->setStatusCode(m_rel->status());
+    m_position += written;
     // whatever was read ahead of the write is no longer where the record is
     m_ptr = 0;
     m_len = 0;
     m_eos = false;
-    m_position += written;
+    if( m_rel->status() != ST_OK )
+    {
+        // Consume the bytes, as a 1541 does, and leave the error for channel
+        // 15: returning fewer makes IECFileDevice keep them and call write()
+        // again on every flush, re-running a failing grow (a BAM write per
+        // block on a full disk) on the IEC task until the bus stalls.
+        m_drive->setStatusCode(m_rel->status());
+        return n;
+    }
     return (uint8_t) written;
 }
 

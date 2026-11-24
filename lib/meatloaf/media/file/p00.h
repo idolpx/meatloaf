@@ -37,6 +37,18 @@
 
 class P00RelStorage;
 
+// Type letter of a PC64 container name: 'p', 's', 'u' or 'r' for a name ending
+// .p00/.s00/.u00/.r00 (case-insensitive), else 0.
+inline char x00TypeLetter(const std::string& filename)
+{
+    size_t n = filename.size();
+    if (n < 4 || filename[n - 4] != '.' || filename[n - 2] != '0' || filename[n - 1] != '0')
+        return 0;
+    char c = filename[n - 3];
+    if (c >= 'A' && c <= 'Z') c = c - 'A' + 'a';
+    return (c == 'p' || c == 's' || c == 'u' || c == 'r') ? c : 0;
+}
+
 class P00MStream : public MMediaStream {
     // override everything that requires overriding here
 
@@ -61,7 +73,9 @@ public:
     static constexpr uint32_t HEADER_SIZE = 26;
 
     // A .r00 holds a REL file's records verbatim after the 26-byte header.
-    uint8_t relRecordLength() override { return header.rel_flag; }
+    // Byte 25 means a record length only in a .r00: a .p00/.s00/.u00 whose
+    // byte 25 happens to be non-zero is still a plain file.
+    uint8_t relRecordLength() override { return isR00() ? header.rel_flag : 0; }
     std::unique_ptr<RELStorage> relStorage() override;
     bool x00Header(std::string& name) override;
 
@@ -90,6 +104,8 @@ protected:
     Header header{};
 
 private:
+    bool isR00() const { return x00TypeLetter(url) == 'r'; }
+
     friend class P00MFile;
     friend class P00RelStorage;
 };
@@ -164,7 +180,7 @@ private:
 
 inline std::unique_ptr<RELStorage> P00MStream::relStorage()
 {
-    if (header.rel_flag == 0)
+    if (relRecordLength() == 0)
         return nullptr;
     auto self = std::static_pointer_cast<P00MStream>(weak_from_this().lock());
     if (!self)
@@ -257,18 +273,6 @@ public:
 /********************************************************
  * x00 header names (settings.directory.x00_header_names)
  ********************************************************/
-
-// Type letter of a PC64 container name: 'p', 's', 'u' or 'r' for a name ending
-// .p00/.s00/.u00/.r00 (case-insensitive), else 0.
-inline char x00TypeLetter(const std::string& filename)
-{
-    size_t n = filename.size();
-    if (n < 4 || filename[n - 4] != '.' || filename[n - 2] != '0' || filename[n - 1] != '0')
-        return 0;
-    char c = filename[n - 3];
-    if (c >= 'A' && c <= 'Z') c = c - 'A' + 'a';
-    return (c == 'p' || c == 's' || c == 'u' || c == 'r') ? c : 0;
-}
 
 // CBM type name of an x00 type letter, LOWERCASE so toPETSCII2 lands in the
 // unshifted range a C64 draws as capitals: "prg", "seq", "usr", "rel".

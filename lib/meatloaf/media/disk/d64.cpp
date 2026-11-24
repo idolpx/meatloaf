@@ -1691,6 +1691,9 @@ public:
 
     bool writable() override { return (img_->mode & std::ios_base::out) != 0; }
 
+    // writeDataBlocks() fills everything past the old end with records.
+    bool fillsNewRecords() const override { return true; }
+
     // vdrive_rel_grow / vdrive_rel_add_sector
     uint8_t grow(uint32_t new_size) override
     {

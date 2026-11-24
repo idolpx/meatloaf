@@ -105,8 +105,11 @@ public:
     virtual uint32_t size() = 0;                                        // bytes of record data
     virtual uint32_t readAt(uint32_t off, uint8_t* buf, uint32_t n) = 0;
     virtual uint32_t writeAt(uint32_t off, const uint8_t* buf, uint32_t n) = 0;
-    virtual uint8_t  grow(uint32_t new_size) = 0;   // ST_OK, or the CBM status (52/72/26); content of new bytes unspecified
+    virtual uint8_t  grow(uint32_t new_size) = 0;   // ST_OK, or the CBM status (52/72/26); new bytes unspecified unless fillsNewRecords()
     virtual bool     writable() = 0;
+    // True when grow() itself writes every new record as $FF then zeros, so
+    // RELMStream need not write the fill a second time.
+    virtual bool     fillsNewRecords() const { return false; }
 };
 
 /********************************************************

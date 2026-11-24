@@ -153,6 +153,10 @@ uint8_t RELMStream::growTo(uint32_t records)
     uint32_t old = recordCount();
     uint8_t st = storage_->grow(records * len_);
     if (st != ST_OK) return st;
+    if (storage_->fillsNewRecords()) {
+        loaded_ = false;
+        return ST_OK;
+    }
     // One writeAt per record: on a disk image each call is a sector access.
     // buf_ holds no live record here (the current record is past the old end,
     // so nothing was loaded); it is reloaded by the caller.
