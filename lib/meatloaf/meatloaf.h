@@ -95,6 +95,20 @@ static constexpr uint32_t MSTREAM_POLL_INTERVAL_MS = 10;
 // TCP_SERVER_SOCKET = set bit 5
 
 
+// Where a CBM relative file keeps its record bytes (D64-family side sectors, a
+// P00 .r00 file, ...). Declared here, not in media/file/rel.h, because
+// MStream::relStorage() returns one; RELMStream layers the record semantics
+// on top (media/file/rel.h).
+class RELStorage {
+public:
+    virtual ~RELStorage() = default;
+    virtual uint32_t size() = 0;                                        // bytes of record data
+    virtual uint32_t readAt(uint32_t off, uint8_t* buf, uint32_t n) = 0;
+    virtual uint32_t writeAt(uint32_t off, const uint8_t* buf, uint32_t n) = 0;
+    virtual uint8_t  grow(uint32_t new_size) = 0;   // ST_OK, or the CBM status (52/72/26); content of new bytes unspecified
+    virtual bool     writable() = 0;
+};
+
 /********************************************************
  * Universal stream
  ********************************************************/
@@ -159,6 +173,12 @@ public:
     // narrow to the concrete stream to ask. Streams that do not connect to
     // anything correctly ignore it.
     virtual void setConnectTimeout(uint32_t ms) { (void)ms; };
+
+    // Relative-file access. A stream whose selected entry is a CBM REL file
+    // reports its record length and hands out the storage RELMStream layers
+    // its record semantics on; everything else answers 0 / nullptr.
+    virtual uint8_t relRecordLength() { return 0; }
+    virtual std::unique_ptr<RELStorage> relStorage() { return nullptr; }
 
     virtual uint32_t available() {
         if ( _position > _size )

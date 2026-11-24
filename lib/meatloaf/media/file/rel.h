@@ -34,15 +34,7 @@
 
 #include "meatloaf.h"
 
-class RELStorage {
-public:
-    virtual ~RELStorage() = default;
-    virtual uint32_t size() = 0;                                        // bytes of record data
-    virtual uint32_t readAt(uint32_t off, uint8_t* buf, uint32_t n) = 0;
-    virtual uint32_t writeAt(uint32_t off, const uint8_t* buf, uint32_t n) = 0;
-    virtual uint8_t  grow(uint32_t new_size) = 0;   // ST_OK, or the CBM status (52/72/26); content of new bytes unspecified
-    virtual bool     writable() = 0;
-};
+// RELStorage itself is declared in meatloaf.h: MStream::relStorage() returns it.
 
 class RELMStream : public MStream {
 public:

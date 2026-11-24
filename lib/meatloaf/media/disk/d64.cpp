@@ -18,6 +18,7 @@
 #include "d64.h"
 
 #include <fstream>
+#include <new>
 #include <iostream>
 
 //#include "meat_broker.h"
@@ -1528,6 +1529,176 @@ bool D64MStream::seekPath(std::string path)
 
     return false;
 };
+
+/********************************************************
+ * REL files (read)
+ ********************************************************/
+
+uint32_t D64MStream::readBlockBytes(uint8_t track, uint8_t sector, uint8_t off, uint8_t* buf, uint32_t n)
+{
+    if (!seekSector(track, sector, off))
+        return 0;
+    return readContainer(buf, n);
+}
+
+// Data bytes live in the file's blocks at offsets 2..255 (254 per block).
+// Where block N is comes from the side sectors, loaded once into a heap table
+// of track/sector pairs - the chain is never walked, which matters over a
+// network filesystem where each block read is a round trip.
+//
+// Side sector: 0-1 next side sector, 2 its number, 3 record length, 4-15 the
+// six T/S of its group, 16-255 up to 120 data block T/S. On a 1581/CMD native
+// the entry points at a SUPER side sector instead: 0-1 first side sector,
+// 2 = $FE, 3.. the first side sector of each six-sector group (confirmed
+// against a c1541-made image: 39/1 then 21/8, whose own next link is 0).
+// Task 7 extends this class with writeAt()/grow().
+class D64RelStorage : public RELStorage {
+public:
+    static constexpr uint32_t DATA_PER_BLOCK = 254;
+    static constexpr uint32_t PLAIN_SIDE_SECTORS = 6;   // per group
+    static constexpr uint32_t MAX_GROUPS = 21;          // 126 side sectors / 6
+    static constexpr uint32_t MAX_SIDE_SECTORS = MAX_GROUPS * PLAIN_SIDE_SECTORS;
+    static constexpr uint32_t ENTRIES_PER_SIDE = 120;
+
+    explicit D64RelStorage(D64MStream* image) : img_(image) {}
+    ~D64RelStorage() override { free(table_); }
+
+    // Loads the side sectors and sizes the file. False if the image is
+    // damaged (bad link, truncated list).
+    bool load(uint8_t first_track, uint8_t first_sector)
+    {
+        uint8_t* blk = (uint8_t*)malloc(256);
+        if (blk == nullptr) return false;
+        if (img_->readBlockBytes(first_track, first_sector, 0, blk, 256) != 256) { free(blk); return false; }
+        // Worst case: every side sector full. A super side sector allows 126
+        // of them, a plain chain 6.
+        capacity_ = (blk[2] == 0xFE ? MAX_SIDE_SECTORS : PLAIN_SIDE_SECTORS) * ENTRIES_PER_SIDE;
+        table_ = (uint8_t*)malloc((size_t)capacity_ * 2);
+        if (table_ == nullptr) { free(blk); return false; }
+
+        bool ok = loadTable(blk, first_track, first_sector);
+        if (ok && blocks_ > 0)
+        {
+            uint8_t link[2];
+            ok = img_->readBlockBytes(table_[(blocks_ - 1) * 2], table_[(blocks_ - 1) * 2 + 1], 0, link, 2) == 2;
+            if (ok)
+            {
+                // Last block: link track 0, sector = index of the last used byte.
+                uint32_t used = (link[0] == 0) ? (link[1] > 1 ? link[1] - 1u : 0u) : DATA_PER_BLOCK;
+                size_ = (blocks_ - 1) * DATA_PER_BLOCK + used;
+            }
+        }
+        free(blk);
+        return ok;
+    }
+
+    uint32_t size() override { return size_; }
+
+    uint32_t readAt(uint32_t off, uint8_t* buf, uint32_t n) override
+    {
+        if (off >= size_) return 0;
+        if (n > size_ - off) n = size_ - off;
+        uint32_t done = 0;
+        while (done < n)
+        {
+            uint32_t idx = (off + done) / DATA_PER_BLOCK;
+            uint32_t in = (off + done) % DATA_PER_BLOCK;
+            uint32_t chunk = std::min<uint32_t>(n - done, DATA_PER_BLOCK - in);
+            uint32_t got = img_->readBlockBytes(table_[idx * 2], table_[idx * 2 + 1],
+                                                (uint8_t)(2 + in), buf + done, chunk);
+            if (got == 0) break;
+            done += got;
+        }
+        return done;
+    }
+
+    uint32_t writeAt(uint32_t, const uint8_t*, uint32_t) override { return 0; }
+    uint8_t  grow(uint32_t) override { return ST_WRITE_PROTECT_ON; }
+    bool     writable() override { return false; }
+
+private:
+    // Appends the data block T/S of one side sector.
+    bool addSideSector(uint8_t* blk, uint8_t t, uint8_t s)
+    {
+        if (img_->readBlockBytes(t, s, 0, blk, 256) != 256) return false;
+        for (uint32_t i = 0; i < ENTRIES_PER_SIDE; i++)
+        {
+            uint8_t dt = blk[16 + i * 2], ds = blk[17 + i * 2];
+            if (dt == 0) return true;   // end of this (and so of every) list
+            if (blocks_ >= capacity_) return false;
+            table_[blocks_ * 2] = dt;
+            table_[blocks_ * 2 + 1] = ds;
+            blocks_++;
+        }
+        return true;
+    }
+
+    // A group is up to six side sectors, and every one of them carries the
+    // whole group's T/S list at bytes 4-15, so the head alone names the rest.
+    bool addGroup(uint8_t* blk, uint8_t t, uint8_t s)
+    {
+        if (img_->readBlockBytes(t, s, 0, blk, 256) != 256) return false;
+        uint8_t list[PLAIN_SIDE_SECTORS * 2];
+        memcpy(list, blk + 4, sizeof(list));
+        for (uint32_t i = 0; i < PLAIN_SIDE_SECTORS && list[i * 2] != 0; i++)
+        {
+            uint32_t before = blocks_;
+            if (!addSideSector(blk, list[i * 2], list[i * 2 + 1])) return false;
+            if (blocks_ - before < ENTRIES_PER_SIDE) break;   // a short side sector is the last
+        }
+        return true;
+    }
+
+    bool loadTable(uint8_t* blk, uint8_t t, uint8_t s)
+    {
+        if (img_->readBlockBytes(t, s, 0, blk, 256) != 256) return false;
+
+        if (blk[2] != 0xFE)
+            return addGroup(blk, t, s);
+
+        // Super side sector (1581/CMD native): bytes 3.. are the T/S of each
+        // group's first side sector, a group being six side sectors. Copy the
+        // list first, blk is reused below.
+        uint8_t list[MAX_GROUPS * 2];
+        memcpy(list, blk + 3, sizeof(list));
+        for (uint32_t i = 0; i < MAX_GROUPS && list[i * 2] != 0; i++)
+        {
+            uint32_t before = blocks_;
+            if (!addGroup(blk, list[i * 2], list[i * 2 + 1])) return false;
+            if (blocks_ - before < PLAIN_SIDE_SECTORS * ENTRIES_PER_SIDE) break;
+        }
+        return true;
+    }
+
+    D64MStream* img_;
+    uint8_t* table_ = nullptr;   // T/S pairs of every data block, heap
+    uint32_t capacity_ = 0;
+    uint32_t blocks_ = 0;
+    uint32_t size_ = 0;
+};
+
+uint8_t D64MStream::relRecordLength()
+{
+    if (!seekCalled || (entry.file_type & 0x07) != 4)
+        return 0;
+    return entry.rel_record_length;
+}
+
+std::unique_ptr<RELStorage> D64MStream::relStorage()
+{
+    if (relRecordLength() == 0)
+        return nullptr;
+    // nothrow: plain new would abort on failure under -fno-exceptions.
+    D64RelStorage* st = new (std::nothrow) D64RelStorage(this);
+    if (st == nullptr)
+        return nullptr;
+    if (!st->load(entry.rel_start_track, entry.rel_start_sector))
+    {
+        delete st;
+        return nullptr;
+    }
+    return std::unique_ptr<RELStorage>(st);
+}
 
 /********************************************************
  * File implementations
