@@ -230,7 +230,12 @@ public:
                 stream->mode = std::ios_base::in | std::ios_base::out;
                 auto storage = stream->relStorage();
                 if (storage != nullptr)
-                    result = std::make_shared<RELMStream>(std::move(storage), record_length);
+                {
+                    auto rel = std::make_shared<RELMStream>(std::move(storage), record_length);
+                    // vdrive_rel_open: a new REL file has one record at OPEN.
+                    if (rel->growTo(1) == ST_OK)
+                        result = rel;
+                }
             }
         }
         if (!result)

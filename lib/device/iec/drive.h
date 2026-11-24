@@ -203,7 +203,6 @@ public:
 
 private:
   std::shared_ptr<RELMStream> m_rel;
-  bool m_written = false;   // bytes written to the current record
 };
 
 

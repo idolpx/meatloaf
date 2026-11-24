@@ -197,6 +197,63 @@ void test_plain_p00_is_not_rel(void)
     TEST_ASSERT_EQUAL_UINT8(0x01, buf[0]);
 }
 
+// vdrive_rel_open (newrelfile): a new REL file has one record at OPEN, $FF
+// then zeros - not zero records - both in the stream and on disk.
+void test_new_rel_has_one_record(void)
+{
+    const uint32_t LEN = 30;
+    {
+        auto f = make_file();
+        auto s = f->createRelStream(LEN);
+        TEST_ASSERT_NOT_NULL(s.get());
+        auto* rel = static_cast<RELMStream*>(s.get());
+        TEST_ASSERT_EQUAL_UINT32(1, rel->recordCount());
+        TEST_ASSERT_EQUAL_UINT8(0, rel->position(1, 1));
+        uint8_t got[LEN];
+        TEST_ASSERT_EQUAL_UINT32(1, rel->read(got, sizeof(got)));   // trailing zeros are not data
+        TEST_ASSERT_EQUAL_UINT8(0xFF, got[0]);
+        TEST_ASSERT_EQUAL_UINT8(0, rel->status());
+        rel->close();
+    }
+    FILE* fp = fopen(kPath, "rb");
+    TEST_ASSERT_NOT_NULL(fp);
+    uint8_t b[26 + LEN + 1];
+    TEST_ASSERT_EQUAL_UINT32(26 + LEN, (uint32_t)fread(b, 1, sizeof(b), fp));
+    fclose(fp);
+    TEST_ASSERT_EQUAL_UINT8(0xFF, b[26]);
+    for (uint32_t i = 1; i < LEN; i++) TEST_ASSERT_EQUAL_UINT8(0, b[26 + i]);
+}
+
+// A REL file on media that cannot be written still opens and reads; only a
+// write fails, with 26 (what the drive gets by keeping the read-only stream).
+void test_read_only_rel_reads_and_refuses_writes(void)
+{
+    {
+        auto f = make_file();
+        auto s = f->createRelStream(30);
+        TEST_ASSERT_NOT_NULL(s.get());
+        auto* rel = static_cast<RELMStream*>(s.get());
+        rel->write((const uint8_t*)"abc", 3);
+        rel->endRecord();
+        rel->close();
+    }
+    HostFile hf(kPath);
+    auto src = hf.getSourceStream(std::ios_base::in);
+    P00MFile pf(kPath);
+    auto st = std::static_pointer_cast<P00MStream>(pf.getDecodedStream(src));
+    st->mode = std::ios_base::in;
+    auto storage = st->relStorage();
+    TEST_ASSERT_NOT_NULL(storage.get());
+    RELMStream rel(std::move(storage), 30);
+    TEST_ASSERT_EQUAL_UINT8(0, rel.position(1, 1));
+    uint8_t got[30];
+    TEST_ASSERT_EQUAL_UINT32(3, rel.read(got, sizeof(got)));
+    TEST_ASSERT_EQUAL_MEMORY("abc", got, 3);
+    TEST_ASSERT_EQUAL_UINT8(0, rel.position(1, 1));
+    TEST_ASSERT_EQUAL_UINT32(0, rel.write((const uint8_t*)"x", 1));
+    TEST_ASSERT_EQUAL_UINT8(26, rel.status());
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_host_filename_basic);
@@ -207,5 +264,7 @@ int main(int, char**) {
     RUN_TEST(test_existing_file_is_not_clobbered);
     RUN_TEST(test_non_writable_container_gives_write_protect);
     RUN_TEST(test_plain_p00_is_not_rel);
+    RUN_TEST(test_new_rel_has_one_record);
+    RUN_TEST(test_read_only_rel_reads_and_refuses_writes);
     return UNITY_END();
 }
