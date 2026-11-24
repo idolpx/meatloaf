@@ -514,7 +514,7 @@ static bool x00HeaderNamesEnabled()
 // else (other extension, container, network, unreadable or no signature).
 static bool x00ReadHeader(MFile *entry, std::string &name, char &letter)
 {
-    if( entry == nullptr || !entry->pathInStream.empty() || !entry->scheme.empty() )
+    if( entry == nullptr || !entry->pathInStream.empty() )
         return false;
     letter = x00TypeLetter(entry->name);
     if( letter == 0 )
@@ -541,7 +541,7 @@ static bool x00ReadHeader(MFile *entry, std::string &name, char &letter)
 // honoured). Caller owns the result; null when none matches.
 static MFile *x00FindByHeader(MFile *f)
 {
-    if( !f->pathInStream.empty() || !f->scheme.empty() )
+    if( !f->pathInStream.empty() )
         return nullptr;
     std::string dir = f->base();
     if( !dir.empty() && dir.back() == '/' )
@@ -566,6 +566,7 @@ iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecCha
 {
     m_dir = dir;
     m_headerLine = 1;
+    m_x00_names = x00HeaderNamesEnabled();   // once per listing
     
     std::string scheme = m_dir->scheme;
     std::string url = m_dir->host;
@@ -726,8 +727,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
         // file entries
         std::unique_ptr<MFile> entry;
         bool skip = false;
-        // one config lookup per entry; headers are only read when it is on
-        const bool x00_names = x00HeaderNamesEnabled();
+        // headers are only read when preferences.x00_header_names is on
         std::string x00_name;
         char x00_letter = 0;
         do 
@@ -749,7 +749,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
                     skip = true;
                 else if ( mstr::isJunk(entry->name) )
                     skip = true;
-                else if ( x00_names && !x00ReadHeader(entry.get(), x00_name, x00_letter) )
+                else if ( m_x00_names && !x00ReadHeader(entry.get(), x00_name, x00_letter) )
                     x00_letter = 0;
 
                 //Debug_printv("name[%s] skip[%d]", entry->name.c_str(), skip);
@@ -1262,7 +1262,7 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                     // names inside .p00/.s00/.u00/.r00 headers. A .r00 goes to the
                     // REL path below; the others replace f and open as ordinary files.
                     MFile *x00_rel = nullptr;
-                    if( (mode == std::ios_base::in) && !f->exists() && x00HeaderNamesEnabled() )
+                    if( (mode == std::ios_base::in) && x00HeaderNamesEnabled() && !f->exists() )
                     {
                         MFile *hit = x00FindByHeader(f);
                         if( hit != nullptr )

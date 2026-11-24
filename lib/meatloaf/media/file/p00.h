@@ -269,14 +269,15 @@ inline char x00TypeLetter(const std::string& filename)
     return (c == 'p' || c == 's' || c == 'u' || c == 'r') ? c : 0;
 }
 
-// CBM type name of an x00 type letter: "PRG", "SEQ", "USR", "REL".
+// CBM type name of an x00 type letter, LOWERCASE so toPETSCII2 lands in the
+// unshifted range a C64 draws as capitals: "prg", "seq", "usr", "rel".
 inline const char* x00TypeName(char letter)
 {
     switch (letter) {
-        case 'p': return "PRG";
-        case 's': return "SEQ";
-        case 'u': return "USR";
-        case 'r': return "REL";
+        case 'p': return "prg";
+        case 's': return "seq";
+        case 'u': return "usr";
+        case 'r': return "rel";
     }
     return "";
 }
