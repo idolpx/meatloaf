@@ -813,6 +813,29 @@ bool D64MStream::finalizeFileWrite()
         return false;
     }
 
+    uint8_t dt, ds, slot;
+    uint16_t blocks = create_allocated.size();
+    uint8_t st = addDirectoryEntry(create_filename, 0x82, // closed PRG
+                                   create_start_track, create_start_sector,
+                                   0, 0, 0, blocks, &dt, &ds, &slot);
+    if (st != 0)
+    {
+        rollbackFileWrite();
+        _error = st;
+        return false;
+    }
+
+    Debug_printv("Created [%s] start[%d/%d] blocks[%d] entry at [%d/%d] slot[%d]",
+                 create_filename.c_str(), create_start_track, create_start_sector, blocks, dt, ds, slot);
+    return true;
+}
+
+uint8_t D64MStream::addDirectoryEntry(const std::string& filename, uint8_t type,
+                                      uint8_t start_track, uint8_t start_sector,
+                                      uint8_t rel_track, uint8_t rel_sector, uint8_t rel_length,
+                                      uint16_t blocks,
+                                      uint8_t* out_track, uint8_t* out_sector, uint8_t* out_slot)
+{
     // Find the first free directory entry, following the chain of the
     // directory the file was created in
     uint8_t dt = dir_track ? dir_track : curPartition().directory_track;
@@ -824,11 +847,7 @@ bool D64MStream::finalizeFileWrite()
     {
         dirsec = readBlock(dt, ds);
         if (dirsec.size() != block_size || chain_safety++ > 1000)
-        {
-            rollbackFileWrite();
-            _error = ST_DIR_ERROR;
-            return false;
-        }
+            return ST_DIR_ERROR;
 
         for (uint8_t i = 0; i < 8; i++)
         {
@@ -855,10 +874,8 @@ bool D64MStream::finalizeFileWrite()
         uint8_t nt, ns;
         if (!getNextFreeBlock(dt, ds, &nt, &ns, true) || !allocateBlock(nt, ns))
         {
-            Debug_printv("Directory full, cannot add entry for [%s]", create_filename.c_str());
-            rollbackFileWrite();
-            _error = ST_DISK_FULL;
-            return false;
+            Debug_printv("Directory full, cannot add entry for [%s]", filename.c_str());
+            return ST_DISK_FULL;
         }
 
         // Link the current last directory sector to the new one
@@ -867,9 +884,7 @@ bool D64MStream::finalizeFileWrite()
         if (!writeBlock(dt, ds, dirsec))
         {
             deallocateBlock(nt, ns);
-            rollbackFileWrite();
-            _error = ST_WRITE_VERIFY;
-            return false;
+            return ST_WRITE_VERIFY;
         }
 
         // Fresh directory sector: end-of-chain link, all entries free
@@ -884,30 +899,29 @@ bool D64MStream::finalizeFileWrite()
 
     // Build the 32-byte entry in place and write the sector back
     uint16_t o = slot * 32;
-    std::string name = mstr::toPETSCII2(create_filename);
+    std::string name = mstr::toPETSCII2(filename);
     if (name.size() > 16)
         name = name.substr(0, 16);
 
-    dirsec[o + 2] = 0x82; // closed PRG
-    dirsec[o + 3] = create_start_track;
-    dirsec[o + 4] = create_start_sector;
+    dirsec[o + 2] = type;
+    dirsec[o + 3] = start_track;
+    dirsec[o + 4] = start_sector;
     memset(&dirsec[o + 5], 0xA0, 16);
     memcpy(&dirsec[o + 5], name.c_str(), name.size());
     memset(&dirsec[o + 21], 0x00, 9);
-    uint16_t blocks = create_allocated.size();
+    dirsec[o + 21] = rel_track;
+    dirsec[o + 22] = rel_sector;
+    dirsec[o + 23] = rel_length;
     dirsec[o + 30] = blocks & 0xFF;
     dirsec[o + 31] = blocks >> 8;
 
     if (!writeBlock(dt, ds, dirsec))
-    {
-        rollbackFileWrite();
-        _error = ST_WRITE_VERIFY;
-        return false;
-    }
+        return ST_WRITE_VERIFY;
 
-    Debug_printv("Created [%s] start[%d/%d] blocks[%d] entry at [%d/%d] slot[%d]",
-                 create_filename.c_str(), create_start_track, create_start_sector, blocks, dt, ds, slot);
-    return true;
+    *out_track = dt;
+    *out_sector = ds;
+    *out_slot = (uint8_t)slot;
+    return 0;
 }
 
 void D64MStream::rollbackFileWrite()
@@ -1086,12 +1100,51 @@ bool D64MStream::scratchEntry()
         s = link[1];
     }
 
+    // A REL file's side sectors are a second chain
+    if ((entry.file_type & 0x07) == 4 && entry.rel_start_track != 0)
+        freeRelSideSectors(entry.rel_start_track, entry.rel_start_sector);
+
     // Mark the directory entry as deleted
     std::string dirsec = readBlock(dir_track, dir_sector);
     if (dirsec.size() != block_size)
         return false;
     dirsec[slot * 32 + 2] = 0x00;
     return writeBlock(dir_track, dir_sector, dirsec);
+}
+
+// vdrive_rel_scratch + vdrive_dir_free_chain: each chain is freed until a
+// block that is already free. With a super side sector every group is a chain
+// of its own (they are also linked to each other, so the later ones stop at
+// once). VICE never frees the super side sector itself; we do, or every
+// scratched 1581/CMD REL file would leak a block.
+void D64MStream::freeRelSideSectors(uint8_t t, uint8_t s)
+{
+    auto freeChain = [this](uint8_t ct, uint8_t cs) {
+        uint16_t safety = 0;
+        while (ct != 0 && safety++ < 10000)
+        {
+            if (isBlockFree(ct, cs))
+                break;
+            uint8_t link[2];
+            if (readBlockBytes(ct, cs, 0, link, 2) != 2)
+                break;
+            deallocateBlock(ct, cs);
+            ct = link[0];
+            cs = link[1];
+        }
+    };
+
+    uint8_t blk[256];
+    if (readBlockBytes(t, s, 0, blk, 256) != 256)
+        return;
+    if (blk[2] != 0xFE)
+    {
+        freeChain(t, s);
+        return;
+    }
+    for (uint32_t i = 0; i < 126; i++)
+        freeChain(blk[3 + i * 2], blk[4 + i * 2]);
+    deallocateBlock(t, s);
 }
 
 void D64MStream::close()
@@ -1502,6 +1555,11 @@ bool D64MStream::seekPath(std::string path)
         //auto type = decodeType(entry.file_type).c_str();
         //Debug_printv("filename[%.16s] type[%s] start_track[%d] start_sector[%d]", entry.filename, type, entry.start_track, entry.start_sector);
 
+        // resolvePath() left track/sector on the entry's directory sector
+        entry_dir_track = track;
+        entry_dir_sector = sector;
+        entry_dir_slot = (entry_index - 1) % 8;
+
         // Calculate file size
         uint8_t t = entry.start_track;
         uint8_t s = entry.start_sector;
@@ -1541,43 +1599,57 @@ uint32_t D64MStream::readBlockBytes(uint8_t track, uint8_t sector, uint8_t off, 
     return readContainer(buf, n);
 }
 
+uint32_t D64MStream::writeBlockBytes(uint8_t track, uint8_t sector, uint8_t off, const uint8_t* buf, uint32_t n)
+{
+    if (!seekSector(track, sector, off))
+        return 0;
+    return writeContainer((uint8_t*)buf, n);
+}
+
 // Data bytes live in the file's blocks at offsets 2..255 (254 per block).
 // Where block N is comes from the side sectors, loaded once into a heap table
 // of track/sector pairs - the chain is never walked, which matters over a
 // network filesystem where each block read is a round trip.
 //
-// Side sector: 0-1 next side sector, 2 its number, 3 record length, 4-15 the
-// six T/S of its group, 16-255 up to 120 data block T/S. On a 1581/CMD native
-// the entry points at a SUPER side sector instead: 0-1 first side sector,
-// 2 = $FE, 3.. the first side sector of each six-sector group (confirmed
-// against a c1541-made image: 39/1 then 21/8, whose own next link is 0).
-// Task 7 extends this class with writeAt()/grow().
+// Side sector: 0-1 next side sector, 2 its number within its group, 3 record
+// length, 4-15 the six T/S of its group, 16-255 up to 120 data block T/S. On a
+// 1581/CMD native the entry points at a SUPER side sector instead: 0-1 first
+// side sector, 2 = $FE, 3.. the first side sector of each six-sector group
+// (confirmed against a c1541-made image: 39/1 then 21/8, whose own next link
+// is 0). Side sectors are also chained to each other across groups.
+//
+// Growth follows vdrive_rel_add_sector/vdrive_rel_grow: whole blocks are
+// added and filled with records ($FF then zeros), and the size is the whole
+// records the blocks hold - the last block's last-used byte is 255 - k, where
+// k is the partial record left over. Unlike VICE a grow is all or nothing: the
+// blocks are claimed first and only written once every one was found, so a
+// 52 or 72 leaves the image as it was.
 class D64RelStorage : public RELStorage {
 public:
     static constexpr uint32_t DATA_PER_BLOCK = 254;
     static constexpr uint32_t PLAIN_SIDE_SECTORS = 6;   // per group
-    static constexpr uint32_t MAX_GROUPS = 21;          // 126 side sectors / 6
+    static constexpr uint32_t MAX_GROUPS = 126;         // SIDE_SUPER_MAX
     static constexpr uint32_t MAX_SIDE_SECTORS = MAX_GROUPS * PLAIN_SIDE_SECTORS;
     static constexpr uint32_t ENTRIES_PER_SIDE = 120;
 
     // Owns a reference to the stream: the storage reads through it, and a
     // RELMStream may well outlive every other holder of the stream.
-    explicit D64RelStorage(std::shared_ptr<D64MStream> image) : img_(std::move(image)) {}
+    D64RelStorage(std::shared_ptr<D64MStream> image, uint8_t record_length,
+                  uint8_t dir_t, uint8_t dir_s, uint8_t slot)
+        : img_(std::move(image)), len_(record_length), dir_t_(dir_t), dir_s_(dir_s), slot_(slot)
+    {
+        max_blocks_ = img_->relBlocksMax();
+        super_ = img_->relHasSuper();
+    }
     ~D64RelStorage() override { free(table_); }
 
     // Loads the side sectors and sizes the file. False if the image is
-    // damaged (bad link, truncated list).
+    // damaged (bad link, truncated list) or the file is larger than the
+    // format allows.
     bool load(uint8_t first_track, uint8_t first_sector)
     {
         uint8_t* blk = (uint8_t*)malloc(256);
         if (blk == nullptr) return false;
-        if (img_->readBlockBytes(first_track, first_sector, 0, blk, 256) != 256) { free(blk); return false; }
-        // Worst case: every side sector full. A super side sector allows 126
-        // of them, a plain chain 6.
-        capacity_ = (blk[2] == 0xFE ? MAX_SIDE_SECTORS : PLAIN_SIDE_SECTORS) * ENTRIES_PER_SIDE;
-        table_ = (uint8_t*)malloc((size_t)capacity_ * 2);
-        if (table_ == nullptr) { free(blk); return false; }
-
         bool ok = loadTable(blk, first_track, first_sector);
         if (ok && blocks_ > 0)
         {
@@ -1598,6 +1670,107 @@ public:
 
     uint32_t readAt(uint32_t off, uint8_t* buf, uint32_t n) override
     {
+        return transfer(off, buf, n, false);
+    }
+
+    uint32_t writeAt(uint32_t off, const uint8_t* buf, uint32_t n) override
+    {
+        if (!writable()) return 0;
+        return transfer(off, (uint8_t*)buf, n, true);
+    }
+
+    bool writable() override { return (img_->mode & std::ios_base::out) != 0; }
+
+    // vdrive_rel_grow / vdrive_rel_add_sector
+    uint8_t grow(uint32_t new_size) override
+    {
+        if (!writable()) return ST_WRITE_PROTECT_ON;
+        if (new_size <= size_) return ST_OK;
+
+        uint64_t bytes = (uint64_t)((new_size + len_ - 1) / len_) * len_;
+        uint32_t need = (uint32_t)((bytes + DATA_PER_BLOCK - 1) / DATA_PER_BLOCK);
+
+        // vdrive_rel_blocks_max: checked against the file's total before each
+        // data block is added, exactly as VICE does - but all of it up front.
+        uint32_t total = blocks_ + nsides_ + (super_t_ ? 1 : 0);
+        uint32_t sides = nsides_;
+        uint32_t new_sides = 0;
+        bool new_super = false;
+        for (uint32_t b = blocks_; b < need; b++)
+        {
+            if (total >= max_blocks_)
+                return ST_FILE_TOO_LARGE;
+            total++;
+            if (b % ENTRIES_PER_SIDE == 0) { total++; sides++; new_sides++; }
+            if (b == 0 && super_) { total++; new_super = true; }
+        }
+        if (sides > (super_ ? MAX_SIDE_SECTORS : PLAIN_SIDE_SECTORS))
+            return ST_FILE_TOO_LARGE;
+        if (!reserveTable(need))
+            return ST_DISK_FULL;
+
+        // Claim every block before writing anything: data blocks, each side
+        // sector right after the data block that needs it, the super side
+        // sector after the first side sector (vdrive_rel_add_sector's order).
+        uint32_t nclaim = (need - blocks_) + new_sides + (new_super ? 1 : 0);
+        uint8_t* claimed = (uint8_t*)malloc((size_t)nclaim * 2);
+        if (claimed == nullptr) return ST_DISK_FULL;
+        uint32_t nc = 0;
+        uint8_t t = blocks_ ? table_[(blocks_ - 1) * 2] : 0;
+        uint8_t sct = blocks_ ? table_[(blocks_ - 1) * 2 + 1] : 0;
+        bool ok = true;
+        for (uint32_t b = blocks_; b < need && ok; b++)
+        {
+            ok = claim(t, sct, claimed, nc);
+            if (!ok) break;
+            t = claimed[(nc - 1) * 2];
+            sct = claimed[(nc - 1) * 2 + 1];
+            table_[b * 2] = t;
+            table_[b * 2 + 1] = sct;
+            if (b % ENTRIES_PER_SIDE == 0)
+            {
+                ok = claim(t, sct, claimed, nc);
+                if (!ok) break;
+                sides_[(b / ENTRIES_PER_SIDE) * 2] = claimed[(nc - 1) * 2];
+                sides_[(b / ENTRIES_PER_SIDE) * 2 + 1] = claimed[(nc - 1) * 2 + 1];
+                if (b == 0 && super_)
+                {
+                    ok = claim(claimed[(nc - 1) * 2], claimed[(nc - 1) * 2 + 1], claimed, nc);
+                    if (!ok) break;
+                    new_super_t_ = claimed[(nc - 1) * 2];
+                    new_super_s_ = claimed[(nc - 1) * 2 + 1];
+                }
+            }
+        }
+        if (!ok)
+        {
+            for (uint32_t i = 0; i < nc; i++)
+                img_->deallocateBlock(claimed[i * 2], claimed[i * 2 + 1]);
+            free(claimed);
+            return ST_DISK_FULL;
+        }
+        free(claimed);
+
+        uint32_t old_blocks = blocks_, old_sides = nsides_, old_size = size_;
+        blocks_ = need;
+        nsides_ = sides;
+        if (new_super) { super_t_ = new_super_t_; super_s_ = new_super_s_; }
+        uint32_t k = (uint32_t)(((uint64_t)blocks_ * DATA_PER_BLOCK) % len_);
+        size_ = blocks_ * DATA_PER_BLOCK - k;
+
+        uint8_t* blk = (uint8_t*)malloc(256);
+        if (blk == nullptr) return ST_WRITE_VERIFY;
+        bool w = writeDataBlocks(blk, old_blocks ? old_blocks - 1 : 0, old_size, k) &&
+                 writeSideSectors(blk, old_sides) &&
+                 (!super_t_ || writeSuper(blk)) &&
+                 writeDirEntry(blk);
+        free(blk);
+        return w ? ST_OK : ST_WRITE_VERIFY;
+    }
+
+private:
+    uint32_t transfer(uint32_t off, uint8_t* buf, uint32_t n, bool write)
+    {
         if (off >= size_) return 0;
         if (n > size_ - off) n = size_ - off;
         uint32_t done = 0;
@@ -1606,28 +1779,158 @@ public:
             uint32_t idx = (off + done) / DATA_PER_BLOCK;
             uint32_t in = (off + done) % DATA_PER_BLOCK;
             uint32_t chunk = std::min<uint32_t>(n - done, DATA_PER_BLOCK - in);
-            uint32_t got = img_->readBlockBytes(table_[idx * 2], table_[idx * 2 + 1],
-                                                (uint8_t)(2 + in), buf + done, chunk);
+            uint8_t bt = table_[idx * 2], bs = table_[idx * 2 + 1];
+            uint32_t got = write ? img_->writeBlockBytes(bt, bs, (uint8_t)(2 + in), buf + done, chunk)
+                                 : img_->readBlockBytes(bt, bs, (uint8_t)(2 + in), buf + done, chunk);
             if (got == 0) break;
             done += got;
         }
         return done;
     }
 
-    uint32_t writeAt(uint32_t, const uint8_t*, uint32_t) override { return 0; }
-    uint8_t  grow(uint32_t) override { return ST_WRITE_PROTECT_ON; }
-    bool     writable() override { return false; }
+    // Room in the data block table for n entries; the table grows on demand
+    // rather than reserving the format's maximum for every open.
+    bool reserveTable(uint32_t n)
+    {
+        if (n <= capacity_) return true;
+        uint32_t cap = capacity_ ? capacity_ : ENTRIES_PER_SIDE;
+        while (cap < n) cap *= 2;
+        uint8_t* t = (uint8_t*)realloc(table_, (size_t)cap * 2);
+        if (t == nullptr) return false;
+        table_ = t;
+        capacity_ = cap;
+        return true;
+    }
 
-private:
+    // One free block after (t, s), allocated and recorded in 'claimed'.
+    bool claim(uint8_t t, uint8_t s, uint8_t* claimed, uint32_t& nc)
+    {
+        uint8_t ft, fs;
+        if (!img_->getNextFreeBlock(t, s, &ft, &fs) || !img_->allocateBlock(ft, fs))
+            return false;
+        claimed[nc * 2] = ft;
+        claimed[nc * 2 + 1] = fs;
+        nc++;
+        return true;
+    }
+
+    // Blocks from 'first' to the end: the old content up to the old end of
+    // file is kept, everything after it becomes $FF,0... records.
+    bool writeDataBlocks(uint8_t* blk, uint32_t first, uint32_t old_size, uint32_t k)
+    {
+        for (uint32_t b = first; b < blocks_; b++)
+        {
+            uint8_t bt = table_[b * 2], bs = table_[b * 2 + 1];
+            uint32_t base = b * DATA_PER_BLOCK;
+            uint32_t keep = old_size > base ? std::min<uint32_t>(old_size - base, DATA_PER_BLOCK) : 0;
+            if (keep && img_->readBlockBytes(bt, bs, 0, blk, 256) != 256) return false;
+            for (uint32_t i = keep; i < DATA_PER_BLOCK; i++)
+                blk[2 + i] = ((base + i) % len_) == 0 ? 0xFF : 0x00;
+            if (b + 1 < blocks_)
+            {
+                blk[0] = table_[(b + 1) * 2];
+                blk[1] = table_[(b + 1) * 2 + 1];
+            }
+            else
+            {
+                blk[0] = 0;
+                blk[1] = (uint8_t)(255 - k);
+            }
+            if (img_->writeBlockBytes(bt, bs, 0, blk, 256) != 256) return false;
+        }
+        return true;
+    }
+
+    // Every side sector of every group that changed. A new side sector
+    // changes the link of the one before it and the group list in all of its
+    // group, so rewriting from the group of the last old side sector covers it.
+    bool writeSideSectors(uint8_t* blk, uint32_t old_sides)
+    {
+        uint32_t from = 0;
+        if (old_sides == nsides_)
+            from = old_sides - 1;   // only the last one gained data blocks
+        else if (old_sides)
+            from = ((old_sides - 1) / PLAIN_SIDE_SECTORS) * PLAIN_SIDE_SECTORS;
+        for (uint32_t i = from; i < nsides_; i++)
+        {
+            memset(blk, 0, 256);
+            uint32_t first = i * ENTRIES_PER_SIDE;
+            uint32_t n = std::min<uint32_t>(ENTRIES_PER_SIDE, blocks_ - first);
+            if (i + 1 < nsides_)
+            {
+                blk[0] = sides_[(i + 1) * 2];
+                blk[1] = sides_[(i + 1) * 2 + 1];
+            }
+            else
+            {
+                blk[0] = 0;
+                blk[1] = (uint8_t)(16 + 2 * n - 1);
+            }
+            blk[2] = (uint8_t)(i % PLAIN_SIDE_SECTORS);
+            blk[3] = len_;
+            uint32_t g = (i / PLAIN_SIDE_SECTORS) * PLAIN_SIDE_SECTORS;
+            for (uint32_t j = 0; j < PLAIN_SIDE_SECTORS && g + j < nsides_; j++)
+            {
+                blk[4 + j * 2] = sides_[(g + j) * 2];
+                blk[5 + j * 2] = sides_[(g + j) * 2 + 1];
+            }
+            memcpy(blk + 16, table_ + first * 2, n * 2);
+            if (img_->writeBlockBytes(sides_[i * 2], sides_[i * 2 + 1], 0, blk, 256) != 256) return false;
+        }
+        return true;
+    }
+
+    bool writeSuper(uint8_t* blk)
+    {
+        memset(blk, 0, 256);
+        blk[0] = sides_[0];
+        blk[1] = sides_[1];
+        blk[2] = 0xFE;
+        for (uint32_t g = 0; g * PLAIN_SIDE_SECTORS < nsides_; g++)
+        {
+            blk[3 + g * 2] = sides_[g * PLAIN_SIDE_SECTORS * 2];
+            blk[4 + g * 2] = sides_[g * PLAIN_SIDE_SECTORS * 2 + 1];
+        }
+        return img_->writeBlockBytes(super_t_, super_s_, 0, blk, 256) == 256;
+    }
+
+    // First data block, side sector (or super side sector) and block count.
+    bool writeDirEntry(uint8_t* blk)
+    {
+        if (img_->readBlockBytes(dir_t_, dir_s_, 0, blk, 256) != 256) return false;
+        uint8_t* e = blk + slot_ * 32;
+        uint32_t total = blocks_ + nsides_ + (super_t_ ? 1 : 0);
+        e[3] = table_[0];
+        e[4] = table_[1];
+        e[21] = super_t_ ? super_t_ : sides_[0];
+        e[22] = super_t_ ? super_s_ : sides_[1];
+        e[30] = total & 0xFF;
+        e[31] = (total >> 8) & 0xFF;
+        return img_->writeBlockBytes(dir_t_, dir_s_, 0, blk, 256) == 256;
+    }
+
     // Appends the data block T/S of one side sector.
     bool addSideSector(uint8_t* blk, uint8_t t, uint8_t s)
     {
+        if (nsides_ >= MAX_SIDE_SECTORS)
+        {
+            Debug_printv("REL: more than %u side sectors", (unsigned)MAX_SIDE_SECTORS);
+            return false;
+        }
+        sides_[nsides_ * 2] = t;
+        sides_[nsides_ * 2 + 1] = s;
+        nsides_++;
         if (img_->readBlockBytes(t, s, 0, blk, 256) != 256) return false;
         for (uint32_t i = 0; i < ENTRIES_PER_SIDE; i++)
         {
             uint8_t dt = blk[16 + i * 2], ds = blk[17 + i * 2];
             if (dt == 0) return true;   // end of this (and so of every) list
-            if (blocks_ >= capacity_) return false;
+            if (blocks_ >= max_blocks_)
+            {
+                Debug_printv("REL: more data blocks than the format allows (%u)", (unsigned)max_blocks_);
+                return false;
+            }
+            if (!reserveTable(blocks_ + 1)) return false;
             table_[blocks_ * 2] = dt;
             table_[blocks_ * 2 + 1] = ds;
             blocks_++;
@@ -1658,9 +1961,11 @@ private:
         if (blk[2] != 0xFE)
             return addGroup(blk, t, s);
 
-        // Super side sector (1581/CMD native): bytes 3.. are the T/S of each
-        // group's first side sector, a group being six side sectors. Copy the
-        // list first, blk is reused below.
+        // Super side sector (1581/CMD native): bytes 3..254 are the T/S of
+        // each group's first side sector - all 126 of them. Copy the list
+        // first, blk is reused below.
+        super_t_ = t;
+        super_s_ = s;
         uint8_t list[MAX_GROUPS * 2];
         memcpy(list, blk + 3, sizeof(list));
         for (uint32_t i = 0; i < MAX_GROUPS && list[i * 2] != 0; i++)
@@ -1673,10 +1978,18 @@ private:
     }
 
     std::shared_ptr<D64MStream> img_;
-    uint8_t* table_ = nullptr;   // T/S pairs of every data block, heap
+    uint8_t  len_;
+    uint8_t  dir_t_, dir_s_, slot_;   // directory entry, for growth
+    uint32_t max_blocks_ = 0;         // vdrive_rel_blocks_max
+    bool     super_ = false;          // vdrive_rel_has_super
+    uint8_t* table_ = nullptr;        // T/S pairs of every data block, heap
     uint32_t capacity_ = 0;
     uint32_t blocks_ = 0;
     uint32_t size_ = 0;
+    uint8_t  sides_[MAX_SIDE_SECTORS * 2] = {};   // T/S of every side sector, in order
+    uint32_t nsides_ = 0;
+    uint8_t  super_t_ = 0, super_s_ = 0;          // 0: no super side sector
+    uint8_t  new_super_t_ = 0, new_super_s_ = 0;
 };
 
 uint8_t D64MStream::relRecordLength()
@@ -1695,7 +2008,8 @@ std::unique_ptr<RELStorage> D64MStream::relStorage()
     auto self = std::static_pointer_cast<D64MStream>(weak_from_this().lock());
     if (!self)
         return nullptr;
-    D64RelStorage* st = new (std::nothrow) D64RelStorage(std::move(self));
+    D64RelStorage* st = new (std::nothrow) D64RelStorage(std::move(self), entry.rel_record_length,
+                                                         entry_dir_track, entry_dir_sector, entry_dir_slot);
     if (st == nullptr)
         return nullptr;
     if (!st->load(entry.rel_start_track, entry.rel_start_sector))
@@ -1704,6 +2018,41 @@ std::unique_ptr<RELStorage> D64MStream::relStorage()
         return nullptr;
     }
     return std::unique_ptr<RELStorage>(st);
+}
+
+// vdrive_rel_open_new: only the directory entry is written; the first write
+// grows the file (vdrive_rel_add_sector with no side sectors yet).
+std::unique_ptr<RELStorage> D64MStream::createRel(std::string path, uint8_t record_length)
+{
+    if (record_length == 0 || record_length > 254)
+        return nullptr;
+    auto self = std::static_pointer_cast<D64MStream>(weak_from_this().lock());
+    if (!self)
+        return nullptr;
+    if (resolvePath(path) != PATH_NOT_FOUND)
+        return nullptr;
+
+    auto parts = splitPathComponents(path);
+    if (parts.empty())
+        return nullptr;
+    std::string parent;
+    for (size_t i = 0; i + 1 < parts.size(); i++)
+    {
+        if (i) parent += '/';
+        parent += parts[i];
+    }
+    if (!seekDirectory(parent))
+        return nullptr;
+
+    uint8_t dt, ds, slot;
+    uint8_t st = addDirectoryEntry(parts.back(), 0x84, 0, 0, 0, 0, record_length, 0, &dt, &ds, &slot);
+    if (st != 0)
+    {
+        _error = st;
+        return nullptr;
+    }
+    D64RelStorage* rel = new (std::nothrow) D64RelStorage(std::move(self), record_length, dt, ds, slot);
+    return std::unique_ptr<RELStorage>(rel);
 }
 
 /********************************************************
@@ -2009,6 +2358,29 @@ bool D64MFile::remove()
         ImageBroker::disposeFor("d64", brokerUrl());
 
     return ok;
+}
+
+std::shared_ptr<MStream> D64MFile::createRelStream(uint8_t record_length)
+{
+    if (pathInStream.empty() || pathInStream == "/" || sourceFile == nullptr)
+        return nullptr;
+
+    // in|out on the container: plain out would truncate the image.
+    auto src = sourceFile->getSourceStream(std::ios_base::in | std::ios_base::out);
+    if (src == nullptr)
+        return nullptr;
+    auto stream = std::static_pointer_cast<D64MStream>(getDecodedStream(src));
+    if (stream == nullptr)
+        return nullptr;
+    stream->mode = std::ios_base::in | std::ios_base::out;
+
+    auto storage = stream->createRel(pathInStream, record_length);
+    if (storage == nullptr)
+        return nullptr;
+
+    // The cached listing stream would not show the new entry.
+    ImageBroker::disposeFor("d64", brokerUrl());
+    return std::make_shared<RELMStream>(std::move(storage), record_length);
 }
 
 bool D64MFile::exists()

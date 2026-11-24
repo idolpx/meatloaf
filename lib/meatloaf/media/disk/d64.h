@@ -330,9 +330,21 @@ public:
     // selected - the storage reads through this stream's container.
     uint8_t relRecordLength() override;
     std::unique_ptr<RELStorage> relStorage() override;
-    // Read n bytes at 'off' inside one block (track/sector), bypassing the
-    // file cursor. Returns the byte count read.
+    // Create a new, empty REL entry 'path' (vdrive_rel_open_new): type $84,
+    // no blocks yet - the first write grows it. nullptr if the name exists,
+    // the record length is not 1-254, the directory is full, or this stream is
+    // not shared_ptr-owned. Needs mode in|out.
+    std::unique_ptr<RELStorage> createRel(std::string path, uint8_t record_length);
+    // Read/write n bytes at 'off' inside one block (track/sector), bypassing
+    // the file cursor. Return the byte count moved.
     uint32_t readBlockBytes(uint8_t track, uint8_t sector, uint8_t off, uint8_t* buf, uint32_t n);
+    uint32_t writeBlockBytes(uint8_t track, uint8_t sector, uint8_t off, const uint8_t* buf, uint32_t n);
+
+    // REL limits per format, from vdrive_rel_blocks_max / vdrive_rel_has_super:
+    // the most blocks a REL file may occupy (data + side sectors + super side
+    // sector), and whether the format uses a super side sector.
+    virtual uint32_t relBlocksMax() { return 700 + 6; }   // 1541/1571
+    virtual bool relHasSuper() { return false; }
 
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
 
@@ -501,6 +513,26 @@ protected:
     // in the BAM at all, so a caller that cannot answer treats it as unsafe
     // rather than assuming free. out_allocated is only set when it returns true.
     bool queryBlockAllocation(uint8_t track, uint8_t sector, bool& out_allocated);
+
+    // Add a directory entry in the current directory: first free slot, or a
+    // new directory block (directory interleave). Returns 0 or the CBM status
+    // (ST_DIR_ERROR, ST_DISK_FULL, ST_WRITE_VERIFY); out_* name the slot.
+    uint8_t addDirectoryEntry(const std::string& name, uint8_t type,
+                              uint8_t start_track, uint8_t start_sector,
+                              uint8_t rel_track, uint8_t rel_sector, uint8_t rel_length,
+                              uint16_t blocks,
+                              uint8_t* out_track, uint8_t* out_sector, uint8_t* out_slot);
+
+    // Free a REL file's side sectors (vdrive_rel_scratch), and the super side
+    // sector itself, which VICE leaves allocated.
+    void freeRelSideSectors(uint8_t track, uint8_t sector);
+
+    // Where the entry seekPath() last resolved lives, for REL growth.
+    uint8_t entry_dir_track = 0;
+    uint8_t entry_dir_sector = 0;
+    uint8_t entry_dir_slot = 0;
+
+    friend class D64RelStorage;
 
     bool creating = false;          // building a new file via streamed writes
     std::string create_filename;    // name for the directory entry (UTF8)
@@ -862,6 +894,9 @@ public:
     // partition number, without which the rebuilt stream decodes whichever
     // partition happens to be selected.
     virtual std::string brokerUrl() { return url; }
+
+    // A new REL file in the image, opened read/write over the container.
+    std::shared_ptr<MStream> createRelStream(uint8_t record_length) override;
 
     bool isDirectory() override;
     bool exists() override;

@@ -116,6 +116,11 @@ public:
     // space up front.
     uint32_t defaultImageSize() override { return 65536; }
 
+    // vdrive_rel_blocks_max: CMD HD 1.92 lets a file reach 64672 data blocks,
+    // + 89 groups + 5 side sectors + super
+    uint32_t relBlocksMax() override { return 64672 + 89 * 6 + 5 + 1; }
+    bool relHasSuper() override { return true; }
+
     // The system area of a CMD native partition, all on track 1:
     //
     //   1/0        autoboot sector

@@ -7,20 +7,24 @@
 #include <string>
 #include <vector>
 #include "media/disk/d64.h"
+#include "media/disk/d71.h"
 #include "media/disk/d81.h"
+#include "media/hd/dnp.h"
 #include "media/file/rel.h"
 #include "../test_disk_write/file_container_stream.h"
 #include "../test_disk_write/c1541_oracle.h"
+#include "../test_disk_write/image_invariants.h"
 
 static const char* kHost = "build_rel_host.bin";
 static const char* kD64 = "build_rel.d64";
 static const char* kD81 = "build_rel.d81";
 static const char* kOut = "build_rel_out.bin";
+static const char* kImg = "build_rel_w.img";
 
 void setUp(void) {}
 void tearDown(void)
 {
-    remove(kHost); remove(kD64); remove(kD81); remove(kOut);
+    remove(kHost); remove(kD64); remove(kD81); remove(kOut); remove(kImg);
 }
 
 static std::vector<uint8_t> pattern(uint32_t records, uint32_t len)
@@ -146,6 +150,277 @@ void test_rel_storage_outlives_stream_owner(void)
     TEST_ASSERT_EQUAL_MEMORY(&data[10], buf, 10);
 }
 
+
+/********************************************************
+ * Creating, growing and scratching (Task 7)
+ ********************************************************/
+
+static const uint8_t ST_OK_ = 0;
+static const uint8_t ST_FILE_TOO_LARGE_ = 52;
+static const uint8_t ST_DISK_FULL_ = 72;
+
+struct RelFmt {
+    const char* name;
+    const char* c1541_type;   // nullptr: no c1541 oracle (DNP)
+    uint32_t size;
+    std::shared_ptr<D64MStream> (*make)(std::shared_ptr<MStream>);
+    uint32_t cross;           // records of len 254 that cross a side-sector (group) boundary
+};
+
+static std::shared_ptr<D64MStream> mk_d64(std::shared_ptr<MStream> s) { return std::make_shared<D64MStream>(s); }
+static std::shared_ptr<D64MStream> mk_d71(std::shared_ptr<MStream> s) { return std::make_shared<D71MStream>(s); }
+static std::shared_ptr<D64MStream> mk_d81(std::shared_ptr<MStream> s) { return std::make_shared<D81MStream>(s); }
+static std::shared_ptr<D64MStream> mk_dnp(std::shared_ptr<MStream> s) { return std::make_shared<DNPMStream>(s); }
+
+// D64/D71 cross from the first side sector into the second (>120 blocks);
+// D81/DNP cross from the first super-side-sector group into the second (>720).
+static const RelFmt kFmts[] = {
+    { "d64", "d64", 174848,  mk_d64, 200 },
+    { "d71", "d71", 349696,  mk_d71, 200 },
+    { "d81", "d81", 819200,  mk_d81, 800 },
+    { "dnp", nullptr, 4 * 65536, mk_dnp, 800 },
+};
+
+static void fresh_image(const RelFmt& f)
+{
+    remove(kImg);
+    if (f.c1541_type)
+    {
+        int rc = 0;
+        std::string out = c1541_run("-format " + c1541_quote("t,01") + " " + f.c1541_type + " " + kImg, &rc);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, rc, out.c_str());
+        return;
+    }
+    auto src = std::make_shared<FileContainerStream>(kImg, f.size);
+    auto img = f.make(src);
+    TEST_ASSERT_TRUE_MESSAGE(img->formatImage("t", "01"), f.name);
+}
+
+static std::shared_ptr<D64MStream> open_rw(const RelFmt& f)
+{
+    auto img = f.make(std::make_shared<FileContainerStream>(kImg));
+    img->mode = std::ios_base::in | std::ios_base::out;
+    return img;
+}
+
+static uint16_t free_blocks(const RelFmt& f)
+{
+    auto img = f.make(std::make_shared<FileContainerStream>(kImg));
+    img->mode = std::ios_base::in;
+    return img->blocksFree();
+}
+
+static std::string slurp(const char* path)
+{
+    std::string s;
+    TEST_ASSERT_TRUE(c1541_read_raw_file(path, s));
+    return s;
+}
+
+// Writes records [first, first+n) of 'data' (len bytes each) through a
+// RELMStream; returns the status of the first failing write, or 0.
+static uint8_t write_records(RELMStream& rel, const std::vector<uint8_t>& data, uint32_t len,
+                             uint32_t first, uint32_t n)
+{
+    for (uint32_t r = first; r < first + n; r++)
+    {
+        // Positioning past the end answers 50 RECORD NOT PRESENT, as on a real
+        // drive; the write then grows the file and leaves that status alone.
+        rel.position((uint16_t)(r + 1), 1);
+        rel.write(&data[r * len], len);
+        if (rel.status() != ST_OK_ && rel.status() != 50) return rel.status();
+        rel.endRecord();
+    }
+    return ST_OK_;
+}
+
+// vdrive_rel_open_new: a new REL entry, then records written through it.
+static void create_rel(const RelFmt& f, const std::vector<uint8_t>& data, uint32_t len, uint32_t records)
+{
+    auto img = open_rw(f);
+    auto st = img->createRel("data", (uint8_t)len);
+    TEST_ASSERT_NOT_NULL_MESSAGE(st.get(), f.name);
+    RELMStream rel(std::move(st), (uint8_t)len);
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(ST_OK_, write_records(rel, data, len, 0, records), f.name);
+    rel.close();
+}
+
+// Reopens an existing REL and writes record 'record' (1-based); returns status.
+static uint8_t write_one(const RelFmt& f, const std::vector<uint8_t>& data, uint32_t len, uint32_t record)
+{
+    auto img = open_rw(f);
+    TEST_ASSERT_TRUE_MESSAGE(img->seekPath("data"), f.name);
+    auto st = img->relStorage();
+    TEST_ASSERT_NOT_NULL_MESSAGE(st.get(), f.name);
+    RELMStream rel(std::move(st), (uint8_t)len);
+    uint8_t s = write_records(rel, data, len, record - 1, 1);
+    rel.close();
+    return s;
+}
+
+// The image is sound, lists the file as REL, and the first expect.size() bytes
+// of the file - read back by c1541 AND by a fresh stream of ours - are expect.
+static void check_rel(const RelFmt& f, const std::vector<uint8_t>& expect, uint32_t len)
+{
+    {
+        auto img = f.make(std::make_shared<FileContainerStream>(kImg));
+        InvariantResult r = check_invariants(*img);
+        TEST_ASSERT_TRUE_MESSAGE(r.ok, (std::string(f.name) + ": " + r.message).c_str());
+    }
+    {
+        auto img = f.make(std::make_shared<FileContainerStream>(kImg));
+        img->mode = std::ios_base::in;
+        TEST_ASSERT_TRUE_MESSAGE(img->seekPath("data"), f.name);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(len, img->relRecordLength(), f.name);
+        auto st = img->relStorage();
+        TEST_ASSERT_NOT_NULL_MESSAGE(st.get(), f.name);
+        TEST_ASSERT_TRUE_MESSAGE(st->size() >= expect.size(), f.name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(0, st->size() % len, f.name);   // VICE fills whole records
+        std::vector<uint8_t> got(expect.size());
+        TEST_ASSERT_EQUAL_UINT32(got.size(), st->readAt(0, got.data(), (uint32_t)got.size()));
+        TEST_ASSERT_EQUAL_MEMORY_MESSAGE(expect.data(), got.data(), got.size(), f.name);
+    }
+    if (!f.c1541_type) return;
+    std::string dir = c1541_dir(kImg);
+    TEST_ASSERT_TRUE_MESSAGE(dir.find("rel") != std::string::npos, dir.c_str());
+    size_t n = 0;
+    TEST_ASSERT_TRUE_MESSAGE(c1541_read(kImg, "data,l", kOut, &n), f.name);
+    TEST_ASSERT_TRUE_MESSAGE(n >= expect.size(), f.name);
+    std::string ref = slurp(kOut);
+    TEST_ASSERT_EQUAL_MEMORY_MESSAGE(expect.data(), ref.data(), expect.size(), f.name);
+    // c1541's validate rewrites the BAM and REL block counts silently; an
+    // unchanged image means both were already right.
+    TEST_ASSERT_TRUE_MESSAGE(c1541_validate(kImg), f.name);
+}
+
+// What a grown file reads as: vdrive_rel_grow fills new records with $FF,0...
+static std::vector<uint8_t> filled(uint32_t records, uint32_t len)
+{
+    std::vector<uint8_t> v(records * len, 0);
+    for (uint32_t r = 0; r < records; r++) v[r * len] = 0xFF;
+    return v;
+}
+
+// vdrive_rel_open_new + vdrive_rel_add_sector (first data block, side sector,
+// super side sector on D81/DNP) + vdrive_rel_write.
+void test_rel_create_and_write_five_records(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    for (const RelFmt& f : kFmts)
+    {
+        fresh_image(f);
+        auto data = pattern(5, 20);
+        create_rel(f, data, 20, 5);
+        check_rel(f, data, 20);
+    }
+}
+
+// vdrive_rel_grow: positioning past the end and writing adds blocks until the
+// record exists; the records in between are $FF,0...
+void test_rel_grow_five_to_thousand(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    for (const RelFmt& f : kFmts)
+    {
+        fresh_image(f);
+        auto data = pattern(1000, 20);
+        create_rel(f, data, 20, 5);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(ST_OK_, write_one(f, data, 20, 1000), f.name);
+        auto expect = filled(1000, 20);
+        std::copy(data.begin(), data.begin() + 5 * 20, expect.begin());
+        std::copy(data.begin() + 999 * 20, data.end(), expect.begin() + 999 * 20);
+        check_rel(f, expect, 20);
+    }
+}
+
+// vdrive_rel_add_sector: a full side sector (120 data blocks) starts a new one;
+// on a 1581/CMD native a full group of six starts a new group in the super
+// side sector.
+void test_rel_grow_crosses_side_sector_groups(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    for (const RelFmt& f : kFmts)
+    {
+        fresh_image(f);
+        auto data = pattern(f.cross, 254);
+        create_rel(f, data, 254, 5);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(ST_OK_, write_one(f, data, 254, f.cross), f.name);
+        auto expect = filled(f.cross, 254);
+        std::copy(data.begin(), data.begin() + 5 * 254, expect.begin());
+        std::copy(data.end() - 254, data.end(), expect.end() - 254);
+        check_rel(f, expect, 254);
+    }
+}
+
+// vdrive_rel_scratch: the data chain and every side sector (and the super side
+// sector) go back to the BAM.
+void test_rel_scratch_frees_everything(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    for (const RelFmt& f : kFmts)
+    {
+        fresh_image(f);
+        uint16_t before = free_blocks(f);
+        auto data = pattern(f.cross, 254);
+        create_rel(f, data, 254, f.cross);
+        TEST_ASSERT_TRUE_MESSAGE(free_blocks(f) < before, f.name);
+        {
+            auto img = open_rw(f);
+            TEST_ASSERT_TRUE_MESSAGE(img->removeFile("data"), f.name);
+        }
+        TEST_ASSERT_EQUAL_UINT16_MESSAGE(before, free_blocks(f), f.name);
+        auto img = f.make(std::make_shared<FileContainerStream>(kImg));
+        InvariantResult r = check_invariants(*img);
+        TEST_ASSERT_TRUE_MESSAGE(r.ok, (std::string(f.name) + ": " + r.message).c_str());
+        if (f.c1541_type) TEST_ASSERT_TRUE_MESSAGE(c1541_validate(kImg), f.name);
+    }
+}
+
+// vdrive_rel_blocks_max: a 1541/1571 REL file is capped at 700 data blocks +
+// 6 side sectors. A 35-track D64 has only 664 free blocks, so it is DISK FULL
+// long before that - the 1541 limit is checked on a D71, which shares it.
+void test_rel_1541_too_large_is_52_and_changes_nothing(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    const RelFmt& f = kFmts[1];   // d71
+    fresh_image(f);
+    auto data = pattern(701, 254);
+    create_rel(f, data, 254, 700);   // 700 data blocks: the limit, allowed
+    std::string before = slurp(kImg);
+    TEST_ASSERT_EQUAL_UINT8(ST_FILE_TOO_LARGE_, write_one(f, data, 254, 701));
+    TEST_ASSERT_TRUE(before == slurp(kImg));
+    data.resize(700 * 254);
+    check_rel(f, data, 254);
+}
+
+// vdrive_rel_add_sector: no free block is 72 DISK FULL; nothing claimed for
+// the failed grow stays allocated.
+void test_rel_d64_disk_full_is_72_and_leaks_nothing(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    const RelFmt& f = kFmts[0];
+    fresh_image(f);
+    auto data = pattern(20, 254);
+    create_rel(f, data, 254, 5);
+    // Fill all but three blocks with a PRG.
+    {
+        uint16_t left = free_blocks(f);
+        auto img = f.make(std::make_shared<FileContainerStream>(kImg));
+        img->mode = std::ios_base::out;
+        TEST_ASSERT_TRUE(img->seekPath("filler"));
+        std::vector<uint8_t> fill((size_t)(left - 3) * 254, 0x5A);
+        TEST_ASSERT_EQUAL_UINT32(fill.size(), img->write(fill.data(), (uint32_t)fill.size()));
+        img->close();
+        TEST_ASSERT_EQUAL_INT(0, img->error());
+    }
+    TEST_ASSERT_EQUAL_UINT16(3, free_blocks(f));
+    std::string before = slurp(kImg);
+    TEST_ASSERT_EQUAL_UINT8(ST_DISK_FULL_, write_one(f, data, 254, 20));   // needs 15 more
+    TEST_ASSERT_TRUE(before == slurp(kImg));
+    data.resize(5 * 254);
+    check_rel(f, data, 254);
+}
+
 int main(int, char**)
 {
     UNITY_BEGIN();
@@ -154,5 +429,11 @@ int main(int, char**)
     RUN_TEST(test_rel_d81_len100_needs_second_super_side_group);
     RUN_TEST(test_rel_record_length_zero_for_non_rel);
     RUN_TEST(test_rel_storage_outlives_stream_owner);
+    RUN_TEST(test_rel_create_and_write_five_records);
+    RUN_TEST(test_rel_grow_five_to_thousand);
+    RUN_TEST(test_rel_grow_crosses_side_sector_groups);
+    RUN_TEST(test_rel_scratch_frees_everything);
+    RUN_TEST(test_rel_1541_too_large_is_52_and_changes_nothing);
+    RUN_TEST(test_rel_d64_disk_full_is_72_and_leaks_nothing);
     return UNITY_END();
 }

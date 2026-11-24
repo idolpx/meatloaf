@@ -470,6 +470,10 @@ public:
     virtual std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in);
     virtual std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src) = 0;
     virtual std::shared_ptr<MStream> createStream(std::ios_base::openmode) { return nullptr; };
+    // Create this path as a new CBM relative file with the given record length
+    // and return a record stream over it; nullptr where the media cannot hold
+    // one or the name already exists.
+    virtual std::shared_ptr<MStream> createRelStream(uint8_t record_length) { return nullptr; }
 
     virtual bool format(std::string header_info) { return false; };
 

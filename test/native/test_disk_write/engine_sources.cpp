@@ -35,3 +35,5 @@
 #include "../../../lib/utils/string_utils.cpp"
 #include "../../../lib/meatloaf/meat_media.cpp"
 #include "../../../lib/meatloaf/media/disk/d64.cpp"
+// d64.cpp builds RELMStreams (D64MFile::createRelStream)
+#include "../../../lib/meatloaf/media/file/rel.cpp"
