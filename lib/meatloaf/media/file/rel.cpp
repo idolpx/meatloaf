@@ -138,12 +138,15 @@ uint8_t RELMStream::growTo(uint32_t records)
     uint32_t old = recordCount();
     uint8_t st = storage_->grow(records * len_);
     if (st != ST_OK) return st;
-    for (uint32_t r = old; r < records; r++) {
-        uint32_t base = r * len_;
-        uint8_t b = 0xFF;
-        storage_->writeAt(base, &b, 1);
-        b = 0;
-        for (uint32_t i = 1; i < len_; i++) storage_->writeAt(base + i, &b, 1);
+    // One writeAt per record: on a disk image each call is a sector access.
+    // buf_ holds no live record here (the current record is past the old end,
+    // so nothing was loaded); it is reloaded by the caller.
+    if (buf_) {
+        buf_[0] = 0xFF;
+        for (uint32_t i = 1; i < len_; i++) buf_[i] = 0;
+        for (uint32_t r = old; r < records; r++)
+            storage_->writeAt(r * len_, buf_, len_);
+        loaded_ = false;
     }
     return ST_OK;
 }

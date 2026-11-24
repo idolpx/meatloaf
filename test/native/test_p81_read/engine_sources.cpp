@@ -9,6 +9,8 @@
 #include "../../../lib/utils/string_utils.cpp"
 #include "../../../lib/meatloaf/meat_media.cpp"
 #include "../../../lib/meatloaf/media/disk/d64.cpp"
+// d64.cpp builds RELMStreams (D64MFile::createRelStream)
+#include "../../../lib/meatloaf/media/file/rel.cpp"
 #include "../../../lib/meatloaf/media/disk/p64.cpp"
 #include "../../../lib/meatloaf/media/disk/mfm.cpp"
 #include "../../../lib/meatloaf/media/disk/p81.cpp"

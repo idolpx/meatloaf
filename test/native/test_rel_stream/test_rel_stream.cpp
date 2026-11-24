@@ -18,6 +18,7 @@ struct MemData {
     std::vector<uint8_t> bytes;
     uint8_t grow_status = ST_OK;   // what grow() answers
     bool    can_write = true;
+    uint32_t writes = 0;           // writeAt() calls
 };
 
 class MemRELStorage : public RELStorage {
@@ -31,6 +32,7 @@ public:
         return n;
     }
     uint32_t writeAt(uint32_t off, const uint8_t* buf, uint32_t n) override {
+        d_->writes++;
         if (off >= size()) return 0;
         if (n > size() - off) n = size() - off;
         for (uint32_t i = 0; i < n; i++) d_->bytes[off + i] = buf[i];
@@ -231,6 +233,22 @@ void test_read_after_full_length_write_is_record_end() {
     TEST_ASSERT_EQUAL('Z', b[0]);
 }
 
+// vdrive_rel_grow fills new records $FF,0... A storage over a disk image
+// pays a sector read-modify-write per writeAt(), so the fill goes out one
+// record at a time, not one byte at a time.
+void test_grow_fill_is_one_write_per_record() {
+    auto r = make(0);
+    TEST_ASSERT_EQUAL_UINT8(ST_RECORD_MISSING, r->position(3, 1));
+    data.writes = 0;
+    TEST_ASSERT_EQUAL_UINT32(1, r->write((const uint8_t*)"A", 1));
+    // three filled records plus the one byte written
+    TEST_ASSERT_EQUAL_UINT32(4, data.writes);
+    TEST_ASSERT_EQUAL_UINT8(0xFF, data.bytes[0]);
+    TEST_ASSERT_EQUAL_UINT8(0x00, data.bytes[1]);
+    TEST_ASSERT_EQUAL_UINT8(0xFF, data.bytes[LEN]);
+    TEST_ASSERT_EQUAL_UINT8('A', data.bytes[2 * LEN]);
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_position_zero_equals_one);
@@ -246,5 +264,6 @@ int main(int, char**) {
     RUN_TEST(test_write_protect);
     RUN_TEST(test_read_after_partial_write_stays_in_record);
     RUN_TEST(test_read_after_full_length_write_is_record_end);
+    RUN_TEST(test_grow_fill_is_one_write_per_record);
     return UNITY_END();
 }

@@ -128,6 +128,11 @@ struct ImageInvariantChecker
         while (img.seekEntry(++index))
         {
             if (img.entry.file_type == 0x00) continue;      // scratched slot
+            // A REL file's side sectors (super side sector first, when the
+            // format has one) are a second chain, linked through bytes 0/1
+            // like any other.
+            if ((img.entry.file_type & 0x07) == 4 && img.entry.rel_start_track != 0)
+                liveEntries.push_back(DirEntry{ index, img.entry.rel_start_track, img.entry.rel_start_sector });
             uint8_t st = img.entry.start_track;
             uint8_t ss = img.entry.start_sector;
             if (st == 0) continue;                          // no data

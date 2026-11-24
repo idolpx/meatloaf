@@ -101,6 +101,9 @@ public:
     virtual uint8_t speedZone(uint8_t track) override { return 0; };
 
     uint32_t defaultImageSize() override { return 819200; }
+    // vdrive_rel_blocks_max: 3000 blocks + 4 groups + 1 side sector + super
+    uint32_t relBlocksMax() override { return 3000 + 4 * 6 + 1 + 1; }
+    bool relHasSuper() override { return true; }
 
 protected:
 

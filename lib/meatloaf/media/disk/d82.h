@@ -115,6 +115,9 @@ public:
     };
 
     uint32_t defaultImageSize() override { return 1066496; }
+    // vdrive_rel_blocks_max: 4090 blocks + 5 groups + 5 side sectors + super
+    uint32_t relBlocksMax() override { return 4090 + 5 * 6 + 5 + 1; }
+    bool relHasSuper() override { return true; }
 
 protected:
 
