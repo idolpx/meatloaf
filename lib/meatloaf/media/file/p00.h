@@ -63,6 +63,7 @@ public:
     // A .r00 holds a REL file's records verbatim after the 26-byte header.
     uint8_t relRecordLength() override { return header.rel_flag; }
     std::unique_ptr<RELStorage> relStorage() override;
+    bool x00Header(std::string& name) override;
 
 protected:
     bool readHeader() override {
@@ -86,7 +87,7 @@ protected:
     }
     uint32_t writeFile(uint8_t* buf, uint32_t size) override { return 0; };
 
-    Header header;
+    Header header{};
 
 private:
     friend class P00MFile;
@@ -294,6 +295,11 @@ inline bool x00HeaderName(const uint8_t* hdr, size_t n, std::string& utf8_name)
     return true;
 }
 
+inline bool P00MStream::x00Header(std::string& name)
+{
+    return x00HeaderName((const uint8_t*)&header, sizeof(header), name);
+}
+
 /********************************************************
  * FS
  ********************************************************/
@@ -308,6 +314,7 @@ public:
             {
                 ".p00",
                 ".s00",
+                ".u00",
                 ".r00",
                 ".c64"      // CCS64 freeze file format uses the .c64 extension too
             }, 

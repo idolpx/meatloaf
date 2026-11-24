@@ -519,22 +519,15 @@ static bool x00ReadHeader(MFile *entry, std::string &name, char &letter)
     letter = x00TypeLetter(entry->name);
     if( letter == 0 )
         return false;
-    // default_fs: raw bytes, never re-wrapped in a P00 decoder
-    std::unique_ptr<MFile> raw( MFSOwner::File(entry->url, true) );
-    if( raw == nullptr )
+    // Resolved normally, so the scheme dispatches (SD, flash and network
+    // alike) and the P00 decoder parses the 26-byte header.
+    std::unique_ptr<MFile> x( MFSOwner::File(entry->url) );
+    if( x == nullptr )
         return false;
-    std::shared_ptr<MStream> s = raw->getSourceStream(std::ios_base::in);
+    std::shared_ptr<MStream> s = x->getSourceStream(std::ios_base::in);
     if( s == nullptr || !s->isOpen() )
         return false;
-    uint8_t hdr[P00MStream::HEADER_SIZE];
-    uint32_t got = 0;
-    while( got < sizeof(hdr) )
-    {
-        uint32_t r = s->read(hdr + got, sizeof(hdr) - got);
-        if( r == 0 ) break;
-        got += r;
-    }
-    return x00HeaderName(hdr, got, name);
+    return s->x00Header(name);
 }
 
 // First x00 file in f's directory whose header name matches f->name (wildcards

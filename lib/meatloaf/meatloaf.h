@@ -182,6 +182,9 @@ public:
     virtual uint8_t relRecordLength() { return 0; }
     virtual std::unique_ptr<RELStorage> relStorage() { return nullptr; }
 
+    // CBM name (UTF-8) in a P00 container's header; false for any other stream.
+    virtual bool x00Header(std::string& name) { (void)name; return false; }
+
     virtual uint32_t available() {
         if ( _position > _size )
             return 0;
