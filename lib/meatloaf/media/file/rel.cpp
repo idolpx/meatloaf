@@ -69,6 +69,7 @@ void RELMStream::computeReadEnd()
     uint32_t e = len_;
     while (e > cursor_ && buf_[e - 1] == 0) e--;
     if (e <= cursor_) e = cursor_ + 1;
+    if (e > len_) e = len_;
     read_end_ = e;
 }
 
@@ -112,6 +113,15 @@ uint32_t RELMStream::read(uint8_t* out, uint32_t size)
         out[0] = 0x0D;
         status_ = ST_RECORD_MISSING;
         return 1;
+    }
+    // A write may have moved the cursor past the scanned end (or to the record
+    // end); that is end-of-record, never an unsigned underflow.
+    if (cursor_ >= len_ || cursor_ >= read_end_) {
+        exhausted_ = false;
+        record_++;
+        cursor_ = 0;
+        loaded_ = false;
+        return 0;
     }
     uint32_t n = read_end_ - cursor_;
     if (n > size) n = size;
