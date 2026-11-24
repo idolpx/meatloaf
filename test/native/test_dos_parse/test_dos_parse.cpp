@@ -70,8 +70,16 @@ void test_rel_no_length(void)
 void test_rel_length_is_not_mode(void)
 {
     // 0x52 == 'R', 0x57 == 'W': must not switch mode
-    TEST_ASSERT_TRUE(P(1, "DATA,L,\x52").mode == ios_base::out);
+    TEST_ASSERT_TRUE(P(1, "DATA,L,\x52").mode == ios_base::in);
     TEST_ASSERT_TRUE(P(2, "DATA,L,\x57").mode == ios_base::in);
+}
+void test_rel_on_channel1_is_not_a_write_open(void)
+{
+    // ,L goes down the REL path on any channel; channel 1's implied write
+    // mode would create a plain file for a missing name before answering 64.
+    TEST_ASSERT_TRUE(P(1, "DATA,L,\x14").mode == ios_base::in);
+    TEST_ASSERT_TRUE(P(1, "DATA,L").mode == ios_base::in);
+    TEST_ASSERT_TRUE(P(1, "DATA,S").mode == ios_base::out);
 }
 void test_types(void)
 {
@@ -121,8 +129,17 @@ void test_p_cr(void)
     TEST_ASSERT_TRUE(PC("P\x62\x0d\x00\x01\x0d", 6, c));
     TEST_ASSERT_EQUAL_UINT16(13, c.record);
     TEST_ASSERT_EQUAL_UINT8(1, c.position);
+    // BASIC's PRINT#15,"P"CHR$(98)CHR$(1)CHR$(0): the CR PRINT# appends is
+    // dropped, not read as position 13 (VICE vdrive-command.c).
     TEST_ASSERT_TRUE(PC("P\x62\x01\x00\x0d", 5, c));
-    TEST_ASSERT_EQUAL_UINT8(13, c.position);
+    TEST_ASSERT_EQUAL_UINT16(1, c.record);
+    TEST_ASSERT_EQUAL_UINT8(1, c.position);
+    // Only ONE trailing CR is dropped: a record-lo of 13 followed by CR stays 13.
+    TEST_ASSERT_TRUE(PC("P\x62\x0d\x0d", 4, c));
+    TEST_ASSERT_EQUAL_UINT16(13, c.record);
+    TEST_ASSERT_EQUAL_UINT8(1, c.position);
+    // "P" + CR alone has no channel.
+    TEST_ASSERT_FALSE(PC("P\x0d", 2, c));
 }
 void test_p_bad(void)
 {
@@ -138,7 +155,7 @@ int main(int, char **)
     RUN_TEST(test_overwrite_prefixes); RUN_TEST(test_leading_slash); RUN_TEST(test_cd_prefix);
     RUN_TEST(test_shifted_space); RUN_TEST(test_direct_access); RUN_TEST(test_rel_length);
     RUN_TEST(test_rel_length_special_bytes); RUN_TEST(test_rel_no_length);
-    RUN_TEST(test_rel_length_is_not_mode); RUN_TEST(test_types); RUN_TEST(test_empty);
+    RUN_TEST(test_rel_length_is_not_mode); RUN_TEST(test_rel_on_channel1_is_not_a_write_open); RUN_TEST(test_types); RUN_TEST(test_empty);
     RUN_TEST(test_tokenizer_parity);
     RUN_TEST(test_p_full); RUN_TEST(test_p_defaults); RUN_TEST(test_p_cr); RUN_TEST(test_p_bad);
     return UNITY_END();
