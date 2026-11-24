@@ -249,8 +249,9 @@ it but does nothing. These are what must be written natively before VDrive can b
 - `vdrive_command_format_internal` / `vdrive_command_format_worker` (N:name,id) -- native N: exists;
   VDrive-only: 1541/1571/1581/native-specific layout options.
 - `vdrive_command_initialize` (I) -- native `I` is `dosReset()` only (no BAM reload).
-- `vdrive_command_position` (P, binary form `P<ch><lo><hi><rec><pos>`) -- native `P` is the text form
-  only and is a plain `seek()`; record positioning is Phase 2 (REL).
+- `vdrive_command_position` (P, binary form `P<ch><lo><hi><rec><pos>`) -- RECONCILED 2026-11-24: binary `P`
+  is now native (Task 9; `parsePositionCommand`, REL record positioning through `RELMStream`). The old text
+  form (`p<ch> <hi> <mid> <lo>`) is gone.
 - `vdrive_command_time` (T-R/T-W) -- native has its own RTC `T-` handling.
 - `vdrive_command_memory`, `vdrive_command_memory_write/_exec/_read` (M-R/M-W/M-E) -- native
   `driveMemory`; the 1541/1581 job-queue and ROM-specific behaviour is not emulated.
@@ -259,8 +260,8 @@ it but does nothing. These are what must be written natively before VDrive can b
 - `vdrive_command_allocate_chain` (internal to validate) -- no native counterpart.
 - `vdrive_command_set_error` status table -- native status codes are a subset; DOS-version-specific
   messages (73 text per drive type) are not.
-- OPEN-level (`vdrive-iec.c`): REL create (`,L,<len>`) and REL read/write/expand live in
-  `vdrive-rel.c` (Phase 2), `@:` replace, `,A` append, wildcard `$` filters (`$:*=P`, `$=T`), the
+- OPEN-level (`vdrive-iec.c`): REL create (`,L,<len>`) and REL read/write/expand are now native (Phase 2,
+  see AGENTS.md 2026-11-24); still VDrive-only: `@:` replace, `,A` append, wildcard `$` filters (`$:*=P`, `$=T`), the
   `#` buffer allocation with buffer number, and the per-channel error `60/61/64` coverage.
 
 Callers of the old text-form `P` (`p<ch> <hi> <mid> <lo>`) found:
