@@ -42,6 +42,7 @@
 #include <cstring>
 
 #include "meat_media.h"
+#include "media/file/rel.h"
 #include "string_utils.h"
 #include "utils.h"
 
@@ -322,6 +323,17 @@ public:
     }
 
     virtual bool seekPath(std::string path) override;
+
+    // REL files: the selected entry's record length (0 when it is not a REL
+    // file) and a RELStorage that finds record bytes through the side
+    // sectors. Valid only while this stream is alive and the entry stays
+    // selected - the storage reads through this stream's container.
+    uint8_t relRecordLength() override;
+    std::unique_ptr<RELStorage> relStorage() override;
+    // Read n bytes at 'off' inside one block (track/sector), bypassing the
+    // file cursor. Returns the byte count read.
+    uint32_t readBlockBytes(uint8_t track, uint8_t sector, uint8_t off, uint8_t* buf, uint32_t n);
+
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
 
     // Seek to any byte offset within the SELECTED file, by walking its block
