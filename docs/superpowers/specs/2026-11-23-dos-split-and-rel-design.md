@@ -143,9 +143,9 @@ record data, plus a record length (1-254). It owns everything that is the same e
 **Storage implementations:**
 
 - **Disk images (`D64MStream` family):** a REL entry's data chain plus its side sectors. Random access
-  uses the side sectors (6 per group of 120 data blocks; D81/DNP add a super side sector). `grow()`
+  uses the side sectors (6 per group of 120 data blocks; D81/D82/DNP add a super side sector). `grow()`
   allocates data blocks with the existing allocator (`getNextFreeBlock()`), links them, and writes the
-  side sectors — creating new side-sector blocks and, for D81/DNP, the super side sector. Creating a
+  side sectors — creating new side-sector blocks and, for D81/D82/DNP, the super side sector. Creating a
   REL file writes a directory entry with type `$84`, `rel_start_track/sector` and
   `rel_record_length` (fields already in `D64MStream`'s entry struct). Delete/scratch must free side
   sectors too.
@@ -249,8 +249,8 @@ it but does nothing. These are what must be written natively before VDrive can b
 - `vdrive_command_format_internal` / `vdrive_command_format_worker` (N:name,id) -- native N: exists;
   VDrive-only: 1541/1571/1581/native-specific layout options.
 - `vdrive_command_initialize` (I) -- native `I` is `dosReset()` only (no BAM reload).
-- `vdrive_command_position` (P, binary form `P<ch><lo><hi><rec><pos>`) -- RECONCILED 2026-11-24: binary `P`
-  is now native (Task 9; `parsePositionCommand`, REL record positioning through `RELMStream`). The old text
+- `vdrive_command_position` (P, binary form `P<ch><rec lo><rec hi><pos>`; one trailing CR is always dropped first, vdrive-command.c) --
+  RECONCILED 2026-11-24: binary `P` is now native (Task 9; `parsePositionCommand`, REL record positioning through `RELMStream`). The old text
   form (`p<ch> <hi> <mid> <lo>`) is gone.
 - `vdrive_command_time` (T-R/T-W) -- native has its own RTC `T-` handling.
 - `vdrive_command_memory`, `vdrive_command_memory_write/_exec/_read` (M-R/M-W/M-E) -- native
