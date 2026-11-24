@@ -254,6 +254,45 @@ void test_read_only_rel_reads_and_refuses_writes(void)
     TEST_ASSERT_EQUAL_UINT8(26, rel.status());
 }
 
+static std::vector<uint8_t> hdr26(const char* sig8, const std::vector<uint8_t>& name)
+{
+    std::vector<uint8_t> h(26, 0);
+    memcpy(h.data(), sig8, 8);
+    for (size_t i = 0; i < name.size() && i < 16; i++) h[8 + i] = name[i];
+    return h;
+}
+
+void test_x00_type_letter(void)
+{
+    TEST_ASSERT_EQUAL_CHAR('p', x00TypeLetter("game.p00"));
+    TEST_ASSERT_EQUAL_CHAR('s', x00TypeLetter("a.S00"));
+    TEST_ASSERT_EQUAL_CHAR('u', x00TypeLetter("a.u00"));
+    TEST_ASSERT_EQUAL_CHAR('r', x00TypeLetter("scores.R00"));
+    TEST_ASSERT_EQUAL_CHAR(0, x00TypeLetter("game.prg"));
+    TEST_ASSERT_EQUAL_CHAR(0, x00TypeLetter("game.p01"));
+    TEST_ASSERT_EQUAL_CHAR(0, x00TypeLetter("p00"));
+    TEST_ASSERT_EQUAL_CHAR(0, x00TypeLetter("x.d64"));
+    TEST_ASSERT_EQUAL_STRING("REL", x00TypeName('r'));
+    TEST_ASSERT_EQUAL_STRING("USR", x00TypeName('u'));
+}
+
+void test_x00_header_name(void)
+{
+    // PETSCII $53.. = unshifted "SCORES" -> lowercase UTF-8 per repo convention
+    auto h = hdr26("C64File\0", {0x53, 0x43, 0x4F, 0x52, 0x45, 0x53});
+    std::string n;
+    TEST_ASSERT_TRUE(x00HeaderName(h.data(), h.size(), n));
+    TEST_ASSERT_EQUAL_STRING("scores", n.c_str());
+    // 16-byte name with no terminator
+    auto full = hdr26("C64File\0", std::vector<uint8_t>(16, 0x41));
+    TEST_ASSERT_TRUE(x00HeaderName(full.data(), full.size(), n));
+    TEST_ASSERT_EQUAL_UINT32(16, n.size());
+    // bad signature and short buffer are refused
+    auto bad = hdr26("C64FilX\0", {0x41});
+    TEST_ASSERT_FALSE(x00HeaderName(bad.data(), bad.size(), n));
+    TEST_ASSERT_FALSE(x00HeaderName(h.data(), 25, n));
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_host_filename_basic);
@@ -266,5 +305,7 @@ int main(int, char**) {
     RUN_TEST(test_plain_p00_is_not_rel);
     RUN_TEST(test_new_rel_has_one_record);
     RUN_TEST(test_read_only_rel_reads_and_refuses_writes);
+    RUN_TEST(test_x00_type_letter);
+    RUN_TEST(test_x00_header_name);
     return UNITY_END();
 }

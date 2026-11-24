@@ -20,7 +20,8 @@
     "country": "US",
     "devicename": "Meatloaf",
     "rotationsounds": 0,
-    "reset_with_host": 0
+    "reset_with_host": 0,
+    "x00_header_names": 0
   },
   "host": {
     "model": "c64",
