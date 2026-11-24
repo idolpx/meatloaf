@@ -31,10 +31,15 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 
 #include "meatloaf.h"
 
 // RELStorage itself is declared in meatloaf.h: MStream::relStorage() returns it.
+
+// Host filename for a REL file kept as a P00 on a plain filesystem. Characters a
+// host filesystem rejects (and PETSCII graphics, U+E000 up) become '_'.
+std::string relHostFilename(const std::string& cbm_name_utf8);
 
 class RELMStream : public MStream {
 public:
