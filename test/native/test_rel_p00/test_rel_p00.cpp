@@ -262,6 +262,22 @@ static std::vector<uint8_t> hdr26(const char* sig8, const std::vector<uint8_t>& 
     return h;
 }
 
+void test_stream_reports_header_name(void)
+{
+    auto f = make_file();
+    TEST_ASSERT_NOT_NULL(f->createRelStream(30).get());
+    auto s = f->getDecodedStream(f->sourceFile->getSourceStream(std::ios_base::in));
+    std::string n;
+    TEST_ASSERT_TRUE(s->x00Header(n));
+    TEST_ASSERT_EQUAL_STRING("scores", n.c_str());
+    // a file with no P00 signature is not an x00
+    FILE* fp = fopen(kPath, "wb");
+    for (int i = 0; i < 40; i++) fputc('z', fp);
+    fclose(fp);
+    auto s2 = f->getDecodedStream(f->sourceFile->getSourceStream(std::ios_base::in));
+    TEST_ASSERT_FALSE(s2->x00Header(n));
+}
+
 void test_x00_type_letter(void)
 {
     TEST_ASSERT_EQUAL_CHAR('p', x00TypeLetter("game.p00"));
@@ -313,6 +329,7 @@ int main(int, char**) {
     RUN_TEST(test_plain_p00_is_not_rel);
     RUN_TEST(test_new_rel_has_one_record);
     RUN_TEST(test_read_only_rel_reads_and_refuses_writes);
+    RUN_TEST(test_stream_reports_header_name);
     RUN_TEST(test_x00_type_letter);
     RUN_TEST(test_x00_header_name);
     return UNITY_END();
