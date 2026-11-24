@@ -1,6 +1,7 @@
 // RELMStream - see rel.h. Behaviour references lib/vdrive/vdrive-rel.c.
 #include "media/file/rel.h"
 
+#include <cstring>
 #include <new>
 
 #include "cbm_defines.h"
@@ -194,4 +195,28 @@ void RELMStream::endRecord()
     cursor_ = 0;
     loaded_ = false;
     exhausted_ = false;
+}
+
+std::string relHostFilename(const std::string& cbm_name_utf8)
+{
+    std::string out;
+    size_t i = 0, n = cbm_name_utf8.size();
+    while (i < n)
+    {
+        uint8_t b = (uint8_t)cbm_name_utf8[i];
+        size_t clen = b < 0x80 ? 1 : (b >> 5) == 6 ? 2 : (b >> 4) == 14 ? 3 : (b >> 3) == 30 ? 4 : 1;
+        if (i + clen > n) clen = 1;
+        uint32_t cp = clen == 1 ? b : (b & (0xFF >> (clen + 1)));
+        for (size_t k = 1; clen > 1 && k < clen; k++)
+            cp = (cp << 6) | ((uint8_t)cbm_name_utf8[i + k] & 0x3F);
+        bool bad = cp < 0x20 || cp == 0x7F || cp >= 0xE000 ||
+                   (cp < 0x80 && strchr("/\\:*?\"<>|", (int)cp) != nullptr);
+        if (bad)
+            out += '_';
+        else
+            out.append(cbm_name_utf8, i, clen);
+        i += clen;
+    }
+    if (out.empty()) out = "_";
+    return out + ".r00";
 }

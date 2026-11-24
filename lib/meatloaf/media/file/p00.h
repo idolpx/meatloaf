@@ -24,10 +24,18 @@
 
 #include "meatloaf.h"
 #include "meat_media.h"
+#include "media/file/rel.h"
+#include "cbm_defines.h"
+#include "string_utils.h"
+
+#include <new>
+#include <utility>
 
 /********************************************************
  * Streams
  ********************************************************/
+
+class P00RelStorage;
 
 class P00MStream : public MMediaStream {
     // override everything that requires overriding here
@@ -49,6 +57,14 @@ protected:
         uint8_t rel_flag;
     };
 
+public:
+    static constexpr uint32_t HEADER_SIZE = 26;
+
+    // A .r00 holds a REL file's records verbatim after the 26-byte header.
+    uint8_t relRecordLength() override { return header.rel_flag; }
+    std::unique_ptr<RELStorage> relStorage() override;
+
+protected:
     bool readHeader() override {
         containerStream->seek(0x00);
         if (readContainer((uint8_t*)&header, sizeof(header)))
@@ -74,7 +90,88 @@ protected:
 
 private:
     friend class P00MFile;
+    friend class P00RelStorage;
 };
+
+// Record bytes of a .r00: the container past the header. Holds the stream so
+// it (and the container under it) lives as long as any RELMStream over it.
+class P00RelStorage : public RELStorage {
+public:
+    explicit P00RelStorage(std::shared_ptr<P00MStream> stream) : s_(std::move(stream))
+    {
+        uint32_t total = s_->containerStream->size();
+        size_ = total > P00MStream::HEADER_SIZE ? total - P00MStream::HEADER_SIZE : 0;
+    }
+
+    uint32_t size() override { return size_; }
+
+    uint32_t readAt(uint32_t off, uint8_t* buf, uint32_t n) override
+    {
+        if (off >= size_) return 0;
+        if (n > size_ - off) n = size_ - off;
+        if (!s_->containerStream->seek(P00MStream::HEADER_SIZE + off)) return 0;
+        uint32_t total = 0;
+        while (total < n)
+        {
+            uint32_t r = s_->containerStream->read(buf + total, n - total);
+            if (r == 0) break;
+            total += r;
+        }
+        return total;
+    }
+
+    uint32_t writeAt(uint32_t off, const uint8_t* buf, uint32_t n) override
+    {
+        if (!writable() || off > size_) return 0;
+        if (!s_->containerStream->seek(P00MStream::HEADER_SIZE + off)) return 0;
+        uint32_t total = 0;
+        while (total < n)
+        {
+            uint32_t w = s_->containerStream->write(buf + total, n - total);
+            if (w == 0) break;
+            total += w;
+        }
+        if (off + total > size_) size_ = off + total;
+        return total;
+    }
+
+    // A file has no allocation limit beyond the medium: extend with zeros
+    // (RELMStream writes the real record fill itself).
+    uint8_t grow(uint32_t new_size) override
+    {
+        if (!writable()) return ST_WRITE_PROTECT_ON;
+        if (new_size <= size_) return ST_OK;
+        uint8_t zeros[64] = {0};
+        if (!s_->containerStream->seek(P00MStream::HEADER_SIZE + size_)) return ST_DISK_FULL;
+        while (size_ < new_size)
+        {
+            uint32_t chunk = new_size - size_;
+            if (chunk > sizeof(zeros)) chunk = sizeof(zeros);
+            uint32_t w = s_->containerStream->write(zeros, chunk);
+            if (w == 0) return ST_DISK_FULL;
+            size_ += w;
+        }
+        return ST_OK;
+    }
+
+    bool writable() override { return (s_->mode & std::ios_base::out) != 0; }
+
+private:
+    std::shared_ptr<P00MStream> s_;
+    uint32_t size_ = 0;
+};
+
+inline std::unique_ptr<RELStorage> P00MStream::relStorage()
+{
+    if (header.rel_flag == 0)
+        return nullptr;
+    auto self = std::static_pointer_cast<P00MStream>(weak_from_this().lock());
+    if (!self)
+        return nullptr;
+    // nothrow: plain new would abort on failure under -fno-exceptions.
+    P00RelStorage* st = new (std::nothrow) P00RelStorage(std::move(self));
+    return std::unique_ptr<RELStorage>(st);
+}
 
 
 /********************************************************
@@ -95,6 +192,50 @@ public:
         Debug_printv("[%s]", url.c_str());
 
         return std::make_shared<P00MStream>(is);
+    }
+
+    // Creates an empty .r00: header only. The header is written through a
+    // write-only open (which creates the file), then the file is reopened
+    // in|out - a plain 'out' open of an existing file would truncate it.
+    // Anything that fails removes what was created.
+    std::shared_ptr<MStream> createRelStream(uint8_t record_length) override
+    {
+        if (record_length == 0 || sourceFile == nullptr || sourceFile->exists())
+            return nullptr;
+
+        P00MStream::Header h;
+        memset(&h, 0, sizeof(h));
+        memcpy(h.signature, "C64File", 7);
+        std::string cbm = name;
+        size_t dot = cbm.rfind('.');
+        if (dot != std::string::npos) cbm.erase(dot);
+        for (auto& c : cbm) if (c >= 'A' && c <= 'Z') c = c - 'A' + 'a';
+        cbm = mstr::toPETSCII2(cbm);
+        memcpy(h.filename, cbm.data(), cbm.size() < 16 ? cbm.size() : 16);
+        h.rel_flag = record_length;
+
+        bool ok = false;
+        {
+            auto w = sourceFile->getSourceStream(std::ios_base::out);
+            ok = w != nullptr && w->write((const uint8_t*)&h, sizeof(h)) == sizeof(h);
+            if (w) w->close();
+        }
+        std::shared_ptr<MStream> result;
+        if (ok)
+        {
+            auto src = sourceFile->getSourceStream(std::ios_base::in | std::ios_base::out);
+            if (src != nullptr)
+            {
+                auto stream = std::static_pointer_cast<P00MStream>(getDecodedStream(src));
+                stream->mode = std::ios_base::in | std::ios_base::out;
+                auto storage = stream->relStorage();
+                if (storage != nullptr)
+                    result = std::make_shared<RELMStream>(std::move(storage), record_length);
+            }
+        }
+        if (!result)
+            sourceFile->remove();
+        return result;
     }
 
     bool isDirectory() override { return false; };
