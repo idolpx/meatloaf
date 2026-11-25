@@ -2,37 +2,37 @@
 
 #include <cerrno>
 
-nDevStatus_t afp_errno_to_status(int error)
+uint8_t afp_errno_to_status(int error)
 {
     switch (-error)
     {
     case 0:
-        return NDEV_STATUS::SUCCESS;
+        return NETWORK_ERROR_SUCCESS;
     case ENOENT:
-        return NDEV_STATUS::FILE_NOT_FOUND;
+        return NETWORK_ERROR_FILE_NOT_FOUND;
     case EEXIST:
-        return NDEV_STATUS::FILE_EXISTS;
+        return NETWORK_ERROR_FILE_EXISTS;
     case EACCES:
     case EPERM:
     case EROFS:
-        return NDEV_STATUS::ACCESS_DENIED;
+        return NETWORK_ERROR_ACCESS_DENIED;
     case ENOSPC:
-        return NDEV_STATUS::NO_SPACE_ON_DEVICE;
+        return NETWORK_ERROR_NO_SPACE_ON_DEVICE;
     case EISDIR:
     case ENOTDIR:
     case EINVAL:
     case ENAMETOOLONG:
-        return NDEV_STATUS::INVALID_DEVICESPEC;
+        return NETWORK_ERROR_INVALID_DEVICESPEC;
     case EHOSTUNREACH:
     case ENETUNREACH:
-        return NDEV_STATUS::NETWORK_UNREACHABLE;
+        return NETWORK_ERROR_NETWORK_UNREACHABLE;
     case ECONNREFUSED:
-        return NDEV_STATUS::CONNECTION_REFUSED;
+        return NETWORK_ERROR_CONNECTION_REFUSED;
     case ETIMEDOUT:
-        return NDEV_STATUS::SOCKET_TIMEOUT;
+        return NETWORK_ERROR_SOCKET_TIMEOUT;
     case ENOTCONN:
-        return NDEV_STATUS::NOT_CONNECTED;
+        return NETWORK_ERROR_NOT_CONNECTED;
     default:
-        return NDEV_STATUS::GENERAL;
+        return NETWORK_ERROR_GENERAL;
     }
 }
