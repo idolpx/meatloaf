@@ -109,6 +109,9 @@ bool TNFSMSession::keep_alive() {
  ********************************************************/
 
 TNFSMFile::TNFSMFile(std::string path): MFile(path) {
+    // Writable media: a read-only share or a missing permission
+    // surfaces as a failed open or write, not as this flag.
+    isWritable = true;
     //Debug_printv("url[%s] host[%s] path[%s]", url.c_str(), host.c_str(), this->path.c_str());
 
     // Obtain or create TNFS session via SessionBroker

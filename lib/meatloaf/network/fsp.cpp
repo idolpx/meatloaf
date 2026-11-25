@@ -135,6 +135,9 @@ bool FSPMSession::keep_alive() {
  ********************************************************/
 
 FSPMFile::FSPMFile(std::string path) : MFile(path) {
+    // Writable for whole-file writes; fsp_fopen refuses "r+" (ENOTSUP),
+    // so an in-place write fails cleanly instead of truncating.
+    isWritable = true;
     // Obtain or create FSP session via SessionBroker
     uint16_t fsp_port = FSP_DEFAULT_PORT;
     if (!port.empty()) {

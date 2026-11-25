@@ -1662,6 +1662,27 @@ bool MFile::exists() {
     return true; // Assume it exists; if it doesn't, we'll find out when we try to open it
 };
 
+bool MFile::remove() {
+    if (!pathInStream.empty() && pathInStream != "/")
+        return false;
+    if (scheme.empty())
+        return ::remove(url.c_str()) == 0;
+
+    // A container class (P00, D64, ZIP...) on a network path. The raw
+    // resolver gives the scheme's own MFile; one that does not override
+    // remove() lands back here, hence the guard.
+    static thread_local bool in_raw_remove = false;
+    if (in_raw_remove)
+        return false;
+    std::unique_ptr<MFile> raw(MFSOwner::File(url, true));
+    if (!raw)
+        return false;
+    in_raw_remove = true;
+    bool ok = raw->remove();
+    in_raw_remove = false;
+    return ok;
+}
+
 uint64_t MFile::getAvailableSpace()
 {
     //Debug_printv("url[%s]", url.c_str());

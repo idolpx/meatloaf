@@ -585,9 +585,9 @@ bool AFPMStream::open(std::ios_base::openmode mode)
     if ((mode & std::ios_base::in) && (mode & std::ios_base::out))
         flags = O_RDWR;
     else if (mode & std::ios_base::out) {
-        flags = O_WRONLY;
-        if (mode & std::ios_base::trunc)  flags |= O_CREAT | O_TRUNC;
-        if (mode & std::ios_base::app)    flags |= O_APPEND;
+        // As std::filebuf: plain out creates and truncates, app appends.
+        flags = O_WRONLY | O_CREAT;
+        flags |= (mode & std::ios_base::app) ? O_APPEND : O_TRUNC;
     } else {
         flags = O_RDONLY;
     }

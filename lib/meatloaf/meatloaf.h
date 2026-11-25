@@ -528,11 +528,9 @@ public:
     // real underlying entity via its url. Harmless no-op-that-fails for
     // remote/synthetic URLs (::remove() just returns nonzero), and any
     // subclass with real delete semantics of its own already overrides this.
-    virtual bool remove() {
-        if (!pathInStream.empty() && pathInStream != "/")
-            return false;
-        return ::remove(url.c_str()) == 0;
-    };
+    // On a network path ::remove() cannot reach "smb://...", so the file is
+    // deleted through its own scheme's filesystem (the raw resolver).
+    virtual bool remove();
     virtual bool rename(std::string dest) { return false; };
     virtual time_t getLastWrite() { return 0; };
     virtual time_t getCreationTime() { return 0; };

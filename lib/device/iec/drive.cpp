@@ -2890,7 +2890,11 @@ std::shared_ptr<MStream> iecDrive::sectorStream()
     if ( f == nullptr )
         return nullptr;
 
+    // Read-write where the medium allows it; read-only where it cannot be
+    // written in place (FTP, FSP refuse in|out) - block reads still work.
     auto s = f->getSourceStream( std::ios_base::in | std::ios_base::out );
+    if ( s == nullptr || !s->isOpen() )
+        s = f->getSourceStream( std::ios_base::in );
     if ( s == nullptr || !s->isOpen() )
         return nullptr;
 

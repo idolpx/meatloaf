@@ -604,12 +604,13 @@ bool NFSMStream::open(std::ios_base::openmode mode) {
     if (mode & std::ios_base::in && mode & std::ios_base::out) {
         nfs_mode = O_RDWR;
     } else if (mode & std::ios_base::out) {
-        nfs_mode = O_WRONLY;
-        if (mode & std::ios_base::trunc) {
-            nfs_mode |= O_CREAT | O_TRUNC;
-        }
+        // As std::filebuf: plain out is "w" (create + truncate), app is "a"
+        // (create + append). Without O_CREAT a new file cannot be made.
+        nfs_mode = O_WRONLY | O_CREAT;
         if (mode & std::ios_base::app) {
             nfs_mode |= O_APPEND;
+        } else {
+            nfs_mode |= O_TRUNC;
         }
     } else {
         nfs_mode = O_RDONLY;

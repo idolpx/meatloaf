@@ -127,6 +127,9 @@ public:
     std::string file_path   = "";   // absolute path within volume, e.g. "/Games/Elite.prg"
 
     AFPMFile(std::string path) : MFile(path) {
+        // Writable media: a read-only share or a missing permission
+        // surfaces as a failed open or write, not as this flag.
+        isWritable = true;
         uint16_t afp_port = port.empty() ? AFP_DEFAULT_PORT : std::stoi(port);
         std::string key = "afp://" + host + ":" + std::to_string(afp_port);
 
