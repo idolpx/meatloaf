@@ -1632,7 +1632,11 @@ create_cb_1(struct smb2_context *smb2, int status,
         }
 
         memset(&req, 0, sizeof(struct smb2_close_request));
-        req.flags = SMB2_CLOSE_FLAG_POSTQUERY_ATTRIB;
+        /* MEATLOAF: no SMB2_CLOSE_FLAG_POSTQUERY_ATTRIB. Nothing reads the
+         * attributes (create_cb_2 ignores the reply), and on a delete-on-close
+         * handle Samba 4.19.5 panics in file_free() (fd_handle.c:39 assert)
+         * processing it, killing the connection after the delete. */
+        req.flags = 0;
         memcpy(req.file_id, rep->file_id, SMB2_FD_SIZE);
 
         pdu = smb2_cmd_close_async(smb2, &req, create_cb_2, create_data);

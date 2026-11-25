@@ -472,15 +472,10 @@ private:
 
 class SMBMStream: public MStream {
 public:
-    SMBMStream(std::string& path): MStream(path) {
-        // Obtain or create SMB session via SessionBroker
-        // Parse URL to get host and port
-        auto parser = PeoplesUrlParser::parseURL(path);
-        if (parser && parser->scheme == "smb") {
-            uint16_t smb_port = parser->port.empty() ? 445 : std::stoi(parser->port);
-            _session = SessionBroker::obtain<SMBMSession>(parser->host, smb_port);
-        }
-    }
+    // The session is obtained in open(), keyed with the URL's credentials.
+    // Obtaining one here by host alone made a second, credential-less
+    // session (and connection) for every stream.
+    SMBMStream(std::string& path): MStream(path) {}
     ~SMBMStream() override {
         close();
         // Don't destroy share context - it's owned and cached by SMBMSession
