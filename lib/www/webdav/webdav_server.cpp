@@ -697,17 +697,24 @@ int Server::doGet(Request &req, Response &resp)
         return 500;
     }
 
+    uint32_t total = stream->size();
+    int remaining = total;
+    uint8_t percent = 0;
+
     for (;;)
     {
-        uint32_t r = stream->read(chunk, chunkSize);
+        uint32_t r = stream->read(chunk, std::min(remaining, chunkSize));
         if (r == 0)
             break;
+        remaining -= r;
+        percent = (remaining * 100) / total;
 
         if (!resp.sendChunk((char *)chunk, r))
         {
             ret = -1;
             break;
         }
+        Debug_printf("sent: %u of %d (%d%%)\r\n", (total - remaining), total, percent);
     }
 
     free(chunk);
@@ -1038,17 +1045,18 @@ int Server::doPut(Request &req, Response &resp)
                 break;
             }
             total += r;
-            Debug_printf("received: %u\n", total);
+            Debug_printf("received: %u\r\n", total);
         }
     }
     else
     {
-        int remaining = req.getContentLength();
+        uint32_t total = req.getContentLength();
+        int remaining = total;
         uint8_t percent = 0;
 
         while (remaining > 0)
         {
-            int r = req.readBody((char *)chunk, std::min(remaining, chunkSize));
+            int r = req.readBody((char *)chunk, std::min<uint32_t>(remaining, chunkSize));
             if (r <= 0)
                 break;
 
@@ -1059,9 +1067,9 @@ int Server::doPut(Request &req, Response &resp)
             }
 
             remaining -= r;
-            total += r;
-            percent = (total * 100) / req.getContentLength();
-            Debug_printf("received: %u of %d (%%%d)\n", total, req.getContentLength(), percent);
+
+            percent = ((total - remaining) * 100) / total;
+            Debug_printf("received: %u of %d (%d%%)\r\n", (total - remaining), total, percent);
         }
 
         if (remaining > 0 && ret == 0)
