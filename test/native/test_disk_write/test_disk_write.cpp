@@ -1462,6 +1462,76 @@ void test_extended_d64_bam_lives_at_dolphin_offset(void)
     }
 }
 
+// A CMD native partition's BAM is MSB-first: bit 7 of each byte is the lowest
+// sector (D2M-DNP.TXT; VICE vdrive-bam.c flips with `sector ^= 7` for NP only).
+// DNP has no c1541 oracle, so these bytes are checked against the CMD layout,
+// not against our own reading of them - an engine that is wrong on both sides
+// agrees with itself.
+void test_dnp_bam_is_msb_first(void)
+{
+    const FormatFixture* dnp = nullptr;
+    for (const auto& f : all_formats())
+        if (std::string(f.name) == "dnp") { dnp = &f; break; }
+    TEST_ASSERT_NOT_NULL_MESSAGE(dnp, "dnp fixture missing from all_formats()");
+
+    const char* path = "build_dnp_msb.dnp";
+    const long track1_bam = 2 * 256 + 0x20;          // 1/2 offset $20
+    const long track2_bam = track1_bam + 32;
+    remove(path);
+    { FILE* mk = fopen(path, "wb"); if (mk) fclose(mk); }
+    {
+        auto src = std::make_shared<FileContainerStream>(path, 0);
+        auto image = dnp->make(src);
+        TEST_ASSERT_TRUE(image->formatImage("msb", "01", 2, false));
+    }
+
+    // 1. Format: sectors 0-34 of track 1 are allocated (system area + 1/34).
+    uint8_t t1[8];
+    FILE* fp = fopen(path, "r+b");
+    TEST_ASSERT_NOT_NULL(fp);
+    fseek(fp, track1_bam, SEEK_SET);
+    TEST_ASSERT_EQUAL(8, fread(t1, 1, 8, fp));
+    const uint8_t want_t1[8] = { 0x00, 0x00, 0x00, 0x00, 0x1F, 0xFF, 0xFF, 0xFF };
+    if (memcmp(want_t1, t1, 8) != 0) { fclose(fp); remove(path); }
+    TEST_ASSERT_EQUAL_HEX8_ARRAY_MESSAGE(want_t1, t1, 8, "track 1 BAM after format");
+
+    // 2. A CMD-written byte: $0F on track 2 byte 0 = sectors 0-3 allocated,
+    //    4-7 free. Mark those four sectors and make sure a write spilling onto
+    //    track 2 leaves them alone.
+    uint8_t mark[256];
+    memset(mark, 0xA5, sizeof(mark));
+    for (int s = 0; s < 4; s++)
+    {
+        fseek(fp, 65536L + s * 256, SEEK_SET);
+        fwrite(mark, 1, 256, fp);
+    }
+    uint8_t cmd = 0x0F;
+    fseek(fp, track2_bam, SEEK_SET);
+    fwrite(&cmd, 1, 1, fp);
+    fclose(fp);
+
+    std::vector<uint8_t> big(254 * 240, 0x5A);   // track 1 has 221 free
+    if (!open_and_save(*dnp, path, "spill", big)) { remove(path); TEST_FAIL_MESSAGE("save failed"); }
+
+    fp = fopen(path, "rb");
+    TEST_ASSERT_NOT_NULL(fp);
+    for (int s = 0; s < 4; s++)
+    {
+        uint8_t got[256];
+        fseek(fp, 65536L + s * 256, SEEK_SET);
+        TEST_ASSERT_EQUAL(256, fread(got, 1, 256, fp));
+        char msg[64];
+        snprintf(msg, sizeof(msg), "allocated sector 2/%d was overwritten", s);
+        if (memcmp(mark, got, 256) != 0) { fclose(fp); remove(path); TEST_FAIL_MESSAGE(msg); }
+    }
+    uint8_t t2;
+    fseek(fp, track2_bam, SEEK_SET);
+    TEST_ASSERT_EQUAL(1, fread(&t2, 1, 1, fp));
+    fclose(fp);
+    remove(path);
+    TEST_ASSERT_EQUAL_HEX8_MESSAGE(0x00, t2 & 0xF0, "sectors 2/0-2/3 no longer allocated");
+}
+
 // The N0: argument is parsed from a string the C64 sends, so it has to cope
 // with anything. Bad trailing fields must fall back to the defaults rather
 // than produce a nonsense image - and must not throw, since ESP-IDF builds
@@ -2000,6 +2070,7 @@ void process()
     RUN_TEST(test_dnp_does_not_grow_by_default);
     RUN_TEST(test_format_honours_track_count_and_error_info);
     RUN_TEST(test_extended_d64_bam_lives_at_dolphin_offset);
+    RUN_TEST(test_dnp_bam_is_msb_first);
     RUN_TEST(test_parse_format_spec);
     // Once per format, so no format can be hidden behind another's failure.
     for (g_format_index = 0; g_format_index < all_formats().size(); g_format_index++)

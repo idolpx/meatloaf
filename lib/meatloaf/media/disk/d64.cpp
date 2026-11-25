@@ -232,7 +232,7 @@ bool D64MStream::setBlockAllocation(uint8_t track, uint8_t sector, bool allocate
     if (byte_index >= rec.byte_count)
         return false; // sector beyond what this BAM record can represent
 
-    uint8_t bitmask = (uint8_t)(1 << (sector & 7));
+    uint8_t bitmask = bamBitMask(sector);
     if (allocate)
     {
         if ((buf[byte_index] & bitmask) == 0)
@@ -318,7 +318,7 @@ bool D64MStream::findFreeSectorOnTrack(uint8_t track, uint8_t startSector, uint8
         uint8_t byte_index = base + (s >> 3);
         if (byte_index >= rec.byte_count)
             continue; // beyond bitmap coverage - treat as allocated
-        if (buf[byte_index] & (1 << (s & 7)))
+        if (buf[byte_index] & bamBitMask(s))
         {
             *foundSector = s;
             return true;
@@ -548,7 +548,7 @@ bool D64MStream::isBlockFree(uint8_t track, uint8_t sector)
         return false;
 
     // Check if bit is set (1 = free, 0 = allocated)
-    uint8_t bitmask = (uint8_t)(1 << (sector & 7));
+    uint8_t bitmask = bamBitMask(sector);
     return (buf[byte_index] & bitmask) == bitmask;
 }
 
@@ -948,7 +948,7 @@ bool D64MStream::queryBlockAllocation(uint8_t track, uint8_t sector, bool& out_a
     if (byte_index >= rec.byte_count)
         return false;   // sector beyond what this BAM record can represent
 
-    uint8_t bitmask = (uint8_t)(1 << (sector & 7));
+    uint8_t bitmask = bamBitMask(sector);
     out_allocated = (buf[byte_index] & bitmask) == 0;   // 1 = free, 0 = allocated
     return true;
 }
