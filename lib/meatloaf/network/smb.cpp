@@ -177,6 +177,17 @@ bool SMBMFile::mkDir()
     return (rc == 0);
 }
 
+bool SMBMFile::rmDir()
+{
+    auto smb = getSMB();
+    if (m_isNull || !smb) {
+        return false;
+    }
+
+    int rc = smb2_rmdir(smb, std::string(basepath + share_path).c_str());
+    return (rc == 0);
+}
+
 bool SMBMFile::exists()
 {
     auto smb = getSMB();

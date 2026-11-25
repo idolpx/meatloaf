@@ -118,7 +118,11 @@ bool VDrive::createDiskImage(const char *filename, const char *itype, const char
 
   if( itype==NULL )
     {
-      const char *s = strchr(filename, '.');
+      // The extension of the last path component: a URL carries dots
+      // before it (an IP address, a host name), and the first dot in
+      // "smb://192.168.1.220/x.d64" names no image type.
+      const char *base = strrchr(filename, '/');
+      const char *s = strrchr(base==NULL ? filename : base, '.');
       itypec = strdup(s==NULL ? "" : s+1);
     }
   else

@@ -363,6 +363,14 @@ bool FSPMFile::mkDir() {
     return fsp_mkdir(getSession(), pathInStream.c_str()) == 0;
 }
 
+bool FSPMFile::rmDir() {
+    if (!pathValid(path)) {
+        return false;
+    }
+
+    return fsp_rmdir(getSession(), pathInStream.c_str()) == 0;
+}
+
 bool FSPMFile::exists() {
     if (!pathValid(path)) {
         return false;
