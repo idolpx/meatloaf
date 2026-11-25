@@ -122,9 +122,16 @@ for src in sorted(glob(os.path.join(LZ4, "*.c"))):
 # lib/compat: strlcpy/strlcat/compat_gettimeofday, which lib/utils/utils.cpp
 # calls and mingw does not provide. Plus localtime_r/gmtime_r for libarchive.
 COMPAT = os.path.join(PROJECT_DIR, "lib", "compat")
+# macOS libc already has strlcpy/strlcat, and its fortified string.h macros
+# make a second definition a compile error.
+IS_MACOS = sys.platform == "darwin"
 for src in ("strlcpy.c", "strlcat.c", "compat_gettimeofday.c"):
+    if IS_MACOS and src in ("strlcpy.c", "strlcat.c"):
+        continue
     build(z_env.Clone(CPPPATH=[COMPAT]), os.path.join(COMPAT, src), "compat")
-build(z_env, os.path.join(HOST_DIR, "host_support.c"), "host")
+# localtime_r/gmtime_r over the MS localtime_s/gmtime_s: POSIX hosts have them.
+if IS_WINDOWS:
+    build(z_env, os.path.join(HOST_DIR, "host_support.c"), "host")
 
 # Link as a static library rather than loose objects: PlatformIO's test
 # builder does not consume PIOBUILDFILES, but it does honour LIBS/LIBPATH.

@@ -16,6 +16,13 @@
  */
 #include "../../../../components/libarchive/config.h"
 
+/* The ESP32 config #defines intmax_t/uintmax_t to int64_t/uint64_t (a FreeBSD 4
+ * workaround left unconditional). Every host libc has the real typedefs, and on
+ * macOS they are a different type from int64_t, so the macro turns the SDK's
+ * own typedef into a conflicting redefinition. */
+#undef intmax_t
+#undef uintmax_t
+
 /* mingw's struct stat has st_atime, not the st_atim/st_atimespec timespec
  * members newlib exposes. */
 #undef HAVE_STRUCT_STAT_ST_ATIM

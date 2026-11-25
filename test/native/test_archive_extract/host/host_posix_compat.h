@@ -6,8 +6,10 @@
  *
  * C++ only: it is on the command line for C sources too (build_flags applies
  * to both), and the C libraries built alongside supply their own equivalents.
+ * mingw only: a POSIX host (Linux, macOS) has both, and a second mkdir()
+ * overload there recurses into itself.
  */
-#ifdef __cplusplus
+#if defined(__cplusplus) && defined(_WIN32)
 #include <cstring>
 #include <sys/stat.h>
 
@@ -23,6 +25,6 @@ static inline char *basename(const char *p) { return basename(const_cast<char *>
 
 /* mingw's mkdir takes only a path; add the POSIX 2-argument overload. */
 static inline int mkdir(const char *p, int mode) { (void)mode; return mkdir(p); }
-#endif /* __cplusplus */
+#endif /* __cplusplus && _WIN32 */
 
 #endif
