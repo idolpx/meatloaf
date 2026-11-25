@@ -106,7 +106,17 @@ MFile* FTPMFile::getNextFileInDir() {
     return file;
 }
 
-bool FTPMFile::mkDir() { return false; }
+bool FTPMFile::mkDir() {
+    FileSystemFTP* fs = getFS();
+    if (!fs) return false;
+    return fs->mkdir(path.c_str());
+}
+
+bool FTPMFile::rmDir() {
+    FileSystemFTP* fs = getFS();
+    if (!fs) return false;
+    return fs->rmdir(path.c_str());
+}
 
 bool FTPMFile::exists() {
     // is_dir is set by getNextFileInDir() from the cached directory listing;
