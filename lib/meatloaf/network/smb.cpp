@@ -516,12 +516,13 @@ bool SMBMStream::open(std::ios_base::openmode mode) {
     if (mode & std::ios_base::in && mode & std::ios_base::out) {
         smb_mode = O_RDWR;
     } else if (mode & std::ios_base::out) {
-        smb_mode = O_WRONLY;
-        if (mode & std::ios_base::trunc) {
-            smb_mode |= O_CREAT | O_TRUNC;
-        }
+        // As std::filebuf: plain out is "w" (create + truncate), app is "a"
+        // (create + append). Without O_CREAT a new file is NAME_NOT_FOUND.
+        smb_mode = O_WRONLY | O_CREAT;
         if (mode & std::ios_base::app) {
             smb_mode |= O_APPEND;
+        } else {
+            smb_mode |= O_TRUNC;
         }
     } else {
         smb_mode = O_RDONLY;
