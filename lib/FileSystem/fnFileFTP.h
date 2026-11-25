@@ -20,11 +20,17 @@
  * The transfer starts LAZILY, on the first read. That is what lets callers do
  * the usual seek-to-end/tell/seek-to-start size probe without any network
  * traffic - the size is known from SIZE up front.
+ *
+ * Constructed with write=true it is the STOR side instead: start_store() sends
+ * STOR (so a refusal surfaces at open), write() streams straight to the data
+ * connection, and close() waits for the server's completion reply - that reply,
+ * not the last write, is what says the file landed. Write handles are
+ * sequential: no seeking, no reading.
  */
 class FileHandlerFTP : public FileHandler
 {
 public:
-    FileHandlerFTP(fnFTP *ftp, const std::string &path);
+    FileHandlerFTP(fnFTP *ftp, const std::string &path, bool write = false);
     virtual ~FileHandlerFTP() override;
 
     int close(bool destroy = true) override;
@@ -38,16 +44,21 @@ public:
     // File size, from the server's SIZE response. Negative if unknown.
     long int size() const { return _size; }
 
+    // Write handles only: begin the STOR. False if the server refuses it.
+    bool start_store();
+
 private:
     bool start_transfer();      // begin RETR at _pos, if not already running
     void stop_transfer();       // end the current RETR, if any
     bool skip_forward(long int target);
+    int finish_store();         // end the STOR, 0 if the server confirmed it
 
     fnFTP *_ftp;
     std::string _path;
     long int _size;             // from SIZE, -1 if the server would not say
     long int _pos;              // where the NEXT read starts
-    bool _started;              // a RETR is in progress at _pos
+    bool _started;              // a RETR/STOR is in progress at _pos
+    bool _writing;              // STOR handle rather than RETR
 };
 
 #endif // FN_FILE_FTP_H

@@ -298,8 +298,9 @@ int ls(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    // If sd card is mounted and we are at root
-    if( getCurrentPath()->url.size() == 1 )
+    // If sd card is mounted and the directory being LISTED is the root. Not
+    // the cwd: "ls ftp://host/dir" from "/" used to list these two as well.
+    if( destPath->url.size() == 1 )
     {
         if ( fnSDFAT.running() && ( !filtered || mstr::compare("sd", pattern, false) ) )
             Serial.printf("d %8lu  \"sd\"\r\n", 0);
@@ -506,6 +507,14 @@ static bool copy_via_mfile(const char *verb,
     free(buf);
     out->close();
 
+    // A network write is only confirmed at close - FTP, for one, gets the
+    // server's verdict on a STOR only then - so a failure there is a failure.
+    if (ok && out->error() != 0)
+    {
+        Serial.printf("%s: '%s' was not stored (error %d)\r\n", verb, dst.c_str(), (int)out->error());
+        ok = false;
+    }
+
     if (out_total) *out_total = total;
     return ok;
 }
@@ -615,7 +624,11 @@ static bool rm_path(const std::string &path, bool recursive, bool force)
             return force;
         }
 
-        bool ok = true;
+        // Read the whole listing BEFORE descending. A network filesystem
+        // keeps one listing per session, not per MFile, so recursing into a
+        // child mid-walk replaced this directory's listing with the child's:
+        // on FTP "rm -r" removed the first subdirectory and stopped there.
+        std::vector<std::string> names;
         f->rewindDirectory();
         MFile *rawEntry;
         while ((rawEntry = f->getNextFileInDir()) != nullptr)
@@ -623,9 +636,13 @@ static bool rm_path(const std::string &path, bool recursive, bool force)
             std::unique_ptr<MFile> entry(rawEntry);
             if (entry->name == "." || entry->name == "..")
                 continue;
-            if (!rm_path(path + "/" + entry->name, recursive, force))
-                ok = false;
+            names.push_back(entry->name);
         }
+
+        bool ok = true;
+        for (const auto &name : names)
+            if (!rm_path(path + "/" + name, recursive, force))
+                ok = false;
 
         if (!f->rmDir())
         {
