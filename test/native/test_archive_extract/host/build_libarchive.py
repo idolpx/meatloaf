@@ -49,7 +49,6 @@ SKIP_EXACT = {
     "archive_read_open_filename",  # tests drive the callbacks, not a filename
     "archive_random",              # Windows BCrypt/arc4random
     "archive_match",               # unused
-    "filter_fork_posix",           # Windows uses filter_fork_windows.c
 }
 
 
@@ -59,7 +58,10 @@ def libarchive_sources():
         name = os.path.splitext(os.path.basename(path))[0]
         if name in SKIP_EXACT or name.startswith(SKIP_PREFIXES):
             continue
+        # One fork implementation per host: the program filter needs it.
         if name == "filter_fork_windows" and not IS_WINDOWS:
+            continue
+        if name == "filter_fork_posix" and IS_WINDOWS:
             continue
         out.append(path)
     return out
