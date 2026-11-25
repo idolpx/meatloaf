@@ -108,6 +108,7 @@
       "hidden_dirs": 1,
       "hidden_files": 1,
       "long_filenames": 1,
+      "x00_header_names": 0,
       "hide_extension": 0,
       "type_colon": 0,
       "standard_types": 0,
@@ -117,8 +118,7 @@
       "entry_counts": 1,
       "blocks_used": 1,
       "footer_bytes": 1,
-      "update_nfo": 1,
-      "x00_header_names": 0
+      "update_nfo": 1
     },
     "fastloaders": {
       "hardware": {
