@@ -1413,6 +1413,55 @@ void test_format_honours_track_count_and_error_info(void)
     }
 }
 
+// Tracks 36-40 of an extended D64 live in the DolphinDOS slot at 18/0 $AC,
+// where VICE (vdrive-bam.c, BAM_EXT_BIT_MAP_1541) keeps them. One record
+// running on from offset 4 reached the disk name at $90, so the name and id
+// bytes were counted as free sectors: a fresh 40-track image reported 1388
+// blocks free instead of 749. Checked both on the formatting instance and on a
+// fresh open, since the reader settles its geometry from the image size.
+void test_extended_d64_bam_lives_at_dolphin_offset(void)
+{
+    struct Case { size_t tracks; uint16_t free_blocks; };
+    const Case cases[] = {
+        { 40, 664 + 5 * 17 },   // 749
+        { 42, 664 + 7 * 17 },   // 783
+    };
+
+    for (const auto& c : cases)
+    {
+        std::string path = "build_ext_d64_" + std::to_string(c.tracks) + ".d64";
+        remove(path.c_str());
+        { FILE* mk = fopen(path.c_str(), "wb"); if (mk) fclose(mk); }
+        char msg[160];
+        {
+            auto src = std::make_shared<FileContainerStream>(path, 0);
+            auto image = make_d64(src);
+            TEST_ASSERT_TRUE(image->formatImage("extended", "01", c.tracks, false));
+            snprintf(msg, sizeof(msg), "%u tracks: free after format", (unsigned)c.tracks);
+            TEST_ASSERT_EQUAL_UINT16_MESSAGE(c.free_blocks, image->blocksFree(), msg);
+        }
+        {
+            auto src = std::make_shared<FileContainerStream>(path, 0);
+            auto image = make_d64(src);
+            snprintf(msg, sizeof(msg), "%u tracks: free after reopen", (unsigned)c.tracks);
+            TEST_ASSERT_EQUAL_UINT16_MESSAGE(c.free_blocks, image->blocksFree(), msg);
+        }
+
+        uint8_t bam[256];
+        FILE* fp = fopen(path.c_str(), "rb");
+        TEST_ASSERT_NOT_NULL(fp);
+        fseek(fp, 357 * 256, SEEK_SET);   // track 18 sector 0
+        TEST_ASSERT_EQUAL(256, fread(bam, 1, 256, fp));
+        fclose(fp);
+        remove(path.c_str());
+
+        // The name survives the BAM write and track 36 starts at $AC.
+        TEST_ASSERT_EQUAL_MEMORY("EXTENDED", bam + 0x90, 8);
+        const uint8_t track36[4] = { 17, 0xFF, 0xFF, 0x01 };
+        TEST_ASSERT_EQUAL_MEMORY(track36, bam + 0xAC, 4);
+    }
+}
+
 // The N0: argument is parsed from a string the C64 sends, so it has to cope
 // with anything. Bad trailing fields must fall back to the defaults rather
 // than produce a nonsense image - and must not throw, since ESP-IDF builds
@@ -1950,6 +1999,7 @@ void process()
     RUN_TEST(test_dnp_grows_beyond_its_initial_track);
     RUN_TEST(test_dnp_does_not_grow_by_default);
     RUN_TEST(test_format_honours_track_count_and_error_info);
+    RUN_TEST(test_extended_d64_bam_lives_at_dolphin_offset);
     RUN_TEST(test_parse_format_spec);
     // Once per format, so no format can be hidden behind another's failure.
     for (g_format_index = 0; g_format_index < all_formats().size(); g_format_index++)

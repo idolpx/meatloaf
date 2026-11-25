@@ -209,20 +209,20 @@ public:
                 break;
 
             case 196608: // 40 tracks no errors
-                curPartition().block_allocation_map[0].end_track = 40;
+                setTrackCount(40);
                 break;
 
             case 197376: // 40 w/ errors
-                curPartition().block_allocation_map[0].end_track = 40;
+                setTrackCount(40);
                 error_info = true;
                 break;
 
             case 205312: // 42 tracks no errors
-                curPartition().block_allocation_map[0].end_track = 42;
+                setTrackCount(42);
                 break;
 
             case 206114: // 42 w/ errors
-                curPartition().block_allocation_map[0].end_track = 42;
+                setTrackCount(42);
                 error_info = true;
                 break;
         }
@@ -610,6 +610,29 @@ protected:
 
     // Virtual for the same reason as setBlockAllocation(): a format whose BAM
     // splits counts from bitmaps has to seed both halves at format time.
+    // Set the image's last track. A 1541 BAM record holds 35 tracks at 18/0
+    // offset 4; the extra tracks of a 40/42-track D64 go in a second record at
+    // $AC (the DolphinDOS layout VICE uses, BAM_EXT_BIT_MAP_1541) - running the
+    // first record on past track 35 lands on the disk name at $90. Every other
+    // geometry just moves the last record's end track.
+    void setTrackCount(uint8_t track_count)
+    {
+        auto &maps = curPartition().block_allocation_map;
+        bool is_1541 = maps.size() >= 1 && maps[0].track == 18 && maps[0].sector == 0 &&
+                       maps[0].offset == 0x04 && maps[0].start_track == 1 &&
+                       maps[0].byte_count == 4 && sectorsPerTrack.size() == 4 &&
+                       sectorsPerTrack[0] == 17 && sectorsPerTrack[3] == 21;
+        if (!is_1541)
+        {
+            maps.back().end_track = track_count;
+            return;
+        }
+        maps.resize(1);
+        maps[0].end_track = track_count < 35 ? track_count : 35;
+        if (track_count > 35)
+            maps.push_back({ 18, 0, 0xAC, 36, track_count, 4 });
+    }
+
     virtual bool initializeBlockAllocationMap()
     {
         uint16_t bam_index = 0;

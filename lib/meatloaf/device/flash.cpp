@@ -418,6 +418,11 @@ uint32_t FlashMStream::write(const uint8_t *buf, uint32_t size) {
     // buffer, element size, count, handle
     uint32_t count = fwrite((void*) buf, 1, size, handle->file_h );
     _position += count;
+    // _size is taken at open, and read() caps at it: a file opened "w+" (or
+    // grown past its old end) would otherwise read back 0 bytes of what was
+    // just written. A format reads the BAM back while writing the image.
+    if (_position > _size)
+        _size = _position;
 
     //Debug_printv("count[%lu] position[%lu]", count, _position);
     return count;
