@@ -4,6 +4,8 @@ set(INCLUDES
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/include/pinmap
 
+    ${CMAKE_SOURCE_DIR}/lib/afp
+
     ${CMAKE_SOURCE_DIR}/lib/audio
 
     ${CMAKE_SOURCE_DIR}/lib/bus
@@ -67,6 +69,10 @@ set(INCLUDES
 
 FILE(GLOB_RECURSE SOURCES 
     ${CMAKE_SOURCE_DIR}/src/*.cpp
+    
+    ${CMAKE_SOURCE_DIR}/lib/afp/*.c
+    ${CMAKE_SOURCE_DIR}/lib/afp/*.cpp
+    
     ${CMAKE_SOURCE_DIR}/lib/audio/*.cpp
 
     ${CMAKE_SOURCE_DIR}/lib/bus/*.cpp
