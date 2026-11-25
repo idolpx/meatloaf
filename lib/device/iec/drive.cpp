@@ -1541,41 +1541,39 @@ bool iecDrive::openMissingRel(uint8_t channel, MFile *f, bool as_rel, uint8_t re
             host.reset(header_match);   // found by its P00 header name
         else
             host.reset(MFSOwner::File(dir + "/" + relHostFilename(f->name)));
-        // A local .r00 must really be on disk. MFile::exists() falls back to
+        // A .r00 must really be on disk. MFile::exists() falls back to
         // its source file, and for a file at the root that source is "/"
         // itself, so a .r00 that is not there read as present (and the
         // create then answered 64). The raw-bytes resolver has no source.
         // For the same reason the .r00's bytes are reached through that raw
         // file: P00MFile reads, writes and creates through its source file,
         // which at the root is the directory.
+        // Network hosts too: there MFile::exists() answers the always-true
+        // _exists of the container class, so a missing .r00 read as present
+        // and the create answered 64.
         bool host_exists = false;
         if( host != nullptr )
         {
-            if( host->scheme.empty() )
+            MFile *raw = MFSOwner::File(host->url, true);
+            if( raw != nullptr )
             {
-                MFile *raw = MFSOwner::File(host->url, true);
-                if( raw != nullptr )
+                host_exists = raw->exists();
+                if( header_match == nullptr )
                 {
-                    host_exists = raw->exists();
-                    if( header_match == nullptr )
-                    {
-                        delete host->sourceFile;
-                        host->sourceFile = raw;
-                    }
-                    else
-                        delete raw;
+                    delete host->sourceFile;
+                    host->sourceFile = raw;
                 }
+                else
+                    delete raw;
             }
-            else
-                host_exists = host->exists();
         }
         if( host_exists )
         {
             // read-write where the media allows; read-only otherwise, and a
-            // write then answers 26
-            std::shared_ptr<MStream> stream;
-            if( host->isWritable )
-                stream = host->getSourceStream(std::ios_base::in | std::ios_base::out);
+            // write then answers 26. The attempt decides, not isWritable: a
+            // network file (SMB) never sets that flag but can be written.
+            std::shared_ptr<MStream> stream =
+                host->getSourceStream(std::ios_base::in | std::ios_base::out);
             if( stream == nullptr || !stream->isOpen() )
                 stream = host->getSourceStream(std::ios_base::in);
             if( stream == nullptr || !stream->isOpen() )

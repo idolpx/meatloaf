@@ -790,6 +790,15 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         //Debug_printv("Finding Target FS for path[%s]", path.c_str());
         targetFileSystem = findParentFS(begin, pathIterator);
     }
+    else if ( PeoplesUrlParser::hasScheme(path) && paths.size() > 1 )
+    {
+        // Raw bytes of a network file: its scheme's filesystem, still with no
+        // extension sniffing. defaultFS cannot open "smb://...".
+        auto schemeEnd = begin + 1;
+        MFileSystem *schemeFS = findParentFS(begin, schemeEnd);
+        if ( schemeFS != *availableFS.begin() )
+            targetFileSystem = schemeFS;
+    }
 
     // targetFile is for access to the file in the container stream
     auto sourcePath = mstr::joinToString(&begin, &pathIterator, "/");
