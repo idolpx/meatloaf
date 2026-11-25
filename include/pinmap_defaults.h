@@ -29,7 +29,7 @@
 
 
 // Zimodem
-#ifdef ENABLE_ZIMODEM
+#ifdef ENABLE_MODEM
 #define DEFAULT_PIN_DCD GPIO_NUM_14
 #define DEFAULT_PIN_CTS GPIO_NUM_13
 #define DEFAULT_PIN_RTS GPIO_NUM_15 // unused
