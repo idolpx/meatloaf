@@ -171,7 +171,7 @@ build_flags =
     ;-D BLUETOOTH_SUPPORT   ; enable BlueTooth support
 
     ; Service Options
-    ;-D ENABLE_ZIMODEM      ; enable Zimodem functionality
+    ;-D ENABLE_MODEM        ; enable Zimodem functionality
     ;-D ENABLE_SSDP         ; enable Simple Service Discovery Protocol service
     ;-D ENABLE_CONSOLE      ; enable console service
     ;-D ENABLE_CONSOLE_TCP  ; enable tcp server for console
