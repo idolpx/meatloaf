@@ -2,8 +2,7 @@
 
 /* Size-optimize this 600+ KB vendored amalgamation regardless of the app
    build type: the app's flash text must stay inside the ESP32's 3.3 MB
-   instruction window (overflowed when the tapclean tape engine was
-   added), and the PlatformIO ESP-IDF builder ignores per-component -O
+   instruction window, and the PlatformIO ESP-IDF builder ignores per-component -O
    compile options. */
 #if defined(ESP_PLATFORM) && defined(__GNUC__)
 #pragma GCC optimize("Os")
