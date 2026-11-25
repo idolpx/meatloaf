@@ -474,6 +474,11 @@ protected:
     virtual bool growImage() { return false; }
     bool isBlockFree(uint8_t track, uint8_t sector);
 
+    // Bit for 'sector' within its BAM byte. CBM floppies are LSB-first
+    // (bit 0 = lowest sector); a CMD native partition is MSB-first, so DNP
+    // overrides this (VICE vdrive-bam.c: `sector ^= 7` for NP only).
+    virtual uint8_t bamBitMask(uint8_t sector) { return (uint8_t)(1 << (sector & 7)); }
+
     // BAM record location for one track (which BAM sector holds it and where)
     struct BAMRecord {
         uint8_t bam_track;

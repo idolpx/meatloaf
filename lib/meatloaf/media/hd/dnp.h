@@ -121,6 +121,11 @@ public:
     uint32_t relBlocksMax() override { return 64672 + 89 * 6 + 5 + 1; }
     bool relHasSuper() override { return true; }
 
+    // CMD native BAM bytes are MSB-first: bit 7 is the lowest sector of the
+    // byte (D2M-DNP.TXT). Reading them LSB-first mirrors every byte, so on a
+    // CMD-made partition the reserved 1/32-1/34 read as free.
+    uint8_t bamBitMask(uint8_t sector) override { return (uint8_t)(0x80 >> (sector & 7)); }
+
     // The system area of a CMD native partition, all on track 1:
     //
     //   1/0        autoboot sector
