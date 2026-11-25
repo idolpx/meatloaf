@@ -2082,23 +2082,35 @@ bool D64MStream::formatImage(std::string name, std::string id, size_t track_coun
     // 42-track D64, an 81-track D81, or a DNP created with more than one track
     // is asked for; 0 means "whatever this media's default is".
     if (track_count > 0)
-        curPartition().block_allocation_map.back().end_track = (uint8_t)track_count;
+        setTrackCount((uint8_t)track_count);
 
     // The parameter shadows the member of the same name - keep the member in
     // step so anything reading it later sees what was actually created.
     this->error_info = error_info;
 
     if (!initializeBlocks())
+    {
+        Debug_printv("format: initializeBlocks failed");
         return false;
+    }
 
     if (!initializeBlockAllocationMap())
+    {
+        Debug_printv("format: initializeBlockAllocationMap failed");
         return false;
+    }
 
     if (!writeHeader(name, id))
+    {
+        Debug_printv("format: writeHeader failed");
         return false;
+    }
 
     if (!initializeDirectory())
+    {
+        Debug_printv("format: initializeDirectory failed");
         return false;
+    }
 
     // Total blocks across the geometry just laid down.
     uint8_t last_track = curPartition().block_allocation_map.back().end_track;
@@ -2120,10 +2132,18 @@ bool D64MStream::formatImage(std::string name, std::string id, size_t track_coun
         image_size += blocks;
 
     if (!seek(image_size - 1))
+    {
+        Debug_printv("format: seek to %lu failed", (unsigned long)(image_size - 1));
         return false;
+    }
 
     uint8_t pad = 0x00;
-    return write(&pad, 1) == 1;
+    if (write(&pad, 1) != 1)
+    {
+        Debug_printv("format: final pad write at %lu failed", (unsigned long)(image_size - 1));
+        return false;
+    }
+    return true;
 }
 
 D64FormatSpec parseD64FormatSpec(const std::string& header_info)
