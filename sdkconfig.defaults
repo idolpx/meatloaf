@@ -105,3 +105,9 @@ CONFIG_MIPI_DISPLAY_PIN_BL=-1
 CONFIG_WL_SECTOR_SIZE_512=y
 # CONFIG_WL_SECTOR_SIZE_4096 is not set
 CONFIG_WL_SECTOR_SIZE=512
+
+# Pin the lwIP tcpip task to core 0. It runs at priority 18, above the IEC bus
+# task (17, core 1), so left unpinned it can be scheduled onto core 1 and preempt
+# bus servicing in the middle of a transaction. Core 1 belongs to IEC alone.
+CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0=y
+CONFIG_LWIP_TCPIP_TASK_AFFINITY=0x0
