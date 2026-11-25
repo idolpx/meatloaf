@@ -691,7 +691,9 @@ Board `freenove-esp32-s3-wroom-1`, console over native USB, no SD card (all on f
 
 **Measured:** `lolin-d32-pro` `.flash.text` 3275653 (+1796 since `3f7a94ff`; window 3342304), `.iram0.text` 126931. Native (pio, macOS): `test_rel_stream`, `test_rel_p00`, `test_rel_d64`, `test_dos_parse` 66/66; `test_disk_write` 106 run, 0 failures, 5 ignored.
 
-**Still not verified:** anything from a real C64 (the BASIC REL program in the Task 9 report), the Phase 1 `dos_commands.sh` before/after comparison against `main`, D71/D81/DNP REL on hardware, REL over a network filesystem, and `CmdHdDos`/`Ide64Dos` on hardware. A 26-byte (record-less) `.r00` was seen once, created with VDrive on under an earlier build in this session, and did not reproduce afterwards.
+**Later the same day, with an SD card in:** D71 and D81 REL on `/sd`. A D71 REL reads its record back, and one needing more than six side sectors answers `52,FILE TOO LARGE` (no super side sector on a D71). On a D81, `P` to record 800 at length 254 grows the file to 808 blocks (800 data + 7 side sectors + 1 super side sector) and record 800 reads back. **Phase 1 baseline:** the D64 part of `test/hardware/dos_commands.sh` run on a fresh image under `main` (built in a worktree) and under this branch gives identical results for every command except VDrive `N:`, which answers 31 on `main` and 00 here - the fall-through fixed above. Note the script's `exec cd_` leaves the drive at the image's parent once `md:x`/`cd:x` fail on a D64, so everything after it (including `n0:` and `"#"`) runs against `/sd`; the 25 and 74 there are the script, not a regression.
+
+**Still not verified:** anything from a real C64 (the BASIC REL program in the Task 9 report), the DHD and HDD parts of the baseline (no CMD HD or IDE64 image on the board), DNP REL, a c1541 read-back of the hardware-made images (the host could not reach the board over WiFi), REL over a network filesystem, and `CmdHdDos`/`Ide64Dos` on hardware. A 26-byte (record-less) `.r00` was seen once, created with VDrive on under an earlier build in this session, and did not reproduce afterwards.
 
 ## Recent Changes (November 24, 2026)
 
