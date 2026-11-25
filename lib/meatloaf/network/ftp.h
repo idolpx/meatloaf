@@ -211,6 +211,7 @@ class FTPMFile : public MFile {
     bool rewindDirectory() override;
     MFile* getNextFileInDir() override;
     bool mkDir() override;
+    bool rmDir() override;
     bool exists() override;
 
     bool remove() override;
