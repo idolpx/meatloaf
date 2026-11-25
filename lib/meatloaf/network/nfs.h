@@ -277,6 +277,9 @@ public:
     std::string file_path = "";
     
     NFSMFile(std::string path): MFile(path) {
+        // Writable media: a read-only share or a missing permission
+        // surfaces as a failed open or write, not as this flag.
+        isWritable = true;
         // Obtain or create NFS session via SessionBroker
         uint16_t nfs_port = port.empty() ? 2049 : std::stoi(port);
         _session = SessionBroker::obtain<NFSMSession>(host, nfs_port);

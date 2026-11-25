@@ -158,6 +158,14 @@ bool FTPMStream::isOpen() { return _impl != nullptr && _impl->fh != nullptr; }
 bool FTPMStream::open(std::ios_base::openmode mode) {
     Debug_printv("Opening FTP stream url[%s] mode[%d]", url.c_str(), mode);
 
+    // FTP has no in-place write: a read-write open would become STOR and
+    // truncate the file - an image being SAVEd into would be destroyed.
+    if ((mode & std::ios_base::in) && (mode & std::ios_base::out)) {
+        Debug_printv("FTP cannot open read-write: %s", url.c_str());
+        _error = ENOTSUP;
+        return false;
+    }
+
     auto parser = PeoplesUrlParser::parseURL(url);
     if (!parser || (parser->scheme != "ftp" && parser->scheme != "ftps")) {
         Debug_printv("Invalid FTP URL: %s", url.c_str());

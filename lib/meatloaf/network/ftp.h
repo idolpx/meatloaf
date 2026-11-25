@@ -171,6 +171,9 @@ class FTPMFile : public MFile {
     std::string basepath = "";
 
     FTPMFile(std::string path) : MFile(path) {
+        // Writable for whole-file writes; a read-write (in-place) open is
+        // refused by the stream, so an image is never truncated.
+        isWritable = true;
         // Obtain or create FTP session via SessionBroker
         uint16_t ftp_port = port.empty() ? 21 : std::stoi(port);
         std::string session_host = ftpSessionHost(user, password, host);

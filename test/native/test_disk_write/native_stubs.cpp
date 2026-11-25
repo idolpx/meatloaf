@@ -79,6 +79,16 @@ bool MFile::exists()
     abort();
 }
 
+// The firmware's version also deletes a container on a network path through
+// MFSOwner::File(url, true), which aborts here; natively only the local path
+// - the old inline body - is meaningful.
+bool MFile::remove()
+{
+    if (!pathInStream.empty() && pathInStream != "/")
+        return false;
+    return ::remove(url.c_str()) == 0;
+}
+
 // util_debug_printf() is the non-ESP backend for the Debug_print*() macros
 // (see include/debug.h's !ESP_PLATFORM branch). Its real implementation
 // lives in lib/utils/utils.cpp, which transitively pulls in the SAM speech
