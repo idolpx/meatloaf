@@ -56,7 +56,10 @@ public:
     P00MStream(std::shared_ptr<MStream> is) : MMediaStream(is) {
         entry_count = 1;
         readHeader();
-        _size = ( containerStream->size() - sizeof(header) );
+        // A container shorter than its header (or one that failed to open) has
+        // no data, not ~4 GB of it.
+        uint32_t total = containerStream->size();
+        _size = total > sizeof(header) ? total - sizeof(header) : 0;
         Debug_printv("name[%s] size[%d]", header.filename, _size);
     };
 

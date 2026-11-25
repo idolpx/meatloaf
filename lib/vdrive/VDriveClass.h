@@ -67,6 +67,11 @@ class VDrive
   // Returns false if an error occurred while writing and true otherwise.
   bool write(uint8_t channel, uint8_t *buffer, size_t *nbytes);
 
+  // The EOI of a write ends a REL record and moves to the next, as the
+  // native path does. VICE does this at the next LISTEN (vdrive_iec_listen);
+  // a no-op for anything but a written REL record.
+  void endOfWrite(uint8_t channel);
+
   // execute the given DOS command, returns true on success false otherwise
   // returns 0 if there was an error (call getStatusString)
   //         1 if the command succeeded

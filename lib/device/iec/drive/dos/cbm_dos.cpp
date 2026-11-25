@@ -443,6 +443,9 @@ bool CbmDos::cmdCbm(std::string& command, uint8_t media, size_t colon_position)
                         m_host.dosSetStatus(ST_OK);
                     fnLedManager.set(eLed::LED_BUS, false);
                 }
+                // Handled either way: falling out of the switch reaches the
+                // final 31 and overwrote the status just set.
+                return true;
             }
             else
             {

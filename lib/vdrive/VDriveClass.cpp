@@ -319,6 +319,12 @@ bool VDrive::write(uint8_t channel, uint8_t *buffer, size_t *nbytes)
 }
 
 
+void VDrive::endOfWrite(uint8_t channel)
+{
+  vdrive_iec_listen(m_drive, channel);
+}
+
+
 void VDrive::printDir()
 {
   image_contents_t *listing = diskcontents_block_read(m_drive, 0);

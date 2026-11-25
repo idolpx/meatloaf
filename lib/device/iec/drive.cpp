@@ -1429,6 +1429,9 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
 
                         if ( m_statusCode != ST_OK && m_statusCode != ST_DRIVE_NOT_READY )
                         {
+                            // set_cwd() answers 00 when it moves (or is already
+                            // there); the open's own error is what the C64 must read.
+                            uint8_t err = m_statusCode, trk = m_statusTrk, sec = m_statusSec;
                             if (f->pathInStream.size()) {
                                 Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "file in container, staying at [%s]", f->url.c_str() );
                                 set_cwd(f->url);
@@ -1436,6 +1439,7 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                                 Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! url[%s] > base[%s]", f->url.c_str(), f->base().c_str() );
                                 set_cwd(f->base());
                             }
+                            setStatusCode(err, trk, sec);
                         }
                         mlConfig.save();
                     }
@@ -1527,14 +1531,45 @@ bool iecDrive::openMissingRel(uint8_t channel, MFile *f, bool as_rel, uint8_t re
     std::unique_ptr<MFile> host;
     if( !in_image )
     {
+        // base() of a file at the root is "//", so strip every trailing
+        // slash: one left over makes "//name.r00", which the flash VFS
+        // cannot open.
         std::string dir = f->base();
-        if( !dir.empty() && dir.back() == '/' )
+        while( !dir.empty() && dir.back() == '/' )
             dir.pop_back();
         if( header_match != nullptr )
             host.reset(header_match);   // found by its P00 header name
         else
             host.reset(MFSOwner::File(dir + "/" + relHostFilename(f->name)));
-        if( host != nullptr && host->exists() )
+        // A local .r00 must really be on disk. MFile::exists() falls back to
+        // its source file, and for a file at the root that source is "/"
+        // itself, so a .r00 that is not there read as present (and the
+        // create then answered 64). The raw-bytes resolver has no source.
+        // For the same reason the .r00's bytes are reached through that raw
+        // file: P00MFile reads, writes and creates through its source file,
+        // which at the root is the directory.
+        bool host_exists = false;
+        if( host != nullptr )
+        {
+            if( host->scheme.empty() )
+            {
+                MFile *raw = MFSOwner::File(host->url, true);
+                if( raw != nullptr )
+                {
+                    host_exists = raw->exists();
+                    if( header_match == nullptr )
+                    {
+                        delete host->sourceFile;
+                        host->sourceFile = raw;
+                    }
+                    else
+                        delete raw;
+                }
+            }
+            else
+                host_exists = host->exists();
+        }
+        if( host_exists )
         {
             // read-write where the media allows; read-only otherwise, and a
             // write then answers 26
@@ -1630,6 +1665,8 @@ uint8_t iecDrive::write(uint8_t channel, uint8_t *data, uint8_t dataLen, bool eo
         size_t n = dataLen;
         if( !m_vdrive->write(channel, data, &n) )
             setStatusCode(ST_VDRIVE);
+        else if( eoi )
+            m_vdrive->endOfWrite(channel);
 
         if( (m_byteCount+n)/256 > m_byteCount/256 ) { printf("."); fflush(stdout); }
         m_byteCount += n;
@@ -2262,6 +2299,10 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
         case ST_DISK_FULL           : msg = "DISK FULL"; break;
         case ST_DRIVE_NOT_READY     : msg = "DRIVE NOT READY"; break;
         case ST_FILE_TYPE_MISMATCH  : msg = "FILE TYPE MISMATCH"; break;
+        // The REL codes. Without these 50 printed "UNKNOWN ERROR".
+        case ST_RECORD_MISSING      : msg = "RECORD NOT PRESENT"; break;
+        case ST_RECORD_OVERFLOW     : msg = "OVERFLOW IN RECORD"; break;
+        case ST_FILE_TOO_LARGE      : msg = "FILE TOO LARGE"; break;
         case ST_PERMISSION_DENIED   : msg = "PERMISSION DENIED"; break;
         default                     : msg = "UNKNOWN ERROR"; break;
     }
