@@ -19,10 +19,10 @@
 // time for the bytes skipped. This is the break-even guess, not a measurement.
 #define FTP_STREAM_SKIP_LIMIT 8192
 
-FileHandlerFTP::FileHandlerFTP(fnFTP *ftp, const std::string &path)
-    : _ftp(ftp), _path(path), _size(-1), _pos(0), _started(false)
+FileHandlerFTP::FileHandlerFTP(fnFTP *ftp, const std::string &path, bool write)
+    : _ftp(ftp), _path(path), _size(write ? 0 : -1), _pos(0), _started(false), _writing(write)
 {
-    if (_ftp != nullptr)
+    if (_ftp != nullptr && !_writing)
     {
         int32_t sz = _ftp->get_file_size(_path);
         if (sz >= 0)
@@ -33,7 +33,45 @@ FileHandlerFTP::FileHandlerFTP(fnFTP *ftp, const std::string &path)
 
 FileHandlerFTP::~FileHandlerFTP()
 {
-    stop_transfer();
+    if (_writing)
+        finish_store();
+    else
+        stop_transfer();
+}
+
+bool FileHandlerFTP::start_store()
+{
+    if (!_writing || _started || _ftp == nullptr)
+        return false;
+
+    if (_ftp->open_file(_path, true))
+    {
+        Debug_printf("FileHandlerFTP - STOR refused for \"%s\"\n", _path.c_str());
+        errno = EACCES;
+        return false;
+    }
+
+    _started = true;
+    return true;
+}
+
+int FileHandlerFTP::finish_store()
+{
+    if (!_started)
+        return 0;
+    _started = false;
+
+    // close() drops our end of the data socket - that EOF is how the server
+    // learns the file is complete - and then waits for its reply.
+    bool timed_out = _ftp->close();
+    int code = _ftp->status();
+    if (timed_out || code < 200 || code > 299)
+    {
+        Debug_printf("FileHandlerFTP - STOR of \"%s\" not confirmed (reply %d)\n", _path.c_str(), code);
+        errno = EIO;
+        return -1;
+    }
+    return 0;
 }
 
 bool FileHandlerFTP::start_transfer()
@@ -90,7 +128,7 @@ bool FileHandlerFTP::skip_forward(long int target)
 
 size_t FileHandlerFTP::read(void *ptr, size_t size, size_t n)
 {
-    if (ptr == nullptr || size == 0 || n == 0)
+    if (ptr == nullptr || size == 0 || n == 0 || _writing)
         return 0;
 
     // Already at the end: answer without touching the network. Without this,
@@ -148,9 +186,34 @@ size_t FileHandlerFTP::read(void *ptr, size_t size, size_t n)
 
 size_t FileHandlerFTP::write(const void *ptr, size_t size, size_t n)
 {
-    // Read-only: this handle exists for RETR. STOR goes through its own path.
-    errno = EBADF;
-    return 0;
+    if (!_writing || !_started || ptr == nullptr)
+    {
+        errno = EBADF;
+        return 0;
+    }
+
+    const uint8_t *in = (const uint8_t *)ptr;
+    size_t want = size * n;
+    size_t total = 0;
+
+    // write_file() takes an unsigned short length.
+    while (total < want)
+    {
+        size_t chunk = want - total;
+        if (chunk > FTP_STREAM_CHUNK)
+            chunk = FTP_STREAM_CHUNK;
+
+        if (_ftp->write_file((uint8_t *)(in + total), (unsigned short)chunk))
+        {
+            errno = EIO;
+            break;
+        }
+        total += chunk;
+    }
+
+    _pos += total;
+    _size = _pos;
+    return (size > 1) ? (total / size) : total;
 }
 
 int FileHandlerFTP::seek(long int off, int whence)
@@ -187,6 +250,13 @@ int FileHandlerFTP::seek(long int off, int whence)
     if (target == _pos)
         return 0;
 
+    // A STOR is a stream: there is no going back over what was sent.
+    if (_writing)
+    {
+        errno = ESPIPE;
+        return -1;
+    }
+
     // Nothing is in flight yet, so moving is free - this is the path the
     // seek-to-end/tell/seek-to-start size probe takes at open time.
     if (!_started)
@@ -214,6 +284,9 @@ long int FileHandlerFTP::tell()
 
 int FileHandlerFTP::eof()
 {
+    if (_writing)
+        return 0;
+
     if (_size >= 0)
         return _pos >= _size ? 1 : 0;
 
@@ -228,10 +301,14 @@ int FileHandlerFTP::flush()
 
 int FileHandlerFTP::close(bool destroy)
 {
-    stop_transfer();
+    int rc = 0;
+    if (_writing)
+        rc = finish_store();
+    else
+        stop_transfer();
 
     if (destroy)
         delete this;
 
-    return 0;
+    return rc;
 }

@@ -261,7 +261,9 @@ void FTPMStream::close() {
 #ifdef FNIO_IS_STDIO
         fclose(_impl->fh);
 #else
-        _impl->fh->close();
+        // For a write this is where the upload is confirmed or not.
+        if (_impl->fh->close() != 0)
+            _error = EIO;
 #endif
         _impl->fh = nullptr;
     }

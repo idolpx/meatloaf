@@ -101,14 +101,20 @@ static int mfile_rm_rf(const std::string &path)
         return -1;
 
     if (mf->isDirectory()) {
+        // Collect first, then descend: a network filesystem keeps one
+        // listing per session, so recursing mid-walk replaced this listing
+        // with the child's and the walk ended early.
+        std::vector<std::string> children;
         mf->rewindDirectory();
         MFile *entry;
         while ((entry = mf->getNextFileInDir()) != nullptr) {
             std::unique_ptr<MFile> e(entry);
             if (e->name == "." || e->name == "..")
                 continue;
-            mfile_rm_rf(e->path);
+            children.push_back(e->path);
         }
+        for (const auto &child : children)
+            mfile_rm_rf(child);
         return mf->rmDir() ? 0 : -1;
     }
     return mf->remove() ? 0 : -1;
@@ -186,14 +192,19 @@ static int mfile_copy_recursive(const std::string &source, const std::string &de
     if (recurse <= 0)
         return 0;
 
+    // Collect first, then descend - see mfile_rm_rf().
+    std::vector<std::string> names;
     srcFile->rewindDirectory();
     MFile *entry;
     while ((entry = srcFile->getNextFileInDir()) != nullptr) {
         std::unique_ptr<MFile> e(entry);
         if (e->name == "." || e->name == "..")
             continue;
-        int ret = mfile_copy_recursive(source + "/" + e->name,
-                                       destination + "/" + e->name,
+        names.push_back(e->name);
+    }
+    for (const auto &name : names) {
+        int ret = mfile_copy_recursive(source + "/" + name,
+                                       destination + "/" + name,
                                        recurse - 1, overwrite);
         if (ret != 0)
             return ret;

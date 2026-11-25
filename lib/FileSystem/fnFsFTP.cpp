@@ -13,6 +13,9 @@
 #include "utils.h"
 #include "fnFileFTP.h"
 
+#include <errno.h>
+#include <string.h>
+
 #define COPY_BLK_SIZE 4096
 
 FileSystemFTP::FileSystemFTP()
@@ -101,6 +104,12 @@ bool FileSystemFTP::exists(const char *path)
 
     Debug_printf("FileSystemFTP::exists(\"%s\")\n", path);
 
+    // A directory first: one CWD answers it, and LIST cannot - an EMPTY
+    // directory lists no entries, so the check below called it missing and
+    // "cp file ftp://host/emptydir/" tried to create the directory as a file.
+    if (is_dir(path))
+        return true;
+
     // Use LIST to check if path exists (works for both files and directories)
     bool res = _ftp->open_directory(path, "");
     
@@ -182,6 +191,29 @@ FileHandler *FileSystemFTP::filehandler_open(const char *path, const char *mode)
     if (!ensure_connected() || path == nullptr)
         return nullptr;
 
+    // Write: STOR straight to the server. The cache is not involved - a
+    // cached copy written to instead would never be uploaded. Append (APPE)
+    // is not implemented.
+    if (mode != nullptr && mode[0] != 'r')
+    {
+        if (mode[0] != 'w' || strchr(mode, '+') != nullptr)
+        {
+            Debug_printf("FileSystemFTP::filehandler_open - mode \"%s\" not supported\n", mode);
+            errno = ENOTSUP;
+            return nullptr;
+        }
+
+        FileHandlerFTP *wh = new FileHandlerFTP(_ftp, path, true);
+        if (wh == nullptr)
+            return nullptr;
+        if (!wh->start_store())
+        {
+            delete wh;
+            return nullptr;
+        }
+        return wh;
+    }
+
     // An existing cache file wins - that is the point of #cache=sd.
     FileHandler *fh = FileCache::open(_url->mRawUrl.c_str(), path, mode);
     if (fh != nullptr)
@@ -208,7 +240,7 @@ FileHandler *FileSystemFTP::filehandler_open(const char *path, const char *mode)
         return sh;
     }
 
-    return cache_file(path, mode);
+    return nullptr;
 }
 
 // Read file from FTP path and write it to cache file
