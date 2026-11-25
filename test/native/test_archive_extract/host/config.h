@@ -39,7 +39,11 @@
 #undef HAVE_ZSTD_H   /* components/zstd     */
 #undef HAVE_EXPAT_H  /* components/expat    */
 
-/* No fork/exec on the host build; the filters that shell out to external
- * lrzip/lzop/grzip binaries compile to their stub form. */
+/* mingw has no fork/exec; the filters that shell out to external
+ * lrzip/lzop/grzip binaries use filter_fork_windows.c there. A POSIX host
+ * (Linux, macOS) keeps them and builds filter_fork_posix.c, which supplies
+ * __archive_create_child for the program filter - the tests never call it. */
+#ifdef _WIN32
 #undef HAVE_FORK
 #undef HAVE_VFORK
+#endif
