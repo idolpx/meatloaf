@@ -272,6 +272,17 @@ bool NFSMFile::mkDir()
     return (rc == 0);
 }
 
+bool NFSMFile::rmDir()
+{
+    auto nfs = getNFS();
+    if (m_isNull || !nfs) {
+        return false;
+    }
+
+    int rc = nfs_rmdir(nfs, std::string(basepath + file_path).c_str());
+    return (rc == 0);
+}
+
 bool NFSMFile::exists()
 {
     auto nfs = getNFS();

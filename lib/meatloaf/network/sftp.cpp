@@ -510,6 +510,25 @@ bool SFTPMFile::mkDir() {
     return true;
 }
 
+bool SFTPMFile::rmDir() {
+    if (!_session || !_session->connect()) {
+        return false;
+    }
+
+    sftp_session sftp = getSFTPSession();
+    if (!sftp) {
+        return false;
+    }
+
+    int rc = sftp_rmdir(sftp, path.c_str());
+    if (rc != SSH_OK) {
+        Debug_printv("Failed to remove directory: %s - error: %d",
+                     path.c_str(), sftp_get_error(sftp));
+        return false;
+    }
+    return true;
+}
+
 bool SFTPMFile::remove() {
     if (!_session || !_session->connect()) {
         return false;

@@ -187,6 +187,7 @@ public:
     bool rewindDirectory() override;
     MFile* getNextFileInDir() override;
     bool mkDir() override;
+    bool rmDir() override;
     bool exists() override;
     bool remove() override;
     bool rename(std::string dest);

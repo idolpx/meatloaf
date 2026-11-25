@@ -274,6 +274,16 @@ bool TNFSMFile::mkDir() {
     return (result == TNFS_RESULT_SUCCESS);
 }
 
+bool TNFSMFile::rmDir() {
+    tnfsMountInfo* mountinfo = getMountInfo();
+    if (m_isNull || !mountinfo) {
+        return false;
+    }
+
+    int result = tnfs_rmdir(mountinfo, path.c_str());
+    return (result == TNFS_RESULT_SUCCESS);
+}
+
 bool TNFSMFile::exists() {
     tnfsMountInfo* mountinfo = getMountInfo();
     if (m_isNull || !mountinfo) {

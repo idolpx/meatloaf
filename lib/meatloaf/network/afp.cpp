@@ -361,6 +361,13 @@ bool AFPMFile::mkDir()
     return ml_mkdir(vol, file_path.c_str(), 0755) == 0;
 }
 
+bool AFPMFile::rmDir()
+{
+    auto vol = getAFP();
+    if (!vol) return false;
+    return ml_rmdir(vol, file_path.c_str()) == 0;
+}
+
 bool AFPMFile::exists()
 {
     if (m_isNull) return false;
