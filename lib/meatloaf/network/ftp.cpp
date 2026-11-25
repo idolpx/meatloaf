@@ -131,6 +131,10 @@ bool FTPMFile::exists() {
 bool FTPMFile::remove() {
     FileSystemFTP* fs = getFS();
     if (!fs) return false;
+    // DELE only removes files: a directory needs RMD, as the other network
+    // filesystems' remove() does with their rmdir call.
+    if (isDirectory())
+        return fs->rmdir(path.c_str());
     return fs->remove(path.c_str());
 }
 
