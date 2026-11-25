@@ -1021,6 +1021,7 @@ int Server::doPut(Request &req, Response &resp)
 
     req.handleExpect();
 
+    uint32_t total = 0;
     if (req.isChunked())
     {
         // Transfer-Encoding: chunked (macOS Finder) -- no Content-Length; the
@@ -1036,11 +1037,14 @@ int Server::doPut(Request &req, Response &resp)
                 ret = -1;
                 break;
             }
+            total += r;
+            Debug_printf("received: %u\n", total);
         }
     }
     else
     {
         int remaining = req.getContentLength();
+        uint8_t percent = 0;
 
         while (remaining > 0)
         {
@@ -1055,6 +1059,9 @@ int Server::doPut(Request &req, Response &resp)
             }
 
             remaining -= r;
+            total += r;
+            percent = (total * 100) / req.getContentLength();
+            Debug_printf("received: %u of %d (%%%d)\n", total, req.getContentLength(), percent);
         }
 
         if (remaining > 0 && ret == 0)
