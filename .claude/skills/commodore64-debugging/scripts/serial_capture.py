@@ -182,6 +182,8 @@ def main():
     # Compile strip patterns once
     ansi_re = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
     ctrl_re = re.compile(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]')
+    stamp_lines = os.environ.get("MEATLOAF_CAPTURE_TS", "") not in ("", "0")
+    at_line_start = True
 
     # Status tracking
     status = "starting"
@@ -304,6 +306,22 @@ def main():
 
                 cleaned = ansi_re.sub("", text)
                 cleaned = ctrl_re.sub("", cleaned)
+
+                if cleaned and stamp_lines:
+                    # MEATLOAF_CAPTURE_TS=1: prefix each line of device output
+                    # with its arrival time, to the millisecond, so a stall can
+                    # be placed in time (the device's own log has no clock).
+                    out = []
+                    for ch in cleaned:
+                        if at_line_start and ch != "\n":
+                            now = time.time()
+                            out.append(time.strftime("%H:%M:%S", time.localtime(now))
+                                       + ".%03d " % int((now % 1) * 1000))
+                            at_line_start = False
+                        out.append(ch)
+                        if ch == "\n":
+                            at_line_start = True
+                    cleaned = "".join(out)
 
                 if cleaned:
                     write_to_log(out_fd, cleaned)
