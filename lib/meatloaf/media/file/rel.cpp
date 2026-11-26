@@ -223,11 +223,30 @@ std::string relHostFilename(const std::string& cbm_name_utf8)
     while (i < n)
     {
         uint8_t b = (uint8_t)cbm_name_utf8[i];
-        size_t clen = b < 0x80 ? 1 : (b >> 5) == 6 ? 2 : (b >> 4) == 14 ? 3 : (b >> 3) == 30 ? 4 : 1;
-        if (i + clen > n) clen = 1;
-        uint32_t cp = clen == 1 ? b : (b & (0xFF >> (clen + 1)));
-        for (size_t k = 1; clen > 1 && k < clen; k++)
-            cp = (cp << 6) | ((uint8_t)cbm_name_utf8[i + k] & 0x3F);
+        // Strict decode: a byte that does not start a complete, minimal,
+        // non-surrogate sequence is one bad byte - '_' - and decoding resumes
+        // at the next byte, so malformed input never reaches the host name.
+        size_t clen = b < 0x80 ? 1 : (b >> 5) == 6 ? 2 : (b >> 4) == 14 ? 3 : (b >> 3) == 30 ? 4 : 0;
+        bool valid = clen != 0 && i + clen <= n;
+        uint32_t cp = 0;
+        if (valid)
+        {
+            cp = clen == 1 ? b : (b & (0xFF >> (clen + 1)));
+            for (size_t k = 1; k < clen && valid; k++)
+            {
+                uint8_t c = (uint8_t)cbm_name_utf8[i + k];
+                valid = (c & 0xC0) == 0x80;
+                cp = (cp << 6) | (c & 0x3F);
+            }
+            static const uint32_t min_cp[5] = { 0, 0, 0x80, 0x800, 0x10000 };
+            valid = valid && cp >= min_cp[clen] && cp <= 0x10FFFF && !(cp >= 0xD800 && cp <= 0xDFFF);
+        }
+        if (!valid)
+        {
+            out += '_';
+            i += 1;
+            continue;
+        }
         bool bad = cp < 0x20 || cp == 0x7F || cp >= 0xE000 ||
                    (cp < 0x80 && strchr("/\\:*?\"<>|", (int)cp) != nullptr);
         if (bad)

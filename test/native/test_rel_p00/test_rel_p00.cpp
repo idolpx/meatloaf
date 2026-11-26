@@ -79,6 +79,20 @@ void test_host_filename_replaces_bad_characters(void)
     TEST_ASSERT_EQUAL_STRING(relHostFilename("a:b").c_str(), relHostFilename("a:b").c_str());
 }
 
+// Malformed UTF-8 must never reach a host file name: each bad byte becomes '_'
+// and decoding resumes at the next byte.
+void test_host_filename_replaces_malformed_utf8(void)
+{
+    TEST_ASSERT_EQUAL_STRING("A_B.r00", relHostFilename("A\x80" "B").c_str());           // lone continuation
+    TEST_ASSERT_EQUAL_STRING("A_B.r00", relHostFilename("A\xC3" "B").c_str());           // lead, then ASCII
+    TEST_ASSERT_EQUAL_STRING("A__B.r00", relHostFilename("A\xE2\x82" "B").c_str());     // 3-byte lead, one continuation
+    TEST_ASSERT_EQUAL_STRING("A__.r00", relHostFilename("A\xC0\xAF").c_str());           // overlong '/'
+    TEST_ASSERT_EQUAL_STRING("A___.r00", relHostFilename("A\xED\xA0\x80").c_str());     // UTF-16 surrogate
+    TEST_ASSERT_EQUAL_STRING("A_B.r00", relHostFilename("A\xFF" "B").c_str());           // never a lead byte
+    TEST_ASSERT_EQUAL_STRING("A_.r00", relHostFilename("A\xC3").c_str());                // truncated at the end
+    TEST_ASSERT_EQUAL_STRING("\xE2\x82\xAC.r00", relHostFilename("\xE2\x82\xAC").c_str()); // euro sign kept
+}
+
 void test_host_filename_empty(void)
 {
     TEST_ASSERT_EQUAL_STRING("_.r00", relHostFilename("").c_str());
@@ -348,6 +362,7 @@ int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_host_filename_basic);
     RUN_TEST(test_host_filename_replaces_bad_characters);
+    RUN_TEST(test_host_filename_replaces_malformed_utf8);
     RUN_TEST(test_host_filename_empty);
     RUN_TEST(test_p00_rel_round_trip);
     RUN_TEST(test_header_holds_cbm_name_and_flag);

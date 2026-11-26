@@ -774,6 +774,15 @@ uint8_t iecChannelHandlerDir::readBufferData()
 
             // directory entry
             uint16_t blocks = entry->blocks();
+            if( x00_letter && entry->size >= P00MStream::HEADER_SIZE )
+            {
+                // Listed under its CBM name, so count the CBM file, not the
+                // host file: leave out the 26-byte PC64 header. Same
+                // arithmetic as MFile::blocks().
+                uint32_t sz = entry->size - P00MStream::HEADER_SIZE;
+                uint32_t bs = entry->media_block_size ? entry->media_block_size : 256;
+                blocks = (sz > 0 && sz < bs) ? 1 : sz / bs;
+            }
             m_data[m_len++] = 1;  // BASIC line pointer low byte
             m_data[m_len++] = 1;  // BASIC line pointer high byte
             m_data[m_len++] = blocks&255;  // Block count low byte

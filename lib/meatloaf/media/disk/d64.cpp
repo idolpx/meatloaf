@@ -1725,9 +1725,17 @@ public:
         // Claim every block before writing anything: data blocks, each side
         // sector right after the data block that needs it, the super side
         // sector after the first side sector (vdrive_rel_add_sector's order).
+        // Both buffers before the first claim: running out of memory once
+        // blocks are claimed would leave them allocated and owned by nothing.
         uint32_t nclaim = (need - blocks_) + new_sides + (new_super ? 1 : 0);
         uint8_t* claimed = (uint8_t*)malloc((size_t)nclaim * 2);
-        if (claimed == nullptr) return ST_DISK_FULL;
+        uint8_t* blk = (uint8_t*)malloc(256);
+        if (claimed == nullptr || blk == nullptr)
+        {
+            free(claimed);
+            free(blk);
+            return ST_DISK_FULL;
+        }
         uint32_t nc = 0;
         uint8_t t = blocks_ ? table_[(blocks_ - 1) * 2] : 0;
         uint8_t sct = blocks_ ? table_[(blocks_ - 1) * 2 + 1] : 0;
@@ -1760,6 +1768,7 @@ public:
             for (uint32_t i = 0; i < nc; i++)
                 img_->deallocateBlock(claimed[i * 2], claimed[i * 2 + 1]);
             free(claimed);
+            free(blk);
             return ST_DISK_FULL;
         }
         free(claimed);
@@ -1772,8 +1781,6 @@ public:
         uint32_t k = (uint32_t)(((uint64_t)blocks_ * DATA_PER_BLOCK) % len_);
         size_ = blocks_ * DATA_PER_BLOCK - k;
 
-        uint8_t* blk = (uint8_t*)malloc(256);
-        if (blk == nullptr) return ST_WRITE_VERIFY;
         bool w = writeDataBlocks(blk, old_blocks ? old_blocks - 1 : 0, old_size, k) &&
                  writeSideSectors(blk, old_sides) &&
                  (!super_t_ || writeSuper(blk)) &&
@@ -2067,6 +2074,8 @@ std::unique_ptr<RELStorage> D64MStream::createRel(std::string path, uint8_t reco
         return nullptr;
     }
     D64RelStorage* rel = new (std::nothrow) D64RelStorage(std::move(self), record_length, dt, ds, slot);
+    if (rel == nullptr)
+        removeFile(path);   // no storage: take back the entry just written
     return std::unique_ptr<RELStorage>(rel);
 }
 
@@ -2416,10 +2425,17 @@ std::shared_ptr<MStream> D64MFile::createRelStream(uint8_t record_length)
     // The cached listing stream would not show the new entry.
     ImageBroker::disposeFor("d64", brokerUrl());
     auto rel = std::make_shared<RELMStream>(std::move(storage), record_length);
-    // vdrive_rel_open (newrelfile): a new REL file has one record at OPEN. A
-    // failure (no room for the first block) is ignored as VICE ignores it; the
-    // first write then answers the error.
-    rel->growTo(1);
+    // vdrive_rel_open (newrelfile): a new REL file has one record at OPEN.
+    // VICE ignores a failure here and leaves a 0-block REL in the directory;
+    // we take the entry back instead, so a full disk answers the error at
+    // OPEN and leaves nothing behind (the .r00 create does the same).
+    if (rel->growTo(1) != ST_OK)
+    {
+        rel.reset();                     // release the storage's hold first
+        stream->removeFile(pathInStream);
+        ImageBroker::disposeFor("d64", brokerUrl());
+        return nullptr;
+    }
     return rel;
 }
 
