@@ -372,6 +372,20 @@ at $0277 is the sole injection path.
 | **1-byte fallback** | If a chunk fails to drain within 3s, switches to 1-byte-at-a-time mode to minimize per-write risk |
 | **Panic STOP ×3** | press_stop() sends RUN/STOP 3 times + ENTER — the KERNAL checks for STOP during I/O at specific points |
 
+### Do not poll the U64 while an IEC transfer is running
+
+Every REST read of C64 memory (`screen`, `read-mem`, the `run` command's
+screen read) is a DMA access that briefly stalls the 6510. The IEC bus
+has 1 ms handshakes - the listener must acknowledge each byte within 1000 µs,
+and a JiffyDOS receiver must pull DATA low within the same window - so a C64
+frozen for a moment misses one, the drive abandons the transfer, and the C64
+waits forever in `LOADING`. Measured 2026-11-25 on fujiloaf-rev0 with a
+200-entry `LOAD"$"`: a loop polling `screen` until `READY.` hung 4 of 11 runs
+on one build and 8 of 8 on another, at a different entry each time; the same
+LOAD with a fixed `sleep` and one screen read afterwards passed 8 of 8 with
+JiffyDOS on and off. It reads exactly like a drive-side protocol bug and is
+not one. **Wait a fixed time, then read the screen once.**
+
 ### Known limitations
 
 - **Blocking I/O blocks the IRQ** — if the C64 is stuck in KERNAL IEC
