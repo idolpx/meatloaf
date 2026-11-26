@@ -722,7 +722,7 @@ Board `freenove-esp32-s3-wroom-1`, console over native USB, no SD card (all on f
 
 - **REL in a CMD-made `.dnp`, after the bit-order fix**: on a copy of `wheels128en.dnp` (made with `VD+` then `cp`, since `cp` refuses images otherwise), the 10- and 100-record programs both pass from the C64. Against the original's BAM: the 13 new blocks (`RECS` 1 data + super side + side, `STRESS` 8 + 2, both with a super side sector, byte 2 = `$FE`) were all free MSB-first beforehand and all allocated after, the free count drops by exactly 13, and the only other sectors changed are the BAM sector covering those tracks (1/4) and the directory sector taking the entries (10/162). Every existing entry still lists. **The SD card's `wheels128en.dnp` itself already carries an `RBIG` REL (808 blocks) from the November 25 session above** - that test ran on the image, not a copy.
 
-**Still not verified:** a `main` comparison of the DHD/HDD baseline. A 26-byte (record-less) `.r00` was seen once, created with VDrive on under an earlier build in this session, and did not reproduce afterwards.
+- **DHD/HDD against `main`**: a read-only script (`partition`, `ls`, `CP1`/`CP0`/`CP256`/`CP255`/`CP2`/`CP5`/`CP10`/`CP17`, `I0`, on `meatloaf.40.dhd` and `ide320101231.hdd`) plus the C64's own `LOAD"$=P"` and `LOAD"$"` of both images give identical results on `main` (`94b145b7`) and the branch, apart from the starting drive cwd and two `main`-only log lines. The C64 listings are byte-identical. **`meatloaf.40.dhd`'s main partition also carries an `rnat` REL (808 blocks) from an earlier test.** A 26-byte (record-less) `.r00` was seen once, created with VDrive on under an earlier build in this session, and did not reproduce afterwards.
 
 ## Recent Changes (November 24, 2026)
 
