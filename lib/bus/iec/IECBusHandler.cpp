@@ -90,6 +90,9 @@ bool IECBusHandler::waitTimeout(uint16_t timeout, uint8_t cond)
   // So we use our high-precision timer. However, on some platforms that timer
   // can only count up to 127 microseconds so we have to go in small increments.
 
+  // the loop below counts timeout down; keep what was asked for "iec state"
+  const uint16_t wanted = timeout;
+
   timer_init();
   timer_reset();
   timer_start();
@@ -130,7 +133,7 @@ bool IECBusHandler::waitTimeout(uint16_t timeout, uint8_t cond)
                 {
                   m_dbgTimeouts++;
                   m_dbgLastWaitCond = cond;
-                  m_dbgLastWaitWanted = timeout;
+                  m_dbgLastWaitWanted = wanted;
                 }
               return cond==TC_NONE;
             }
@@ -2095,11 +2098,24 @@ static const char *debugStageName(uint8_t stage)
     }
 }
 
+static const char *debugCondName(uint8_t cond)
+{
+  switch( cond )
+    {
+    case TC_NONE:      return "none";
+    case TC_DATA_LOW:  return "DATA low";
+    case TC_DATA_HIGH: return "DATA high";
+    case TC_CLK_LOW:   return "CLK low";
+    case TC_CLK_HIGH:  return "CLK high";
+    default:           return "unknown";
+    }
+}
+
 void IECBusHandler::debugState(char *buf, int len)
 {
   uint8_t stage = m_dbgStage;   // read once: it can change under us
-  snprintf(buf, len, "stage[%u %s] bytes[%lu] ATN[%d] CLK[%d] DATA[%d] flags[%02X] timeouts[%lu] last[%u us, cond %u]",
+  snprintf(buf, len, "stage[%u %s] bytes[%lu] ATN[%d] CLK[%d] DATA[%d] flags[%02X] timeouts[%lu] last[%u us waiting for %s]",
            stage, debugStageName(stage), (unsigned long)m_dbgBytes,
            readPinATN() ? 1 : 0, readPinCLK() ? 1 : 0, readPinDATA() ? 1 : 0, m_flags,
-           (unsigned long)m_dbgTimeouts, m_dbgLastWaitWanted, m_dbgLastWaitCond);
+           (unsigned long)m_dbgTimeouts, m_dbgLastWaitWanted, debugCondName(m_dbgLastWaitCond));
 }
