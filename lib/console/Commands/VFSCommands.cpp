@@ -439,15 +439,33 @@ static bool copy_via_mfile(const char *verb,
         Serial.printf("%s: cannot open '%s': No such file or directory\r\n", verb, src.c_str());
         return false;
     }
+
+    // A disk image or archive resolves as a directory - that is how cd and ls
+    // see inside it - so cp refused every .d64, .dhd, .zip ... as "a
+    // directory". The raw resolver sees the bytes: when it says this is a
+    // regular file, copy the file. A copied image is then a plain
+    // file-to-file copy, so the destination is resolved raw as well.
+    bool raw = false;
     if (srcFile->isDirectory())
     {
-        Serial.printf("%s: '%s' is a directory\r\n", verb, src.c_str());
-        return false;
+        std::unique_ptr<MFile> bytes(MFSOwner::File(src, true));
+        if (bytes && bytes->exists() && !bytes->isDirectory())
+        {
+            srcFile = std::move(bytes);
+            raw = true;
+        }
+        else
+        {
+            Serial.printf("%s: '%s' is a directory\r\n", verb, src.c_str());
+            return false;
+        }
     }
 
-    // "<verb> file dir" puts it INSIDE dir, as cp(1)/mv(1) do.
+    // "<verb> file dir" puts it INSIDE dir, as cp(1)/mv(1) do. For a raw copy
+    // only a real directory counts: "cp a.d64 b.d64" over an existing b.d64
+    // replaces it, it does not copy a.d64 into the image.
     {
-        std::unique_ptr<MFile> dstProbe(MFSOwner::File(dst));
+        std::unique_ptr<MFile> dstProbe(MFSOwner::File(dst, raw));
         if (dstProbe && dstProbe->exists() && dstProbe->isDirectory())
         {
             // Take the name from the source PATH, not srcFile->name. For a
@@ -474,7 +492,7 @@ static bool copy_via_mfile(const char *verb,
         return false;
     }
 
-    std::unique_ptr<MFile> dstFile(MFSOwner::File(dst));
+    std::unique_ptr<MFile> dstFile(MFSOwner::File(dst, raw));
     auto out = dstFile ? dstFile->getSourceStream(std::ios_base::out) : nullptr;
     if (!out || !out->isOpen())
     {
@@ -703,7 +721,28 @@ int rm(int argc, char **argv)
             // List matches first, then delete — removing entries while
             // iterating the directory handle isn't safe on all backing
             // filesystems.
+            //
+            // A wildcard in the LAST component filters that component's
+            // directory, as in ls: "rm /sd/x/pl*" lists /sd/x. It used to
+            // match the whole argument against the current directory, so a
+            // pattern with a path in front never matched anything.
+            std::unique_ptr<MFile> dirHolder;
             MFile *cwd = getCurrentPath();
+            size_t slash = pattern.find_last_of('/');
+            if (slash != std::string::npos)
+            {
+                // keep the trailing '/' so a rooted "/pl*" still resolves to "/"
+                dirHolder.reset(getCurrentPath()->cd(pattern.substr(0, slash + 1)));
+                if (!dirHolder || !dirHolder->isDirectory())
+                {
+                    if (!force)
+                        Serial.printf("rm: cannot access '%s': No such directory\r\n", pattern.c_str());
+                    anyFailed = !force;
+                    continue;
+                }
+                cwd = dirHolder.get();
+                pattern = pattern.substr(slash + 1);
+            }
             psram_string_vector matches;
             cwd->rewindDirectory();
             MFile *rawEntry;
@@ -720,7 +759,7 @@ int rm(int argc, char **argv)
             }
 
             if (matches.empty() && !force)
-                Serial.printf("rm: no matches for '%s'\r\n", pattern.c_str());
+                Serial.printf("rm: no matches for '%s'\r\n", argv[argi]);
 
             for (auto &m : matches)
                 if (!rm_path(std::string(m.c_str()), recursive, force))
@@ -2172,6 +2211,39 @@ static std::string strip_compression_ext(const std::string &name)
 // Windows sometimes store them.
 //
 // Returns "" when nothing usable is left, in which case the entry is skipped.
+// One stored path component, made storable: a byte that does not start a
+// complete, minimal UTF-8 sequence becomes '_', and so do the characters FAT
+// refuses (control characters and : * ? " < > |; '/' and backslash already split
+// the path into components). C64 archivers store names
+// as raw PETSCII, which is not UTF-8; written verbatim it produced a host file
+// whose name no other part of Meatloaf - which is UTF-8 throughout - could
+// name. Valid UTF-8 is kept, PETSCII graphics (U+E0xx) included.
+static std::string unzip_storable_component(const std::string &comp)
+{
+    std::string out;
+    size_t i = 0, n = comp.size();
+    while (i < n) {
+        uint8_t b = (uint8_t)comp[i];
+        size_t len = b < 0x80 ? 1 : (b >> 5) == 6 ? 2 : (b >> 4) == 14 ? 3 : (b >> 3) == 30 ? 4 : 0;
+        bool ok = len != 0 && i + len <= n;
+        uint32_t cp = ok ? (len == 1 ? b : (b & (0xFF >> (len + 1)))) : 0;
+        for (size_t k = 1; ok && k < len; k++) {
+            uint8_t c = (uint8_t)comp[i + k];
+            ok = (c & 0xC0) == 0x80;
+            cp = (cp << 6) | (c & 0x3F);
+        }
+        static const uint32_t min_cp[5] = { 0, 0, 0x80, 0x800, 0x10000 };
+        ok = ok && cp >= min_cp[len] && cp <= 0x10FFFF && !(cp >= 0xD800 && cp <= 0xDFFF);
+        if (!ok) { out += '_'; i++; continue; }
+        if (cp < 0x20 || cp == 0x7F || (cp < 0x80 && strchr(":*?\"<>|", (int)cp)))
+            out += '_';
+        else
+            out.append(comp, i, len);
+        i += len;
+    }
+    return out;
+}
+
 static std::string unzip_safe_relpath(const std::string &name)
 {
     std::string out;
@@ -2188,7 +2260,7 @@ static std::string unzip_safe_relpath(const std::string &name)
             continue;   // popping an empty path is a no-op, so dest is the floor
         }
         if (!out.empty()) out += '/';
-        out += comp;
+        out += unzip_storable_component(comp);
     }
     return out;
 }

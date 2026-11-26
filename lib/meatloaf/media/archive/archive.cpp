@@ -252,6 +252,23 @@ std::string Archive::gzipNameFromHeader(const uint8_t *p, size_t n)
     return name;
 }
 
+// archive_read_next_header() answers ARCHIVE_WARN for an entry it read
+// successfully but could not fully describe - on this platform, with no
+// iconv, that is any name it cannot convert to the "current locale"
+// ("Pathname cannot be converted from UTF-8 to current locale"). Treating the
+// warning as a failure ended the walk at the first non-ASCII name, so a zip
+// whose names carry the UTF-8 flag extracted nothing at all.
+static inline bool headerRead(int r) { return r == ARCHIVE_OK || r == ARCHIVE_WARN; }
+
+// The entry's name as stored, UTF-8 when the archive says it is: the locale
+// form archive_entry_pathname() returns is NULL exactly when that conversion
+// failed.
+static inline const char *entryPathname(struct archive_entry *e)
+{
+    const char *p = archive_entry_pathname_utf8(e);
+    return (p && p[0]) ? p : archive_entry_pathname(e);
+}
+
 static std::string compressedEntryNameFromUrl(const std::string &containerUrl)
 {
     size_t lastSlash = containerUrl.find_last_of("/\\");
@@ -505,7 +522,7 @@ bool ArchiveMStream::ensureData() {
             return false;
         }
         struct archive_entry *ae = nullptr;
-        if (archive_read_next_header(m_archive->getArchive(), &ae) != ARCHIVE_OK) {
+        if (!headerRead(archive_read_next_header(m_archive->getArchive(), &ae))) {
             Debug_printv("ERROR: raw-only header read failed for %s", entry.filename.c_str());
             return false;
         }
@@ -634,6 +651,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
 
     int r = archive_read_next_header(a, &a_entry);
     //Debug_printv("archive_read_next_header returned: %d", r);
+    if (r == ARCHIVE_WARN) r = ARCHIVE_OK;   // see headerRead()
 
     // Special handling for compressed-only files (e.g., standalone .gz, .bz2 files)
     // These have compression filters but no archive format, so archive_read_next_header returns EOF
@@ -720,7 +738,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
     const mode_t type = archive_entry_filetype(a_entry);
     //Debug_printv("entry filetype: 0x%x, S_ISREG=%d", type, S_ISREG(type));
     if ( S_ISREG(type) ) {
-        const char* pathname = archive_entry_pathname(a_entry);
+        const char* pathname = entryPathname(a_entry);
 
         // For raw compressed files (.gz, .bz2, etc.), pathname may be NULL or empty
         // (libarchive raw format sets "data" but other formats may leave it null).
@@ -800,14 +818,14 @@ bool ArchiveMStream::seekEntry( uint16_t index )
                     // Reopen archive; Archive::open() seeks containerStream back to 0
                     m_archive->open(std::ios_base::in);
                     a = m_archive->getArchive();
-                    if (archive_read_next_header(a, &a_entry) != ARCHIVE_OK) {
+                    if (!headerRead(archive_read_next_header(a, &a_entry))) {
                         entry.size = 0;
                         return false;
                     }
                     // Use the filename embedded in the gzip header (FNAME field) if present.
                     // gzip_read_header() runs during archive_read_next_header and overrides
                     // the raw format's "data" pathname with the stored name, if any.
-                    const char* embeddedName = archive_entry_pathname(a_entry);
+                    const char* embeddedName = entryPathname(a_entry);
                     if (embeddedName && embeddedName[0] != '\0' &&
                         strcmp(embeddedName, "data") != 0) {
                         entry.filename = basename(embeddedName);
@@ -837,7 +855,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
                     m_archive->close();
                     m_archive->open(std::ios_base::in);
                     a = m_archive->getArchive();
-                    if (archive_read_next_header(a, &a_entry) != ARCHIVE_OK ||
+                    if (!headerRead(archive_read_next_header(a, &a_entry)) ||
                         !m_archive->hasCompressionFilter()) {
                         Debug_printv("ERROR! source is not serving [%s] as a compressed stream; "
                                      "refusing to report the compressed length as the entry size",
@@ -867,7 +885,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
                 m_archive->close();
                 m_archive->open(std::ios_base::in);
                 a = m_archive->getArchive();
-                if (archive_read_next_header(a, &a_entry) != ARCHIVE_OK) {
+                if (!headerRead(archive_read_next_header(a, &a_entry))) {
                     entry.size = 0;
                     return false;
                 }
@@ -919,14 +937,14 @@ bool ArchiveMStream::nextEntrySimple() {
     struct archive *a = m_archive->getArchive();
     while (true) {
         int r = archive_read_next_header(a, &a_entry);
-        if (r != ARCHIVE_OK) {
+        if (!headerRead(r)) {
             entry.filename.clear();
             entry.size = 0;
             return false;  // EOF or error ends the walk
         }
         if (!S_ISREG(archive_entry_filetype(a_entry))) continue;  // skip dirs
 
-        const char *pn = archive_entry_pathname(a_entry);
+        const char *pn = entryPathname(a_entry);
         // Keep BOTH: the basename for flat listings, and the stored path so
         // extraction can recreate the directory structure. basename() is
         // destructive on some platforms, so read pathname first.

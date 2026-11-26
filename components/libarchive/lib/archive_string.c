@@ -445,7 +445,13 @@ static const char *
 default_iconv_charset(const char *charset) {
 	if (charset != NULL && charset[0] != '\0')
 		return charset;
-#if HAVE_LOCALE_CHARSET && !defined(__APPLE__)
+#if defined(ESP_PLATFORM)
+	/* MEATLOAF: every name inside Meatloaf is UTF-8, so that IS the current
+	 * character set. newlib's C locale reports ASCII here, and with no iconv
+	 * a UTF-8 entry name holding any non-ASCII character then failed to
+	 * "convert" and lost its pathname entirely - the entry was skipped. */
+	return "UTF-8";
+#elif HAVE_LOCALE_CHARSET && !defined(__APPLE__)
 	/* locale_charset() is broken on Mac OS */
 	return locale_charset();
 #elif HAVE_NL_LANGINFO
