@@ -165,6 +165,10 @@ public:
     bool error_info = false;
     std::string bam_message = "";
 
+    // Size of the image before D64MFile::format() truncated it, 0 if it did not
+    // exist. Only a format whose geometry follows the old image reads it.
+    uint32_t prior_size = 0;
+
     D64MStream(std::shared_ptr<MStream> is) : MMediaStream(is)
     {
         // D64 Partition Info
@@ -569,7 +573,7 @@ public:
     // Lay out a blank image: fill blocks, initialize the BAM and directory,
     // and write the header. Contains no MFSOwner/MFile resolution so it can
     // be driven directly over any container stream.
-    bool formatImage(std::string name, std::string id, size_t track_count = 0, bool error_info = false);
+    virtual bool formatImage(std::string name, std::string id, size_t track_count = 0, bool error_info = false);
 
 protected:
     // CBM 8050/8250 BAM blocks carry a 6-byte header ahead of their per-track

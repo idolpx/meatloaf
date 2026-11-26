@@ -105,6 +105,9 @@ static int fsimage_create_dxx(disk_image_t *image)
             /* use D9090 for default D90 size */
             size = D9090_FILE_SIZE;
             break;
+        case DISK_IMAGE_TYPE_D60: /* MEATLOAF: D9060 */
+            size = D9060_FILE_SIZE;
+            break;
         case DISK_IMAGE_TYPE_G64:
         case DISK_IMAGE_TYPE_G71:
             break;
@@ -635,6 +638,7 @@ int fsimage_create(const char *name, unsigned int type)
         case DISK_IMAGE_TYPE_D2M:
         case DISK_IMAGE_TYPE_D4M:
         case DISK_IMAGE_TYPE_D90:
+        case DISK_IMAGE_TYPE_D60: /* MEATLOAF */
             rc = fsimage_create_dxx(image);
             break;
         case DISK_IMAGE_TYPE_G64:

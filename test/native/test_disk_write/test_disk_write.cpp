@@ -64,6 +64,8 @@ void tearDown(void)
         "build_test_oracle_trunc.d64", "build_test_oracle_trunc.prg",
         "build_test_sizes.bin",
         "build_d90_9090.d90", "build_d90_9060.d90",
+        "build_d90_new.d90", "build_d90_new.d60", "build_d90_new.d96",
+        "build_d90_9090.d90.ours", "build_d90_9060.d90.ours",
     };
     for (const char* name : kFixedNames)
     {
@@ -2151,22 +2153,80 @@ void test_d90_remove_returns_every_block(void)
     }
 }
 
-// Our layout code describes floppies; a D90 must refuse rather than get one.
-void test_d90_format_is_refused(void)
+// A new image has no size, so the extension picks the drive: .d60 a D9060,
+// .d90/.d96 a D9090. Our format of an empty file must be byte-identical to
+// c1541's format of a pre-sized one with the same name and id.
+static void d90_format_ours(const char* path)
+{
+    remove(path);
+    FILE* fp = fopen(path, "wb");
+    TEST_ASSERT_NOT_NULL(fp);
+    fclose(fp);
+    auto img = std::make_shared<D90MStream>(std::make_shared<FileContainerStream>(path));
+    img->mode = std::ios_base::in | std::ios_base::out;
+    TEST_ASSERT_TRUE_MESSAGE(img->formatImage("t", "01"), path);
+}
+
+static void d90_assert_same(const char* ours, const char* theirs)
+{
+    std::string a, b;
+    TEST_ASSERT_TRUE(c1541_read_raw_file(ours, a));
+    TEST_ASSERT_TRUE(c1541_read_raw_file(theirs, b));
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(b.size(), a.size(), ours);
+    size_t i = 0;
+    while (i < a.size() && a[i] == b[i]) i++;
+    char msg[96];
+    snprintf(msg, sizeof(msg), "%s first differs at 0x%zx (block %zu byte %zu)", ours, i, i / 256, i % 256);
+    TEST_ASSERT_TRUE_MESSAGE(i == a.size(), msg);
+}
+
+void test_d90_format_new_matches_c1541(void)
 {
     if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
-    const D90Case& c = kD90Cases[0];
-    d90_fresh(c);
-    std::string before;
-    TEST_ASSERT_TRUE(c1541_read_raw_file(c.path, before));
+    const char* ours[] = { "build_d90_new.d90", "build_d90_new.d60", "build_d90_new.d96" };
+    const D90Case* theirs[] = { &kD90Cases[0], &kD90Cases[1], &kD90Cases[0] };
+    for (int i = 0; i < 3; i++)
     {
-        auto img = d90_open(c);
-        img->mode = std::ios_base::in | std::ios_base::out;
-        TEST_ASSERT_FALSE(img->formatImage("x", "02"));
+        d90_format_ours(ours[i]);
+        d90_fresh(*theirs[i]);
+        d90_assert_same(ours[i], theirs[i]->path);
+        TEST_ASSERT_EQUAL_INT_MESSAGE((int)d90_c1541_free(*theirs[i]),
+            (int)std::make_shared<D90MStream>(std::make_shared<FileContainerStream>(ours[i]))->blocksFree(), ours[i]);
+        TEST_ASSERT_TRUE_MESSAGE(c1541_validate(ours[i]), ours[i]);
+        remove(ours[i]);
     }
-    std::string after;
-    TEST_ASSERT_TRUE(c1541_read_raw_file(c.path, after));
-    TEST_ASSERT_TRUE(before == after);
+}
+
+// Reformatting an existing image keeps its drive: a D9060 stays a D9060 even
+// under a .d90 name (both cases are named .d90), and whatever was on it is gone.
+void test_d90_reformat_keeps_geometry_and_clears(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    for (const D90Case& c : kD90Cases)
+    {
+        d90_fresh(c);
+        std::vector<uint8_t> data(50 * 254, 0x5A);
+        {
+            auto img = d90_open(c);
+            TEST_ASSERT_TRUE_MESSAGE(save_file(*img, "old", data), c.name);
+        }
+        // As D64MFile::format() does: the image is opened truncated, and the
+        // size it had is handed over separately.
+        FILE* fp = fopen(c.path, "wb");
+        TEST_ASSERT_NOT_NULL(fp);
+        fclose(fp);
+        {
+            auto img = d90_open(c);
+            img->mode = std::ios_base::in | std::ios_base::out;
+            img->prior_size = c.size;
+            TEST_ASSERT_TRUE_MESSAGE(img->formatImage("t", "01"), c.name);
+        }
+        std::string ours = std::string(c.path) + ".ours";
+        rename(c.path, ours.c_str());
+        d90_fresh(c);
+        d90_assert_same(ours.c_str(), c.path);
+        remove(ours.c_str());
+    }
 }
 
 void test_tier3_randomized_stress(void)
@@ -2202,7 +2262,8 @@ void process()
     RUN_TEST(test_d90_blocks_free_matches_c1541);
     RUN_TEST(test_d90_save_is_valid_for_c1541);
     RUN_TEST(test_d90_remove_returns_every_block);
-    RUN_TEST(test_d90_format_is_refused);
+    RUN_TEST(test_d90_format_new_matches_c1541);
+    RUN_TEST(test_d90_reformat_keeps_geometry_and_clears);
     // Once per format, so no format can be hidden behind another's failure.
     for (g_format_index = 0; g_format_index < all_formats().size(); g_format_index++)
     {
