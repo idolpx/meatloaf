@@ -7,6 +7,7 @@
 #include "media/disk/d80.h"
 #include "media/disk/d81.h"
 #include "media/disk/d82.h"
+#include "media/hd/d90.h"
 #include "file_container_stream.h"
 #include "c1541_oracle.h"
 #include "image_invariants.h"
@@ -62,6 +63,7 @@ void tearDown(void)
         "build_test_oracle_errchan.d80", "build_test_oracle_ref.d64",
         "build_test_oracle_trunc.d64", "build_test_oracle_trunc.prg",
         "build_test_sizes.bin",
+        "build_d90_9090.d90", "build_d90_9060.d90",
     };
     for (const char* name : kFixedNames)
     {
@@ -2042,6 +2044,131 @@ void test_tier2_unremove_refuses_when_blocks_reused(void)
     remove(path.c_str());
 }
 
+/********************************************************
+ * D9090 / D9060 (VICE c1541 as the oracle)
+ ********************************************************/
+
+// The D90 BAM is a chain of blocks, one 5-byte entry per 32-sector group, so
+// it is NOT in all_formats(): our engine cannot format one (formatImage()
+// refuses), and these tests start from an image c1541 formatted.
+struct D90Case { const char* name; const char* path; uint32_t size; };
+static const D90Case kD90Cases[] = {
+    { "d9090", "build_d90_9090.d90", 7520256 },   // 153 tracks x 6 heads x 32
+    { "d9060", "build_d90_9060.d90", 5013504 },   // 153 tracks x 4 heads x 32
+};
+
+// c1541 formats a D90 by attaching an image of the right size, which picks
+// the head count; "-format ... d90" alone always makes a D9090.
+static void d90_fresh(const D90Case& c)
+{
+    remove(c.path);
+    FILE* fp = fopen(c.path, "wb");
+    TEST_ASSERT_NOT_NULL(fp);
+    TEST_ASSERT_EQUAL_INT(0, fseek(fp, (long)c.size - 1, SEEK_SET));
+    fputc(0, fp);
+    fclose(fp);
+    int rc = 0;
+    std::string out = c1541_run("-attach " + c1541_quote(c.path) + " -format " + c1541_quote("t,01"), &rc);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, rc, out.c_str());
+}
+
+static std::shared_ptr<D90MStream> d90_open(const D90Case& c)
+{
+    return std::make_shared<D90MStream>(std::make_shared<FileContainerStream>(c.path));
+}
+
+// "29161 blocks free." in c1541's listing.
+static long d90_c1541_free(const D90Case& c)
+{
+    std::string dir = c1541_dir(c.path);
+    size_t at = dir.find("blocks free");
+    if (at == std::string::npos) return -1;
+    size_t start = dir.rfind('\n', at);
+    return strtol(dir.c_str() + (start == std::string::npos ? 0 : start + 1), nullptr, 10);
+}
+
+void test_d90_blocks_free_matches_c1541(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    for (const D90Case& c : kD90Cases)
+    {
+        d90_fresh(c);
+        long expect = d90_c1541_free(c);
+        TEST_ASSERT_TRUE_MESSAGE(expect > 0, c.name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE((int)expect, (int)d90_open(c)->blocksFree(), c.name);
+    }
+}
+
+// A file long enough to cross BAM groups and tracks: c1541 lists it, reads it
+// back byte for byte, agrees on the free count, and its validate - which
+// rebuilds the BAM from the chains - leaves the image byte-identical, i.e. our
+// BAM is exactly the one c1541 would have written.
+void test_d90_save_is_valid_for_c1541(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    for (const D90Case& c : kD90Cases)
+    {
+        d90_fresh(c);
+        long before = d90_c1541_free(c);
+        std::vector<uint8_t> data(300 * 254);
+        for (size_t i = 0; i < data.size(); i++) data[i] = (uint8_t)(i * 7 + i / 254);
+        {
+            auto img = d90_open(c);
+            TEST_ASSERT_TRUE_MESSAGE(save_file(*img, "big", data), c.name);
+        }
+        TEST_ASSERT_EQUAL_INT_MESSAGE((int)(before - 300), (int)d90_c1541_free(c), c.name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE((int)(before - 300), (int)d90_open(c)->blocksFree(), c.name);
+        std::string out = std::string(c.path) + ".out";
+        size_t n = 0;
+        TEST_ASSERT_TRUE_MESSAGE(c1541_read(c.path, "big", out, &n), c.name);
+        std::string got;
+        TEST_ASSERT_TRUE(c1541_read_raw_file(out, got));
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(data.size(), got.size(), c.name);
+        TEST_ASSERT_EQUAL_MEMORY_MESSAGE(data.data(), got.data(), data.size(), c.name);
+        TEST_ASSERT_TRUE_MESSAGE(c1541_validate(c.path), c.name);
+    }
+}
+
+void test_d90_remove_returns_every_block(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    for (const D90Case& c : kD90Cases)
+    {
+        d90_fresh(c);
+        long before = d90_c1541_free(c);
+        std::vector<uint8_t> data(40 * 254, 0x5A);
+        {
+            auto img = d90_open(c);
+            TEST_ASSERT_TRUE_MESSAGE(save_file(*img, "tmp", data), c.name);
+        }
+        {
+            auto img = d90_open(c);
+            img->mode = std::ios_base::in | std::ios_base::out;
+            TEST_ASSERT_TRUE_MESSAGE(img->removeFile("tmp"), c.name);
+        }
+        TEST_ASSERT_EQUAL_INT_MESSAGE((int)before, (int)d90_c1541_free(c), c.name);
+        TEST_ASSERT_TRUE_MESSAGE(c1541_validate(c.path), c.name);
+    }
+}
+
+// Our layout code describes floppies; a D90 must refuse rather than get one.
+void test_d90_format_is_refused(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    const D90Case& c = kD90Cases[0];
+    d90_fresh(c);
+    std::string before;
+    TEST_ASSERT_TRUE(c1541_read_raw_file(c.path, before));
+    {
+        auto img = d90_open(c);
+        img->mode = std::ios_base::in | std::ios_base::out;
+        TEST_ASSERT_FALSE(img->formatImage("x", "02"));
+    }
+    std::string after;
+    TEST_ASSERT_TRUE(c1541_read_raw_file(c.path, after));
+    TEST_ASSERT_TRUE(before == after);
+}
+
 void test_tier3_randomized_stress(void)
 {
     // Fixed seeds keep failures reproducible. When a seed finds a bug, keep it
@@ -2072,6 +2199,10 @@ void process()
     RUN_TEST(test_extended_d64_bam_lives_at_dolphin_offset);
     RUN_TEST(test_dnp_bam_is_msb_first);
     RUN_TEST(test_parse_format_spec);
+    RUN_TEST(test_d90_blocks_free_matches_c1541);
+    RUN_TEST(test_d90_save_is_valid_for_c1541);
+    RUN_TEST(test_d90_remove_returns_every_block);
+    RUN_TEST(test_d90_format_is_refused);
     // Once per format, so no format can be hidden behind another's failure.
     for (g_format_index = 0; g_format_index < all_formats().size(); g_format_index++)
     {
