@@ -560,7 +560,14 @@ static MFile *x00FindByHeader(MFile *f)
         std::string hname;
         char letter;
         if( x00ReadHeader(e, hname, letter) && mstr::compareFilename(hname, want, wildcard) )
-            return e;
+        {
+            // Re-resolve: a directory-listing entry is a bare host file, so
+            // opening it would serve the 26-byte header as data. Resolved by
+            // URL it gets the P00 decoder, as x00ReadHeader() does.
+            MFile *hit = MFSOwner::File(e->url);
+            delete e;
+            return hit;
+        }
         delete e;
     }
     return nullptr;

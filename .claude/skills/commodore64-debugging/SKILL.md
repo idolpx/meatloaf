@@ -305,6 +305,19 @@ identical `pio run -t upload` succeeded seconds later once it was stopped.
 So the flash sequence is always: **stop capture, flash, start capture.**
 And the last thing any session does is stop it.
 
+### Per-line timestamps
+
+The device log carries no clock. Start the capture with `MEATLOAF_CAPTURE_TS=1`
+in the environment and every line of device output is prefixed with its arrival
+time (`HH:MM:SS.mmm`), which is what places a stall or a slow step in time:
+
+```bash
+MEATLOAF_CAPTURE_TS=1 python3 scripts/meatloaf_debug.py capture start
+```
+
+Lines arrive in USB bursts, so neighbours often share a stamp; read gaps, not
+single lines.
+
 ### Health check
 
 ```bash
