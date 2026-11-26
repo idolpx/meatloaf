@@ -104,15 +104,69 @@ public:
         partitions[0].block_allocation_map[0].track = read();
         // this.partitions[0].block_allocation_map[0].sector = this.read();
         partitions[0].block_allocation_map[0].sector = read();
+
+        // VICE: "reserved DIR space is skipped on all drives except D9090/60"
+        // - the directory track is open to file data.
+        dedicated_directory_track = false;
+
+        readBAMChain();
     };
 
     virtual uint8_t speedZone(uint8_t track) override { return 0; };
+
+    // Each track's BAM entry is one 5-byte group (free count + 32 bits) per 32
+    // sectors: 4 groups on a D9060, 6 on a D9090.
+    uint8_t bamGroupSectors() override { return 32; }
+
+    // vdrive_bam_free_block_count counts tracks 1 up: track 0 (configuration
+    // sector and bad-block lists) can still be allocated when everything else
+    // is full, but it is not reported as free.
+    uint16_t blocksFree() override { return D64MStream::blocksFree() - getTrackFreeCount(0); }
 
     uint32_t defaultImageSize() override { return 7520256; } // D9090 - 153 tracks, 32 sectors, 6 heads
 
 protected:
 
 private:
+    // The BAM is a chain of blocks, linked at bytes 0/1 and ended by track 255
+    // (vdrive_bam_allocate_chain_255). Byte 4 is the lowest track a block
+    // covers and byte 5 one past the highest; the entries start at offset
+    // $10 (BAM_BIT_MAP_9000), one per track, 5 bytes per 32-sector group.
+    // One block_allocation_map record per BAM block is exactly the shape the
+    // generic BAM code already walks for the 8050's several blocks. If the
+    // chain cannot be read the single placeholder record stays, which keeps
+    // the image readable and refuses allocations.
+    void readBAMChain()
+    {
+        // Until the chain is known the placeholder record covers the track
+        // range (seekSector() needs it) but describes no BAM bytes, so a
+        // failed read below leaves the image listable and every allocation
+        // refused, rather than written through a guessed layout.
+        partitions[0].block_allocation_map[0].byte_count = 0;
+        uint8_t groups = (uint8_t)(getSectorCount(0) / 32);
+        if (groups == 0)
+            return;
+        uint8_t record = (uint8_t)(groups * 5);
+        std::vector<BlockAllocationMap> chain;
+        uint8_t t = partitions[0].block_allocation_map[0].track;
+        uint8_t s = partitions[0].block_allocation_map[0].sector;
+        while (t != 255 && chain.size() < 64)
+        {
+            uint8_t hdr[6];
+            if (!seekSector(t, s, 0) || readContainer(hdr, sizeof(hdr)) != sizeof(hdr))
+                return;
+            uint8_t lo = hdr[4], hi = hdr[5];
+            if (hi <= lo || (uint32_t)0x10 + (uint32_t)(hi - lo) * record > block_size)
+                return;    // not a BAM block this layout describes
+            chain.push_back({ t, s, 0x10, lo, (uint8_t)(hi - 1), record });
+            t = hdr[0];
+            s = hdr[1];
+        }
+        if (t != 255 || chain.empty())
+            return;
+        partitions[0].block_allocation_map = chain;
+    }
+
     void allocateBadBlocks() {
         // seekSector( 0, 10, 0x00 );
         // uint8_t next_track = read();

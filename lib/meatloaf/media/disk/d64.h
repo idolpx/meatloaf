@@ -479,6 +479,13 @@ protected:
     // overrides this (VICE vdrive-bam.c: `sector ^= 7` for NP only).
     virtual uint8_t bamBitMask(uint8_t sector) { return (uint8_t)(1 << (sector & 7)); }
 
+    // Sectors per BAM group, or 0 when a track's record is ONE free count
+    // followed by ONE bitmap (every floppy, CMD native). A D9090/D9060 splits
+    // each track into groups of 32 sectors, each its own 5-byte entry - count
+    // then 32 bits - laid end to end (VICE vdrive-bam.c, "D9090/60 groups 32
+    // sectors per bam group").
+    virtual uint8_t bamGroupSectors() { return 0; }
+
     // BAM record location for one track (which BAM sector holds it and where)
     struct BAMRecord {
         uint8_t bam_track;
@@ -489,6 +496,10 @@ protected:
     };
     bool getBAMRecord( uint8_t track, BAMRecord *rec );
     bool readBAMRecord( uint8_t track, BAMRecord *rec, uint8_t *buf );
+    // Where 'sector's bit and its free count sit inside a track's record:
+    // bitmap byte index, and count byte index (-1 for a bitmap-only record).
+    // False when the record cannot represent the sector.
+    bool bamIndex( const BAMRecord &rec, uint8_t sector, uint8_t *byte_index, int *count_index );
     // Virtual so formats whose BAM splits the free COUNT away from the BITMAP
     // can maintain both halves - see D71MStream, where side 2's counts live in
     // 18/0 at 0xDD while its bitmaps live at 53/0.

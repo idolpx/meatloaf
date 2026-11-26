@@ -220,17 +220,39 @@ bool D64MStream::readBAMRecord(uint8_t track, BAMRecord *rec, uint8_t *buf)
     return readContainer(buf, rec->byte_count) == rec->byte_count;
 }
 
+bool D64MStream::bamIndex(const BAMRecord &rec, uint8_t sector, uint8_t *byte_index, int *count_index)
+{
+    uint8_t grp = bamGroupSectors();
+    unsigned bi;
+    if (grp)
+    {
+        unsigned stride = grp / 8 + 1;              // count byte + bitmap
+        unsigned g = sector / grp;
+        *count_index = (int)(g * stride);
+        bi = g * stride + 1 + ((sector % grp) >> 3);
+    }
+    else
+    {
+        *count_index = rec.has_count ? 0 : -1;
+        bi = (rec.has_count ? 1 : 0) + (sector >> 3);
+    }
+    if (bi >= rec.byte_count)
+        return false; // sector beyond what this BAM record can represent
+    *byte_index = (uint8_t)bi;
+    return true;
+}
+
 bool D64MStream::setBlockAllocation(uint8_t track, uint8_t sector, bool allocate)
 {
     BAMRecord rec;
-    uint8_t buf[32]; // largest byte_count in use is 32 (DNP/DHD native: 256 sectors/track)
+    uint8_t buf[32]; // largest byte_count in use is 32 (DNP/DHD native: 256 sectors/track; D9090: 6 x 5)
     if (!readBAMRecord(track, &rec, buf))
         return false;
 
-    uint8_t base = rec.has_count ? 1 : 0;
-    uint8_t byte_index = base + (sector >> 3);
-    if (byte_index >= rec.byte_count)
-        return false; // sector beyond what this BAM record can represent
+    uint8_t byte_index;
+    int count_index;
+    if (!bamIndex(rec, sector, &byte_index, &count_index))
+        return false;
 
     uint8_t bitmask = bamBitMask(sector);
     if (allocate)
@@ -241,8 +263,8 @@ bool D64MStream::setBlockAllocation(uint8_t track, uint8_t sector, bool allocate
             return false;
         }
         buf[byte_index] &= ~bitmask; // 0 = allocated
-        if (rec.has_count && buf[0] > 0)
-            buf[0]--;
+        if (count_index >= 0 && buf[count_index] > 0)
+            buf[count_index]--;
     }
     else
     {
@@ -253,8 +275,8 @@ bool D64MStream::setBlockAllocation(uint8_t track, uint8_t sector, bool allocate
             return true;
         }
         buf[byte_index] |= bitmask; // 1 = free
-        if (rec.has_count)
-            buf[0]++;
+        if (count_index >= 0)
+            buf[count_index]++;
     }
 
     if (!seekSector(rec.bam_track, rec.bam_sector, rec.offset))
@@ -291,6 +313,17 @@ uint16_t D64MStream::getTrackFreeCount(uint8_t track)
     if (!readBAMRecord(track, &rec, buf))
         return 0;
 
+    uint8_t grp = bamGroupSectors();
+    if (grp)
+    {
+        // One count per group of 'grp' sectors
+        unsigned stride = grp / 8 + 1;
+        uint16_t count = 0;
+        for (unsigned g = 0; g * grp < getSectorCount(track) && g * stride < rec.byte_count; g++)
+            count += buf[g * stride];
+        return count;
+    }
+
     if (rec.has_count)
         return buf[0];
 
@@ -310,13 +343,13 @@ bool D64MStream::findFreeSectorOnTrack(uint8_t track, uint8_t startSector, uint8
     if (!readBAMRecord(track, &rec, buf))
         return false;
 
-    uint8_t base = rec.has_count ? 1 : 0;
     uint16_t spt = getSectorCount(track);
     for (uint16_t i = 0; i < spt; i++)
     {
         uint8_t s = (startSector + i) % spt;
-        uint8_t byte_index = base + (s >> 3);
-        if (byte_index >= rec.byte_count)
+        uint8_t byte_index;
+        int count_index;
+        if (!bamIndex(rec, s, &byte_index, &count_index))
             continue; // beyond bitmap coverage - treat as allocated
         if (buf[byte_index] & bamBitMask(s))
         {
@@ -543,8 +576,9 @@ bool D64MStream::isBlockFree(uint8_t track, uint8_t sector)
     if (!readBAMRecord(track, &rec, buf))
         return false;
 
-    uint8_t byte_index = (rec.has_count ? 1 : 0) + (sector >> 3);
-    if (byte_index >= rec.byte_count)
+    uint8_t byte_index;
+    int count_index;
+    if (!bamIndex(rec, sector, &byte_index, &count_index))
         return false;
 
     // Check if bit is set (1 = free, 0 = allocated)
@@ -943,9 +977,9 @@ bool D64MStream::queryBlockAllocation(uint8_t track, uint8_t sector, bool& out_a
     if (!readBAMRecord(track, &rec, buf))
         return false;
 
-    uint8_t base = rec.has_count ? 1 : 0;
-    uint8_t byte_index = base + (sector >> 3);
-    if (byte_index >= rec.byte_count)
+    uint8_t byte_index;
+    int count_index;
+    if (!bamIndex(rec, sector, &byte_index, &count_index))
         return false;   // sector beyond what this BAM record can represent
 
     uint8_t bitmask = bamBitMask(sector);
@@ -2085,6 +2119,16 @@ std::unique_ptr<RELStorage> D64MStream::createRel(std::string path, uint8_t reco
 
 bool D64MStream::formatImage(std::string name, std::string id, size_t track_count, bool error_info)
 {
+    // A D9090/D9060 (dos_version 0xFF, as in linearBlock()) keeps its BAM as a
+    // chain of blocks with a configuration sector at 0/0 and bad-block lists;
+    // none of the layout below applies to it, and running it would write a
+    // floppy BAM over the drive. Refuse instead.
+    if (dos_version == 0xFF)
+    {
+        Debug_printv("format: not supported for D9090/D9060 images");
+        return false;
+    }
+
     // Settle the geometry BEFORE anything is laid out: initializeBlocks() fills
     // every track and initializeBlockAllocationMap() writes one BAM entry per
     // track, and both read end_track. A non-zero track_count is how a 40- or

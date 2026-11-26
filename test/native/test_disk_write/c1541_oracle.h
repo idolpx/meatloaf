@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <cstring>
 
 // Thin wrapper over VICE's c1541 used as an independent oracle. Path comes
 // from the C1541 env var so CI can point at its own install.
@@ -55,7 +56,14 @@ inline std::string c1541_run(const std::string& args, int* exit_code = nullptr)
     }
     char buf[512];
     while (fgets(buf, sizeof(buf), pipe) != nullptr)
+    {
+        // Attaching a D9090/D9060 makes c1541 try it as a GCR image first and
+        // print this, whatever the image holds. It is not a report about the
+        // image, and left in it trips every "error" check below on a D90.
+        if (strstr(buf, "Import GCR: Unknown GCR image version") != nullptr)
+            continue;
         out += buf;
+    }
     int rc = pclose(pipe);
     if (exit_code != nullptr) *exit_code = rc;
     return out;
