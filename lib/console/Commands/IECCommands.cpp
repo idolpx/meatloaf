@@ -191,8 +191,23 @@ static int iec(int argc, char **argv)
     {
         return iecScan(argc, argv);
     }
+    else if (strcmp(argv[1], "state") == 0)
+    {
+        char buf[256];
+        IEC.debugState(buf, sizeof(buf));
+        Serial.printf("%s\r\n", buf);
+        return EXIT_SUCCESS;
+    }
+    else if (strcmp(argv[1], "reset") == 0)
+    {
+        IEC.debugReset();
+        char buf[256];
+        IEC.debugState(buf, sizeof(buf));
+        Serial.printf("%s\r\n", buf);
+        return EXIT_SUCCESS;
+    }
 
-    Serial.printf("Usage: iec [sleep|wake [id]|scan [start] [end]]\r\n");
+    Serial.printf("Usage: iec [sleep|wake [id]|scan [start] [end]|state|reset]\r\n");
     return EXIT_FAILURE;
 }
 #else
@@ -733,7 +748,7 @@ namespace ESP32Console::Commands
     const ConsoleCommand getIECCommand()
     {
         return ConsoleCommand("iec", &iec,
-            "Show/control the IEC bus. Usage: iec [sleep|wake|exclusive [id]|scan [start] [end]]");
+            "Show/control the IEC bus. Usage: iec [sleep|wake|exclusive [id]|scan [start] [end]|state|reset]");
     }
     const ConsoleCommand getEnableCommand()
     {

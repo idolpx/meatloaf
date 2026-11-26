@@ -125,6 +125,13 @@ bool IECBusHandler::waitTimeout(uint16_t timeout, uint8_t cond)
             {
               // timeout has expired => if there was no condition to wait for
               // then return TRUE, otherwise return FALSE (because the condition was not met)
+              // for "iec state": a wait that expired on a condition
+              if( cond!=TC_NONE )
+                {
+                  m_dbgTimeouts++;
+                  m_dbgLastWaitCond = cond;
+                  m_dbgLastWaitWanted = timeout;
+                }
               return cond==TC_NONE;
             }
         }
@@ -1103,6 +1110,7 @@ bool RAMFUNC(IECBusHandler::transmitIECByte)(uint8_t numData)
   // signal "ready-to-send" (CLK=1)
   writePinCLK(HIGH);
   
+  m_dbgStage = 1;
   // wait (indefinitely, no timeout) for DATA HIGH ("ready-to-receive")
   // NOTE: this must be in a blocking loop since the receiver starts counting
   // up the EOI timeout immediately after setting DATA HIGH. If we had exited the 
@@ -1116,7 +1124,9 @@ bool RAMFUNC(IECBusHandler::transmitIECByte)(uint8_t numData)
       // wait for receiver to acknowledge EOI by setting DATA=0 then DATA=1
       // if we got here by "verifyError" then wait indefinitely because we
       // didn't enter the "wait for DATA high" state above
+      m_dbgStage = 2;
       if( !waitPinDATA(LOW, verifyError ? 0 : 1000) ) { interrupts(); return false; }
+      m_dbgStage = 3;
       if( !waitPinDATA(HIGH) ) { interrupts(); return false; }
     }
 
@@ -1148,6 +1158,7 @@ bool RAMFUNC(IECBusHandler::transmitIECByte)(uint8_t numData)
   uint8_t data = m_currentDevice->read();
 #endif
 
+  m_dbgStage = 4;
   // transmit the byte
   for(uint8_t i=0; i<8; i++)
     {
@@ -1174,8 +1185,11 @@ bool RAMFUNC(IECBusHandler::transmitIECByte)(uint8_t numData)
   writePinCLK(LOW);
   writePinDATA(HIGH);
 
+  m_dbgStage = 5;
   // wait for receiver to signal "busy"
   if( !waitPinDATA(LOW) ) return false;
+  m_dbgStage = 0;
+  m_dbgBytes++;
 
   // discard previously read data byte
   if( doPeek ) m_currentDevice->read();
@@ -1944,7 +1958,9 @@ void IECBusHandler::task()
         // check if we can read (also gives devices a chance to
         // execute time-consuming tasks while bus master waits for ready-to-send)
         m_inTask = false;
+        m_dbgStage = 6;
         int8_t numData = m_currentDevice->canRead();
+        m_dbgStage = 0;
         m_inTask = true;
 
         if( m_flags & P_ATN )
@@ -2018,4 +2034,72 @@ void IECBusHandler::task()
   // call "task" function for attached devices
   for(uint8_t i=0; i<m_numDevices; i++)
     m_devices[i]->task(); 
+}
+
+
+
+// "iec reset": zero the diagnostic counters and put the lines back where
+// begin() leaves them - CLK, DATA and the split SRQ/ATN/RESET outputs
+// released, ATN->DATA hardware coupling on. Called from the console task, so
+// it touches only the pins and the counters: m_flags belongs to task() on the
+// IEC core (see end()).
+void IECBusHandler::debugReset()
+{
+  m_dbgStage = 0;
+  m_dbgBytes = 0;
+  m_dbgTimeouts = 0;
+  m_dbgLastWaitWanted = 0;
+  m_dbgLastWaitCond = 0;
+
+  writePinCLK(HIGH);
+  writePinDATA(HIGH);
+
+#if defined(IEC_USE_INVERTED_LINE_DRIVERS)
+  const uint8_t released = LOW;
+#else
+  const uint8_t released = HIGH;
+#endif
+#if defined(IEC_USE_SRQ_LINE_DRIVER)
+#ifdef IEC_SPLIT_SRQ
+  if( m_pinSRQout<0xFF ) digitalWrite(m_pinSRQout, released);
+#else
+  if( m_pinSRQ<0xFF ) digitalWrite(m_pinSRQ, released);
+#endif
+#endif
+#ifdef IEC_SPLIT_ATN
+  if( m_pinATNout<0xFF ) digitalWrite(m_pinATNout, released);
+#endif
+#ifdef IEC_SPLIT_RESET
+  if( m_pinRESETout<0xFF ) digitalWrite(m_pinRESETout, released);
+#endif
+  (void)released;
+
+  writePinCTRL(LOW);
+}
+
+static const char *debugStageName(uint8_t stage)
+{
+  switch( stage )
+    {
+    case 0:  return "idle";
+    case 1:  return "IEC wait ready-to-receive (DATA high)";
+    case 2:  return "IEC EOI wait ack (DATA low)";
+    case 3:  return "IEC EOI wait release (DATA high)";
+    case 4:  return "IEC sending bits";
+    case 5:  return "IEC wait byte ack (DATA low)";
+    case 6:  return "in device canRead()";
+    case 11: return "JiffyDOS wait ready (DATA high)";
+    case 12: return "JiffyDOS sending";
+    case 13: return "JiffyDOS wait done (DATA low)";
+    default: return "unknown";
+    }
+}
+
+void IECBusHandler::debugState(char *buf, int len)
+{
+  uint8_t stage = m_dbgStage;   // read once: it can change under us
+  snprintf(buf, len, "stage[%u %s] bytes[%lu] ATN[%d] CLK[%d] DATA[%d] flags[%02X] timeouts[%lu] last[%u us, cond %u]",
+           stage, debugStageName(stage), (unsigned long)m_dbgBytes,
+           readPinATN() ? 1 : 0, readPinCLK() ? 1 : 0, readPinDATA() ? 1 : 0, m_flags,
+           (unsigned long)m_dbgTimeouts, m_dbgLastWaitWanted, m_dbgLastWaitCond);
 }

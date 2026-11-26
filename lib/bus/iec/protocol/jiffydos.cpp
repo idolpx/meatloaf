@@ -201,6 +201,7 @@ bool RAMFUNC(IECBusHandler::transmitJiffyByte)(uint8_t numData)
 
   // signal "READY" by releasing CLK
   writePinCLK(HIGH);
+  m_dbgStage = 11;
   
   // wait (indefinitely) for either DATA high ("ready-to-receive", FBCB) or ATN low
   // NOTE: this must be in a blocking loop since the receiver receives the data
@@ -224,8 +225,9 @@ bool RAMFUNC(IECBusHandler::transmitJiffyByte)(uint8_t numData)
 
   // abort if ATN low
   if( !readPinATN() )
-    { interrupts(); return false; }
+    { interrupts(); m_dbgStage = 0; return false; }
 
+  m_dbgStage = 12;
   writePinCLK(data & bit(0));
   writePinDATA(data & bit(1));
   JDEBUG1();
@@ -292,14 +294,17 @@ bool RAMFUNC(IECBusHandler::transmitJiffyByte)(uint8_t numData)
 
   // receiver signals "done" by pulling DATA low (FBF2)
   // 63 cycles after initial DATA HIGH (FBF2)
+  m_dbgStage = 13;
   if( !waitPinDATA(LOW) ) { interrupts(); return false; }
   JDEBUG0();
 
   interrupts();
+  m_dbgStage = 0;
 
   if( numData>0 )
     {
       // success => discard transmitted byte (was previously read via peek())
+      m_dbgBytes++;
       m_currentDevice->read();
       return true;
     }

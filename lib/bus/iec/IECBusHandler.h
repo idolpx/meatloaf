@@ -160,6 +160,21 @@ class IECBusHandler
   bool isHostMode() const { return m_hostMode; }
   bool isEnabled() const { return m_enabled; }
 
+  // Diagnostic for the "iec state" console command: where the TALK send path
+  // is (m_dbgStage) and the live line levels, so a stuck transfer can be read
+  // off the console while it is stuck. Only single stores on the hot path.
+  // The stage values are named in debugStageName() (IECBusHandler.cpp); a new
+  // stage needs a name there. Fast loaders other than JiffyDOS do not set a stage. m_dbgBytes counts
+  // bytes sent; m_dbgTimeouts counts waitTimeout() calls that expired on a
+  // condition, the last one's timeout (us) and condition kept alongside.
+  volatile uint8_t m_dbgStage = 0;
+  volatile uint32_t m_dbgBytes = 0;
+  volatile uint32_t m_dbgTimeouts = 0;
+  volatile uint16_t m_dbgLastWaitWanted = 0;
+  volatile uint8_t  m_dbgLastWaitCond = 0;
+  void debugState(char *buf, int len);
+  void debugReset();      // zero the counters, release the lines ("iec reset")
+
   IECDevice *m_currentDevice;
   IECDevice *m_devices[IEC_MAX_DEVICES];
 
