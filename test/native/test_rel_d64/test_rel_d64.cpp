@@ -8,7 +8,9 @@
 #include <vector>
 #include "media/disk/d64.h"
 #include "media/disk/d71.h"
+#include "media/disk/d80.h"
 #include "media/disk/d81.h"
+#include "media/disk/d82.h"
 #include "media/hd/dnp.h"
 #include "media/file/rel.h"
 #include "../test_disk_write/file_container_stream.h"
@@ -171,6 +173,12 @@ static std::shared_ptr<D64MStream> mk_d64(std::shared_ptr<MStream> s) { return s
 static std::shared_ptr<D64MStream> mk_d71(std::shared_ptr<MStream> s) { return std::make_shared<D71MStream>(s); }
 static std::shared_ptr<D64MStream> mk_d81(std::shared_ptr<MStream> s) { return std::make_shared<D81MStream>(s); }
 static std::shared_ptr<D64MStream> mk_dnp(std::shared_ptr<MStream> s) { return std::make_shared<DNPMStream>(s); }
+static std::shared_ptr<D64MStream> mk_d80(std::shared_ptr<MStream> s) { return std::make_shared<D80MStream>(s); }
+static std::shared_ptr<D64MStream> mk_d82(std::shared_ptr<MStream> s) { return std::make_shared<D82MStream>(s); }
+
+// Formats exercised only by the limit tests below (kFmts is the common set).
+static const RelFmt kD80 = { "d80", "d80", 533248,  mk_d80, 0 };
+static const RelFmt kD82 = { "d82", "d82", 1066496, mk_d82, 0 };
 
 // D64/D71 cross from the first side sector into the second (>120 blocks);
 // D81/DNP cross from the first super-side-sector group into the second (>720).
@@ -421,6 +429,92 @@ void test_rel_d64_disk_full_is_72_and_leaks_nothing(void)
     check_rel(f, data, 254);
 }
 
+// Fills the image with a PRG until exactly 'leave' blocks are free.
+static void fill_leaving(const RelFmt& f, uint16_t leave)
+{
+    uint16_t left = free_blocks(f);
+    TEST_ASSERT_TRUE_MESSAGE(left > leave, f.name);
+    auto img = f.make(std::make_shared<FileContainerStream>(kImg));
+    img->mode = std::ios_base::out;
+    TEST_ASSERT_TRUE(img->seekPath("filler"));
+    std::vector<uint8_t> fill((size_t)(left - leave) * 254, 0x5A);
+    TEST_ASSERT_EQUAL_UINT32(fill.size(), img->write(fill.data(), (uint32_t)fill.size()));
+    img->close();
+    TEST_ASSERT_EQUAL_INT(0, img->error());
+    TEST_ASSERT_EQUAL_UINT16_MESSAGE(leave, free_blocks(f), f.name);
+}
+
+// A record of 254 bytes is one data block, so 'records' of them is that many
+// data blocks. At the format's limit the file is accepted; one block more is
+// 52 FILE TOO LARGE and the image is left byte-identical.
+static void check_too_large(const RelFmt& f, uint32_t max_data_blocks)
+{
+    fresh_image(f);
+    auto data = pattern(max_data_blocks + 1, 254);
+    create_rel(f, data, 254, 5);
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(ST_OK_, write_one(f, data, 254, max_data_blocks), f.name);
+    std::string before = slurp(kImg);
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(ST_FILE_TOO_LARGE_, write_one(f, data, 254, max_data_blocks + 1), f.name);
+    TEST_ASSERT_TRUE_MESSAGE(before == slurp(kImg), f.name);
+    auto expect = filled(max_data_blocks, 254);
+    std::copy(data.begin(), data.begin() + 5 * 254, expect.begin());
+    std::copy(data.begin() + (max_data_blocks - 1) * 254, data.begin() + max_data_blocks * 254,
+              expect.begin() + (max_data_blocks - 1) * 254);
+    check_rel(f, expect, 254);
+}
+
+// vdrive_rel_blocks_max for an 8050: 720 data blocks + 6 side sectors, and no
+// super side sector to go further.
+void test_rel_d80_too_large_is_52_and_changes_nothing(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    check_too_large(kD80, 720);
+}
+
+// vdrive_rel_blocks_max for an 8250: 4090 data blocks, their side sectors and
+// the super side sector.
+void test_rel_d82_too_large_is_52_and_changes_nothing(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    check_too_large(kD82, 4090);
+}
+
+// Growing past a side sector's 120 data blocks needs TWO blocks - the data
+// block and the new side sector. With room for only the first the grow is 72
+// DISK FULL and claims nothing, rather than writing a data block that no side
+// sector points at.
+void test_rel_side_sector_allocation_failure_changes_nothing(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    const RelFmt& f = kFmts[0];   // d64
+    fresh_image(f);
+    auto data = pattern(121, 254);
+    create_rel(f, data, 254, 120);   // exactly one full side sector
+    fill_leaving(f, 1);
+    std::string before = slurp(kImg);
+    TEST_ASSERT_EQUAL_UINT8(ST_DISK_FULL_, write_one(f, data, 254, 121));
+    TEST_ASSERT_TRUE(before == slurp(kImg));
+    data.resize(120 * 254);
+    check_rel(f, data, 254);
+}
+
+// The same at a super-side-sector group boundary: 720 data blocks fill the six
+// side sectors of group 0, so the 721st needs the first side sector of group 1.
+void test_rel_super_group_allocation_failure_changes_nothing(void)
+{
+    if (!c1541_available()) TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+    const RelFmt& f = kFmts[2];   // d81
+    fresh_image(f);
+    auto data = pattern(721, 254);
+    create_rel(f, data, 254, 720);
+    fill_leaving(f, 1);
+    std::string before = slurp(kImg);
+    TEST_ASSERT_EQUAL_UINT8(ST_DISK_FULL_, write_one(f, data, 254, 721));
+    TEST_ASSERT_TRUE(before == slurp(kImg));
+    data.resize(720 * 254);
+    check_rel(f, data, 254);
+}
+
 // vdrive_rel_open (newrelfile) -> vdrive_rel_grow(.., 0): what
 // D64MFile::createRelStream does after createRel(). Growing to one record
 // takes one data block, and a REL file is whole blocks of records (254 / 20 =
@@ -500,5 +594,9 @@ int main(int, char**)
     RUN_TEST(test_rel_scratch_frees_everything);
     RUN_TEST(test_rel_1541_too_large_is_52_and_changes_nothing);
     RUN_TEST(test_rel_d64_disk_full_is_72_and_leaks_nothing);
+    RUN_TEST(test_rel_d80_too_large_is_52_and_changes_nothing);
+    RUN_TEST(test_rel_d82_too_large_is_52_and_changes_nothing);
+    RUN_TEST(test_rel_side_sector_allocation_failure_changes_nothing);
+    RUN_TEST(test_rel_super_group_allocation_failure_changes_nothing);
     return UNITY_END();
 }

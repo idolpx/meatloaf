@@ -753,8 +753,12 @@ bool CbmDos::cmdSd2iec(std::string& command, size_t colon_position)
         break;
         case 'P':
             {
-                // PWD - print working directory
-                if ( command[1] == 'W' && command[2] == 'D' )
+                // PWD - print working directory. Only the bare three letters
+                // (and BASIC's trailing CR): a binary P whose channel byte is
+                // $57 and record-low byte $44 starts with the same bytes, and
+                // it always carries at least the record-high and position.
+                bool bare_pwd = m_rawLen == 3 || (m_rawLen == 4 && m_raw[3] == 0x0D);
+                if ( bare_pwd && command[1] == 'W' && command[2] == 'D' )
                 {
                     Debug_printv( "print working directory");
                     std::string path = mstr::toPETSCII2(m_host.dosCwd()->url);
