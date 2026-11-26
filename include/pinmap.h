@@ -37,6 +37,7 @@
 #include "pinmap/esp32-s3-rgb.h"
 #include "pinmap/esp32-s3-dev-kit-n8r8.h"
 #include "pinmap/esp32-s3-makemagazin.h"
+#include "pinmap/esp32-s3-carrier-clauss-v1_1.h"
 
 // ESP32 C3
 #include "pinmap/esp32-c3-super-mini.h"

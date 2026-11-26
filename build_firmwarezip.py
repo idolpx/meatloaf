@@ -107,11 +107,13 @@ def makezip(source, target, env):
             value = define[1]
             version[name] = value
 
-        # Get and clean the current commit message
-        try:
-            version_desc = subprocess.getoutput("git log -1 --pretty=%B | tr '\n' ' '")
-        except subprocess.CalledProcessError as e:
-            # Revert to full version if no commit msg or error
+        # Prefer the environment's user-facing board description when set.
+        version_desc = env.GetProjectOption("custom_firmware_description", "").strip()
+        if not version_desc:
+            version_desc = subprocess.getoutput(
+                "git log -1 --pretty=%B | tr '\n' ' '"
+            ).strip()
+        if not version_desc:
             version_desc = version['FN_VERSION_FULL']
 
         try:
