@@ -81,6 +81,7 @@
 #define DISK_IMAGE_TYPE_D4M 4000
 #define DISK_IMAGE_TYPE_DHD 4844 /* HD in ASCII for CMDHD */
 #define DISK_IMAGE_TYPE_D90 9000 /* D9090/D9060 */
+#define DISK_IMAGE_TYPE_D60 9060 /* MEATLOAF: create-only - a D9060-sized D90; probes back as DISK_IMAGE_TYPE_D90 */
 
 struct fsimage_s;
 struct rawimage_s;

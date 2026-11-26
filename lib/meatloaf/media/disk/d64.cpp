@@ -2119,10 +2119,9 @@ std::unique_ptr<RELStorage> D64MStream::createRel(std::string path, uint8_t reco
 
 bool D64MStream::formatImage(std::string name, std::string id, size_t track_count, bool error_info)
 {
-    // A D9090/D9060 (dos_version 0xFF, as in linearBlock()) keeps its BAM as a
-    // chain of blocks with a configuration sector at 0/0 and bad-block lists;
-    // none of the layout below applies to it, and running it would write a
-    // floppy BAM over the drive. Refuse instead.
+    // A D9090/D9060 (dos_version 0xFF, as in linearBlock()) has its own
+    // layout and its own formatImage() (D90MStream); the floppy layout below
+    // would write a floppy BAM over the drive, so refuse if it ever lands here.
     if (dos_version == 0xFF)
     {
         Debug_printv("format: not supported for D9090/D9060 images");
@@ -2248,6 +2247,24 @@ bool D64MFile::format(std::string header_info)
 {
     Debug_printv("header_info[%s] url[%s]", header_info.c_str(), url.c_str());
 
+    // The open below truncates, so whatever size the image had is gone by the
+    // time formatImage() runs. A format that takes its geometry from the old
+    // image (a D9060 reformatted under a .d90 name) needs it, so read it first.
+    uint32_t prior_size = 0;
+    {
+        MFile *raw = MFSOwner::File(url, true);
+        if (raw != nullptr)
+        {
+            if (raw->exists())
+            {
+                auto rs = raw->getSourceStream(std::ios_base::in);
+                if (rs != nullptr)
+                    prior_size = rs->size();
+            }
+            delete raw;
+        }
+    }
+
     auto newFile = MFSOwner::File(url);
     if (newFile == nullptr)
         return false;
@@ -2265,6 +2282,7 @@ bool D64MFile::format(std::string header_info)
                  spec.name.c_str(), spec.id.c_str(),
                  (int)spec.track_count, (int)spec.error_info);
 
+    image->prior_size = prior_size;
     bool ok = image->formatImage(spec.name, spec.id, spec.track_count, spec.error_info);
 
     delete newFile;

@@ -155,8 +155,10 @@ bool VDrive::createDiskImage(const char *filename, const char *itype, const char
     disk_type = DISK_IMAGE_TYPE_D2M;
   } else if (strcmp(itypec, "d4m") == 0) {
     disk_type = DISK_IMAGE_TYPE_D4M;
-  } else if (strcmp(itypec, "d90") == 0) {
+  } else if (strcmp(itypec, "d90") == 0 || strcmp(itypec, "d96") == 0) {
     disk_type = DISK_IMAGE_TYPE_D90;
+  } else if (strcmp(itypec, "d60") == 0) {
+    disk_type = DISK_IMAGE_TYPE_D60;   // MEATLOAF: created at D9060 size, probed back as a D90
   } else {
     lib_free(itypec);
     return false;
