@@ -48,6 +48,7 @@ public:
 
     uint8_t  recordLength() const { return len_; }
     uint32_t recordCount();                                  // storage size / record length
+    using MStream::position;                                 // keep the byte-position overloads visible
     uint8_t  position(uint16_t record, uint8_t pos);         // CBM P: 1-based, 0==1; returns ST_OK / 50 / 51
     uint32_t read(uint8_t* buf, uint32_t size) override;     // current record only; 0 = record end
     uint32_t readRecord(uint8_t* buf, uint32_t size);        // read() without the 0 end marker: what a channel serves
