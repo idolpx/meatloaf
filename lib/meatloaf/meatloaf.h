@@ -336,6 +336,34 @@ public:
         return false;
     };
 
+    // The CBM type (1 SEQ, 2 PRG, 3 USR, 0 DEL) a file being CREATED in a disk
+    // image gets in its directory entry. Media without CBM types ignore it.
+    virtual void setWriteFileType(uint8_t cbm_type) { (void)cbm_type; }
+
+    // The CBM type (low three bits of the directory entry) of the file this
+    // stream has selected; -1 when the media has no CBM types or no file is
+    // selected. An MFile resolved by name carries no type of its own.
+    virtual int cbmFileType() { return -1; }
+
+    // A 1581 CBM sub-partition by name: its first and last track, which the
+    // "/" command reports in its 02 PARTITION SELECTED answer.
+    virtual bool subPartitionTracks(const std::string& name, uint8_t* first, uint8_t* last) {
+        (void)name; (void)first; (void)last;
+        return false;
+    }
+
+    // The V command: rebuild the BAM, answering a CBM status code. Media
+    // without a BAM answer 74 (DRIVE NOT READY - this project's "not
+    // supported on this file system").
+    virtual uint8_t validate() { return 74; }
+
+    // The next free block at or after track/sector, which B-A names in its
+    // 65 NO BLOCK answer. false when there is none (or no BAM).
+    virtual bool suggestFreeBlock(uint8_t track, uint8_t sector, uint8_t *found_track, uint8_t *found_sector) {
+        (void)track; (void)sector; (void)found_track; (void)found_sector;
+        return false;
+    }
+
     // For files with no directory structure
     // tap, crt, tar
     virtual std::string seekNextEntry() {
@@ -521,6 +549,10 @@ public:
 
     virtual bool mkDir() { return false; };
     virtual bool rmDir() { return false; };
+    // L (lock/unlock) and R-H (rename the disk header): media with a CBM
+    // directory override these; everything else has nothing to lock or name.
+    virtual bool toggleLock() { return false; };
+    virtual bool setDiskName(std::string name) { (void)name; return false; };
     virtual bool exists();
     // Default: pathInStream empty means this MFile IS the container/file
     // itself (isDirectory() reports true above so it can be browsed, but on

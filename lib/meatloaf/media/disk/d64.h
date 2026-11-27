@@ -395,6 +395,30 @@ public:
     // since that is the single byte a scratch overwrites.
     bool unremoveFile(std::string path);
 
+    // R: rename a file inside the image. `new_name` is UTF-8, written as
+    // PETSCII padded with $A0 (the same encoding a SAVE writes). Fails if
+    // `path` does not name a file; the caller checks the new name is free.
+    bool renameFile(std::string path, std::string new_name);
+
+    // L: toggle the lock bit ($40) of a file's type byte (vdrive_command_lockunlock).
+    bool toggleLock(std::string path);
+
+    // R-H: replace the disk name in the current partition's header, padded
+    // with $A0 (vdrive_command_renameheader). `name` is UTF-8.
+    bool renameHeader(std::string name);
+
+    // V: rebuild the BAM from what the directory reaches, as
+    // vdrive_command_validate() does. Returns a CBM status (0 = OK). On any
+    // failure the BAM sectors are put back as they were.
+    uint8_t validate() override;
+
+    // B-A: the next free block at or after t/s, for the 65 NO BLOCK answer.
+    bool suggestFreeBlock(uint8_t t, uint8_t s, uint8_t *ft, uint8_t *fs) override;
+    void setWriteFileType(uint8_t cbm_type) override { create_type = 0x80 | (cbm_type & 0x07); }
+    int cbmFileType() override { return seekCalled ? (entry.file_type & 0x07) : -1; }
+    bool subPartitionTracks(const std::string& name, uint8_t* first, uint8_t* last) override;
+    uint8_t create_type = 0x82;   // closed PRG unless the OPEN said otherwise
+
     // Enter a subdirectory entry (CMD native DIR or 1581 CBM sub-partition)
     bool enterDirectory(std::string name);
 
@@ -533,6 +557,12 @@ protected:
     // in the BAM at all, so a caller that cannot answer treats it as unsafe
     // rather than assuming free. out_allocated is only set when it returns true.
     bool queryBlockAllocation(uint8_t track, uint8_t sector, bool& out_allocated);
+    // Validate walk (V); see validate(). The failing block, for the status.
+    uint8_t validateClaim(uint8_t t, uint8_t s);
+    uint8_t validateChain(uint8_t t, uint8_t s, uint32_t *count);
+    uint8_t validateSideSectors(uint8_t t, uint8_t s, uint32_t *count);
+    uint8_t validateDirectory(uint8_t t, uint8_t s, bool geos, int depth);
+    uint8_t failed_track = 0, failed_sector = 0;
 
     // Add a directory entry in the current directory: first free slot, or a
     // new directory block (directory interleave). Returns 0 or the CBM status
@@ -944,7 +974,10 @@ public:
     bool isDirectory() override;
     bool exists() override;
     bool remove() override;
-    bool rename(std::string dest) override { return false; };
+    bool rename(std::string dest) override;
+    std::shared_ptr<D64MStream> openForUpdate();
+    bool toggleLock() override;
+    bool setDiskName(std::string name) override;
     time_t getLastWrite() override;
     time_t getCreationTime() override;
 

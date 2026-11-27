@@ -43,6 +43,7 @@
 // https://github.com/c64pectre/c64-cmd-hd
 // https://www.pipesup.ca/cmdhd-in-vice/
 // https://mikenaberezny.com/hardware/c64-128/cmd-hd-series/
+// https://dn710605.ca.archive.org/0/items/cmd-hd-manual-remaster-v-0.1/CMD%20HD%20User%20Manual%20Remaster%20V1.pdf
 //
 
 
@@ -93,6 +94,12 @@ public:
         std::string disk_label;             // system partition (entry 0) name
         std::vector<DHDPartition> parts;
 
+        // Where the 32-byte partition entries live in the image, so the
+        // G-P/R-P/D-P commands can read and write them raw.
+        uint32_t table_base = 0;
+        uint16_t maxpart = 254;             // 254 on an HD, 31 on an FD
+        uint8_t  fd_kind = 0;               // 0 HD, else 1/2/4 for D1M/D2M/D4M
+
         const DHDPartition* byNumber(uint8_t number) const;
         const DHDPartition* byName(std::string utf8name) const;
         const DHDPartition* current() const { return byNumber(selected); }
@@ -100,6 +107,18 @@ public:
 
     static Image* obtain(const std::string& containerUrl);
     static bool select(const std::string& containerUrl, uint8_t number);
+
+    // The raw 32-byte table entry `number` (0 = system partition). False when
+    // the image has no table or the entry is past the end of the image.
+    static bool readEntry(const std::string& containerUrl, uint8_t number, uint8_t out[32]);
+
+    // R-P: write a new name (PETSCII, padded with $A0) into entry `number`.
+    static bool renamePartition(const std::string& containerUrl, uint8_t number, const std::string& petscii_name);
+
+    // D-P (CMD FD only, as VICE): clear the type of every listed partition,
+    // then pack the remaining ones to the start of the disk, moving their data
+    // (vdrive_pack_parts). Returns a CBM status; the table is re-read after.
+    static uint8_t deletePartitions(const std::string& containerUrl, const std::vector<uint8_t>& numbers);
 
     // True while the registry reads the raw image (so DHDMFileSystem
     // declines the path and the underlying filesystem serves the bytes)
@@ -115,6 +134,8 @@ public:
 
 private:
     static bool parse(const std::string& containerUrl, Image& img);
+    static std::shared_ptr<MStream> openRaw(const std::string& containerUrl, std::ios_base::openmode mode);
+    static void forget(const std::string& containerUrl);
 
     static std::map<std::string, Image> s_images;
     static bool s_probing;

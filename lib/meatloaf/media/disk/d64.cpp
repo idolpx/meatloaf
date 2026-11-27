@@ -296,10 +296,7 @@ bool D64MStream::deallocateBlock(uint8_t track, uint8_t sector)
 
 bool D64MStream::validateBAM()
 {
-    // TODO: Walk each files blocks to ensure the BAM accurately reflects the allocation.
-    // Correct the BAM if it is not accurate.
-    // Make safe for REL and VLIR files.
-    return false;
+    return validate() == 0;
 }
 
 // Returns uint16_t, not uint8_t: a CMD native track (DNP, DHD) has 256 sectors,
@@ -849,7 +846,7 @@ bool D64MStream::finalizeFileWrite()
 
     uint8_t dt, ds, slot;
     uint16_t blocks = create_allocated.size();
-    uint8_t st = addDirectoryEntry(create_filename, 0x82, // closed PRG
+    uint8_t st = addDirectoryEntry(create_filename, create_type, // closed, PRG unless set
                                    create_start_track, create_start_sector,
                                    0, 0, 0, blocks, &dt, &ds, &slot);
     if (st != 0)
@@ -1097,6 +1094,393 @@ bool D64MStream::unremoveFile(std::string path)
     if (!seekScratchedEntry(parts.back()))
         return false;
     return unscratchEntry();
+}
+
+
+// --- R, L, R-H ----------------------------------------------------------
+
+// resolvePath() leaves track/sector on the entry's DIRECTORY sector and
+// entry_index one past its slot - the same contract scratchEntry() relies on.
+bool D64MStream::renameFile(std::string path, std::string new_name)
+{
+    if (resolvePath(path) != PATH_FILE)
+        return false;
+
+    uint8_t dt = track, ds = sector;
+    uint8_t slot = (entry_index - 1) % 8;
+
+    std::string name = mstr::toPETSCII2(new_name);
+    if (name.size() > 16)
+        name = name.substr(0, 16);
+
+    std::string dirsec = readBlock(dt, ds);
+    if (dirsec.size() != block_size)
+        return false;
+    memset(&dirsec[slot * 32 + 5], 0xA0, 16);
+    memcpy(&dirsec[slot * 32 + 5], name.data(), name.size());
+    return writeBlock(dt, ds, dirsec);
+}
+
+bool D64MStream::toggleLock(std::string path)
+{
+    if (resolvePath(path) != PATH_FILE)
+        return false;
+
+    uint8_t dt = track, ds = sector;
+    uint8_t slot = (entry_index - 1) % 8;
+
+    std::string dirsec = readBlock(dt, ds);
+    if (dirsec.size() != block_size)
+        return false;
+    dirsec[slot * 32 + 2] ^= 0x40;   // CBMDOS_FT_LOCKED
+    return writeBlock(dt, ds, dirsec);
+}
+
+bool D64MStream::renameHeader(std::string name)
+{
+    if (partitions.empty() || partition >= partitions.size())
+        return false;
+
+    std::string n = mstr::toPETSCII2(name);
+    if (n.size() > 16)
+        n = n.substr(0, 16);
+
+    uint8_t ht = curPartition().header_track;
+    uint8_t hs = curPartition().header_sector;
+    uint8_t ho = curPartition().header_offset;
+
+    std::string hdr = readBlock(ht, hs);
+    if (hdr.size() != block_size || (size_t) ho + 16 > hdr.size())
+        return false;
+    memset(&hdr[ho], 0xA0, 16);
+    memcpy(&hdr[ho], n.data(), n.size());
+    if (!writeBlock(ht, hs, hdr))
+        return false;
+
+    readHeader();
+    return true;
+}
+
+
+// --- B-A suggestion -------------------------------------------------------
+
+bool D64MStream::suggestFreeBlock(uint8_t t, uint8_t s, uint8_t *ft, uint8_t *fs)
+{
+    // vdrive_command_block 'A' suggests the next free sector; the 1541 looks
+    // only on higher tracks, VICE (and this) use the allocator's own search.
+    return getNextFreeBlock(t, s, ft, fs);
+}
+
+
+// --- V ----------------------------------------------------------------------
+
+namespace {
+    // CBM file types (low three bits of the type byte)
+    constexpr uint8_t FT_DEL = 0, FT_SEQ = 1, FT_REL = 4, FT_CBM = 5, FT_DIR = 6;
+    constexpr uint8_t FT_CLOSED = 0x80;
+}
+
+// Allocate a block for the validate walk: 66 when it is not on the disk, 65
+// when something else already holds it (a cross-linked file - "the real drive
+// does not seem to catch this error", VICE says, and answers it anyway).
+uint8_t D64MStream::validateClaim(uint8_t t, uint8_t s)
+{
+    bool allocated = false;
+    if (!queryBlockAllocation(t, s, allocated))
+        return 66;
+    if (allocated)
+        return 65;
+    return setBlockAllocation(t, s, true) ? 0 : 25;
+}
+
+// vdrive_command_allocate_chain: claim every block of a link chain, counting.
+uint8_t D64MStream::validateChain(uint8_t t, uint8_t s, uint32_t *count)
+{
+    uint32_t guard = 0;
+    while (t != 0)
+    {
+        if (guard++ > 70000)
+            return 66;
+        uint8_t st = validateClaim(t, s);
+        if (st != 0)
+        {
+            failed_track = t;
+            failed_sector = s;
+            return st;
+        }
+        uint8_t link[2];
+        if (readBlockBytes(t, s, 0, link, 2) != 2)
+            return 74;
+        if (count)
+            (*count)++;
+        t = link[0];
+        s = link[1];
+    }
+    return 0;
+}
+
+// REL side sectors: a chain, or with a super side sector (1581, CMD) the super
+// block plus one chain per group, as freeRelSideSectors() walks them.
+uint8_t D64MStream::validateSideSectors(uint8_t t, uint8_t s, uint32_t *count)
+{
+    uint8_t blk[256];
+    if (readBlockBytes(t, s, 0, blk, 256) != 256)
+        return 66;
+    if (blk[2] != 0xFE)
+        return validateChain(t, s, count);
+
+    uint8_t st = validateClaim(t, s);
+    if (st != 0)
+        return st;
+    (*count)++;
+    for (uint32_t i = 0; i < 126; i++)
+    {
+        uint8_t gt = blk[3 + i * 2], gs = blk[4 + i * 2];
+        if (gt == 0)
+            break;
+        // groups are linked to each other too: stop where one is already ours
+        bool allocated = false;
+        if (queryBlockAllocation(gt, gs, allocated) && allocated)
+            continue;
+        st = validateChain(gt, gs, count);
+        if (st != 0)
+            return st;
+    }
+    return 0;
+}
+
+// vdrive_command_validate_worker: one directory, starting at its first
+// directory block. Closed files are reallocated and their block counts
+// corrected; unclosed ones are scratched. depth bounds CMD native recursion.
+uint8_t D64MStream::validateDirectory(uint8_t t, uint8_t s, bool geos, int depth)
+{
+    if (depth > 16)
+        return 71;
+
+    uint32_t guard = 0;
+    while (t != 0)
+    {
+        if (guard++ > 4096)
+            return 71;
+
+        uint8_t st = validateClaim(t, s);
+        if (st != 0)
+        {
+            failed_track = t;
+            failed_sector = s;
+            return st;
+        }
+
+        std::string dirsec = readBlock(t, s);
+        if (dirsec.size() != block_size)
+            return 74;
+        bool dirty = false;
+
+        for (uint8_t slot = 0; slot < 8; slot++)
+        {
+            uint8_t *e = (uint8_t *) &dirsec[slot * 32];
+            uint8_t type = e[2];
+            if (type == 0)
+                continue;
+
+            if (!(type & FT_CLOSED))
+            {
+                // Delete an unclosed file.
+                e[2] = FT_DEL;
+                dirty = true;
+                continue;
+            }
+
+            uint8_t ft = type & 0x07;
+            uint32_t recorded = e[30] | (e[31] << 8);
+            uint32_t counted = 0;
+            bool check_count = true;
+
+            if (ft == FT_CBM)
+            {
+                // 1581 sub-partition: a contiguous run of blocks.
+                uint8_t pt = e[3], ps = e[4];
+                for (uint32_t n = recorded; n > 0; n--)
+                {
+                    if (pt == curPartition().header_track)
+                        return 66;
+                    st = validateClaim(pt, ps);
+                    if (st != 0)
+                    {
+                        failed_track = pt;
+                        failed_sector = ps;
+                        return st;
+                    }
+                    if (++ps >= getSectorCount(pt))
+                    {
+                        ps = 0;
+                        pt++;
+                    }
+                }
+                check_count = false;
+            }
+            else if (ft == FT_DIR)
+            {
+                // CMD native subdirectory: its header block, then its own
+                // directory, which starts where the header links.
+                st = validateClaim(e[3], e[4]);
+                if (st != 0)
+                    return st;
+                uint8_t link[2];
+                if (readBlockBytes(e[3], e[4], 0, link, 2) != 2)
+                    return 74;
+                st = validateDirectory(link[0], link[1], geos, depth + 1);
+                if (st != 0)
+                    return st;
+                check_count = false;
+            }
+            else if (ft >= FT_SEQ && ft <= FT_REL)
+            {
+                if (geos && e[24] != 0 && ft != FT_REL)
+                {
+                    // GEOS: the info block, then a sequential chain or a VLIR
+                    // record block whose 127 entries are chains of their own.
+                    if (e[21] != 0)
+                    {
+                        st = validateClaim(e[21], e[22]);
+                        if (st != 0)
+                            return st;
+                    }
+                    counted++;
+
+                    if (e[23] == 0)
+                    {
+                        st = validateChain(e[3], e[4], &counted);
+                    }
+                    else if (e[23] == 1)
+                    {
+                        uint8_t idx[256];
+                        if (readBlockBytes(e[3], e[4], 0, idx, 256) != 256)
+                            return 66;
+                        st = validateClaim(e[3], e[4]);
+                        if (st != 0)
+                            return st;
+                        counted++;
+                        for (int r = 0; r < 127; r++)
+                        {
+                            uint8_t rt = idx[2 + r * 2], rs = idx[3 + r * 2];
+                            if (rt == 0 && rs == 255) continue;   // empty record
+                            if (rt == 0 && rs == 0) break;        // end
+                            st = validateChain(rt, rs, &counted);
+                            if (st != 0)
+                                break;
+                        }
+                    }
+                    else
+                        return 71;
+                }
+                else
+                {
+                    st = validateChain(e[3], e[4], &counted);
+                    if (st == 0 && ft == FT_REL && e[21] != 0)
+                        st = validateSideSectors(e[21], e[22], &counted);
+                }
+                if (st != 0)
+                    return st;
+            }
+            else
+                check_count = false;   // anything else, skip it
+
+            if (check_count && counted != recorded)
+            {
+                e[30] = counted & 0xFF;
+                e[31] = (counted >> 8) & 0xFF;
+                dirty = true;
+            }
+        }
+
+        if (dirty && !writeBlock(t, s, dirsec))
+            return 25;
+
+        t = (uint8_t) dirsec[0];
+        s = (uint8_t) dirsec[1];
+    }
+    return 0;
+}
+
+uint8_t D64MStream::validate()
+{
+    // D9060/D9090 keep their BAM as a chain of blocks that the generic
+    // initializer cannot lay down; not supported here.
+    if (dos_version == 0xFF || partitions.empty() || partition >= partitions.size())
+        return 74;
+
+    failed_track = failed_sector = 0;
+
+    // Back up every BAM sector (and the header, which on a D64/D71 is the
+    // same block and on a D71 also carries side 2's counts): the rebuild
+    // writes through to the image block by block, and VICE puts the BAM back
+    // as it was when validation fails.
+    std::vector<std::pair<Block, std::string>> backup;
+    auto keep = [&](uint8_t t, uint8_t s) {
+        for (auto &b : backup)
+            if (b.first.track == t && b.first.sector == s)
+                return true;
+        std::string data = readBlock(t, s);
+        if (data.size() != block_size)
+            return false;
+        backup.push_back({ { t, s }, data });
+        return true;
+    };
+    for (auto &bam : curPartition().block_allocation_map)
+        if (!keep(bam.track, bam.sector))
+            return 74;
+    if (!keep(curPartition().header_track, curPartition().header_sector))
+        return 74;
+
+    std::string header = readBlock(curPartition().header_track, curPartition().header_sector);
+    uint8_t dir_t = (uint8_t) header[0];
+    uint8_t dir_s = (uint8_t) header[1];
+    // vdrive_bam_isgeos: "GEOS format" at $AD of the header block
+    bool geos = header.size() >= 0xB8 && memcmp(&header[0xAD], "GEOS format", 11) == 0;
+
+    uint8_t st = 0;
+    auto restore = [&]() {
+        for (auto &b : backup)
+            writeBlock(b.first.track, b.first.sector, b.second);
+    };
+
+    // Everything free, plus what each format reserves on its own (D71 track
+    // 53, the CMD native system area, the D80/D82 BAM block headers) ...
+    if (!initializeBlockAllocationMap())
+    {
+        restore();
+        return 25;
+    }
+    // ... then the header and the BAM's own sectors, exactly as format does.
+    for (auto &bam : curPartition().block_allocation_map)
+    {
+        bool allocated = false;
+        if (queryBlockAllocation(bam.track, bam.sector, allocated) && !allocated)
+            setBlockAllocation(bam.track, bam.sector, true);
+    }
+    {
+        bool allocated = false;
+        if (queryBlockAllocation(curPartition().header_track, curPartition().header_sector, allocated) && !allocated)
+            setBlockAllocation(curPartition().header_track, curPartition().header_sector, true);
+    }
+
+    // GEOS keeps a border block, named at $AB/$AC of the header.
+    if (geos && header[0xAB] != 0)
+        st = validateClaim((uint8_t) header[0xAB], (uint8_t) header[0xAC]);
+
+    if (st == 0)
+        st = validateDirectory(dir_t, dir_s, geos, 0);
+
+    if (st != 0)
+    {
+        Debug_printv("validate failed: status[%d] t[%d] s[%d]", st, failed_track, failed_sector);
+        restore();
+        return st;
+    }
+
+    readHeader();
+    return 0;
 }
 
 bool D64MStream::removeFile(std::string path)
@@ -1469,16 +1853,61 @@ bool D64MStream::enterDirectory(std::string name)
     if (dir_track == 0)
         return false; // not a formatted subdirectory
 
+    // A 1581 CBM sub-partition is a disk of its own: header at its first
+    // block, its own BAM in the next two, its directory from the header link.
+    // Only switching the directory chain - all this did before - listed it
+    // correctly but allocated a SAVE's blocks from the ROOT BAM, outside the
+    // partition's tracks, and showed the root's name and free count. So push
+    // a Partition whose header and BAM records sit on the partition's first
+    // track; seekDirectory() drops back to the root. A CMD native DIR shares
+    // its partition's BAM and needs none of this.
+    if (t == 5)
+    {
+        Partition p = curPartition();
+        uint8_t old_header = p.header_track;
+        p.parent_header_track = p.header_track;
+        p.parent_header_sector = p.header_sector;
+        p.header_track = entry.start_track;
+        p.header_sector = entry.start_sector;
+        p.directory_track = dir_track;
+        p.directory_sector = dir_sector;
+        for (auto &bam : p.block_allocation_map)
+            if (bam.track == old_header)
+                bam.track = entry.start_track;
+        partitions.push_back(p);
+        partition = (uint8_t)(partitions.size() - 1);
+        readHeader();
+    }
+
     //Debug_printv("entered dir[%s] chain[%d/%d]", name.c_str(), dir_track, dir_sector);
+    return true;
+}
+
+bool D64MStream::subPartitionTracks(const std::string& name, uint8_t* first, uint8_t* last)
+{
+    if (!seekDirectory("") || !seekEntry(name) || (entry.file_type & 0x07) != 5)
+        return false;
+    uint8_t spt = (uint8_t) getSectorCount(entry.start_track);
+    if (spt == 0)
+        return false;
+    *first = entry.start_track;
+    *last = (uint8_t) (entry.start_track + (entry.blocks + spt - 1) / spt - 1);
     return true;
 }
 
 bool D64MStream::seekDirectory(std::string path)
 {
-    // Reset to the image root
+    // Reset to the image root - including out of any 1581 sub-partition
+    // enterDirectory() pushed
     dir_track = 0;
     dir_sector = 0;
     entry_index = 0;
+    if (partitions.size() > 1)
+    {
+        partitions.resize(1);
+        partition = 0;
+        readHeader();
+    }
 
     auto parts = splitPathComponents(path);
     for (size_t i = 0; i < parts.size(); i++)
@@ -2463,6 +2892,61 @@ bool D64MFile::remove()
     if (ok)
         ImageBroker::disposeFor("d64", brokerUrl());
 
+    return ok;
+}
+
+// R, L and R-H all rewrite one directory or header block in place, so they
+// share remove()'s shape: a private in|out stream (never ImageBroker's
+// read-only one), then dispose the broker entry so listings re-read.
+std::shared_ptr<D64MStream> D64MFile::openForUpdate()
+{
+    auto stream = std::static_pointer_cast<D64MStream>(
+        getSourceStream(std::ios_base::in | std::ios_base::out));
+    if (stream == nullptr || !stream->isOpen())
+        return nullptr;
+    return stream;
+}
+
+bool D64MFile::rename(std::string dest)
+{
+    // The container itself is an ordinary file on its backend.
+    if (pathInStream.empty() || pathInStream == "/")
+        return MFile::rename(dest);
+
+    auto stream = openForUpdate();
+    if (stream == nullptr)
+        return false;
+    bool ok = stream->renameFile(pathInStream, dest);
+    stream->close();
+    if (ok)
+        ImageBroker::disposeFor("d64", brokerUrl());
+    return ok;
+}
+
+bool D64MFile::toggleLock()
+{
+    if (pathInStream.empty() || pathInStream == "/")
+        return false;
+
+    auto stream = openForUpdate();
+    if (stream == nullptr)
+        return false;
+    bool ok = stream->toggleLock(pathInStream);
+    stream->close();
+    if (ok)
+        ImageBroker::disposeFor("d64", brokerUrl());
+    return ok;
+}
+
+bool D64MFile::setDiskName(std::string name)
+{
+    auto stream = openForUpdate();
+    if (stream == nullptr)
+        return false;
+    bool ok = stream->renameHeader(name);
+    stream->close();
+    if (ok)
+        ImageBroker::disposeFor("d64", brokerUrl());
     return ok;
 }
 

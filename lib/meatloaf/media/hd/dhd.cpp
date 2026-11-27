@@ -21,6 +21,8 @@
 #include <cstring>
 #include <cstdlib>
 #include <memory>
+#include <algorithm>
+#include <climits>
 
 std::map<std::string, DHDImageRegistry::Image> DHDImageRegistry::s_images;
 bool DHDImageRegistry::s_probing = false;
@@ -191,6 +193,9 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
     }
 
     img.default_part = cfg[0xE2];
+    img.table_base = table_base;
+    img.maxpart = maxpart;
+    img.fd_kind = fd_sys == 0 ? 0 : (fd_sys == 0x640 * 512 ? 1 : (fd_sys == 0xC80 * 512 ? 2 : 4));
 
     // Partition table on track 1 of the system partition: 32-byte entries,
     // 8 per 256-byte sector, laid out contiguously. Entry 0 is the system
@@ -303,6 +308,173 @@ bool DHDImageRegistry::select(const std::string &containerUrl, uint8_t number)
     img->cached_part = 0;
 
     return true;
+}
+
+std::shared_ptr<MStream> DHDImageRegistry::openRaw(const std::string &containerUrl, std::ios_base::openmode mode)
+{
+    // As parse(): the probing flag makes the CMD media filesystems decline the
+    // path, so the underlying filesystem serves the raw image bytes.
+    s_probing = true;
+    std::unique_ptr<MFile> f(MFSOwner::File(containerUrl));
+    std::shared_ptr<MStream> s = (f != nullptr) ? f->getSourceStream(mode) : nullptr;
+    s_probing = false;
+    if (s == nullptr || !s->isOpen())
+        return nullptr;
+    return s;
+}
+
+void DHDImageRegistry::forget(const std::string &containerUrl)
+{
+    s_images.erase(containerUrl);
+    disposeCachedStream(containerUrl);
+}
+
+bool DHDImageRegistry::readEntry(const std::string &containerUrl, uint8_t number, uint8_t out[32])
+{
+    Image *img = obtain(containerUrl);
+    if (img == nullptr || number > img->maxpart)
+        return false;
+    auto s = openRaw(containerUrl, std::ios_base::in);
+    if (s == nullptr)
+        return false;
+    uint32_t off = img->table_base + (uint32_t) number * 32;
+    return s->seek(off) && s->read(out, 32) == 32;
+}
+
+bool DHDImageRegistry::renamePartition(const std::string &containerUrl, uint8_t number, const std::string &petscii_name)
+{
+    Image *img = obtain(containerUrl);
+    if (img == nullptr || number == 0 || number > img->maxpart)
+        return false;
+
+    uint8_t name[16];
+    memset(name, 0xA0, sizeof(name));
+    memcpy(name, petscii_name.data(), std::min(petscii_name.size(), sizeof(name)));
+
+    auto s = openRaw(containerUrl, std::ios_base::in | std::ios_base::out);
+    if (s == nullptr)
+        return false;
+    uint32_t off = img->table_base + (uint32_t) number * 32 + 5;
+    bool ok = s->seek(off) && s->write(name, sizeof(name)) == sizeof(name);
+    s->close();
+
+    // Keep the selection across the re-read.
+    uint8_t selected = img->selected;
+    forget(containerUrl);
+    if (ok && (img = obtain(containerUrl)) != nullptr && img->byNumber(selected))
+        img->selected = selected;
+    return ok;
+}
+
+uint8_t DHDImageRegistry::deletePartitions(const std::string &containerUrl, const std::vector<uint8_t> &numbers)
+{
+    Image *img = obtain(containerUrl);
+    if (img == nullptr)
+        return 74;
+    // vdrive_command_deletepart: "can only do this on CMD FDs". On an FD the
+    // system partition is at the END of the image, which is what makes
+    // packing from LBA 0 safe; an HD's sits wherever it was formatted.
+    if (img->fd_kind == 0)
+        return 31;
+    for (uint8_t n : numbers)
+        if (n == 0 || n == 255 || n > img->maxpart)
+            return 31;
+
+    const uint16_t maxpart = img->maxpart;
+    const uint32_t table_base = img->table_base;
+
+    auto s = openRaw(containerUrl, std::ios_base::in | std::ios_base::out);
+    if (s == nullptr)
+        return 74;
+
+    // The whole table, entries 0..maxpart
+    std::vector<uint8_t> table((maxpart + 1) * 32);
+    if (!s->seek(table_base) || s->read(table.data(), table.size()) != table.size())
+        return 74;
+
+    auto type   = [&](int i) -> uint8_t& { return table[i * 32 + 2]; };
+    auto lba    = [&](int i, int o) -> uint32_t {
+        return ((uint32_t) table[i * 32 + o] << 16) | ((uint32_t) table[i * 32 + o + 1] << 8) | table[i * 32 + o + 2];
+    };
+    auto setLba = [&](int i, int o, uint32_t v) {
+        table[i * 32 + o] = (v >> 16) & 0xFF; table[i * 32 + o + 1] = (v >> 8) & 0xFF; table[i * 32 + o + 2] = v & 0xFF;
+    };
+    auto offset = [&](int i) { return (int64_t) lba(i, 0x15); };
+    auto size   = [&](int i) { return (int64_t) lba(i, 0x1D); };
+
+    for (uint8_t n : numbers)
+        type(n) = 0;
+
+    // vdrive_pack_parts: repeatedly move the physically nearest movable
+    // partition (types 1-6) down against the previous one, never into a
+    // foreign (type 7) partition. Offsets and sizes are in 512-byte LBAs.
+    std::vector<uint8_t> buf(64 * 512);
+    int64_t lowpos = -1, length = 1;
+    for (int guard = 0; guard < 512; guard++)
+    {
+        int best = 0, block = 0;
+        int64_t bestpos = INT64_MAX;
+        for (int i = 1; i <= maxpart; i++)
+        {
+            if (type(i) > 0 && type(i) < 7 && offset(i) >= lowpos + length && offset(i) < bestpos)
+            {
+                for (int j = 1; j <= maxpart; j++)
+                {
+                    if (type(j) == 7 &&
+                        ((offset(j) >= lowpos + length && offset(j) < lowpos + length + size(i)) ||
+                         (offset(j) + size(j) >= lowpos + length && offset(j) + size(j) < lowpos + length + size(i))))
+                    {
+                        block = j;
+                        break;
+                    }
+                }
+                if (!block) { best = i; bestpos = offset(i); }
+                else break;
+            }
+        }
+        if (bestpos == INT64_MAX && !block)
+            break;
+        if (bestpos == INT64_MAX && block)
+        {
+            lowpos = offset(block);
+            length = size(block);
+            continue;
+        }
+        if (lowpos + length == bestpos)
+        {
+            lowpos = bestpos;
+            length = size(best);
+            continue;
+        }
+
+        // Move partition `best` from bestpos down to lowpos+length. The
+        // destination is lower, so copying in ascending order never reads
+        // a block this move has already overwritten.
+        int64_t dest = lowpos + length;
+        uint64_t bytes = (uint64_t) size(best) * 512;
+        uint64_t src_b = (uint64_t) bestpos * 512, dst_b = (uint64_t) dest * 512;
+        Debug_printv("D-P: moving partition[%d] from lba[%lld] to lba[%lld] size[%lld]",
+                     best, (long long) bestpos, (long long) dest, (long long) size(best));
+        for (uint64_t done = 0; done < bytes; )
+        {
+            uint32_t n = (uint32_t) std::min<uint64_t>(buf.size(), bytes - done);
+            if (!s->seek(src_b + done) || s->read(buf.data(), n) != n)
+                return 74;
+            if (!s->seek(dst_b + done) || s->write(buf.data(), n) != n)
+                return 25;
+            done += n;
+        }
+        setLba(best, 0x15, (uint32_t) dest);
+        lowpos = dest;
+        length = size(best);
+    }
+
+    if (!s->seek(table_base) || s->write(table.data(), table.size()) != table.size())
+        return 25;
+    s->close();
+
+    forget(containerUrl);
+    return 0;
 }
 
 void DHDImageRegistry::disposeCachedStream(const std::string &containerUrl)
