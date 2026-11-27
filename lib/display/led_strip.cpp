@@ -105,6 +105,7 @@ void DisplayLEDs::service()
                     fill_all((CRGB){.r=0, .g=0, .b=0});
                     break;
                 case ST_OK             :
+                case ST_PARTITION_SELECTED:
                 case ST_SCRATCHED      :
                 case ST_DOSVERSION     :
                     mode = MODE_IDLE;
