@@ -23,6 +23,14 @@ public:
     // Returns the length of the data written to buffer, or 0 if error
     static size_t toIsoTime(const struct tm* tinfo, uint8_t* buf, size_t bufSize);
 
+    // The T-W counterparts (sd2iec's T-WA/T-WI/T-WD/T-WB): parse the same
+    // layouts back into a struct tm (local time, tm_isdst = -1). The binary
+    // forms take the 8 bytes before the CR. False on anything out of range.
+    static bool fromAsciiTime(const uint8_t* buf, size_t len, struct tm* out);
+    static bool fromIsoTime(const uint8_t* buf, size_t len, struct tm* out);
+    static bool fromDecimalTime(const uint8_t* buf, size_t len, struct tm* out);
+    static bool fromBcdTime(const uint8_t* buf, size_t len, struct tm* out);
+
 private:
     // Convert a decimal number to BCD (Binary Coded Decimal)
     static uint8_t toBcd(uint8_t decimal);
