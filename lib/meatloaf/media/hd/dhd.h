@@ -124,7 +124,8 @@ public:
     // on an FD only, because there the system partition sits at the END and
     // packing from LBA 0 is safe; on an HD the pack starts after the system
     // partition and never moves anything into it. Returns a CBM status; the
-    // table is re-read after.
+    // table is re-read after. An empty list only packs (partition:pack); a
+    // DHD is then cut at the end of its last partition either way.
     static uint8_t deletePartitions(const std::string& containerUrl, const std::vector<uint8_t>& numbers);
 
     // Create a partition (a Meatloaf extension - on CMD hardware only HD-TOOLS

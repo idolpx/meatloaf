@@ -148,6 +148,7 @@ void CmdHdDos::cmdDeletePartition()
 // partition:create,<name>,<type|file>[,<tracks>][,@<n>][,#<slot>]
 // partition:delete,<n>[,<n>...]
 // partition:default,<n>
+// partition:pack
 // partition:dump,<n>[,<filename>]
 // partition:write,<n>,<file>
 //
@@ -226,6 +227,22 @@ void CmdHdDos::cmdPartitionAdmin(const std::string& args)
             return;
         }
         m_host.dosSetStatus(DHDImageRegistry::setDefaultPartition(url, (uint8_t) n));
+        return;
+    }
+
+    // partition:pack - close every gap between partitions and, on a DHD,
+    // cut the file at the end of the last one (the pack a delete does,
+    // without deleting anything)
+    if ( verb == "pack" )
+    {
+        if ( a.size() != 1 )
+        {
+            m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+            return;
+        }
+        uint8_t st = DHDImageRegistry::deletePartitions(url, std::vector<uint8_t>());
+        invalidateListings();
+        m_host.dosSetStatus(st);
         return;
     }
 
