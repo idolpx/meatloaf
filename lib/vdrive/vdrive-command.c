@@ -3227,15 +3227,23 @@ static int vdrive_command_format_internal(vdrive_t *vdrive, cbmdos_cmd_parse_plu
         j = 0;
         k = 0x20;
         for (i = 0; i < parts; i++) {
+            /* MEATLOAF: a native partition is whole 64 KB (128-LBA) tracks, as
+               real CMD FD images have it: a D1M's is $600 LBAs, not the $640
+               of the whole data area (12.5 tracks). 1581 partitions already
+               divide evenly. */
+            int partsize = psize / parts;
+            if (ptype == 1) {
+                partsize &= ~127;
+            }
             buf[k | 0x02] = ptype;
             memset(&(buf[k | 0x05]), 0xa0, 16);
             memcpy(&(buf[k | 0x05]), "PARTITION ", 10);
             buf[k | 0x0f] = '1' + i;
             buf[k | 0x16] = (j >> 8) & 255;
             buf[k | 0x17] = j & 255;
-            buf[k | 0x1e] = ((psize/parts) >> 8) & 255;
-            buf[k | 0x1f] = (psize/parts) & 255;
-            j += (psize/parts);
+            buf[k | 0x1e] = (partsize >> 8) & 255;
+            buf[k | 0x1f] = partsize & 255;
+            j += partsize;
             k += 0x20;
         }
         if (vdrive_write_sector(vdrive, buf, 1, 0)) {
@@ -3248,10 +3256,13 @@ static int vdrive_command_format_internal(vdrive_t *vdrive, cbmdos_cmd_parse_plu
         buf[0x00] = 0;
         buf[0x38] = 0;
         buf[0x39] = 0;
-        buf[0x70] = psize & 255;
+        /* MEATLOAF: the data-area size as real CMD FD images store it - high
+           byte at $71, low byte at $A9 (checked on a D1M, D2M and D4M:
+           06/40, 0C/80, 19/00). This wrote it little-endian at $70-$71. */
+        buf[0x70] = 0;
         buf[0x71] = (psize >> 8) & 255;
         buf[0xa8] = 0;
-        buf[0xa9] = 0;
+        buf[0xa9] = psize & 255;
         buf[0xe2] = 1;
         buf[0xe3] = 1;
         memcpy(&(buf[0xf0]), "CMD FD SERIES   ", 16);

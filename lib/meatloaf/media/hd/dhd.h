@@ -104,7 +104,9 @@ public:
 
         const DHDPartition* byNumber(uint8_t number) const;
         const DHDPartition* byName(std::string utf8name) const;
-        const DHDPartition* current() const { return byNumber(selected); }
+        // nullptr when nothing is selected - a new image has no partitions, and
+        // byNumber(0) is the SYSTEM partition, never something to mount.
+        const DHDPartition* current() const { return selected ? byNumber(selected) : nullptr; }
     };
 
     static Image* obtain(const std::string& containerUrl);
@@ -144,8 +146,33 @@ public:
     // Copy partition `number` out to a standalone image in the container's
     // directory: .d64 / .d71 / .d81 / .dnp by its type. `filename` (UTF-8)
     // defaults to the partition's name; the extension is added if missing.
-    // 63 if the file exists. Returns a CBM status.
+    // Partition 0 on an HD is the system partition (the drive's DOS): it goes
+    // to /sd/.sys/cmdhd.sys by default, which createImage() uses for new
+    // DHDs. 63 if the file exists. Returns a CBM status.
     static uint8_t dumpPartition(const std::string& containerUrl, uint8_t number, std::string filename);
+
+    // A new, empty CMD container: the type comes from the extension (.dhd,
+    // .d1m, .d2m, .d4m); a DHD is `megabytes` big, the FD sizes are fixed.
+    // FD layout as VICE's format (vdrive_command_format_internal): system
+    // partition at the end, a 4-sector table, the config sector with the FD
+    // magic. A DHD gets its system partition (144 LBAs: the config track and
+    // a 32-sector table) at LBA 128, inside the range vdrive_find_sys() scans,
+    // with the HD magic. No user partitions; 63 if the file exists.
+    // A DHD takes its system partition from /sd/.sys/cmdhd.sys when there is
+    // one (partition:dump,0 of a real image): a real CMD HD loads its DOS from
+    // there. Without it the system partition has only the magic, table and
+    // config - enough for Meatloaf and VICE's virtual drive, not hardware.
+    static uint8_t createImage(const std::string& url, uint32_t megabytes);
+
+    // Copy a D64/D71/D81/DNP into partition `number`. The file's type must be
+    // the partition's (64) and it must fit (52); a D64/D71/D81 carrying error
+    // info has it dropped. The rest of the window is zeroed.
+    static uint8_t writePartitionImage(const std::string& containerUrl, uint8_t number, const std::string& mediaUrl);
+
+    // What a media file would need: its partition type (1 native, 2 1541,
+    // 3 1571, 4 1581) and size in LBAs. False when it is not one of those or
+    // cannot be read. *err gets the CBM status.
+    static bool mediaGeometry(const std::string& mediaUrl, uint8_t* type, uint32_t* lbas, uint8_t* err);
 
     // True while the registry reads the raw image (so DHDMFileSystem
     // declines the path and the underlying filesystem serves the bytes)
@@ -459,7 +486,8 @@ public:
         auto img = DHDImageRegistry::obtain(DHDImageRegistry::containerOf(this->url));
         if (img == nullptr)
             return nullptr;
-        return (m_part == 0) ? img->current() : img->byNumber(m_part);
+        const DHDPartition* p = (m_part == 0) ? img->current() : img->byNumber(m_part);
+        return (p != nullptr && p->number != 0) ? p : nullptr;
     }
 
     // Name the partition for the broker, so its rebuild resolves the partition

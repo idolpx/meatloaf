@@ -25,6 +25,10 @@
 #include <climits>
 
 std::map<std::string, DHDImageRegistry::Image> DHDImageRegistry::s_images;
+
+// Where partition:dump,0 keeps a CMD HD's system partition (its DOS) and
+// partition:new takes it from for a new DHD.
+#define SYSTEM_TEMPLATE "/sd/.sys/cmdhd.sys"
 bool DHDImageRegistry::s_probing = false;
 
 const DHDPartition* DHDImageRegistry::Image::byNumber(uint8_t number) const
@@ -258,11 +262,11 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
         if (p.number != 0) { first_user = p.number; break; }
     }
 
+    // An image with no user partitions yet is valid - partition:new makes
+    // exactly that, and partition:create needs to reach it - it just has
+    // nothing selected (selected 0; current() answers nullptr for it).
     if (first_user == 0)
-    {
-        Debug_printv("No usable partitions in [%s]", containerUrl.c_str());
-        return false;
-    }
+        Debug_printv("No partitions yet in [%s]", containerUrl.c_str());
 
     // First use: select the default partition, falling back to the first USER
     // partition - never entry 0. parts[0] is the system partition now, so using
@@ -709,8 +713,11 @@ uint8_t DHDImageRegistry::setDefaultPartition(const std::string &containerUrl, u
     auto s = openRaw(containerUrl, std::ios_base::in | std::ios_base::out);
     if (s == nullptr)
         return 74;
-    // cfg sits at sys_base + $500; the default partition is its byte $E2
-    if (!s->seek(img->sys_base + 0x500 + 0xE2) || s->write(&number, 1) != 1)
+    // cfg sits at sys_base + $500; the default partition is its byte $E2,
+    // and $E3 carries the same value on real images (05 05 on the reference
+    // HD) and in VICE's format.
+    uint8_t both[2] = { number, number };
+    if (!s->seek(img->sys_base + 0x500 + 0xE2) || s->write(both, 2) != 2)
         return 25;
     s->close();
     img->default_part = number;
@@ -722,28 +729,54 @@ uint8_t DHDImageRegistry::dumpPartition(const std::string &containerUrl, uint8_t
     Image *img = obtain(containerUrl);
     if (img == nullptr)
         return 74;
-    const DHDPartition *p = number ? img->byNumber(number) : nullptr;
-    if (p == nullptr || p->size == 0)
+    // Partition 0 is the system partition. On an HD it carries the drive's
+    // DOS, so it is worth keeping: by default it goes to SYSTEM_TEMPLATE,
+    // which createImage() then uses for every new DHD. An FD's system
+    // partition holds only the table and config (its DOS is in ROM), and its
+    // entry 0 has no start or size, so there is nothing to dump.
+    const DHDPartition *p = img->byNumber(number);
+    if (p == nullptr || p->size == 0 || (number == 0 && img->fd_kind))
         return 77;
 
-    static const char *exts[] = { "", ".dnp", ".d64", ".d71", ".d81" };
-    std::string ext = exts[p->type];
+    std::string target;
+    std::string ext;
+    if (number == 0)
+    {
+        ext = ".sys";
+        if (filename.empty())
+        {
+            target = SYSTEM_TEMPLATE;
+            std::unique_ptr<MFile> dir(MFSOwner::File(target.substr(0, target.find_last_of('/')), true));
+            if (dir && !dir->exists())
+                dir->mkDir();
+        }
+    }
+    else
+    {
+        static const char *exts[] = { "", ".dnp", ".d64", ".d71", ".d81" };
+        if (p->type < 1 || p->type > 4)
+            return 64;
+        ext = exts[p->type];
+    }
 
-    if (filename.empty())
+    if (target.empty() && filename.empty())
         filename = mstr::toUTF8(p->name);
     // a plain file name, never a path
     for (auto &c : filename)
         if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?')
             c = '_';
     mstr::trim(filename);
-    if (filename.empty())
-        return 34;
-    if (!mstr::endsWith(filename, ext.c_str(), false))
-        filename += ext;
+    if (target.empty())
+    {
+        if (filename.empty())
+            return 34;
+        if (!mstr::endsWith(filename, ext.c_str(), false))
+            filename += ext;
 
-    size_t slash = containerUrl.find_last_of('/');
-    std::string dir = slash == std::string::npos ? std::string() : containerUrl.substr(0, slash);
-    std::string target = dir + "/" + filename;
+        size_t slash = containerUrl.find_last_of('/');
+        std::string dir = slash == std::string::npos ? std::string() : containerUrl.substr(0, slash);
+        target = dir + "/" + filename;
+    }
 
     // Raw on both ends: the target's name says .d64, which would otherwise
     // resolve to an image decoder rather than the file.
@@ -794,6 +827,232 @@ uint8_t DHDImageRegistry::dumpPartition(const std::string &containerUrl, uint8_t
     else
         Debug_printv("partition:dump [%d] -> [%s] (%lu bytes)", number, target.c_str(), (unsigned long) length);
     return st;
+}
+
+uint8_t DHDImageRegistry::createImage(const std::string &url, uint32_t megabytes)
+{
+    std::string lower = url;
+    for (auto &c : lower) c = tolower(c);
+
+    uint32_t psize = 0, ssize = 0;              // FD: data LBAs, table-track sectors
+    bool hd = false;
+    if (mstr::endsWith(lower, ".d1m"))      { psize = 0x640;  ssize = 32; }
+    else if (mstr::endsWith(lower, ".d2m")) { psize = 0xC80;  ssize = 72; }
+    else if (mstr::endsWith(lower, ".d4m")) { psize = 0x1900; ssize = 152; }
+    else if (mstr::endsWith(lower, ".dhd")) hd = true;
+    else return 64;
+    if (hd && (megabytes < 1 || megabytes > 4095))
+        return 30;
+
+    std::unique_ptr<MFile> f(MFSOwner::File(url, true));
+    if (f == nullptr)
+        return 74;
+    if (f->exists())
+        return 63;
+    if (!f->isWritable)
+        return 26;
+    auto s = f->getSourceStream(std::ios_base::in | std::ios_base::out | std::ios_base::trunc);
+    if (s == nullptr || !s->isOpen())
+        return 25;
+
+    // The system partition, built in memory: track 0 (config at sector 5) then
+    // the table track. 256-byte sectors.
+    const uint32_t track0 = hd ? 256 : 8;       // sectors in track 0
+    const uint32_t tsecs = hd ? 32 : 4;         // table sectors
+    const uint32_t sys_sectors = hd ? (track0 + 32) : (track0 + ssize);
+    std::vector<uint8_t> sys(sys_sectors * 256, 0);
+    uint8_t *table = &sys[track0 * 256];
+    for (uint32_t k = 0; k < tsecs; k++)
+    {
+        table[k * 256 + 0] = (k + 1 < tsecs) ? 1 : 0;
+        table[k * 256 + 1] = (k + 1 < tsecs) ? (uint8_t) (k + 1) : 0xFF;
+    }
+    table[2] = 0xFF;                            // entry 0: the system partition
+    memset(&table[5], 0xA0, 16);
+    memcpy(&table[5], "SYSTEM", 6);
+
+    uint8_t *cfg = &sys[5 * 256];
+    uint64_t sys_lba, total;
+    bool from_template = false;
+    if (hd)
+    {
+        // A system partition dumped from a real CMD HD (partition:dump,0)
+        // carries the drive's DOS: use it when there is one, so the image
+        // boots on hardware too. Its table is emptied below.
+        std::unique_ptr<MFile> tf(MFSOwner::File(SYSTEM_TEMPLATE, true));
+        auto ts = (tf && tf->exists()) ? tf->getSourceStream(std::ios_base::in) : nullptr;
+        if (ts != nullptr && ts->size() == sys.size())
+        {
+            uint32_t got = 0;
+            while (got < sys.size())
+            {
+                uint32_t r = ts->read(sys.data() + got, sys.size() - got);
+                if (r == 0) break;
+                got += r;
+            }
+            from_template = (got == sys.size());
+            if (!from_template)
+                memset(sys.data(), 0, sys.size());
+        }
+    }
+    if (from_template)
+    {
+        // Keep the DOS and config; empty the table, keeping each sector's
+        // link, and keep entry 0 (the system partition) itself.
+        for (uint32_t k = 0; k < tsecs; k++)
+            for (uint32_t e = 0; e < 8; e++)
+            {
+                if (k == 0 && e == 0)
+                    continue;
+                memset(&table[k * 256 + e * 32 + 2], 0, 30);
+            }
+    }
+    if (hd)
+    {
+        static const uint8_t hdmagic[16] = {
+            0x43, 0x4D, 0x44, 0x20, 0x48, 0x44, 0x20, 0x20, 0x8D, 0x03, 0x88, 0x8E, 0x02, 0x88, 0xEA, 0x60 };
+        if (!from_template)
+            memcpy(&cfg[0xF0], hdmagic, 16);
+        else if (memcmp(&cfg[0xF0], hdmagic, 16) != 0)
+            return 64;                          // not a CMD HD system partition
+        sys_lba = 128;
+        uint32_t sys_lbas = sys_sectors / 2;    // 144
+        table[0x15] = (sys_lba >> 16) & 0xFF; table[0x16] = (sys_lba >> 8) & 0xFF; table[0x17] = sys_lba & 0xFF;
+        table[0x1D] = (sys_lbas >> 16) & 0xFF; table[0x1E] = (sys_lbas >> 8) & 0xFF; table[0x1F] = sys_lbas & 0xFF;
+        total = (uint64_t) megabytes * 1024 * 1024;
+    }
+    else
+    {
+        // The config sector as real CMD FD images have it (three checked: a
+        // D1M, D2M and D4M). The data-area size is split: its high byte at
+        // $71, its low byte at $A9. VICE's vdrive_command_format_internal
+        // writes it little-endian at $70-$71 instead; its own detection never
+        // reads these, so the difference never shows there.
+        memset(cfg, 0xFF, 224);
+        cfg[0x00] = 0; cfg[0x38] = 0; cfg[0x39] = 0;
+        cfg[0x70] = 0; cfg[0x71] = (psize >> 8) & 0xFF;
+        cfg[0xA8] = 0; cfg[0xA9] = psize & 0xFF;
+        memcpy(&cfg[0xF0], "CMD FD SERIES   ", 16);
+        sys_lba = psize;
+        total = (uint64_t) psize * 512 + sys.size();
+    }
+    cfg[0xE2] = 0;                              // no default yet: no partitions
+    cfg[0xE3] = 0;
+
+    // An FD is small: zero the data area. A DHD only needs its length - the
+    // area before and after the system partition is never read until a
+    // partition is created there, and partition:create zeroes it.
+    if (!hd)
+    {
+        std::vector<uint8_t> zero(64 * 512, 0);
+        for (uint64_t done = 0; done < (uint64_t) psize * 512; )
+        {
+            uint32_t n = (uint32_t) std::min<uint64_t>(zero.size(), (uint64_t) psize * 512 - done);
+            if (s->write(zero.data(), n) != n)
+                return 25;
+            done += n;
+        }
+    }
+    if (!s->seek(sys_lba * 512) || s->write(sys.data(), sys.size()) != sys.size())
+        return 25;
+    if (hd)
+    {
+        uint8_t z = 0;
+        if (!s->seek(total - 1) || s->write(&z, 1) != 1)
+            return 25;
+    }
+    s->close();
+    Debug_printv("partition:new [%s] %s size[%llu]%s", url.c_str(), hd ? "HD" : "FD", (unsigned long long) total,
+                 from_template ? " system partition from " SYSTEM_TEMPLATE : "");
+    forget(url);
+    return 0;
+}
+
+bool DHDImageRegistry::mediaGeometry(const std::string &mediaUrl, uint8_t *type, uint32_t *lbas, uint8_t *err)
+{
+    std::string lower = mediaUrl;
+    for (auto &c : lower) c = tolower(c);
+    *err = 64;
+    uint32_t base = 0;
+    if (mstr::endsWith(lower, ".d64"))      { *type = 2; *lbas = 342;  base = 174848; }
+    else if (mstr::endsWith(lower, ".d71")) { *type = 3; *lbas = 683;  base = 349696; }
+    else if (mstr::endsWith(lower, ".d81")) { *type = 4; *lbas = 1600; base = 819200; }
+    else if (mstr::endsWith(lower, ".dnp")) { *type = 1; }
+    else return false;
+
+    std::unique_ptr<MFile> f(MFSOwner::File(mediaUrl, true));
+    if (f == nullptr || !f->exists())
+    {
+        *err = 62;
+        return false;
+    }
+    auto in = f->getSourceStream(std::ios_base::in);
+    uint32_t size = in ? in->size() : 0;
+    if (*type == 1)
+    {
+        // a native image is whole 64 KB tracks, 1-255 of them
+        if (size == 0 || size % 65536 != 0 || size / 65536 > 255)
+            return false;
+        *lbas = size / 512;
+    }
+    else if (size != base && size != base + base / 256)   // plain, or with error info
+        return false;
+    *err = 0;
+    return true;
+}
+
+uint8_t DHDImageRegistry::writePartitionImage(const std::string &containerUrl, uint8_t number, const std::string &mediaUrl)
+{
+    Image *img = obtain(containerUrl);
+    if (img == nullptr)
+        return 74;
+    const DHDPartition *p = number ? img->byNumber(number) : nullptr;
+    if (p == nullptr)
+        return 77;
+
+    uint8_t type = 0, err = 0;
+    uint32_t lbas = 0;
+    if (!mediaGeometry(mediaUrl, &type, &lbas, &err))
+        return err;
+    if (type != p->type)
+        return 64;
+    if ((uint64_t) lbas * 512 > p->size)
+        return 52;
+
+    // Only the image itself: error info past it is dropped.
+    uint32_t length = (type == 2) ? 174848 : (type == 3) ? 349696 : (type == 4) ? 819200 : lbas * 512;
+
+    std::unique_ptr<MFile> f(MFSOwner::File(mediaUrl, true));
+    auto in = f ? f->getSourceStream(std::ios_base::in) : nullptr;
+    if (in == nullptr || !in->isOpen())
+        return 62;
+    auto out = openRaw(containerUrl, std::ios_base::in | std::ios_base::out);
+    if (out == nullptr)
+        return 74;
+
+    std::vector<uint8_t> buf(64 * 512);
+    for (uint32_t done = 0; done < p->size; )
+    {
+        uint32_t n = std::min<uint32_t>((uint32_t) buf.size(), p->size - done);
+        uint32_t want = done < length ? std::min<uint32_t>(n, length - done) : 0;
+        uint32_t got = 0;
+        while (got < want)
+        {
+            uint32_t r = in->read(buf.data() + got, want - got);
+            if (r == 0) break;
+            got += r;
+        }
+        if (got < want)
+            return 74;
+        memset(buf.data() + got, 0, n - got);   // the rest of the window
+        if (!out->seek(p->start + done) || out->write(buf.data(), n) != n)
+            return 25;
+        done += n;
+    }
+    out->close();
+    disposeCachedStream(containerUrl);
+    Debug_printv("partition:write [%d] <- [%s] (%lu bytes)", number, mediaUrl.c_str(), (unsigned long) length);
+    return 0;
 }
 
 void DHDImageRegistry::disposeCachedStream(const std::string &containerUrl)

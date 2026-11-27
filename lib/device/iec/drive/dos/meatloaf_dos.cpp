@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "../../drive.h"
+#include "../../../../meatloaf/media/hd/dhd.h"
 
 #include "fnSystem.h"
 #include "utils.h"
@@ -158,11 +159,56 @@ bool CbmDos::cmdFilePosition(std::string command)
 }
 
 
-// partition:... on media with no CMD partition table.
+// partition:new,<file>[,<MB>] creates an empty CMD container (.dhd .d1m .d2m
+// .d4m; a DHD needs its size in MB) in the current directory - or, when the
+// drive stands in a CMD image, beside it. Every other partition:... verb
+// needs a partition table, so on other media it is 31 (CmdHdDos has them).
 void CbmDos::cmdPartitionAdmin(const std::string& args)
 {
-    (void) args;
-    m_host.dosSetStatus(ST_SYNTAX_INVALID);
+    std::vector<std::string> a = mstr::split(args, ',');
+    for ( auto &x : a )
+        mstr::trim(x);
+    if ( a.empty() || a[0] != "new" )
+    {
+        m_host.dosSetStatus(ST_SYNTAX_INVALID);
+        return;
+    }
+    if ( a.size() < 2 || a.size() > 3 || a[1].empty() )
+    {
+        m_host.dosSetStatus(a.size() < 2 || a[1].empty() ? ST_SYNTAX_NO_NAME : ST_SYNTAX_UNKNOWN);
+        return;
+    }
+
+    uint32_t mb = 0;
+    if ( a.size() == 3 && !dosParseUint(a[2], &mb) )
+    {
+        m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+        return;
+    }
+
+    std::string url = mediaPath(a[1]);
+    m_host.dosSetStatus(DHDImageRegistry::createImage(url, mb));
+    invalidateListings();
+}
+
+// A file named in a partition command: a URL or an absolute path as given,
+// anything else relative to the directory the drive is in - or, inside a
+// CMD image, the directory that image is in.
+std::string CbmDos::mediaPath(const std::string& name)
+{
+    if ( name.find("://") != std::string::npos || (!name.empty() && name[0] == '/') )
+        return name;
+    MFile *cwd = m_host.dosCwd();
+    std::string dir = cwd ? cwd->fullUrl() : std::string("/");
+    std::string container = DHDImageRegistry::containerOf(dir);
+    if ( !container.empty() )
+    {
+        size_t slash = container.find_last_of('/');
+        dir = slash == std::string::npos ? std::string() : container.substr(0, slash);
+    }
+    while ( dir.size() > 1 && dir.back() == '/' )
+        dir.pop_back();
+    return (dir == "/" ? std::string() : dir) + "/" + name;
 }
 
 

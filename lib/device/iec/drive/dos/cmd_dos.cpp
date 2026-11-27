@@ -145,10 +145,12 @@ void CmdHdDos::cmdDeletePartition()
     m_host.dosSetStatus(st);
 }
 
-// partition:create,<name>,<type>[,<tracks>][,@<n>][,#<slot>]
+// partition:create,<name>,<type|file>[,<tracks>][,@<n>][,#<slot>]
 // partition:delete,<n>[,<n>...]
 // partition:default,<n>
 // partition:dump,<n>[,<filename>]
+// partition:write,<n>,<file>
+// partition:new,<file>[,<MB>]        (CbmDos; also from inside a CMD image)
 //
 // Meatloaf extensions: on CMD hardware only HD-TOOLS and FD-TOOLS create
 // partitions or change the default. <type> is nat, 1541, 1571 or 1581. The
@@ -163,6 +165,14 @@ void CmdHdDos::cmdDeletePartition()
 // partition:dump,<n>[,<filename>] writes partition n's bytes to a standalone
 // image beside the container - .d64 / .d71 / .d81 / .dnp by its type, named
 // after the partition unless a filename is given (63 if it exists).
+// partition:dump,0 on a CMD HD saves the system partition - the drive's DOS -
+// to /sd/.sys/cmdhd.sys, which partition:new then uses for new DHDs.
+//
+// A .d64/.d71/.d81/.dnp file in place of <type> creates a partition of that
+// file's type and size and writes the file in instead of formatting;
+// partition:write,<n>,<file> does the same to an existing partition (64 if
+// the types differ, 52 if it does not fit). Files are relative to the
+// directory the image is in unless absolute or a URL.
 void CmdHdDos::cmdPartitionAdmin(const std::string& args)
 {
     std::vector<std::string> a = mstr::split(args, ',');
@@ -190,6 +200,28 @@ void CmdHdDos::cmdPartitionAdmin(const std::string& args)
     };
 
     const std::string& verb = a[0];
+
+    // partition:new makes a container, which needs no table to stand in
+    if ( verb == "new" )
+    {
+        CbmDos::cmdPartitionAdmin(args);
+        return;
+    }
+
+    // partition:write,<n>,<file>: a D64/D71/D81/DNP into an existing partition
+    if ( verb == "write" )
+    {
+        long n = 0;
+        if ( a.size() != 3 || !number(a[1], 1, 254, &n) || a[2].empty() )
+        {
+            m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+            return;
+        }
+        uint8_t st = DHDImageRegistry::writePartitionImage(url, (uint8_t) n, mediaPath(a[2]));
+        invalidateListings();
+        m_host.dosSetStatus(st);
+        return;
+    }
 
     if ( verb == "default" )
     {
@@ -230,7 +262,7 @@ void CmdHdDos::cmdPartitionAdmin(const std::string& args)
     if ( verb == "dump" )
     {
         long n = 0;
-        if ( a.size() < 2 || a.size() > 3 || !number(a[1], 1, 254, &n) )
+        if ( a.size() < 2 || a.size() > 3 || !number(a[1], 0, 254, &n) )
         {
             m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
             return;
@@ -252,7 +284,20 @@ void CmdHdDos::cmdPartitionAdmin(const std::string& args)
 
         uint8_t type = 0;
         uint32_t lbas = 0;
-        if ( kind == "nat" || kind == "native" ) type = 1;
+        // A media file instead of a type: the partition takes the file's type
+        // and size, and the file is written in rather than formatted.
+        std::string media;
+        if ( kind.find('.') != std::string::npos )
+        {
+            media = mediaPath(kind);
+            uint8_t err = 0;
+            if ( !DHDImageRegistry::mediaGeometry(media, &type, &lbas, &err) )
+            {
+                m_host.dosSetStatus(err);
+                return;
+            }
+        }
+        else if ( kind == "nat" || kind == "native" ) type = 1;
         else if ( kind == "1541" ) { type = 2; lbas = 342; }    // 683 blocks
         else if ( kind == "1571" ) { type = 3; lbas = 683; }    // 1366 blocks
         else if ( kind == "1581" ) { type = 4; lbas = 1600; }   // 3200 blocks
@@ -287,14 +332,14 @@ void CmdHdDos::cmdPartitionAdmin(const std::string& args)
                     return;
                 }
             }
-            else if ( type != 1 || !number(a[i], 1, 255, &tracks) )
+            else if ( type != 1 || !media.empty() || !number(a[i], 1, 255, &tracks) )
             {
                 // a size only means something for a native partition
                 m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
                 return;
             }
         }
-        if ( type == 1 )
+        if ( type == 1 && media.empty() )
         {
             if ( tracks == 0 )
             {
@@ -304,6 +349,7 @@ void CmdHdDos::cmdPartitionAdmin(const std::string& args)
             lbas = (uint32_t) tracks * 128;          // 256 blocks = 64 KB = 128 LBAs per track
         }
 
+        bool had_default = DHDImageRegistry::obtain(url)->default_part != 0;
         uint8_t slot = 0;
         uint8_t st = DHDImageRegistry::createPartition(url, type, mstr::toPETSCII2(name), lbas, (uint8_t) before, (uint8_t) slot_req, &slot);
         if ( st != ST_OK )
@@ -311,8 +357,23 @@ void CmdHdDos::cmdPartitionAdmin(const std::string& args)
             m_host.dosSetStatus(st);
             return;
         }
+        // A new image has no default; its first partition becomes it, as a
+        // CMD-made image with one partition has E2 = 1.
+        if ( !had_default )
+            DHDImageRegistry::setDefaultPartition(url, slot);
+
+        if ( !media.empty() )
+        {
+            // Write the media file in instead of formatting
+            st = DHDImageRegistry::writePartitionImage(url, slot, media);
+            invalidateListings();
+            m_host.dosSetStatus(st, st == ST_OK ? slot : 0, 0);
+            return;
+        }
 
         // Format it: select it for the format, then put the selection back.
+        // An image with nothing selected yet (a new one) keeps the new
+        // partition selected.
         DHDImageRegistry::Image *img = DHDImageRegistry::obtain(url);
         uint8_t previous = img ? img->selected : 0;
         bool formatted = false;
