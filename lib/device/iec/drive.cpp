@@ -1831,6 +1831,7 @@ bool iecDrive::positionChannel(uint32_t chan, uint32_t pos, bool within_block)
         }
 
         channel->repositioned(target);
+        clearReadBuffer(chan);
         setStatusCode(ST_OK);
         return true;
     }
@@ -1854,6 +1855,7 @@ bool iecDrive::positionChannel(uint32_t chan, uint32_t pos, bool within_block)
     }
 
     channel->repositioned(target);
+    clearReadBuffer(chan);
     setStatusCode(ST_OK);
     return true;
 }
@@ -1947,6 +1949,11 @@ bool iecDrive::seekChannelToBlock(uint8_t channel_num, uint8_t track, uint8_t se
     // The channel holds bytes read AHEAD of the stream; without this the next
     // read serves them instead of the block just seeked to.
     channel->setBlockWindow(base, start, length);
+
+    // IECFileDevice also holds up to two bytes read ahead for the bus; they
+    // belong to the old position and would be sent as the block's first two
+    // bytes -- its track/sector link. The VDrive path clears them too.
+    clearReadBuffer(channel_num);
 
     setStatusCode(ST_OK);
     return true;
