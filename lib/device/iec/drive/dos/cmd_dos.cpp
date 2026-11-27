@@ -150,7 +150,8 @@ void CmdHdDos::cmdDeletePartition()
 // partition:default,<n>
 // partition:dump,<n>[,<filename>]
 // partition:write,<n>,<file>
-// partition:new,<file>[,<MB>]        (CbmDos; also from inside a CMD image)
+//
+// (A new CMD container is made by N0: or MD: with a .dhd .d1m .d2m .d4m name.)
 //
 // Meatloaf extensions: on CMD hardware only HD-TOOLS and FD-TOOLS create
 // partitions or change the default. <type> is nat, 1541, 1571 or 1581. The
@@ -166,7 +167,7 @@ void CmdHdDos::cmdDeletePartition()
 // image beside the container - .d64 / .d71 / .d81 / .dnp by its type, named
 // after the partition unless a filename is given (63 if it exists).
 // partition:dump,0 on a CMD HD saves the system partition - the drive's DOS -
-// to /sd/.sys/cmdhd.sys, which partition:new then uses for new DHDs.
+// to /sd/.sys/cmdhd.sys, which N0:/MD: then use for new DHDs.
 //
 // A .d64/.d71/.d81/.dnp file in place of <type> creates a partition of that
 // file's type and size and writes the file in instead of formatting;
@@ -200,13 +201,6 @@ void CmdHdDos::cmdPartitionAdmin(const std::string& args)
     };
 
     const std::string& verb = a[0];
-
-    // partition:new makes a container, which needs no table to stand in
-    if ( verb == "new" )
-    {
-        CbmDos::cmdPartitionAdmin(args);
-        return;
-    }
 
     // partition:write,<n>,<file>: a D64/D71/D81/DNP into an existing partition
     if ( verb == "write" )

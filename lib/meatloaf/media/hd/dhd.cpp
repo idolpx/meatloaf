@@ -23,11 +23,13 @@
 #include <memory>
 #include <algorithm>
 #include <climits>
+#include <cerrno>
+#include <unistd.h>
 
 std::map<std::string, DHDImageRegistry::Image> DHDImageRegistry::s_images;
 
 // Where partition:dump,0 keeps a CMD HD's system partition (its DOS) and
-// partition:new takes it from for a new DHD.
+// N0:/MD: take it from for a new DHD.
 #define SYSTEM_TEMPLATE "/sd/.sys/cmdhd.sys"
 bool DHDImageRegistry::s_probing = false;
 
@@ -262,7 +264,7 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
         if (p.number != 0) { first_user = p.number; break; }
     }
 
-    // An image with no user partitions yet is valid - partition:new makes
+    // An image with no user partitions yet is valid - N0:/MD: make
     // exactly that, and partition:create needs to reach it - it just has
     // nothing selected (selected 0; current() answers nullptr for it).
     if (first_user == 0)
@@ -545,6 +547,26 @@ uint8_t DHDImageRegistry::deletePartitions(const std::string &containerUrl, cons
         return 25;
     s->close();
 
+    // A DHD shrinks back to fit: after the pack every free LBA is at the end,
+    // so cut the file at the end of the last partition (never below the
+    // system partition). A partition running past the end of the image keeps
+    // the part of it that is there. Local files only - truncate() has no
+    // equivalent over a network share, where the image keeps its size.
+    if (!img->fd_kind && !containerUrl.empty() && containerUrl[0] == '/')
+    {
+        int64_t end = area_first;
+        for (int i = 1; i <= maxpart; i++)
+            if (t.type(i) != 0)
+                end = std::max<int64_t>(end, std::min<int64_t>(offset(i) + size(i), area_end));
+        if (end < area_end)
+        {
+            Debug_printv("D-P: shrinking [%s] from %lld to %lld LBAs", containerUrl.c_str(),
+                         (long long) area_end, (long long) end);
+            if (truncate(containerUrl.c_str(), (off_t) end * 512) != 0)
+                Debug_printv("D-P: truncate failed errno[%d]", errno);
+        }
+    }
+
     forget(containerUrl);
     return 0;
 }
@@ -594,6 +616,11 @@ uint8_t DHDImageRegistry::createPartition(const std::string &containerUrl, uint8
 
     int64_t area_first, area_end;
     partitionArea(*img, t, area_first, area_end);
+    // An FD is its fixed size. A DHD grows to take a new partition - up to
+    // 4 GB, the most a FAT32 file can be (the table's 3-byte LBA allows more).
+    // area_end stays the image's current end: a partition past it is one that
+    // cannot be moved (see deletePartitions()).
+    const int64_t alloc_end = img->fd_kind ? area_end : (int64_t) (0xFFFFFFFFull / 512);
 
     // Everything that occupies the area, sorted by start
     std::vector<int> used;
@@ -610,13 +637,14 @@ uint8_t DHDImageRegistry::createPartition(const std::string &containerUrl, uint8
         for (int i : used)
         {
             int64_t st = t.start(i), en = st + t.size(i);
-            if (en <= area_first || st >= area_end)
+            if (en <= area_first || st >= alloc_end)
                 continue;
             if (st - cursor >= (int64_t) lbas)
                 break;
             cursor = std::max(cursor, en);
         }
-        if (cursor + (int64_t) lbas <= area_end)
+        // No gap: after the last partition - on a DHD that grows the file
+        if (cursor + (int64_t) lbas <= alloc_end)
             at = cursor;
         if (at < 0)
             return 72;
@@ -642,7 +670,7 @@ uint8_t DHDImageRegistry::createPartition(const std::string &containerUrl, uint8
         };
         if (fixed(insert_before))
             return 77;
-        int64_t limit = area_end;
+        int64_t limit = alloc_end;
         for (int i : used)
             if (fixed(i) && (int64_t) t.start(i) > at)
             {
@@ -829,7 +857,15 @@ uint8_t DHDImageRegistry::dumpPartition(const std::string &containerUrl, uint8_t
     return st;
 }
 
-uint8_t DHDImageRegistry::createImage(const std::string &url, uint32_t megabytes)
+bool DHDImageRegistry::isContainerName(const std::string &name)
+{
+    std::string lower = name;
+    for (auto &c : lower) c = tolower(c);
+    return mstr::endsWith(lower, ".dhd") || mstr::endsWith(lower, ".d1m") ||
+           mstr::endsWith(lower, ".d2m") || mstr::endsWith(lower, ".d4m");
+}
+
+uint8_t DHDImageRegistry::createImage(const std::string &url)
 {
     std::string lower = url;
     for (auto &c : lower) c = tolower(c);
@@ -841,8 +877,6 @@ uint8_t DHDImageRegistry::createImage(const std::string &url, uint32_t megabytes
     else if (mstr::endsWith(lower, ".d4m")) { psize = 0x1900; ssize = 152; }
     else if (mstr::endsWith(lower, ".dhd")) hd = true;
     else return 64;
-    if (hd && (megabytes < 1 || megabytes > 4095))
-        return 30;
 
     std::unique_ptr<MFile> f(MFSOwner::File(url, true));
     if (f == nullptr)
@@ -919,7 +953,8 @@ uint8_t DHDImageRegistry::createImage(const std::string &url, uint32_t megabytes
         uint32_t sys_lbas = sys_sectors / 2;    // 144
         table[0x15] = (sys_lba >> 16) & 0xFF; table[0x16] = (sys_lba >> 8) & 0xFF; table[0x17] = sys_lba & 0xFF;
         table[0x1D] = (sys_lbas >> 16) & 0xFF; table[0x1E] = (sys_lbas >> 8) & 0xFF; table[0x1F] = sys_lbas & 0xFF;
-        total = (uint64_t) megabytes * 1024 * 1024;
+        // Minimal: it ends with the system partition. partition:create grows it.
+        total = (sys_lba + sys_lbas) * 512;
     }
     else
     {
@@ -957,12 +992,13 @@ uint8_t DHDImageRegistry::createImage(const std::string &url, uint32_t megabytes
         return 25;
     if (hd)
     {
-        uint8_t z = 0;
-        if (!s->seek(total - 1) || s->write(&z, 1) != 1)
+        // LBAs 0-127 before the system partition, zeroed
+        std::vector<uint8_t> zero(128 * 512, 0);
+        if (!s->seek(0) || s->write(zero.data(), zero.size()) != zero.size())
             return 25;
     }
     s->close();
-    Debug_printv("partition:new [%s] %s size[%llu]%s", url.c_str(), hd ? "HD" : "FD", (unsigned long long) total,
+    Debug_printv("new CMD image [%s] %s size[%llu]%s", url.c_str(), hd ? "HD" : "FD", (unsigned long long) total,
                  from_template ? " system partition from " SYSTEM_TEMPLATE : "");
     forget(url);
     return 0;

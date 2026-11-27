@@ -35,6 +35,7 @@
 #include <memory>
 
 #include "../../drive.h"
+#include "../../../../meatloaf/media/hd/dhd.h"
 
 #include "mlConfig.h"
 #include "utils.h"
@@ -152,6 +153,15 @@ bool CbmDos::cmdSd2iec(std::string& command, size_t colon_position)
 void CbmDos::cmdMakeDirectory(const std::string& arg)
 {
     std::string path = mstr::toUTF8(arg);
+
+    // MD:name.dhd (or .d1m .d2m .d4m) makes a new, empty CMD container
+    if ( DHDImageRegistry::isContainerName(path) )
+    {
+        m_host.dosSetStatus(DHDImageRegistry::createImage(mediaPath(path)));
+        invalidateListings();
+        return;
+    }
+
     Debug_printv("make directory path[%s]", path.c_str());
     std::unique_ptr<MFile> f(m_host.dosCwd()->cd(path));
     if ( f == nullptr )

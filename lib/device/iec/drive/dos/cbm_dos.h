@@ -82,7 +82,7 @@ protected:
   bool cmdFastLoaderSwitch(const std::string& command);                       // EJ/EE/EA/EF/ED +/-
   bool cmdFilePosition(std::string command);                                  // F-P
   void cmdHardReset(const std::string& command);                              // U{Shift-J}[+]
-  virtual void cmdPartitionAdmin(const std::string& args);                    // partition:new here; the rest in CmdHdDos (31 here)
+  virtual void cmdPartitionAdmin(const std::string& args);                    // partition:...: 31 here, CmdHdDos has the commands
   std::string mediaPath(const std::string& name);                             // a file named in a partition command
 
   // --- Helpers (cbm_dos.cpp). Each that can fail sets the status itself. ------

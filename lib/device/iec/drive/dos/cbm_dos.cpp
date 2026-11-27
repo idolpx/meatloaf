@@ -34,6 +34,7 @@
 
 #include "../../drive.h"
 #include "../../../../meatloaf/meat_media.h"
+#include "../../../../meatloaf/media/hd/dhd.h"
 
 #include "led.h"
 #include "utils.h"
@@ -420,6 +421,20 @@ void CbmDos::cmdMemoryWrite(uint16_t address)
 // which needs an extension to say what kind.
 void CbmDos::cmdNew(const std::string& command, size_t colon_position)
 {
+    // N0:name.dhd (or .d1m .d2m .d4m) makes a new CMD container - also in
+    // VDrive mode, whose own N: cannot create these types.
+    {
+        std::string spec = mstr::toUTF8(command.substr(colon_position + 1));
+        std::string name = spec.substr(0, spec.find(','));
+        mstr::trim(name);
+        if ( DHDImageRegistry::isContainerName(name) )
+        {
+            m_host.dosSetStatus(DHDImageRegistry::createImage(mediaPath(name)));
+            invalidateListings();
+            return;
+        }
+    }
+
     if ( !m_host.dosUseVDrive() )
     {
         Debug_printv("new (format)");

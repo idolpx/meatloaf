@@ -130,8 +130,9 @@ public:
     // Create a partition (a Meatloaf extension - on CMD hardware only HD-TOOLS
     // and FD-TOOLS do this). type is 1 native, 2 1541, 3 1571, 4 1581; lbas is
     // its size in 512-byte LBAs. insert_before = 0 places it in the first free
-    // gap that fits; otherwise it goes where that partition starts and every
-    // partition from there on moves up by its size. The lowest free table
+    // gap that fits - on a DHD, at the end of the image, growing it, when no
+    // gap does; otherwise it goes where that partition starts and every
+    // partition from there on moves up by its size (a DHD grows for that too). The lowest free table
     // slot is used and returned in *out_number. The partition is NOT
     // formatted here. Returns a CBM status.
     // slot = 0 takes the lowest free table slot; otherwise that slot is used
@@ -151,8 +152,9 @@ public:
     // DHDs. 63 if the file exists. Returns a CBM status.
     static uint8_t dumpPartition(const std::string& containerUrl, uint8_t number, std::string filename);
 
-    // A new, empty CMD container: the type comes from the extension (.dhd,
-    // .d1m, .d2m, .d4m); a DHD is `megabytes` big, the FD sizes are fixed.
+    // A new, empty CMD container (N0:/MD: with a .dhd .d1m .d2m .d4m name):
+    // the type comes from the extension. An FD is its fixed size; a DHD is
+    // only its system partition (272 LBAs) and grows as partitions are added.
     // FD layout as VICE's format (vdrive_command_format_internal): system
     // partition at the end, a 4-sector table, the config sector with the FD
     // magic. A DHD gets its system partition (144 LBAs: the config track and
@@ -162,7 +164,10 @@ public:
     // one (partition:dump,0 of a real image): a real CMD HD loads its DOS from
     // there. Without it the system partition has only the magic, table and
     // config - enough for Meatloaf and VICE's virtual drive, not hardware.
-    static uint8_t createImage(const std::string& url, uint32_t megabytes);
+    static uint8_t createImage(const std::string& url);
+
+    // True for a name a new CMD container is made from: .dhd .d1m .d2m .d4m
+    static bool isContainerName(const std::string& name);
 
     // Copy a D64/D71/D81/DNP into partition `number`. The file's type must be
     // the partition's (64) and it must fit (52); a D64/D71/D81 carrying error
