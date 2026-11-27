@@ -2306,6 +2306,7 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
         case ST_ILLEGAL_TS_COMMAND  : msg = "ILLEGAL TRACK OR SECTOR"; break;
         case ST_DOSVERSION          :
             dosVersionMsg = std::string(PRODUCT_ID " ") + ESP.getFirmwareVersion().c_str();
+            //dosVersionMsg = "CBM DOS V2.6 1541";
             msg = dosVersionMsg.c_str();
             break;
         case ST_NO_CHANNEL          : msg = "NO CHANNEL"; break;

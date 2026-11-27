@@ -347,6 +347,8 @@ bool CbmDos::cmdCbm(std::string& command, uint8_t media, size_t colon_position)
             // Initialize
             Debug_printv( "initialize");
             m_host.dosReset();
+            m_host.dosSetStatus(ST_OK);
+
             return true;
         break;
         case 'M':
