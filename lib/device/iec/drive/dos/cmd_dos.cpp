@@ -145,4 +145,195 @@ void CmdHdDos::cmdDeletePartition()
     m_host.dosSetStatus(st);
 }
 
+// partition:create,<name>,<type>[,<tracks>][,@<n>][,#<slot>]
+// partition:delete,<n>[,<n>...]
+// partition:default,<n>
+// partition:dump,<n>[,<filename>]
+//
+// Meatloaf extensions: on CMD hardware only HD-TOOLS and FD-TOOLS create
+// partitions or change the default. <type> is nat, 1541, 1571 or 1581. The
+// fixed types size themselves (683 / 1366 / 3200 blocks); a native partition
+// needs <tracks>, 1-255, each 256 blocks (64 KB). Without @<n> the partition
+// goes in the first free gap that fits; with it, where partition n starts, and
+// every partition from there on moves up. #<slot> picks the table slot (the
+// partition's number); without it, or with #0, the lowest free one is used -
+// 63 if the slot is taken, 77 if it is beyond the table. The new partition is
+// formatted and its number answered in the status's track field: 00, OK,<n>,00.
+//
+// partition:dump,<n>[,<filename>] writes partition n's bytes to a standalone
+// image beside the container - .d64 / .d71 / .d81 / .dnp by its type, named
+// after the partition unless a filename is given (63 if it exists).
+void CmdHdDos::cmdPartitionAdmin(const std::string& args)
+{
+    std::vector<std::string> a = mstr::split(args, ',');
+    for ( auto &x : a )
+        mstr::trim(x);
+    if ( a.empty() )
+    {
+        m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+        return;
+    }
+
+    std::string url = container();
+    if ( DHDImageRegistry::obtain(url) == nullptr )
+    {
+        m_host.dosSetStatus(ST_SYNTAX_INVALID);
+        return;
+    }
+
+    auto number = [](const std::string& s, long lo, long hi, long* out) {
+        char *end = nullptr;
+        long v = strtol(s.c_str(), &end, 10);
+        if ( s.empty() || *end != '\0' || v < lo || v > hi ) return false;
+        *out = v;
+        return true;
+    };
+
+    const std::string& verb = a[0];
+
+    if ( verb == "default" )
+    {
+        long n = 0;
+        if ( a.size() != 2 || !number(a[1], 1, 254, &n) )
+        {
+            m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+            return;
+        }
+        m_host.dosSetStatus(DHDImageRegistry::setDefaultPartition(url, (uint8_t) n));
+        return;
+    }
+
+    if ( verb == "delete" )
+    {
+        std::vector<uint8_t> numbers;
+        for ( size_t i = 1; i < a.size(); i++ )
+        {
+            long n = 0;
+            if ( !number(a[i], 1, 254, &n) )
+            {
+                m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+                return;
+            }
+            numbers.push_back((uint8_t) n);
+        }
+        if ( numbers.empty() )
+        {
+            m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+            return;
+        }
+        uint8_t st = DHDImageRegistry::deletePartitions(url, numbers);
+        invalidateListings();
+        m_host.dosSetStatus(st);
+        return;
+    }
+
+    if ( verb == "dump" )
+    {
+        long n = 0;
+        if ( a.size() < 2 || a.size() > 3 || !number(a[1], 1, 254, &n) )
+        {
+            m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+            return;
+        }
+        std::string name = a.size() == 3 ? a[2] : std::string();
+        m_host.dosSetStatus(DHDImageRegistry::dumpPartition(url, (uint8_t) n, name));
+        return;
+    }
+
+    if ( verb == "create" )
+    {
+        if ( a.size() < 3 || a[1].empty() || hasWildcard(a[1]) )
+        {
+            m_host.dosSetStatus(a.size() >= 2 && a[1].empty() ? ST_SYNTAX_NO_NAME : ST_SYNTAX_UNKNOWN);
+            return;
+        }
+        const std::string& name = a[1];
+        const std::string& kind = a[2];
+
+        uint8_t type = 0;
+        uint32_t lbas = 0;
+        if ( kind == "nat" || kind == "native" ) type = 1;
+        else if ( kind == "1541" ) { type = 2; lbas = 342; }    // 683 blocks
+        else if ( kind == "1571" ) { type = 3; lbas = 683; }    // 1366 blocks
+        else if ( kind == "1581" ) { type = 4; lbas = 1600; }   // 3200 blocks
+        else
+        {
+            m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+            return;
+        }
+
+        long tracks = 0, before = 0, slot_req = 0;
+        for ( size_t i = 3; i < a.size(); i++ )
+        {
+            if ( !a[i].empty() && a[i][0] == '@' )
+            {
+                if ( !number(a[i].substr(1), 1, 254, &before) )
+                {
+                    m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+                    return;
+                }
+            }
+            else if ( !a[i].empty() && a[i][0] == '#' )
+            {
+                // the table slot; #0 (or none) takes the lowest free one
+                if ( !number(a[i].substr(1), 0, 255, &slot_req) )
+                {
+                    m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+                    return;
+                }
+                if ( slot_req == 255 )
+                {
+                    m_host.dosSetStatus(ST_PARTITION_ILLEGAL);
+                    return;
+                }
+            }
+            else if ( type != 1 || !number(a[i], 1, 255, &tracks) )
+            {
+                // a size only means something for a native partition
+                m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+                return;
+            }
+        }
+        if ( type == 1 )
+        {
+            if ( tracks == 0 )
+            {
+                m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+                return;
+            }
+            lbas = (uint32_t) tracks * 128;          // 256 blocks = 64 KB = 128 LBAs per track
+        }
+
+        uint8_t slot = 0;
+        uint8_t st = DHDImageRegistry::createPartition(url, type, mstr::toPETSCII2(name), lbas, (uint8_t) before, (uint8_t) slot_req, &slot);
+        if ( st != ST_OK )
+        {
+            m_host.dosSetStatus(st);
+            return;
+        }
+
+        // Format it: select it for the format, then put the selection back.
+        DHDImageRegistry::Image *img = DHDImageRegistry::obtain(url);
+        uint8_t previous = img ? img->selected : 0;
+        bool formatted = false;
+        if ( DHDImageRegistry::select(url, slot) )
+        {
+            std::unique_ptr<MFile> part(MFSOwner::File(url));
+            formatted = part && part->format(name + ",01");
+        }
+        if ( previous )
+            DHDImageRegistry::select(url, previous);
+        invalidateListings();
+
+        Debug_printv("partition:create [%s] type[%d] lbas[%lu] -> %d formatted[%d]", name.c_str(), type, (unsigned long) lbas, slot, formatted);
+        if ( !formatted )
+            m_host.dosSetStatus(ST_WRITE_VERIFY, slot, 0);
+        else
+            m_host.dosSetStatus(ST_OK, slot, 0);
+        return;
+    }
+
+    m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+}
+
 #endif

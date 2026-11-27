@@ -158,6 +158,14 @@ bool CbmDos::cmdFilePosition(std::string command)
 }
 
 
+// partition:... on media with no CMD partition table.
+void CbmDos::cmdPartitionAdmin(const std::string& args)
+{
+    (void) args;
+    m_host.dosSetStatus(ST_SYNTAX_INVALID);
+}
+
+
 // U{Shift-J}: hard reset back to the flash root; U{Shift-J}+ reboots.
 void CbmDos::cmdHardReset(const std::string& command)
 {
@@ -186,6 +194,15 @@ void CbmDos::cmdMeatloafExtended(std::string& command)
     // pt[0] then faults (LoadProhibited comparing a std::string at address 0).
     if ( pt.empty() )
         return;
+
+    // partition:create,... / partition:delete,... / partition:default,...
+    // on CMD images (CmdHdDos); 31 everywhere else.
+    if ( pt[0] == "partition" )
+    {
+        size_t colon = command.find(':');
+        cmdPartitionAdmin(colon == std::string::npos ? std::string() : command.substr(colon + 1));
+        return;
+    }
 
     if ( pt[0] == "auth" )
     {

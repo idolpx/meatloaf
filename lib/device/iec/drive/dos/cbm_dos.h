@@ -82,6 +82,7 @@ protected:
   bool cmdFastLoaderSwitch(const std::string& command);                       // EJ/EE/EA/EF/ED +/-
   bool cmdFilePosition(std::string command);                                  // F-P
   void cmdHardReset(const std::string& command);                              // U{Shift-J}[+]
+  virtual void cmdPartitionAdmin(const std::string& args);                    // partition:create/delete/default: 31 here, CmdHdDos overrides
 
   // --- Helpers (cbm_dos.cpp). Each that can fail sets the status itself. ------
   bool isBarePwd(const std::string& command) const;                           // PWD, not a binary P

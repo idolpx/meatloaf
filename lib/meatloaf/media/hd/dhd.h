@@ -97,6 +97,8 @@ public:
         // Where the 32-byte partition entries live in the image, so the
         // G-P/R-P/D-P commands can read and write them raw.
         uint32_t table_base = 0;
+        uint32_t sys_base = 0;              // byte offset of the system partition
+        uint32_t image_size = 0;            // bytes
         uint16_t maxpart = 254;             // 254 on an HD, 31 on an FD
         uint8_t  fd_kind = 0;               // 0 HD, else 1/2/4 for D1M/D2M/D4M
 
@@ -115,10 +117,35 @@ public:
     // R-P: write a new name (PETSCII, padded with $A0) into entry `number`.
     static bool renamePartition(const std::string& containerUrl, uint8_t number, const std::string& petscii_name);
 
-    // D-P (CMD FD only, as VICE): clear the type of every listed partition,
-    // then pack the remaining ones to the start of the disk, moving their data
-    // (vdrive_pack_parts). Returns a CBM status; the table is re-read after.
+    // D-P: clear the type of every listed partition, then pack the remaining
+    // ones together, moving their data (vdrive_pack_parts). VICE allows this
+    // on an FD only, because there the system partition sits at the END and
+    // packing from LBA 0 is safe; on an HD the pack starts after the system
+    // partition and never moves anything into it. Returns a CBM status; the
+    // table is re-read after.
     static uint8_t deletePartitions(const std::string& containerUrl, const std::vector<uint8_t>& numbers);
+
+    // Create a partition (a Meatloaf extension - on CMD hardware only HD-TOOLS
+    // and FD-TOOLS do this). type is 1 native, 2 1541, 3 1571, 4 1581; lbas is
+    // its size in 512-byte LBAs. insert_before = 0 places it in the first free
+    // gap that fits; otherwise it goes where that partition starts and every
+    // partition from there on moves up by its size. The lowest free table
+    // slot is used and returned in *out_number. The partition is NOT
+    // formatted here. Returns a CBM status.
+    // slot = 0 takes the lowest free table slot; otherwise that slot is used
+    // (63 if it is in use, 77 if it is beyond this image's table).
+    static uint8_t createPartition(const std::string& containerUrl, uint8_t type, const std::string& petscii_name,
+                                   uint32_t lbas, uint8_t insert_before, uint8_t slot, uint8_t* out_number);
+
+    // The partition the drive selects at power-on (cfg $E2 of the system
+    // partition). Returns a CBM status.
+    static uint8_t setDefaultPartition(const std::string& containerUrl, uint8_t number);
+
+    // Copy partition `number` out to a standalone image in the container's
+    // directory: .d64 / .d71 / .d81 / .dnp by its type. `filename` (UTF-8)
+    // defaults to the partition's name; the extension is added if missing.
+    // 63 if the file exists. Returns a CBM status.
+    static uint8_t dumpPartition(const std::string& containerUrl, uint8_t number, std::string filename);
 
     // True while the registry reads the raw image (so DHDMFileSystem
     // declines the path and the underlying filesystem serves the bytes)
@@ -135,6 +162,8 @@ public:
 private:
     static bool parse(const std::string& containerUrl, Image& img);
     static std::shared_ptr<MStream> openRaw(const std::string& containerUrl, std::ios_base::openmode mode);
+    static bool loadTable(Image* img, std::shared_ptr<MStream>& s, std::vector<uint8_t>& raw);
+    static bool saveTable(Image* img, std::shared_ptr<MStream>& s, const std::vector<uint8_t>& raw);
     static void forget(const std::string& containerUrl);
 
     static std::map<std::string, Image> s_images;
@@ -270,6 +299,35 @@ public:
     {
         normalizePath();
         return BASE::getSourceStream(mode);
+    }
+
+    // N0: (and partition:create) inside a CMD partition. D64MFile::format()
+    // opens the image with trunc, which is right for a .d64 on its own and
+    // wrong here: the image is the whole CMD container, and an empty
+    // pathInStream passes the mode straight to it. So open in|out and lay the
+    // disk down inside the partition's fixed window. A native partition gets
+    // its track count from the window (128 LBAs per 256-sector track).
+    bool format(std::string header_info) override
+    {
+        normalizePath();
+        const DHDPartition* p = effectivePartition();
+        if (p == nullptr)
+            return false;
+        auto stream = std::static_pointer_cast<D64MStream>(
+            BASE::getSourceStream(std::ios_base::in | std::ios_base::out));
+        if (stream == nullptr || !stream->isOpen())
+            return false;
+
+        D64FormatSpec spec = parseD64FormatSpec(header_info);
+        size_t tracks = spec.track_count;
+        if (p->type == 1)
+            tracks = p->size / 65536;           // p->size is bytes; a track is 64 KB
+        else
+            tracks = 0;                         // fixed geometry
+        bool ok = stream->formatImage(spec.name, spec.id, tracks, false);
+        stream->close();
+        DHDImageRegistry::disposeCachedStream(DHDImageRegistry::containerOf(this->url));
+        return ok;
     }
 
     bool rewindDirectory() override

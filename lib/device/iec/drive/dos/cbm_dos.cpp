@@ -148,9 +148,10 @@ bool CbmDos::cmdCbm(std::string& command, uint8_t media, size_t colon_position)
             return true;
 
         case 'P':
-            // PWD (SD2IEC) starts with the same letter; only the binary
-            // position form is CBM DOS.
-            if ( isBarePwd(command) )
+            // PWD (SD2IEC) and partition:... (Meatloaf) start with the same
+            // letter; only the binary position form is CBM DOS. A position
+            // command's second byte is $60+channel, never the 'A' of PARTITION.
+            if ( isBarePwd(command) || mstr::startsWith(command, "PARTITION") )
                 break;
             cmdPosition();
             return true;

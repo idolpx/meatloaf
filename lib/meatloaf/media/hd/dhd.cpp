@@ -194,6 +194,8 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
 
     img.default_part = cfg[0xE2];
     img.table_base = table_base;
+    img.sys_base = sys_base;
+    img.image_size = image_size;
     img.maxpart = maxpart;
     img.fd_kind = fd_sys == 0 ? 0 : (fd_sys == 0x640 * 512 ? 1 : (fd_sys == 0xC80 * 512 ? 2 : 4));
 
@@ -366,61 +368,139 @@ bool DHDImageRegistry::renamePartition(const std::string &containerUrl, uint8_t 
     return ok;
 }
 
+// --- Partition table editing (D-P, partition:create, partition:default) -----
+
+namespace {
+
+// The raw partition table, entries 0..maxpart, with helpers over its fields.
+// Offsets and sizes are 512-byte LBAs.
+struct PartTable
+{
+    std::vector<uint8_t> raw;
+
+    uint8_t& type(int i) { return raw[i * 32 + 2]; }
+    uint32_t field(int i, int o) const
+    {
+        return ((uint32_t) raw[i * 32 + o] << 16) | ((uint32_t) raw[i * 32 + o + 1] << 8) | raw[i * 32 + o + 2];
+    }
+    void setField(int i, int o, uint32_t v)
+    {
+        raw[i * 32 + o] = (v >> 16) & 0xFF; raw[i * 32 + o + 1] = (v >> 8) & 0xFF; raw[i * 32 + o + 2] = v & 0xFF;
+    }
+    uint32_t start(int i) const { return field(i, 0x15); }
+    uint32_t size(int i) const { return field(i, 0x1D); }
+};
+
+// Where partitions may live on this image, in LBAs: [first, end). On an FD
+// that is everything before the system partition (which is at the end); on
+// an HD everything after the system partition (the area before it is not for
+// partitions either - the reference image starts its first one right after).
+void partitionArea(const DHDImageRegistry::Image& img, PartTable& t, int64_t& first, int64_t& end)
+{
+    int64_t sys = img.sys_base / 512;
+    if (img.fd_kind)
+    {
+        first = 0;
+        end = sys;
+    }
+    else
+    {
+        first = sys + std::max<int64_t>(t.size(0), 1);
+        end = img.image_size / 512;
+    }
+}
+
+// Copy `lbas` LBAs from src to dst, whichever way they overlap: ascending
+// when moving down, descending when moving up, so no block is read after the
+// move has overwritten it.
+bool moveLbas(std::shared_ptr<MStream>& s, uint64_t src, uint64_t dst, uint64_t lbas)
+{
+    if (src == dst || lbas == 0)
+        return true;
+    std::vector<uint8_t> buf(64 * 512);
+    uint64_t bytes = lbas * 512, step = buf.size();
+    bool up = dst > src;
+    for (uint64_t done = 0; done < bytes; )
+    {
+        uint32_t n = (uint32_t) std::min<uint64_t>(step, bytes - done);
+        uint64_t off = up ? bytes - done - n : done;
+        if (!s->seek(src * 512 + off) || s->read(buf.data(), n) != n)
+            return false;
+        if (!s->seek(dst * 512 + off) || s->write(buf.data(), n) != n)
+            return false;
+        done += n;
+    }
+    return true;
+}
+
+} // namespace
+
+bool DHDImageRegistry::loadTable(Image* img, std::shared_ptr<MStream>& s, std::vector<uint8_t>& raw)
+{
+    raw.assign((img->maxpart + 1) * 32, 0);
+    return s->seek(img->table_base) && s->read(raw.data(), raw.size()) == raw.size();
+}
+
+bool DHDImageRegistry::saveTable(Image* img, std::shared_ptr<MStream>& s, const std::vector<uint8_t>& raw)
+{
+    return s->seek(img->table_base) && s->write(raw.data(), raw.size()) == raw.size();
+}
+
 uint8_t DHDImageRegistry::deletePartitions(const std::string &containerUrl, const std::vector<uint8_t> &numbers)
 {
     Image *img = obtain(containerUrl);
     if (img == nullptr)
         return 74;
-    // vdrive_command_deletepart: "can only do this on CMD FDs". On an FD the
-    // system partition is at the END of the image, which is what makes
-    // packing from LBA 0 safe; an HD's sits wherever it was formatted.
-    if (img->fd_kind == 0)
-        return 31;
     for (uint8_t n : numbers)
         if (n == 0 || n == 255 || n > img->maxpart)
             return 31;
 
-    const uint16_t maxpart = img->maxpart;
-    const uint32_t table_base = img->table_base;
-
+    const int maxpart = img->maxpart;
     auto s = openRaw(containerUrl, std::ios_base::in | std::ios_base::out);
     if (s == nullptr)
         return 74;
 
-    // The whole table, entries 0..maxpart
-    std::vector<uint8_t> table((maxpart + 1) * 32);
-    if (!s->seek(table_base) || s->read(table.data(), table.size()) != table.size())
+    PartTable t;
+    if (!loadTable(img, s, t.raw))
         return 74;
 
-    auto type   = [&](int i) -> uint8_t& { return table[i * 32 + 2]; };
-    auto lba    = [&](int i, int o) -> uint32_t {
-        return ((uint32_t) table[i * 32 + o] << 16) | ((uint32_t) table[i * 32 + o + 1] << 8) | table[i * 32 + o + 2];
-    };
-    auto setLba = [&](int i, int o, uint32_t v) {
-        table[i * 32 + o] = (v >> 16) & 0xFF; table[i * 32 + o + 1] = (v >> 8) & 0xFF; table[i * 32 + o + 2] = v & 0xFF;
-    };
-    auto offset = [&](int i) { return (int64_t) lba(i, 0x15); };
-    auto size   = [&](int i) { return (int64_t) lba(i, 0x1D); };
-
+    // Deleting a partition that is not there is an error, not a no-op (VICE
+    // only range-checks; this answers 77 before anything changes).
     for (uint8_t n : numbers)
-        type(n) = 0;
+        if (t.type(n) == 0)
+            return 77;
+    for (uint8_t n : numbers)
+        t.type(n) = 0;
+
+    int64_t area_first, area_end;
+    partitionArea(*img, t, area_first, area_end);
 
     // vdrive_pack_parts: repeatedly move the physically nearest movable
     // partition (types 1-6) down against the previous one, never into a
-    // foreign (type 7) partition. Offsets and sizes are in 512-byte LBAs.
-    std::vector<uint8_t> buf(64 * 512);
-    int64_t lowpos = -1, length = 1;
+    // foreign (type 7) partition. The pack starts at the beginning of the
+    // partition area - LBA 0 on an FD, the end of the system partition on an
+    // HD - which is what VICE's FD-only rule was protecting.
+    auto offset = [&](int i) { return (int64_t) t.start(i); };
+    auto size   = [&](int i) { return (int64_t) t.size(i); };
+    // A partition that is not wholly inside the image cannot be moved - its
+    // data is not all there to read - so it is treated as foreign: fixed, and
+    // nothing is moved onto it. The data is moved before the table is
+    // written, so a read failing half way would leave the two disagreeing.
+    auto fixed = [&](int i) {
+        return t.type(i) == 7 || offset(i) < area_first || offset(i) + size(i) > area_end;
+    };
+    int64_t lowpos = area_first - 1, length = 1;
     for (int guard = 0; guard < 512; guard++)
     {
         int best = 0, block = 0;
         int64_t bestpos = INT64_MAX;
         for (int i = 1; i <= maxpart; i++)
         {
-            if (type(i) > 0 && type(i) < 7 && offset(i) >= lowpos + length && offset(i) < bestpos)
+            if (t.type(i) > 0 && !fixed(i) && offset(i) >= lowpos + length && offset(i) < bestpos)
             {
                 for (int j = 1; j <= maxpart; j++)
                 {
-                    if (type(j) == 7 &&
+                    if (t.type(j) != 0 && fixed(j) &&
                         ((offset(j) >= lowpos + length && offset(j) < lowpos + length + size(i)) ||
                          (offset(j) + size(j) >= lowpos + length && offset(j) + size(j) < lowpos + length + size(i))))
                     {
@@ -447,34 +527,273 @@ uint8_t DHDImageRegistry::deletePartitions(const std::string &containerUrl, cons
             continue;
         }
 
-        // Move partition `best` from bestpos down to lowpos+length. The
-        // destination is lower, so copying in ascending order never reads
-        // a block this move has already overwritten.
         int64_t dest = lowpos + length;
-        uint64_t bytes = (uint64_t) size(best) * 512;
-        uint64_t src_b = (uint64_t) bestpos * 512, dst_b = (uint64_t) dest * 512;
         Debug_printv("D-P: moving partition[%d] from lba[%lld] to lba[%lld] size[%lld]",
                      best, (long long) bestpos, (long long) dest, (long long) size(best));
-        for (uint64_t done = 0; done < bytes; )
-        {
-            uint32_t n = (uint32_t) std::min<uint64_t>(buf.size(), bytes - done);
-            if (!s->seek(src_b + done) || s->read(buf.data(), n) != n)
-                return 74;
-            if (!s->seek(dst_b + done) || s->write(buf.data(), n) != n)
-                return 25;
-            done += n;
-        }
-        setLba(best, 0x15, (uint32_t) dest);
+        if (!moveLbas(s, bestpos, dest, size(best)))
+            return 25;
+        t.setField(best, 0x15, (uint32_t) dest);
         lowpos = dest;
         length = size(best);
     }
 
-    if (!s->seek(table_base) || s->write(table.data(), table.size()) != table.size())
+    if (!saveTable(img, s, t.raw))
         return 25;
     s->close();
 
     forget(containerUrl);
     return 0;
+}
+
+uint8_t DHDImageRegistry::createPartition(const std::string &containerUrl, uint8_t type, const std::string &petscii_name,
+                                          uint32_t lbas, uint8_t insert_before, uint8_t slot_req, uint8_t *out_number)
+{
+    Image *img = obtain(containerUrl);
+    if (img == nullptr)
+        return 74;
+    if (type < 1 || type > 4 || lbas == 0)
+        return 30;
+
+    const int maxpart = img->maxpart;
+    auto s = openRaw(containerUrl, std::ios_base::in | std::ios_base::out);
+    if (s == nullptr)
+        return 74;
+
+    PartTable t;
+    if (!loadTable(img, s, t.raw))
+        return 74;
+
+    // Names are unique, as R-P keeps them
+    uint8_t name[16];
+    memset(name, 0xA0, sizeof(name));
+    memcpy(name, petscii_name.data(), std::min(petscii_name.size(), sizeof(name)));
+    for (int i = 1; i <= maxpart; i++)
+        if (t.type(i) != 0 && memcmp(&t.raw[i * 32 + 5], name, 16) == 0)
+            return 63;
+
+    // The slot asked for, or the lowest free one. Numbering has nothing to do
+    // with placement on the disk, and the table always holds every entry.
+    int slot = 0;
+    if (slot_req != 0)
+    {
+        if (slot_req > maxpart)
+            return 77;
+        if (t.type(slot_req) != 0)
+            return 63;
+        slot = slot_req;
+    }
+    for (int i = 1; i <= maxpart && !slot; i++)
+        if (t.type(i) == 0)
+            slot = i;
+    if (!slot)
+        return 72;
+
+    int64_t area_first, area_end;
+    partitionArea(*img, t, area_first, area_end);
+
+    // Everything that occupies the area, sorted by start
+    std::vector<int> used;
+    for (int i = 1; i <= maxpart; i++)
+        if (t.type(i) != 0)
+            used.push_back(i);
+    std::sort(used.begin(), used.end(), [&](int a, int b) { return t.start(a) < t.start(b); });
+
+    int64_t at = -1;
+    if (insert_before == 0)
+    {
+        // First fit: the first gap at least `lbas` long
+        int64_t cursor = area_first;
+        for (int i : used)
+        {
+            int64_t st = t.start(i), en = st + t.size(i);
+            if (en <= area_first || st >= area_end)
+                continue;
+            if (st - cursor >= (int64_t) lbas)
+                break;
+            cursor = std::max(cursor, en);
+        }
+        if (cursor + (int64_t) lbas <= area_end)
+            at = cursor;
+        if (at < 0)
+            return 72;
+    }
+    else
+    {
+        // Insert: take the place of `insert_before` and move it, and every
+        // partition after it, up by `lbas`. A foreign partition (type 7) is
+        // never moved, as in the pack, so it cannot be in the way.
+        if (insert_before > maxpart || t.type(insert_before) == 0)
+            return 77;
+        at = t.start(insert_before);
+
+        // Everything from `at` up to the next foreign partition (or the end of
+        // the area) moves; it has to fit in front of whatever stops it. An
+        // entry starting past the end of the image is ignored - it cannot be
+        // moved, and the reference image has such entries.
+        // A foreign partition, or one not wholly inside the image, stops the
+        // move: those are never moved (see deletePartitions()).
+        auto fixed = [&](int i) {
+            return t.type(i) == 7 || (int64_t) t.start(i) < area_first ||
+                   (int64_t) (t.start(i) + t.size(i)) > area_end;
+        };
+        if (fixed(insert_before))
+            return 77;
+        int64_t limit = area_end;
+        for (int i : used)
+            if (fixed(i) && (int64_t) t.start(i) > at)
+            {
+                limit = std::min<int64_t>(limit, t.start(i));
+            }
+        std::vector<int> moving;
+        int64_t last_end = at;
+        for (int i : used)
+        {
+            int64_t st = t.start(i);
+            if (st >= at && st < limit && !fixed(i))
+            {
+                moving.push_back(i);
+                last_end = std::max<int64_t>(last_end, st + t.size(i));
+            }
+        }
+        if (last_end + (int64_t) lbas > limit)
+            return 72;
+        // From the top down, so no partition is moved onto one not yet moved
+        for (auto it = moving.rbegin(); it != moving.rend(); ++it)
+        {
+            int i = *it;
+            Debug_printv("partition:create: moving partition[%d] from lba[%lu] to lba[%lld]",
+                         i, (unsigned long) t.start(i), (long long) (t.start(i) + lbas));
+            if (!moveLbas(s, t.start(i), t.start(i) + lbas, t.size(i)))
+                return 25;
+            t.setField(i, 0x15, t.start(i) + lbas);
+        }
+    }
+
+    // The new entry: keep bytes 0-1, which on the first entry of each table
+    // sector are that sector's link.
+    uint8_t *e = &t.raw[slot * 32];
+    memset(e + 2, 0, 30);
+    e[2] = type;
+    memcpy(e + 5, name, 16);
+    t.setField(slot, 0x15, (uint32_t) at);
+    t.setField(slot, 0x1D, lbas);
+
+    // Zero the new partition's area so the format starts from nothing
+    std::vector<uint8_t> zero(64 * 512, 0);
+    for (uint64_t done = 0; done < (uint64_t) lbas * 512; )
+    {
+        uint32_t n = (uint32_t) std::min<uint64_t>(zero.size(), (uint64_t) lbas * 512 - done);
+        if (!s->seek((uint64_t) at * 512 + done) || s->write(zero.data(), n) != n)
+            return 25;
+        done += n;
+    }
+
+    if (!saveTable(img, s, t.raw))
+        return 25;
+    s->close();
+
+    Debug_printv("partition:create: [%d] type[%d] at lba[%lld] size[%lu]", slot, type, (long long) at, (unsigned long) lbas);
+    forget(containerUrl);
+    if (out_number)
+        *out_number = (uint8_t) slot;
+    return 0;
+}
+
+uint8_t DHDImageRegistry::setDefaultPartition(const std::string &containerUrl, uint8_t number)
+{
+    Image *img = obtain(containerUrl);
+    if (img == nullptr)
+        return 74;
+    if (number == 0 || img->byNumber(number) == nullptr)
+        return 77;
+    auto s = openRaw(containerUrl, std::ios_base::in | std::ios_base::out);
+    if (s == nullptr)
+        return 74;
+    // cfg sits at sys_base + $500; the default partition is its byte $E2
+    if (!s->seek(img->sys_base + 0x500 + 0xE2) || s->write(&number, 1) != 1)
+        return 25;
+    s->close();
+    img->default_part = number;
+    return 0;
+}
+
+uint8_t DHDImageRegistry::dumpPartition(const std::string &containerUrl, uint8_t number, std::string filename)
+{
+    Image *img = obtain(containerUrl);
+    if (img == nullptr)
+        return 74;
+    const DHDPartition *p = number ? img->byNumber(number) : nullptr;
+    if (p == nullptr || p->size == 0)
+        return 77;
+
+    static const char *exts[] = { "", ".dnp", ".d64", ".d71", ".d81" };
+    std::string ext = exts[p->type];
+
+    if (filename.empty())
+        filename = mstr::toUTF8(p->name);
+    // a plain file name, never a path
+    for (auto &c : filename)
+        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?')
+            c = '_';
+    mstr::trim(filename);
+    if (filename.empty())
+        return 34;
+    if (!mstr::endsWith(filename, ext.c_str(), false))
+        filename += ext;
+
+    size_t slash = containerUrl.find_last_of('/');
+    std::string dir = slash == std::string::npos ? std::string() : containerUrl.substr(0, slash);
+    std::string target = dir + "/" + filename;
+
+    // Raw on both ends: the target's name says .d64, which would otherwise
+    // resolve to an image decoder rather than the file.
+    std::unique_ptr<MFile> out(MFSOwner::File(target, true));
+    if (out == nullptr)
+        return 74;
+    if (out->exists())
+        return 63;
+    if (!out->isWritable)
+        return 26;
+
+    auto src = openRaw(containerUrl, std::ios_base::in);
+    if (src == nullptr)
+        return 74;
+    auto dst = out->getSourceStream(std::ios_base::out);
+    if (dst == nullptr || !dst->isOpen())
+        return 25;
+
+    // The image's own size, not the partition window's: a 1541 partition is
+    // 342 LBAs = 175104 bytes, 256 more than a D64, and a file of that size is
+    // not a valid D64 to other tools. The other windows are exact.
+    uint32_t length = p->size;
+    if (p->type == 2 && length > 174848)
+        length = 174848;
+
+    std::vector<uint8_t> buf(64 * 512);
+    uint8_t st = 0;
+    for (uint32_t done = 0; done < length; )
+    {
+        uint32_t n = std::min<uint32_t>((uint32_t) buf.size(), length - done);
+        if (!src->seek(p->start + done) || src->read(buf.data(), n) != n)
+        {
+            st = 74;
+            break;
+        }
+        if (dst->write(buf.data(), n) != n)
+        {
+            st = 25;
+            break;
+        }
+        done += n;
+    }
+    dst->close();
+    if (st == 0 && dst->error())
+        st = 25;
+    if (st != 0)
+        out->remove();
+    else
+        Debug_printv("partition:dump [%d] -> [%s] (%lu bytes)", number, target.c_str(), (unsigned long) length);
+    return st;
 }
 
 void DHDImageRegistry::disposeCachedStream(const std::string &containerUrl)
