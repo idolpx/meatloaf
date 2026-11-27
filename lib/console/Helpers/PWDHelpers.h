@@ -13,6 +13,14 @@ namespace ESP32Console
 
     MFile* getCurrentPath();
 
+    // Resolve a path the user typed, relative to the current path. A single
+    // leading '/' is ABSOLUTE on the host whatever the current path is:
+    // MFile::cd() follows CBM DOS there (on a network path "/DIR" descends
+    // from the current directory), so with the console standing in
+    // fsp://host/dir, "ls /sd" listed fsp://host/dir/sd. "//" keeps cd()'s
+    // meaning (the root of the current image). The caller owns the result.
+    MFile* resolveConsolePath(const std::string& arg);
+
     // Replace the console's current path, deleting the previous MFile.
     // Takes ownership of 'path'.
     void setCurrentPath(MFile* path);

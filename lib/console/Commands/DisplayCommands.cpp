@@ -129,7 +129,7 @@ static int show(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    std::unique_ptr<MFile> f(ESP32Console::getCurrentPath()->cd(argv[1]));
+    std::unique_ptr<MFile> f(ESP32Console::resolveConsolePath(argv[1]));
     if (f == nullptr || !f->exists())
     {
         Serial.printf("show: file not found: %s\r\n", argv[1]);

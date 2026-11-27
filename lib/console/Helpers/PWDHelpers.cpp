@@ -26,6 +26,12 @@ namespace ESP32Console
         return currentPath;
     }
 
+    MFile* resolveConsolePath(const std::string& arg) {
+        if (arg.size() > 0 && arg[0] == '/' && (arg.size() == 1 || arg[1] != '/'))
+            return MFSOwner::File(arg);
+        return getCurrentPath()->cd(arg);
+    }
+
     void setCurrentPath(MFile* path) {
         if (path == nullptr)
             return;
