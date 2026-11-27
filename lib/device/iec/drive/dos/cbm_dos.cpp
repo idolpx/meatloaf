@@ -15,6 +15,13 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
+// The command channel, part 1 of 3: CBM DOS 2.6 and the 1581 additions, plus
+// execute() itself and the helpers the other two parts share.
+//
+//   cbm_dos.cpp       this file
+//   sd2iec_dos.cpp    SD2IEC and CMD extensions
+//   meatloaf_dos.cpp  Meatloaf's own commands
+
 #if defined(BUILD_IEC)
 
 #include "cbm_dos.h"
@@ -22,23 +29,17 @@
 
 #include <cstdlib>
 #include <cstring>
-#include <ctime>
 #include <memory>
 #include <vector>
 
 #include "../../drive.h"
+#include "../../../../meatloaf/meat_media.h"
 
-#include "mlConfig.h"
-#include "fnSystem.h"
 #include "led.h"
 #include "utils.h"
-#include "time_converter.h"
 
 #include "../../../../../include/debug.h"
 #include "../../../../../include/cbm_defines.h"
-
-// Moved from iecDrive::executeData() unchanged: every status code, status
-// text and side effect is the same. Member accesses go through DosHost.
 
 static bool isMatch(std::string name, std::string pattern)
 {
@@ -57,22 +58,6 @@ static bool isMatch(std::string name, std::string pattern)
     return found==1;
 }
 
-// Parse one decimal DOS command argument.  strtoul, never stoi/stol: ESP-IDF
-// builds -fno-exceptions, so a throwing parser on a string that came off the
-// IEC bus is std::terminate.  Rejects an empty string and any trailing
-// rubbish rather than accepting a prefix, so a malformed argument is a syntax
-// error instead of a silently different number.
-static bool dosParseUint(const std::string &s, uint32_t *out)
-{
-    if ( s.empty() ) return false;
-
-    char *end = nullptr;
-    unsigned long value = strtoul(s.c_str(), &end, 10);
-    if ( end == s.c_str() || *end != '\0' ) return false;
-
-    *out = (uint32_t) value;
-    return true;
-}
 
 
 void CbmDos::execute(std::string command, const uint8_t* raw, uint8_t rawLen)
@@ -109,70 +94,10 @@ void CbmDos::execute(std::string command, const uint8_t* raw, uint8_t rawLen)
 }
 
 
-// CD, the E?+/- fast-loader switches and the Dolphin M-R hack.
-bool CbmDos::cmdMeatloafPrefix(std::string& command)
-{
-    if( mstr::startsWith(command, "CD") )
-    {
-        command = mstr::toUTF8(command);
-        m_host.dosSetCwd(mstr::drop(command, 2));
-        return true;
-    }
-#ifdef IEC_FP_JIFFY
-    else if( command=="EJ+" || command=="EJ-" )
-    {
-        m_host.dosEnableFastLoader(IEC_FP_JIFFY, command[2]=='+');
-        return true;
-    }
-#endif  
-#ifdef IEC_FP_EPYX
-    else if( command=="EE+" || command=="EE-" )
-    {
-        m_host.dosEnableFastLoader(IEC_FP_EPYX, command[2]=='+');
-        return true;
-    }
-#endif  
-#ifdef IEC_FP_AR6
-    else if( command=="EA+" || command=="EA-" )
-    {
-        m_host.dosEnableFastLoader(IEC_FP_AR6, command[2]=='+');
-        return true;
-    }
-#endif
-#ifdef IEC_FP_FC3
-    else if( command=="EF+" || command=="EF-" )
-    {
-        m_host.dosEnableFastLoader(IEC_FP_FC3, command[2]=='+');
-        return true;
-    }
-#endif
-#ifdef IEC_FP_DOLPHIN
-    else if( command=="ED+" || command=="ED-" )
-    {
-        m_host.dosEnableFastLoader(IEC_FP_DOLPHIN, command[2]=='+');
-        return true;
-    }
-    else if( command == "M-R\xfa\x02\x03" )
-    {
-        // hack: DolphinDos' MultiDubTwo copy program reads 02FA-02FC to determine
-        // number of free blocks => pretend we have 664 (0298h) blocks available
-        m_host.dosSetStatus(ST_OK);
-        uint8_t data[3] = {0x98, 0, 0x02};
-        m_host.dosSetStatusData((char *) data, 3);
-        return true;
-    }
-#endif
-    // else
-    // {
-    //   setStatusCode(ST_SYNTAX_INVALID);
-    //   //Debug_printv("Invalid command");
-    // }
 
-    return false;
-}
-
-
-// Drive level commands, CBM DOS 2.6.
+// Drive level commands, CBM DOS 2.6. Only decides WHICH command it is; each
+// command is its own function below. A handler that returns false (or a case
+// that breaks) lets the command fall through to the SD2IEC and Meatloaf sets.
 bool CbmDos::cmdCbm(std::string& command, uint8_t media, size_t colon_position)
 {
     (void) media;
@@ -180,893 +105,864 @@ bool CbmDos::cmdCbm(std::string& command, uint8_t media, size_t colon_position)
     switch ( command[0] )
     {
         case 'B':
-            if (command[1] == '-')
-            {
-                // B-P buffer pointer
-                if (command[2] == 'P')
-                {
-                    command = mstr::drop(command, 3);
-                    mstr::trim(command);
-                    mstr::replaceAll(command, "  ", " ");
+            return cmdBlock(command);
 
-                    std::vector<std::string> pt = util_tokenize(command, ' ');
-                    uint32_t chan = 0, pos = 0;
-                    if ( pt.size() < 2 || !dosParseUint(pt[0], &chan) || !dosParseUint(pt[1], &pos) )
-                    {
-                        m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
-                        return true;
-                    }
-
-                    Debug_printv("B-P channel[%lu] position-in-block[%lu]",
-                                 (unsigned long) chan, (unsigned long) pos);
-
-                    m_host.dosPositionChannel( chan, pos, true );
-                    return true;
-                }
-                // B-R read block / B-W write block
-                else if (command[2] == 'R' || command[2] == 'W')
-                {
-                    bool for_write = (command[2] == 'W');
-                    Debug_printv("%s block", for_write ? "write" : "read");
-
-                    command = mstr::drop(command, 3);
-                    mstr::trim(command);
-                    mstr::replaceAll(command, "  ", " ");
-                    std::vector<uint8_t> pti = util_tokenize_uint8(command);
-                    if ( pti.size() < 4 )
-                    {
-                        m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
-                        return true;
-                    }
-                    Debug_printv("command[%s] channel[%d] media[%d] track[%d] sector[%d]", command.c_str(), pti[0], pti[1], pti[2], pti[3]);
-
-                    // CBM keeps byte 0 of a B-R/B-W block as the count of
-                    // valid bytes, so both land on byte 1; U1/U2 give the
-                    // whole 256.
-                    m_host.dosSeekChannelToBlock( pti[0], pti[2], pti[3], 1, for_write );
-                    return true;
-                }
-                // B-A allocate block in BAM
-                else if (command[2] == 'A')
-                {
-                    Debug_printv("allocate block in BAM");
-
-                    command = mstr::drop(command, 3);
-                    mstr::trim(command);
-                    mstr::replaceAll(command, "  ", " ");
-                    std::vector<uint8_t> pti = util_tokenize_uint8(command);
-                    if (pti.size() < 3)
-                    {
-                        m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
-                        return true;
-                    }
-                    Debug_printv("track[%d] sector[%d]", pti[0], pti[1]);
-
-                    std::unique_ptr<MFile> image(MFSOwner::File(m_host.dosCwd()->url));
-                    auto stream = image ? image->getSourceStream() : nullptr;
-                    if (stream == nullptr || !stream->isOpen() || !image || !image->isWritable)
-                    {
-                        m_host.dosSetStatus(ST_DRIVE_NOT_READY);
-                        return true;
-                    }
-
-                    // B-A allocates: true = allocate (mark as used)
-                    if (!stream->setBlockAllocation(pti[0], pti[1], true))
-                    {
-                        m_host.dosSetStatus(ST_NO_BLOCK, pti[0], pti[1]);
-                        return true;
-                    }
-                    m_host.dosSetStatus(ST_OK);
-                    return true;
-                }
-                // B-F free block in BAM
-                else if (command[2] == 'F')
-                {
-                    Debug_printv("free block in BAM");
-
-                    command = mstr::drop(command, 3);
-                    mstr::trim(command);
-                    mstr::replaceAll(command, "  ", " ");
-                    std::vector<uint8_t> pti = util_tokenize_uint8(command);
-                    if (pti.size() < 3)
-                    {
-                        m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
-                        return true;
-                    }
-                    Debug_printv("track[%d] sector[%d]", pti[0], pti[1]);
-
-                    std::unique_ptr<MFile> image(MFSOwner::File(m_host.dosCwd()->url));
-                    auto stream = image ? image->getSourceStream() : nullptr;
-                    if (stream == nullptr || !stream->isOpen() || !image || !image->isWritable)
-                    {
-                        m_host.dosSetStatus(ST_DRIVE_NOT_READY);
-                        return true;
-                    }
-
-                    // B-F frees: false = deallocate (mark as free)
-                    if (!stream->setBlockAllocation(pti[0], pti[1], false))
-                    {
-                        m_host.dosSetStatus(ST_NO_BLOCK, pti[0], pti[1]);
-                        return true;
-                    }
-                    m_host.dosSetStatus(ST_OK);
-                    return true;
-                }
-                // B-E block execute
-                else if (command[2] == 'E')
-                {
-                    Debug_printv( "block execute");
-                }
-            }
-            //Error(ERROR_31_SYNTAX_ERROR);
-            Debug_printv( "block/buffer");
-        break;
         case 'C':
-            if ( command[1] != 'D' && colon_position)
+            // C[d]:new=[d:]old[,[d:]old2...] - CD and CP are handled elsewhere
+            if ( command[1] != 'D' && command[1] != 'P' && command[1] != 'p' && colon_position )
             {
-                //Copy(); // Copy File
-                Debug_printv( "copy file");
+                cmdCopy(command.substr(colon_position + 1));
+                return true;
             }
-        break;
+            break;
+
         case 'D':
-            Debug_printv( "duplicate disk");
-            //Error(ERROR_31_SYNTAX_ERROR);	// DI, DR, DW not implemented yet
-        break;
-        case 'F':
-            if (command[1] == '-')
+            // D-P <count> <partition...> $FF: delete CMD FD partitions.
+            // D (duplicate) needs a dual drive and answers 31.
+            if ( command.size() >= 3 && command[1] == '-' && command[2] == 'P' )
             {
-                // F-P file position
-                if (command[2] == 'P')
-                {
-                    command = mstr::drop(command, 3);
-                    mstr::trim(command);
-                    mstr::replaceAll(command, "  ", " ");
-
-                    // Parsed as 32-bit, not through util_tokenize_uint8():
-                    // F-P's argument is an absolute offset in the file and a
-                    // uint8_t silently WRAPS it -- 300 became 44, answering OK.
-                    std::vector<std::string> pt = util_tokenize(command, ' ');
-                    uint32_t chan = 0, pos = 0;
-                    if ( pt.size() < 2 || !dosParseUint(pt[0], &chan) || !dosParseUint(pt[1], &pos) )
-                    {
-                        m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
-                        return true;
-                    }
-
-                    Debug_printv("F-P channel[%lu] position[%lu]",
-                                 (unsigned long) chan, (unsigned long) pos);
-
-                    m_host.dosPositionChannel( chan, pos, false );
-                    return true;
-                }
+                cmdDeletePartition();
+                return true;
             }
-            // Without this an unmatched F-* falls straight into 'I' and
-            // resets the drive.
-        break;
+            break;
+
         case 'I':
-            // Initialize
-            Debug_printv( "initialize");
-            m_host.dosReset();
-            m_host.dosSetStatus(ST_OK);
-
+            cmdInitialize();
             return true;
-        break;
-        case 'M':
-            if ( command[1] == '-' ) // Memory
-            {
-                if (command[2] == 'R') // M-R memory read
-                {
-                    command = mstr::drop(command, 3); // Drop M-R
-                    std::string code = mstr::toHex(command);
-                    uint16_t address = (command[0] | command[1] << 8);
-                    uint8_t size = command[2];
-                    Debug_printv("Memory Read [%s]", code.c_str());
-                    Debug_printv("address[%04X] size[%d]", address, size);
 
-                    // size is uint8_t, so 255 is the most that can be asked for.
-                    uint8_t data[256] = { 0 };
-                    // read() answers with what it could actually supply --
-                    // publishing `size` bytes regardless would hand the caller
-                    // buffer contents for an address that is not mapped.
-                    size_t got = m_host.dosMemory().read(address, data, size);
-                    m_host.dosSetStatusData((char *) data, got);
-                    Debug_printv("address[%04X] data[%s]", address, mstr::toHex(data, got).c_str());
-                }
-                else if (command[2] == 'W') // M-W memory write
-                {
-                    command = mstr::drop(command, 3); // Drop M-W
-                    uint16_t address = (command[0] | command[1] << 8);
-                    size_t size = command[2]; // Limited to 34 data bytes per command
-
-                    command = mstr::drop(command, 3); // Drop address, size
-
-                    if (size > command.size())
-                        size = command.size();
-
-                    Debug_printv("Memory Write address[%04X] size[%d] data[%s]", address, size,
-                                 mstr::toHex((const uint8_t *)command.c_str(), size).c_str());
-
-                    m_host.dosMemory().write(address, (const uint8_t *)command.c_str(), size);
-                }
-                else if (command[2] == 'E') // M-E memory execute
-                {
-                    command = mstr::drop(command, 3); // Drop M-E
-                    std::string code = mstr::toHex(command);
-                    uint16_t address = (command[0] | command[1] << 8);
-                    Debug_printv("Memory Execute address[%04X][%s]", address, code.c_str());
-
-                    // Fast loader detection happens earlier, in
-                    // IECFileDevice::isFastLoaderRequest -- an M-E only reaches
-                    // here when no loader claimed it.
-                    m_host.dosMemory().execute(address);
-                }
-                //setStatusCode(ST_OK);
-                return true;
-            }
-        break;
-        case 'N':
-        {
-//#ifdef USE_VDRIVE
-            if ( m_host.dosUseVDrive() )
-                {
-                std::string params = command.substr(colon_position+1);
-                size_t dot = params.find('.');
-
-                if( dot==std::string::npos )
-                {
-                    // must have extension to determine image type
-                    m_host.dosSetStatus(ST_SYNTAX_INVALID);
-                }
-                else
-                {
-                    std::string filename, diskname, ext;
-                    size_t comma = params.find(',');
-                    if( comma==std::string::npos )
-                    {
-                        filename = mstr::toUTF8(params);
-                        diskname = params.substr(0,dot);
-                    }
-                    else
-                    {
-                        filename = mstr::toUTF8(params.substr(0, comma));
-                        diskname = params.substr(comma+1);
-                    }
-
-                    fnLedManager.set(eLed::LED_BUS, true);
-                    Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Changing directory to [%s][%s]", m_host.dosCwd()->url.c_str(), filename.c_str());
-                    MFile *f = m_host.dosCwd()->cd(filename);
-                    if( f->exists() )
-                        m_host.dosSetStatus(ST_FILE_EXISTS);
-                    else if( !f->isWritable )
-                        m_host.dosSetStatus(ST_WRITE_PROTECT_ON);
-                    else if( !m_host.dosCreateDiskImage(f->url, diskname) )
-                        m_host.dosSetStatus(ST_WRITE_VERIFY);
-                    else
-                        m_host.dosSetStatus(ST_OK);
-                    fnLedManager.set(eLed::LED_BUS, false);
-                }
-                // Handled either way: falling out of the switch reaches the
-                // final 31 and overwrote the status just set.
-                return true;
-            }
-            else
-            {
-//#else
-                //New();
-                Debug_printv( "new (format)");
-                command = mstr::toUTF8(command.substr(colon_position + 1));
-                if (!m_host.dosCwd()->format(command))
-                    m_host.dosSetStatus(ST_WRITE_VERIFY);
-
-                return true;
-            }
-//#endif
-        }
-        break;
-        case 'R':
-            if ( command[1] != 'D' && colon_position ) // Rename
-            {
-                Debug_printv( "rename file");
-                // Rename();
-                command = command.substr(colon_position + 1);
-                command = mstr::toUTF8(command);
-                auto parts = mstr::split(command, '=');
-
-                if( parts.size() != 2 )
-                {
-                m_host.dosSetStatus(ST_SYNTAX_INVALID);
-                return true;
-                }
-
-                uint8_t n = 0;
-                MFile *dir = MFSOwner::File(m_host.dosCwd()->url);
-                if( dir!=nullptr )
-                {
-                    if( dir->isDirectory() )
-                        {
-                        std::unique_ptr<MFile> entry;
-                        while( (entry=std::unique_ptr<MFile>(m_host.dosCwd()->getNextFileInDir()))!=nullptr )
-                            {
-                            if( isMatch(entry->name, parts[1]) )
-                                {
-                                entry->rename(parts[0]);
-                                Debug_printv("Renamed '%s' to '%s'", parts[1].c_str(), parts[0].c_str());
-                                n++;
-                                break;
-                                }
-                            }
-                        }
-                    delete dir;
-                }
-
-                if ( n == 0 )
-                    m_host.dosSetStatus(ST_FILE_NOT_FOUND);
-
-                return true;
-            }
-        break;
-        case 'S': // Scratch
+        case 'L':
             if ( colon_position )
             {
-                Debug_printv( "scratch");
-                //Scratch();
-                // SCRATCH (delete)
-                uint8_t n = 0;
-
-                // Everything between the command letter and the colon is a
-                // PATH ("S/TEMPORARY/:*" scratches inside TEMPORARY), and it
-                // used to be discarded - the pattern was then matched against
-                // the CURRENT directory, so C64 OS clearing its temp directory
-                // instead matched os/BOOTER. Nothing was lost only because
-                // MFile::remove() refuses a container-hosted entry; on a
-                // writable image it would have deleted the wrong files.
-                std::string dirPath = command.substr(1, colon_position - 1);
-                std::string pattern = command.substr(colon_position + 1);
-
-                // drive number prefix ("S0:...")
-                while( !dirPath.empty() && isdigit((unsigned char)dirPath.front()) )
-                    dirPath.erase(0, 1);
-
-                // As in open(): one leading '/' descends from the current
-                // directory, "//" starts at the root of the image.
-                if( dirPath.size() > 1 && dirPath[0] == '/' && dirPath[1] != '/' )
-                    dirPath.erase(0, 1);
-                while( !dirPath.empty() && dirPath.back() == '/' )
-                    dirPath.pop_back();
-
-                std::unique_ptr<MFile> dir(dirPath.empty()
-                                           ? MFSOwner::File(m_host.dosCwd()->fullUrl())
-                                           : m_host.dosCwd()->cd(dirPath));
-                if( dir!=nullptr && dir->isDirectory() )
-                {
-                    std::unique_ptr<MFile> entry;
-                    while( (entry=std::unique_ptr<MFile>(dir->getNextFileInDir()))!=nullptr )
-                        {
-                        if( !entry->isDirectory() && isMatch(mstr::toPETSCII2(entry->name), pattern) )
-                            {
-                            Debug_printv("DELETING %s", entry->name.c_str());
-                            if( entry->remove() ) n++;
-                            }
-                        //else Debug_printv("NOT DELETING %s", entry->name.c_str());
-                        }
-                }
-
-                m_host.dosSetStatus(ST_SCRATCHED, n);
+                cmdLock(command.substr(colon_position + 1));
                 return true;
             }
-        break;
-        case 'U':
-            if (command[1] == '1' || command[1] == '2' || command[1] == 'A' || command[1] == 'B') // U1/UA, U2/UB
-            {
-                // Block Read if 1/A, Write if 2/B
-                bool read = (command[1] == '1' || command[1] == 'A');
-                command = mstr::drop(command, 3);
-                mstr::trim(command);
-                mstr::replaceAll(command, "  ", " ");
-                std::vector<uint8_t> pti = util_tokenize_uint8(command);
-                if ( pti.size() < 4 )
-                {
-                    m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
-                    return true;
-                }
-                Debug_printv("command[%s] channel[%d] media[%d] track[%d] sector[%d]", command.c_str(), pti[0], pti[1], pti[2], pti[3]);
+            break;
 
-                // TODO: Check for C128 Auto boot and if track/sector is 1/0
-
-                // Unlike B-R/B-W, U1/U2 give the WHOLE block -- there is no
-                // count byte -- so they land on byte 0.
-                //
-                // The seek matters beyond the data: some fast loaders expect
-                // the drive's track/sector registers to be updated here and
-                // then issue reads that do not name a block.
-                Debug_printv("Block-%s", read ? "Read" : "Write");
-                m_host.dosSeekChannelToBlock( pti[0], pti[2], pti[3], 0, !read );
-                return true;
-            }
-            else if ((command[1] >= '3' && command[1] <= '9') || (command[1] >= 'C' && command[1] <= 'H')) // U3-U9, UC-UH
-            {
-                uint8_t offset = command[1] - '3';
-                if (offset > 5)
-                {
-                    //Debug_printv("U%C [%02x] C[%02x]", command[1], command[1], 'C');
-                    offset = command[1] - 'C';
-                }
-                offset = (offset * 3);
-                //Debug_printv( "U%c, offset %02x", command[1], offset);
-                m_host.dosMemory().execute(0x0500 + offset);
-                return true;
-            }
-            else if ((command[1] == '9' || command[1] == 'I') && command.size() == 2) // U9, UI
-            {
-                Debug_printv( "warm reset");
-                m_host.dosSetStatus(ST_DOSVERSION);
-                m_host.dosMemory().execute(0xFFFA);
-                return true;
-            }
-            else if (command[1] == 'J') // UJ
-            {
-                Debug_printv( "cold reset");
-                m_host.dosReset();
-                return true;
-            }
-            else if (command[1] == 0xCA) // U{Shift-J}
-            {
-                if ( command[2] == '+')
-                {
-                    Debug_printv( "reboot");
-                    fnSystem.reboot();
-                    return true;
-                }
-                Debug_printv( "hard reset");
-                m_host.dosReset();
-                //m_cwd.reset(m_cwd->cd("^")); // reset to flash root
-                m_host.dosSetCwd("^");
-                return true;
-            }
-            else if (command[1] == 'I' && command.size() == 3) // UI+/-
-            {
-                if (command[2] == '-')
-                {
-                    Debug_printv( "VIC-20 Bus Speed");
-                    // Set IEC Data Valid timing to 20us
-                }
-                else
-                {
-                    Debug_printv( "C64 Bus Speed");
-                    // Set IEC Data Valid timing to 60us
-                }
-                //setStatusCode(ST_OK);
-                return true;
-            }
-        break;
-        case 'V':
-            {
-                Debug_printv( "validate bam");
-
-                std::unique_ptr<MFile> image(MFSOwner::File(m_host.dosCwd()->url));
-                auto stream = image ? image->getSourceStream() : nullptr;
-                if (stream == nullptr || !stream->isOpen() || !image || !image->isWritable)
-                {
-                    m_host.dosSetStatus(ST_DRIVE_NOT_READY);
-                    return true;
-                }
-
-                if (!stream->validateBAM())
-                {
-                    m_host.dosSetStatus(ST_DRIVE_NOT_READY);
-                    return true;
-                }
-                return true;
-            }
-        break;
-        default:
-            //Error(ERROR_31_SYNTAX_ERROR);
-        break;
-    }
-
-    return false;
-}
-
-
-// SD2IEC Commands
-// http://www.n2dvm.com/UIEC.pdf
-bool CbmDos::cmdSd2iec(std::string& command, size_t colon_position)
-{
-    switch ( command[0] )
-    {
-        case 'C':
-            if ( command[1] == 'P' || command[1] == 'p') // CP<n> / C{Shift-P}<byte>
-                return cmdChangePartition(command);
-            // else if ( command[1] == 'D') // Change Directory
-            // {
-            //     set_cwd(mstr::drop(command, 2));
-            // }
-        break;
-        case 'E':
-            if (command[1] == '-')
-            {
-                Debug_printv( "eeprom");
-            }
-        break;
-        case 'G':
-            Debug_printv( "get partition info");
-            //Error(ERROR_31_SYNTAX_ERROR);	// G-P not implemented yet
-        break;
         case 'M':
-            if ( command[1] == 'D') // Make Directory
-            {
-                std::string path = mstr::toUTF8(command.substr(colon_position + 1));
-                Debug_printv( "make directory path[%s]", path.c_str());
-                MFile *f = m_host.dosCwd()->cd( path );
-                if( f!=nullptr )
-                {
-                    bool created = false;
-                    if( f->sourceFile!=nullptr )
-                    {
-                        if( f->sourceFile->exists() )
-                        {
-                            Debug_printv("directory exists");
-                            m_host.dosSetStatus(ST_FILE_EXISTS);
-                        }
-                        else if( !f->sourceFile->isWritable )
-                        {
-                            Debug_printv("not writable");
-                            m_host.dosSetStatus(ST_WRITE_PROTECT_ON);
-                        }
-                        else if( f->format("meatloaf,01") )
-                        {
-                            Debug_printv("format ok");
-                            created = true;
-                        }
-                    }
+            if ( command[1] == '-' )
+                return cmdMemory(command);
+            break;
 
-                    if ( !created )
-                    {
-                        if( f->exists() )
-                        {
-                            Debug_printv("directory exists");
-                            m_host.dosSetStatus(ST_FILE_EXISTS);
-                        }
-                        else if( !f->isWritable )
-                        {
-                            Debug_printv("not writable");
-                            m_host.dosSetStatus(ST_WRITE_PROTECT_ON);
-                        }
-                        else if( f->mkDir() )
-                        {
-                            Debug_printv("mkdir ok");
-                        }
-                        else
-                        {
-                            Debug_printv("make directory failed");
-                            m_host.dosSetStatus(ST_WRITE_VERIFY);
-                        }
-                    }
+        case 'N':
+            cmdNew(command, colon_position);
+            return true;
 
-                    delete f;
-                }
-                else
-                {
-                    Debug_printv("make directory failed");
-                    m_host.dosSetStatus(ST_WRITE_VERIFY);
-                }
-                return true;
-            }
-        break;
         case 'P':
-            {
-                // PWD - print working directory. Only the bare three letters
-                // (and BASIC's trailing CR): a binary P whose channel byte is
-                // $57 and record-low byte $44 starts with the same bytes, and
-                // it always carries at least the record-high and position.
-                bool bare_pwd = m_rawLen == 3 || (m_rawLen == 4 && m_raw[3] == 0x0D);
-                if ( bare_pwd && command[1] == 'W' && command[2] == 'D' )
-                {
-                    Debug_printv( "print working directory");
-                    std::string path = mstr::toPETSCII2(m_host.dosCwd()->url);
-                    path += "\r";
-                    m_host.dosSetStatusData((const char *) path.c_str(), path.length());
-                    return true;
-                }
+            // PWD (SD2IEC) starts with the same letter; only the binary
+            // position form is CBM DOS.
+            if ( isBarePwd(command) )
+                break;
+            cmdPosition();
+            return true;
 
-                // Position a REL channel: P <$60+channel> <record lo> <record hi>
-                // <byte>, binary, as vdrive_command_position decodes it. The raw
-                // bytes are used: any parameter may be $0D, which the command
-                // string has already lost when it was the last byte.
-                PositionCommand pc;
-                if ( !parsePositionCommand(m_raw, m_rawLen, pc) )
-                {
-                    m_host.dosSetStatus(ST_NO_CHANNEL);
-                    return true;
-                }
-                Debug_printv("position channel[%d] record[%d] byte[%d]", pc.channel, pc.record, pc.position);
-                auto channel = m_host.dosChannel(pc.channel);
-                RELMStream *rel = channel != nullptr ? channel->relStream() : nullptr;
-                if ( rel == nullptr )
-                {
-                    // vdrive_command_position: not a relative buffer
-                    m_host.dosSetStatus(ST_NO_CHANNEL);
-                    return true;
-                }
-                uint8_t st = rel->position(pc.record, pc.position);
-                if ( st != ST_OK )
-                    m_host.dosSetStatus(st);
-                // bytes already read ahead belong to the old record
-                m_host.dosClearReadBuffer(pc.channel);
-                uint32_t record = pc.record ? pc.record - 1 : 0;
-                uint32_t byte   = pc.position ? pc.position - 1 : 0;
-                channel->repositioned(record * rel->recordLength() + byte);
-                return true;
-            }
-        break;
         case 'R':
-            if ( command[1] == 'D') // Remove Directory
+            if ( command[1] == '-' && command.size() > 2 )
             {
-                Debug_printv( "remove directory");
-                std::string path = mstr::toUTF8(command.substr(colon_position + 1));
-                MFile *f = m_host.dosCwd()->cd( path );
-                if( f!=nullptr )
-                    {
-                    if( !f->exists() )
-                        m_host.dosSetStatus(ST_FILE_NOT_FOUND);
-                    else if( !f->isWritable )
-                        m_host.dosSetStatus(ST_WRITE_PROTECT_ON);
-                    else if( !f->rmDir() )
-                        m_host.dosSetStatus(ST_WRITE_VERIFY);
-
-                    delete f;
-                    }
+                // R-H:name renames the disk header; R-P:new=old a CMD partition
+                std::string arg = colon_position ? command.substr(colon_position + 1) : std::string();
+                if ( command[2] == 'H' )
+                    cmdRenameHeader(arg);
+                else if ( command[2] == 'P' )
+                    cmdRenamePartition(arg);
+                else
+                    m_host.dosSetStatus(ST_SYNTAX_INVALID);
                 return true;
             }
-        break;
+            if ( command[1] != 'D' && colon_position ) // RD is an SD2IEC command
+            {
+                cmdRename(command.substr(colon_position + 1));
+                return true;
+            }
+            break;
+
         case 'S':
-            if (command[1] == '-')
+            if ( colon_position )
             {
-                if (command[2] == 'D' || mstr::isNumeric(&command[2])) // Swap Drive
-                {
-                    // Swap drive number 
-                    Debug_printv( "swap drive number [%c]", command[2]);
-                    return true;
-                }
-                else if (command[2] == 'C') // Send SCSI Command
-                {
-                    // Set partition number
-                    Debug_printv( "send scsi command");
-                    return true;
-                }
-            }
-        break;
-        case 'T':
-            if (command[1] == '-')
-            {
-                // Tape image commands (current directory is a mounted tape):
-                // T-C <ms|MMM:SS> - set the tape counter (read position)
-                // T-I             - scan the tape and generate its .idx file
-#ifndef DISABLE_TAPE   // MEATLOAF-GATE
-                if (command[2] == 'C' || command[2] == 'I')
-                {
-                    m_host.dosTapeCommand(command);
-                    return true;
-                }
-#endif
-
-                time_t tt = time(nullptr);
-                struct tm *tinfo = localtime(&tt);
-
-                uint8_t buf[IECFILEDEVICE_STATUS_BUFFER_SIZE];
-                size_t len = 0;
-
-                //Error(ERROR_31_SYNTAX_ERROR);	// T-R and T-W not implemented yet
-                if (command[2] == 'R')
-                {
-                    if(command[3] == 'A')
-                    {
-                        Debug_printv("read ascii format");
-                        len = TimeConverter::toAsciiTime(tinfo, buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
-                    }
-                    else if(command[3] == 'I')
-                    {
-                        Debug_printv("read ISO-8601 format");
-                        len = TimeConverter::toIsoTime(tinfo, buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
-                    }
-                    else if(command[3] == 'D')
-                    {
-                        Debug_printv("read decimal format");
-                        len = TimeConverter::toDecimalTime(tinfo, buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
-                    }
-                    else if(command[3] == 'B')
-                    {
-                        Debug_printv("read BCD format");
-                        len = TimeConverter::toBcdTime(tinfo, buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
-                    }
-                    else if(command[3] == 'Z')
-                    {
-                        std::string tz;
-                        char* tz_value = getenv("TZ");
-                        if (tz_value != nullptr) {
-                            tz = tz_value;
-                        } else {
-                            tz = "UTC"; // Set a default value
-                        }
-                        Debug_printv("read TIMEZONE [%s]", tz.c_str());
-                        tz = mstr::toPETSCII2(tz);
-                        len = tz.size();
-                        memcpy(buf, tz.data(), len);
-                    }
-                    m_host.dosSetStatusData((const char *) buf, len);
-                }
-                else if (command[2] == 'W')
-                {
-                    if(command[3] == 'A')
-                    {
-                        Debug_printv("write ascii format");
-                    }
-                    else if(command[3] == 'I')
-                    {
-                        Debug_printv("write ISO-8601 format");
-                    }
-                    else if(command[3] == 'D')
-                    {
-                        Debug_printv("write decimal format");
-                    }
-                    else if(command[3] == 'B')
-                    {
-                        Debug_printv("write BCD format");
-                    }
-                    else if(command[3] == 'Z')
-                    {
-                        if (colon_position)
-                            command = command.substr(colon_position + 1);
-                        else
-                            command = mstr::drop(command, 4);
-                        command = mstr::toUTF8(command);
-                        mstr::trim(command);
-                        mstr::replaceAll(command, " ", "_");
-                        Debug_printv("write TIMEZONE [%s]", command.c_str());
-
-                        const char *posix_tz = iana_to_posix_tz(command);
-                        setenv("TZ", posix_tz ? posix_tz : command.c_str(), 1);
-                        tzset();
-
-                        // Persist the IANA name (not the resolved POSIX
-                        // string) so mlConfig.load() re-resolves it the
-                        // same way on the next boot.
-                        json_object_at(mlConfig.data(), "preferences")["timezone"] = command;
-                        mlConfig.save();
-                    }
-                }
+                cmdScratch(command, colon_position);
                 return true;
             }
-        break;
-        case 'W':
-            if (command[1] == '-') // Write Protect
-            {
-                if (command[2] == '0') // W-0 disable write protect
-                {
-                    Debug_printv( "write protect disabled");
-                    return true;
-                }
-                else if (command[2] == '1') // W-1 enable write protect
-                {
-                    Debug_printv( "write protect enabled");
-                    return true;
-                }
-            }
-        break;
-        case 'X':
-            Debug_printv( "xtended commands");
-            // X{0-4}
-            // XE+ / XE-
-            // XB+ / XB-
-            // X{0-7}={0-15}
-            // XD?
-            // XJ+ / XJ-
-            // XF+ / XF-
-            // X
-            // XR:{name}
-            if (command[1] == 'R' && colon_position)
-            {
-                command = command.substr(colon_position + 1);
-                Debug_printv("rom[%s]", command.c_str());
-                command = mstr::toUTF8(command);
-                if (!m_host.dosMemory().setROM(command))
-                {
-                    m_host.dosSetStatus(ST_FILE_NOT_FOUND);
-                    break;
-                }
-                //setStatusCode(ST_OK);
-                return true;
-            }
-            // XS:{name} / XS
-            // XW
-            // X?
-            //Extended();
-        break;
+            break;
+
+        case 'U':
+            return cmdUser(command);
+
+        case 'V':
+            cmdValidate();
+            return true;
+
         case '/':
+            cmdSelectSubPartition(command, colon_position);
+            return true;
 
-        break;
         default:
-            //Error(ERROR_31_SYNTAX_ERROR);
-        break;
+            break;
     }
 
     return false;
 }
 
 
-// CP / C{Shift-P} on media with no partition table (anything but a CMD or CFS
-// image): "31 INVALID COMMAND", exactly what iecDrive::changePartition() answers
-// when hdpart::targetFor() finds no table. CmdHdDos and Ide64Dos override this.
-bool CbmDos::cmdChangePartition(const std::string& command)
+// --- B-x: block commands -----------------------------------------------------
+
+// B-x / BLOCK-x: the letter after the '-' selects the command.
+bool CbmDos::cmdBlock(const std::string& command)
 {
-    (void) command;
-    m_host.dosSetStatus(ST_SYNTAX_INVALID);
+    size_t dash = command.find('-');
+    size_t colon = command.find(':');
+    if ( dash == std::string::npos || dash + 1 >= command.size() ||
+         (colon != std::string::npos && colon < dash) )
+        return false;
+
+    switch ( command[dash + 1] )
+    {
+        case 'P': cmdBlockPointer(command);           break;
+        case 'R': cmdBlockReadWrite(command, false);  break;
+        case 'W': cmdBlockReadWrite(command, true);   break;
+        case 'A': cmdBlockAllocate(command, true);    break;
+        case 'F': cmdBlockAllocate(command, false);   break;
+        case 'E': cmdBlockExecute(command);           break;
+        default:  m_host.dosSetStatus(ST_SYNTAX_INVALID); break;
+    }
     return true;
 }
 
-// CP<n> (text) and C{Shift-P}<byte> (binary), for media that have partitions.
-bool CbmDos::partitionFromCommand(const std::string& command)
+// B-P <channel> <position>
+void CbmDos::cmdBlockPointer(const std::string& command)
 {
-    if ( command[1] == 'P') // Change Partition text: CP<n>
+    int p[4] = { 0, 0, 0, 0 };
+    if ( !blockParams(command, p, 2) )
+        return;
+    Debug_printv("B-P channel[%d] position[%d]", p[0], p[1]);
+    m_host.dosPositionChannel( p[0], p[1], true );
+}
+
+// B-R/B-W <channel> <drive> <track> <sector>: byte 0 of the block is the
+// count of valid bytes. U1/U2 give the whole 256.
+void CbmDos::cmdBlockReadWrite(const std::string& command, bool for_write)
+{
+    int p[4] = { 0, 0, 0, 0 };
+    if ( !blockParams(command, p, 4) || !trackSectorInRange(p[2], p[3]) )
+        return;
+    Debug_printv("B-%c channel[%d] drive[%d] track[%d] sector[%d]",
+                 for_write ? 'W' : 'R', p[0], p[1], p[2], p[3]);
+    if ( m_host.dosBlockTransfer( p[0], p[2], p[3], for_write, true ) && for_write )
+        invalidateListings();
+}
+
+// B-A/B-F <drive> <track> <sector>: allocate/free in the BAM
+void CbmDos::cmdBlockAllocate(const std::string& command, bool allocate)
+{
+    int p[4] = { 0, 0, 0, 0 };
+    if ( !blockParams(command, p, 3) || !trackSectorInRange(p[1], p[2]) )
+        return;
+    Debug_printv("B-%c drive[%d] track[%d] sector[%d]", allocate ? 'A' : 'F', p[0], p[1], p[2]);
+
+    std::unique_ptr<MFile> image;
+    auto stream = openImageForUpdate(image);
+    if ( stream == nullptr )
+        return;
+
+    uint8_t t = p[1], s = p[2];
+    if ( stream->sectorByteOffset(t, s) < 0 )
     {
-        // Digits must start right after "CP" - find_first_of over the
-        // whole string would let "CPX5" parse as partition 5. strtol
-        // (not atoi) per the project rule against atoi/std::stoi on
-        // C64-sourced input; leave pnum = -1 on any parse failure so
-        // hdpart::select() (called via changePartition()) rejects it,
-        // range-checking per format.
-        int pnum = -1;
-        char *end = nullptr;
-        const char *start = command.c_str() + 2;
-        long v = strtol(start, &end, 10);
-        if ( end != start )
-        {
-            while ( *end == ' ' || *end == '\r' )
-                end++;
-            if ( *end == '\0' )
-                pnum = (int)v;
-        }
-        m_host.dosChangePartition(pnum);
-        return true;
+        m_host.dosSetStatus(ST_ILLEGAL_TS_COMMAND, t, s);
+        return;
     }
-    else // command[1] == 'p': Change Partition binary: C{Shift-P}<byte>
+    if ( !stream->setBlockAllocation(t, s, allocate) )
     {
-        m_host.dosChangePartition(command.size() > 2 ? (uint8_t)command[2] : -1);
-        return true;
+        // vdrive_command_block 'A': the block is in use, so suggest the next
+        // free one (0/0 when there is none).
+        uint8_t ft = 0, fs = 0;
+        if ( !stream->suggestFreeBlock(t, s, &ft, &fs) )
+            ft = fs = 0;
+        m_host.dosSetStatus(ST_NO_BLOCK, ft, fs);
+        return;
     }
+    invalidateListings();
+    m_host.dosSetStatus(ST_OK);
+}
+
+// B-E <channel> <drive> <track> <sector>: read the block into the buffer and
+// run it. There is no 6502 here to run it on; VICE answers "needs TDE" the
+// same way.
+void CbmDos::cmdBlockExecute(const std::string& command)
+{
+    int p[4] = { 0, 0, 0, 0 };
+    if ( !blockParams(command, p, 4) || !trackSectorInRange(p[2], p[3]) )
+        return;
+    if ( m_host.dosBlockTransfer( p[0], p[2], p[3], false, false ) )
+        m_host.dosSetStatus(ST_UNKNOWN_DRIVECODE);
 }
 
 
-void CbmDos::cmdMeatloafExtended(std::string& command)
+// --- I ------------------------------------------------------------------------
+
+
+void CbmDos::cmdInitialize()
 {
-    // Meatloaf Extended Commands
-    command = mstr::toUTF8(command);
-    auto pt = util_tokenize(command, ':');
+    Debug_printv("initialize");
+    m_host.dosReset();
+    m_host.dosSetStatus(ST_OK);
+}
 
-    // util_tokenize() yields NO tokens for an empty command, and the C64 does
-    // send one - a lone 0x00 on the command channel arrives here as "". Reading
-    // pt[0] then faults (LoadProhibited comparing a std::string at address 0).
-    if ( pt.empty() )
-        return;
 
-    if ( pt[0] == "auth" )
+// P <$60+channel> <record lo> <record hi> <byte>: position a REL channel,
+// binary, as vdrive_command_position decodes it. The raw bytes are used: any
+// parameter may be $0D, which the command string has already lost when it was
+// the last byte.
+void CbmDos::cmdPosition()
+{
+    PositionCommand pc;
+    if ( !parsePositionCommand(m_raw, m_rawLen, pc) )
     {
-        if( pt.size() == 2 )
+        m_host.dosSetStatus(ST_NO_CHANNEL);
+        return;
+    }
+    Debug_printv("position channel[%d] record[%d] byte[%d]", pc.channel, pc.record, pc.position);
+    auto channel = m_host.dosChannel(pc.channel);
+    RELMStream *rel = channel != nullptr ? channel->relStream() : nullptr;
+    if ( rel == nullptr )
+    {
+        // vdrive_command_position: not a relative buffer
+        m_host.dosSetStatus(ST_NO_CHANNEL);
+        return;
+    }
+    uint8_t st = rel->position(pc.record, pc.position);
+    if ( st != ST_OK )
+        m_host.dosSetStatus(st);
+    // bytes already read ahead belong to the old record
+    m_host.dosClearReadBuffer(pc.channel);
+    uint32_t record = pc.record ? pc.record - 1 : 0;
+    uint32_t byte   = pc.position ? pc.position - 1 : 0;
+    channel->repositioned(record * rel->recordLength() + byte);
+}
+
+// PWD is only the bare three letters (and BASIC's trailing CR): a binary P
+// whose channel byte is $57 and record-low byte $44 starts with the same
+// bytes, and it always carries at least the record-high and position.
+bool CbmDos::isBarePwd(const std::string& command) const
+{
+    bool bare = m_rawLen == 3 || (m_rawLen == 4 && m_raw[3] == 0x0D);
+    return bare && command.size() >= 3 && command[1] == 'W' && command[2] == 'D';
+}
+
+
+// --- M-x: memory commands ----------------------------------------------------
+
+// vdrive_command_memory: parsed from the RAW bytes. The address, count and data
+// are binary, and any of them may be $0D - which the CR-stripped command string
+// has lost when it was the last byte (an M-R of 13 bytes, an M-W ending in $0D).
+bool CbmDos::cmdMemory(const std::string& command)
+{
+    if ( m_raw == nullptr || m_rawLen < 5 )
+    {
+        m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+        return true;
+    }
+    uint16_t address = m_raw[3] | (m_raw[4] << 8);
+
+    switch ( command[2] )
+    {
+        case 'R': cmdMemoryRead(address);  break;
+        case 'W': cmdMemoryWrite(address); break;
+        case 'E':
+            // Fast loader detection happens earlier, in
+            // IECFileDevice::isFastLoaderRequest -- an M-E only reaches here
+            // when no loader claimed it.
+            Debug_printv("Memory Execute address[%04X]", address);
+            m_host.dosMemory().execute(address);
+            break;
+        default:
+            m_host.dosSetStatus(ST_SYNTAX_INVALID);
+            break;
+    }
+    return true;
+}
+
+// vdrive_command_memory_read: no count byte means one; 0 means 256 (the status
+// buffer holds 255 of them).
+void CbmDos::cmdMemoryRead(uint16_t address)
+{
+    unsigned count = m_rawLen < 6 ? 1 : m_raw[5];
+    if ( count == 0 ) count = 256;
+    if ( count > IECFILEDEVICE_STATUS_BUFFER_SIZE ) count = IECFILEDEVICE_STATUS_BUFFER_SIZE;
+    Debug_printv("Memory Read address[%04X] size[%u]", address, count);
+
+    uint8_t data[256] = { 0 };
+    // read() answers with what it could actually supply -- publishing `count`
+    // bytes regardless would hand the caller buffer contents for an address
+    // that is not mapped.
+    size_t got = m_host.dosMemory().read(address, data, count);
+    m_host.dosSetStatusData((char *) data, got);
+    Debug_printv("address[%04X] data[%s]", address, mstr::toHex(data, got).c_str());
+}
+
+// vdrive_command_memory_write: the count byte, then that many data bytes, all
+// of which must have arrived.
+void CbmDos::cmdMemoryWrite(uint16_t address)
+{
+    if ( m_rawLen < 6 || (unsigned) m_raw[5] + 6 > m_rawLen )
+    {
+        m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+        return;
+    }
+    uint8_t count = m_raw[5];
+    Debug_printv("Memory Write address[%04X] size[%d] data[%s]", address, count,
+                 mstr::toHex(m_raw + 6, count).c_str());
+    m_host.dosMemory().write(address, m_raw + 6, count);
+}
+
+
+// --- N, L, S, V ---------------------------------------------------------------
+
+// N[d]:name,id: format. In VDrive mode it creates a new image file instead,
+// which needs an extension to say what kind.
+void CbmDos::cmdNew(const std::string& command, size_t colon_position)
+{
+    if ( !m_host.dosUseVDrive() )
+    {
+        Debug_printv("new (format)");
+        std::string spec = mstr::toUTF8(command.substr(colon_position + 1));
+        if ( !m_host.dosCwd()->format(spec) )
+            m_host.dosSetStatus(ST_WRITE_VERIFY);
+        return;
+    }
+
+    std::string params = command.substr(colon_position + 1);
+    size_t dot = params.find('.');
+    if ( dot == std::string::npos )
+    {
+        // must have extension to determine image type
+        m_host.dosSetStatus(ST_SYNTAX_INVALID);
+        return;
+    }
+
+    std::string filename, diskname;
+    size_t comma = params.find(',');
+    if ( comma == std::string::npos )
+    {
+        filename = mstr::toUTF8(params);
+        diskname = params.substr(0, dot);
+    }
+    else
+    {
+        filename = mstr::toUTF8(params.substr(0, comma));
+        diskname = params.substr(comma + 1);
+    }
+
+    fnLedManager.set(eLed::LED_BUS, true);
+    Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Changing directory to [%s][%s]", m_host.dosCwd()->url.c_str(), filename.c_str());
+    std::unique_ptr<MFile> f(m_host.dosCwd()->cd(filename));
+    if ( f->exists() )
+        m_host.dosSetStatus(ST_FILE_EXISTS);
+    else if ( !f->isWritable )
+        m_host.dosSetStatus(ST_WRITE_PROTECT_ON);
+    else if ( !m_host.dosCreateDiskImage(f->url, diskname) )
+        m_host.dosSetStatus(ST_WRITE_VERIFY);
+    else
+        m_host.dosSetStatus(ST_OK);
+    fnLedManager.set(eLed::LED_BUS, false);
+}
+
+// L[d]:name toggles the lock bit (vdrive_command_lockunlock).
+void CbmDos::cmdLock(const std::string& arg)
+{
+    std::string name = stripDrivePrefix(mstr::toUTF8(arg));
+    if ( name.empty() || hasWildcard(name) )
+    {
+        m_host.dosSetStatus(name.empty() ? ST_SYNTAX_NO_NAME : ST_SYNTAX_UNKNOWN);
+        return;
+    }
+    std::unique_ptr<MFile> f(m_host.dosCwd()->cd(name));
+    if ( f == nullptr || !f->exists() )
+        m_host.dosSetStatus(ST_FILE_NOT_FOUND);
+    else if ( !f->isWritable )
+        m_host.dosSetStatus(ST_WRITE_PROTECT_ON);
+    else if ( !f->toggleLock() )
+        m_host.dosSetStatus(ST_DRIVE_NOT_READY);   // no lock bit on this media
+    else
+        m_host.dosSetStatus(ST_OK);
+}
+
+// S[path]:pattern - scratch every matching file.
+void CbmDos::cmdScratch(const std::string& command, size_t colon_position)
+{
+    Debug_printv("scratch");
+    uint8_t n = 0;
+
+    // Everything between the command letter and the colon is a PATH
+    // ("S/TEMPORARY/:*" scratches inside TEMPORARY), and it used to be
+    // discarded - the pattern was then matched against the CURRENT directory,
+    // so C64 OS clearing its temp directory instead matched os/BOOTER. Nothing
+    // was lost only because MFile::remove() refuses a container-hosted entry;
+    // on a writable image it would have deleted the wrong files.
+    std::string dirPath = command.substr(1, colon_position - 1);
+    std::string pattern = command.substr(colon_position + 1);
+
+    // drive number prefix ("S0:...")
+    while ( !dirPath.empty() && isdigit((unsigned char) dirPath.front()) )
+        dirPath.erase(0, 1);
+
+    // As in open(): one leading '/' descends from the current directory, "//"
+    // starts at the root of the image.
+    if ( dirPath.size() > 1 && dirPath[0] == '/' && dirPath[1] != '/' )
+        dirPath.erase(0, 1);
+    while ( !dirPath.empty() && dirPath.back() == '/' )
+        dirPath.pop_back();
+
+    std::unique_ptr<MFile> dir(dirPath.empty()
+                               ? MFSOwner::File(m_host.dosCwd()->fullUrl())
+                               : m_host.dosCwd()->cd(dirPath));
+    if ( dir != nullptr && dir->isDirectory() )
+    {
+        std::unique_ptr<MFile> entry;
+        while ( (entry = std::unique_ptr<MFile>(dir->getNextFileInDir())) != nullptr )
         {
-            auto creds = util_tokenize(pt[1], ',');
-            if( creds.size() == 2 )
+            if ( !entry->isDirectory() && isMatch(mstr::toPETSCII2(entry->name), pattern) )
             {
-                Debug_printv("Setting authorization for url[%s] user[%s] pass[%s]", m_host.dosCwd()->url.c_str(), creds[0].c_str(), creds[1].c_str());
-                m_host.dosCwd()->user = creds[0];
-                m_host.dosCwd()->password = creds[1];
-                m_host.dosCwd()->rebuildUrl();
-                //setStatusCode(ST_OK);
-                return;
+                Debug_printv("DELETING %s", entry->name.c_str());
+                if ( entry->remove() ) n++;
             }
         }
     }
 
-    m_host.dosSetStatus(ST_SYNTAX_INVALID);
+    m_host.dosSetStatus(ST_SCRATCHED, n);
 }
+
+// V: rebuild the BAM from the directory (D64MStream::validate).
+void CbmDos::cmdValidate()
+{
+    Debug_printv("validate");
+    std::unique_ptr<MFile> image;
+    auto stream = openImageForUpdate(image);
+    if ( stream == nullptr )
+        return;
+
+    uint8_t st = stream->validate();
+    stream->close();
+    if ( st == ST_OK )
+        invalidateListings();
+    m_host.dosSetStatus(st);
+}
+
+
+// --- U-x: user commands ------------------------------------------------------
+
+bool CbmDos::cmdUser(const std::string& command)
+{
+    if ( command.size() < 2 )
+        return false;
+
+    char u = command[1];
+
+    // 1581 U-R / U-W (shifted R/W) are U1/U2 (vdrive_command_u1a2b)
+    if ( u == '-' && command.size() > 2 )
+    {
+        if ( (uint8_t) command[2] == 0xD2 ) u = '1';
+        else if ( (uint8_t) command[2] == 0xD7 ) u = '2';
+        else
+        {
+            m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+            return true;
+        }
+    }
+
+    switch ( u )
+    {
+        // U1/UA read, U2/UB write: the whole block, no count byte.
+        case '1': case 'A': cmdUserBlock(command, false); break;
+        case '2': case 'B': cmdUserBlock(command, true);  break;
+
+        // U3-U8 / UC-UH: jump to $0500 + 3*n in drive RAM.
+        case '3': case '4': case '5': case '6': case '7': case '8':
+        case 'C': case 'D': case 'E': case 'F': case 'G': case 'H':
+        {
+            uint8_t n = (u <= '8') ? (u - '3') : (u - 'C');
+            m_host.dosMemory().execute(0x0500 + n * 3);
+            break;
+        }
+
+        // U9 / UI / U;: UI+ and UI- set the bus speed; anything else is a warm
+        // reset - channels closed, DOS version answered.
+        case '9': case 'I': case ';':
+            if ( command.size() == 3 && (command[2] == '+' || command[2] == '-') )
+            {
+                Debug_printv("%s bus speed", command[2] == '+' ? "C64" : "VIC-20");
+                m_host.dosSetStatus(ST_OK);
+                break;
+            }
+            Debug_printv("warm reset");
+            m_host.dosReset();
+            break;
+
+        // UJ / U:: cold reset. A real drive takes a second to come back and
+        // answers the DOS version.
+        case 'J': case ':':
+            Debug_printv("cold reset");
+            m_host.dosReset();
+            break;
+
+        // U0 alone is accepted; the U0> burst/device-number forms are not
+        // implemented (VICE answers 74 for them too).
+        case '0':
+            m_host.dosSetStatus(command.size() == 2 ? ST_OK : ST_DRIVE_NOT_READY);
+            break;
+
+        default:
+            m_host.dosSetStatus(ST_DRIVE_NOT_READY);
+            break;
+    }
+    return true;
+}
+
+// U1/U2 <channel> <drive> <track> <sector>
+void CbmDos::cmdUserBlock(const std::string& command, bool for_write)
+{
+    int p[4] = { 0, 0, 0, 0 };
+    if ( !blockParams(command, p, 4) || !trackSectorInRange(p[2], p[3]) )
+        return;
+    Debug_printv("U%c channel[%d] drive[%d] track[%d] sector[%d]",
+                 for_write ? '2' : '1', p[0], p[1], p[2], p[3]);
+    if ( m_host.dosBlockTransfer( p[0], p[2], p[3], for_write, false ) && for_write )
+        invalidateListings();
+}
+
+
+
+
+
+
+
+
+
+
+
+// --- Helpers ----------------------------------------------------------------
+
+bool CbmDos::blockParams(const std::string& command, int p[4], int needed)
+{
+    int n = parseBlockParams(command, p);
+    if ( n < needed )
+    {
+        m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+        return false;
+    }
+    return true;
+}
+
+bool CbmDos::trackSectorInRange(int track, int sector)
+{
+    if ( track < 0 || track > 255 || sector < 0 || sector > 255 )
+    {
+        m_host.dosSetStatus(ST_ILLEGAL_TS_COMMAND, track & 0xFF, sector & 0xFF);
+        return false;
+    }
+    return true;
+}
+
+std::shared_ptr<MStream> CbmDos::openImageForUpdate(std::unique_ptr<MFile>& image)
+{
+    MFile *cwd = m_host.dosCwd();
+    if ( cwd == nullptr )
+    {
+        m_host.dosSetStatus(ST_DRIVE_NOT_READY);
+        return nullptr;
+    }
+
+    // The container, never ImageBroker's stream (read-only), and never plain
+    // out (that truncates the image).
+    image.reset(MFSOwner::File(cwd->url));
+    if ( image == nullptr )
+    {
+        m_host.dosSetStatus(ST_DRIVE_NOT_READY);
+        return nullptr;
+    }
+    if ( !image->isWritable )
+    {
+        m_host.dosSetStatus(ST_WRITE_PROTECT_ON);
+        return nullptr;
+    }
+    auto stream = image->getSourceStream(std::ios_base::in | std::ios_base::out);
+    // Only block-addressable media have a BAM to work on.
+    if ( stream == nullptr || !stream->isOpen() || stream->sectorByteOffset(1, 0) < 0 )
+    {
+        m_host.dosSetStatus(ST_DRIVE_NOT_READY);
+        return nullptr;
+    }
+    return stream;
+}
+
+void CbmDos::invalidateListings()
+{
+    // The cached listing stream has its own handle on the container and would
+    // keep serving what was there before the write.
+    MFile *cwd = m_host.dosCwd();
+    if ( cwd != nullptr )
+        ImageBroker::disposeUnderPath(cwd->url);
+}
+
+std::string CbmDos::stripDrivePrefix(const std::string& name)
+{
+    if ( name.size() >= 2 && isdigit((unsigned char) name[0]) && name[1] == ':' )
+        return name.substr(2);
+    if ( !name.empty() && name[0] == ':' )
+        return name.substr(1);
+    return name;
+}
+
+bool CbmDos::hasWildcard(const std::string& name)
+{
+    return name.find_first_of("*?") != std::string::npos;
+}
+
+
+// --- R, R-H, C ----------------------------------------------------------------
+
+// R[d]:new=[d:]old (vdrive_command_rename): no wildcards on either side, the
+// new name must be free (63), the old one must exist (62).
+void CbmDos::cmdRename(const std::string& arg)
+{
+    std::string body = mstr::toUTF8(arg);
+    size_t eq = body.find('=');
+    if ( eq == std::string::npos )
+    {
+        m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+        return;
+    }
+    std::string dest = stripDrivePrefix(body.substr(0, eq));
+    std::string src  = stripDrivePrefix(body.substr(eq + 1));
+    if ( dest.empty() || src.empty() )
+    {
+        m_host.dosSetStatus(ST_SYNTAX_NO_NAME);
+        return;
+    }
+    if ( hasWildcard(dest) || hasWildcard(src) )
+    {
+        m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+        return;
+    }
+
+    MFile *cwd = m_host.dosCwd();
+    std::unique_ptr<MFile> existing(cwd->cd(dest));
+    if ( existing != nullptr && existing->exists() )
+    {
+        m_host.dosSetStatus(ST_FILE_EXISTS);
+        return;
+    }
+    std::unique_ptr<MFile> f(cwd->cd(src));
+    if ( f == nullptr || !f->exists() )
+    {
+        m_host.dosSetStatus(ST_FILE_NOT_FOUND);
+        return;
+    }
+    if ( !f->isWritable )
+    {
+        m_host.dosSetStatus(ST_WRITE_PROTECT_ON);
+        return;
+    }
+    if ( !f->rename(dest) )
+    {
+        m_host.dosSetStatus(ST_WRITE_VERIFY);
+        return;
+    }
+    Debug_printv("Renamed [%s] to [%s]", src.c_str(), dest.c_str());
+    m_host.dosSetStatus(ST_OK);
+}
+
+// R-H:name (vdrive_command_renameheader)
+void CbmDos::cmdRenameHeader(const std::string& arg)
+{
+    std::string name = stripDrivePrefix(mstr::toUTF8(arg));
+    if ( hasWildcard(name) )
+    {
+        m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+        return;
+    }
+    MFile *cwd = m_host.dosCwd();
+    std::unique_ptr<MFile> image(MFSOwner::File(cwd->url));
+    if ( image == nullptr )
+        m_host.dosSetStatus(ST_DRIVE_NOT_READY);
+    else if ( !image->isWritable )
+        m_host.dosSetStatus(ST_WRITE_PROTECT_ON);
+    else if ( !image->setDiskName(name) )
+        m_host.dosSetStatus(ST_DRIVE_NOT_READY);   // no header on this media
+    else
+        m_host.dosSetStatus(ST_OK);
+}
+
+// C[d]:new=[d:]old[,[d:]old2...] (vdrive_command_copy): every source must
+// exist (62) before the destination is checked (63); the new file takes the
+// first source's type and the rest are appended. REL is not concatenated.
+void CbmDos::cmdCopy(const std::string& arg)
+{
+    std::string body = mstr::toUTF8(arg);
+    size_t eq = body.find('=');
+    if ( eq == std::string::npos )
+    {
+        m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+        return;
+    }
+    std::string dest = stripDrivePrefix(body.substr(0, eq));
+    if ( dest.empty() )
+    {
+        m_host.dosSetStatus(ST_SYNTAX_NO_NAME);
+        return;
+    }
+    if ( hasWildcard(dest) )
+    {
+        m_host.dosSetStatus(ST_SYNTAX_UNKNOWN);
+        return;
+    }
+
+    MFile *cwd = m_host.dosCwd();
+    std::vector<std::unique_ptr<MFile>> sources;
+    for ( auto &part : mstr::split(body.substr(eq + 1), ',') )
+    {
+        std::string name = stripDrivePrefix(part);
+        if ( name.empty() )
+            continue;
+        if ( sources.size() == 5 )   // CMD: up to five files
+        {
+            m_host.dosSetStatus(ST_SYNTAX_LONG_LINE);
+            return;
+        }
+        std::unique_ptr<MFile> f(cwd->cd(name));
+        if ( f == nullptr || !f->exists() )
+        {
+            m_host.dosSetStatus(ST_FILE_NOT_FOUND);
+            return;
+        }
+        if ( f->isDirectory() )
+        {
+            m_host.dosSetStatus(ST_FILE_TYPE_MISMATCH);
+            return;
+        }
+        sources.push_back(std::move(f));
+    }
+    if ( sources.empty() )
+    {
+        m_host.dosSetStatus(ST_SYNTAX_NO_NAME);
+        return;
+    }
+
+    std::unique_ptr<MFile> out(cwd->cd(dest));
+    if ( out == nullptr )
+    {
+        m_host.dosSetStatus(ST_DRIVE_NOT_READY);
+        return;
+    }
+    if ( out->exists() )
+    {
+        m_host.dosSetStatus(ST_FILE_EXISTS);
+        return;
+    }
+    if ( !out->isWritable )
+    {
+        m_host.dosSetStatus(ST_WRITE_PROTECT_ON);
+        return;
+    }
+
+    // The new file takes the first source's type, read off its directory
+    // entry: an MFile resolved by name carries none of its own. Media without
+    // CBM types copy as PRG. REL is not concatenated (64).
+    uint8_t type = 2;
+    std::vector<std::shared_ptr<MStream>> inputs;
+    for ( auto &src : sources )
+    {
+        auto is = src->getSourceStream(std::ios_base::in);
+        if ( is == nullptr || !is->isOpen() )
+        {
+            m_host.dosSetStatus(ST_READ_NO_DATA);
+            return;
+        }
+        int t = is->cbmFileType();
+        if ( t == 4 || is->relRecordLength() != 0 )
+        {
+            m_host.dosSetStatus(ST_FILE_TYPE_MISMATCH);
+            return;
+        }
+        if ( inputs.empty() && t >= 1 && t <= 3 )
+            type = (uint8_t) t;
+        inputs.push_back(is);
+    }
+
+    auto os = out->getSourceStream(std::ios_base::out);
+    if ( os == nullptr || !os->isOpen() )
+    {
+        m_host.dosSetStatus(ST_WRITE_VERIFY);
+        return;
+    }
+    os->setWriteFileType(type);
+
+    uint8_t buf[256];
+    uint8_t st = ST_OK;
+    for ( auto &is : inputs )
+    {
+        uint32_t n;
+        while ( (n = is->read(buf, sizeof(buf))) > 0 )
+        {
+            if ( os->write(buf, n) != n )
+            {
+                st = os->error() ? os->error() : ST_WRITE_VERIFY;
+                break;
+            }
+        }
+        is->close();
+        if ( st != ST_OK )
+            break;
+    }
+    os->close();
+    if ( st == ST_OK && os->error() )
+        st = os->error();
+
+    invalidateListings();
+    m_host.dosSetStatus(st);
+}
+
+
+// --- / (1581 sub-partitions) ------------------------------------------------
+
+// /[d:]name selects a 1581 CBM sub-partition; "/" alone (or "/0:") goes back to
+// the root, answering 02 PARTITION SELECTED (vdrive_command_chpart). The create
+// form "/0:name,<t><s><lo><hi>,C" is not implemented.
+void CbmDos::cmdSelectSubPartition(const std::string& command, size_t colon)
+{
+    std::string name = colon ? command.substr(colon + 1) : command.substr(1);
+    if ( name.find(",C") != std::string::npos && name.size() >= 7 )
+    {
+        m_host.dosSetStatus(ST_SYNTAX_INVALID);
+        return;
+    }
+    name = mstr::toUTF8(name);
+
+    if ( name.empty() )
+    {
+        // "//" is the root of the image (cdLocalRoot)
+        m_host.dosSetCwd("//");
+        if ( m_host.dosStatusCode() == ST_OK )
+            m_host.dosSetStatus(ST_PARTITION_SELECTED, 1, 80);
+        return;
+    }
+
+    std::unique_ptr<MFile> f(m_host.dosCwd()->cd(name));
+    if ( f == nullptr || !f->exists() || !f->isDirectory() )
+    {
+        m_host.dosSetStatus(ST_FILE_NOT_FOUND);
+        return;
+    }
+    // The track range, as vdrive_command_chpart answers it (02,...,50,59)
+    uint8_t first = 0, last = 0;
+    {
+        std::unique_ptr<MFile> image(MFSOwner::File(m_host.dosCwd()->url));
+        auto stream = image ? image->getSourceStream() : nullptr;
+        if ( stream == nullptr || !stream->subPartitionTracks(name, &first, &last) )
+            first = last = 0;
+    }
+    m_host.dosSetCwd(name);
+    if ( m_host.dosStatusCode() == ST_OK )
+        m_host.dosSetStatus(ST_PARTITION_SELECTED, first, last);
+}
+
+
 
 #endif // BUILD_IEC
