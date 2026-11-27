@@ -438,6 +438,163 @@ uint8_t iecChannelHandlerFile::readBufferData()
 // -------------------------------------------------------------------------------------------------
 
 
+iecChannelHandlerBlock::iecChannelHandlerBlock(iecDrive *drive, std::shared_ptr<MStream> stream, uint32_t full_size)
+  : iecChannelHandlerFile(drive, stream)
+{
+    // A fresh buffer reads as zeros; VICE allocates it zeroed too.
+    memset(m_buf, 0, sizeof(m_buf));
+    m_full_size = full_size;
+}
+
+
+uint8_t iecChannelHandlerBlock::read(uint8_t *data, uint8_t n)
+{
+    if( !m_buffer_mode )
+        return iecChannelHandlerFile::read(data, n);
+
+    // vdrive_iec_read(), BUFFER_MEMORY_BUFFER: the byte at length-1 carries
+    // EOI and the pointer wraps to 1. Stop at that byte so the EOI lands on it.
+    //
+    // After that byte every read answers 0 until the buffer is positioned
+    // again (B-P, U1/B-R, U2/B-W, or a write). IECFileDevice reads ahead and
+    // its talk() clears the EOI flag; BASIC does every GET# as its own TALK,
+    // and the bus handler asks for the next byte BEFORE the C64's UNTALK. A
+    // single 0 was consumed inside the previous transaction and the next TALK
+    // forgot the EOI, so the C64 read X Y Z X Y Z... with ST 0. A 0 that
+    // lasts is what a file's end gives, and what IECFileDevice turns back
+    // into EOI every time. (VICE wraps to byte 1 here; reading past EOI on a
+    // "#" channel is the one place this differs.)
+    if( m_at_end )
+    {
+        m_eoi = true;
+        return 0;
+    }
+    m_eoi = false;
+    uint8_t count = 0;
+    while( count < n )
+    {
+        if( m_bufptr >= m_buflen )
+            m_bufptr = 1;
+        data[count++] = m_buf[m_bufptr++];
+        if( m_bufptr >= m_buflen )
+        {
+            m_bufptr = 1;
+            m_eoi = true;
+            m_at_end = true;
+            break;
+        }
+    }
+    m_position += count;
+    return count;
+}
+
+
+uint8_t iecChannelHandlerBlock::write(uint8_t *data, uint8_t n)
+{
+    if( !m_buffer_mode )
+        return iecChannelHandlerFile::write(data, n);
+
+    // vdrive_iec_write(), BUFFER_MEMORY_BUFFER: wraps to 0, not 1.
+    m_at_end = false;
+    for( uint8_t i = 0; i < n; i++ )
+    {
+        if( m_bufptr >= m_buflen )
+            m_bufptr = 0;
+        m_buf[m_bufptr++] = data[i];
+        if( m_bufptr >= m_buflen )
+            m_bufptr = 0;
+    }
+    m_position += n;
+    return n;
+}
+
+
+uint8_t iecChannelHandlerBlock::readBlock(uint32_t offset, bool cbm)
+{
+    // Back to buffer mode whatever F-P left; the stream's size bounds reads
+    // and must cover the whole container for the block read below.
+    m_buffer_mode = true;
+    m_eoi = false;
+    m_at_end = false;
+    repositioned(0);
+    if( m_full_size > 0 )
+        m_stream->setSize(m_full_size);
+
+    uint32_t got = 0;
+    if( m_stream->position(offset) )
+    {
+        while( got < sizeof(m_buf) )
+        {
+            uint32_t r = m_stream->read(m_buf + got, sizeof(m_buf) - got);
+            if( r == 0 ) break;
+            got += r;
+        }
+    }
+
+    if( got < sizeof(m_buf) )
+    {
+        // vdrive_command_u1a2b: after a failed read the pointer is 1.
+        m_bufptr = 1;
+        m_buflen = 256;
+        return ST_READ_NO_DATA;
+    }
+
+    if( cbm )
+    {
+        // B-R: byte 0 is the count of valid bytes; the readable part is
+        // bytes 1..count, i.e. length = count+1, pointer 1.
+        m_buflen = (uint16_t) m_buf[0] + 1;
+        m_bufptr = 1;
+    }
+    else
+    {
+        m_buflen = 256;
+        m_bufptr = 0;
+    }
+    return ST_OK;
+}
+
+
+uint8_t iecChannelHandlerBlock::writeBlock(uint32_t offset, bool cbm)
+{
+    m_buffer_mode = true;
+    m_eoi = false;
+    m_at_end = false;
+    repositioned(0);
+    if( m_full_size > 0 )
+        m_stream->setSize(m_full_size);
+
+    if( cbm )
+    {
+        // vdrive_command_block 'W': byte 0 is set from the pointer.
+        int l = (int) m_bufptr - 1;
+        m_buf[0] = (uint8_t) (l < 1 ? 1 : l);
+    }
+
+    if( !m_stream->position(offset) )
+        return ST_WRITE_VERIFY;
+    if( m_stream->write(m_buf, sizeof(m_buf)) != sizeof(m_buf) )
+        return ST_WRITE_VERIFY;
+
+    // after a B-W the pointer is 1; a U2 leaves it alone
+    if( cbm )
+        m_bufptr = 1;
+    return ST_OK;
+}
+
+
+bool iecChannelHandlerBlock::enterStreamMode(uint32_t pos)
+{
+    if( m_full_size > 0 )
+        m_stream->setSize(m_full_size);
+    if( !m_stream->position(pos) )
+        return false;
+    m_buffer_mode = false;
+    m_eos = false;
+    return true;
+}
+
+
 iecChannelHandlerRel::iecChannelHandlerRel(iecDrive *drive, std::shared_ptr<RELMStream> rel) : iecChannelHandler(drive)
 {
     m_rel = rel;
@@ -1092,12 +1249,13 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                     return false;
                 }
 
-                // NEVER plain out: opening a container for write TRUNCATES the
-                // image. Writing to it has to be read-modify-write.
-                std::ios_base::openmode container_mode =
-                    (mode & std::ios_base::out) ? (std::ios_base::in | std::ios_base::out)
-                                                : std::ios_base::in;
-
+                // A "#" channel is read/write on a CBM drive whatever the OPEN
+                // said (programs never pass ",W"), so the container is opened
+                // in|out when it can be written, read-only otherwise -- U2/B-W
+                // then answer 26. NEVER plain out: opening a container for
+                // write TRUNCATES the image. FTP and FSP refuse in|out, hence
+                // the read-only fallback.
+                //
                 // A fresh MFile on the cwd's own url carries no pathInStream,
                 // so getSourceStream() selects no entry: seekCalled stays false
                 // and reads pipe raw container bytes through readContainer(),
@@ -1105,7 +1263,14 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                 // also builds a FRESH stream per open, so this cannot disturb
                 // the ImageBroker instance a directory listing is using.
                 std::unique_ptr<MFile> image(MFSOwner::File(m_cwd->url));
-                auto stream = image ? image->getSourceStream(container_mode) : nullptr;
+                std::shared_ptr<MStream> stream = nullptr;
+                if( image && image->isWritable )
+                    stream = image->getSourceStream(std::ios_base::in | std::ios_base::out);
+                if( (stream == nullptr || !stream->isOpen()) && image )
+                {
+                    image.reset(MFSOwner::File(m_cwd->url));
+                    stream = image ? image->getSourceStream(std::ios_base::in) : nullptr;
+                }
                 if( stream == nullptr || !stream->isOpen() )
                 {
                     Debug_printv("Error: no container stream for direct access [%s]",
@@ -1114,16 +1279,11 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                     return false;
                 }
 
-                m_channels[channel] = new iecChannelHandlerFile(this, stream);
-                m_channels[channel]->setName(m_cwd->url + " (direct)");
-
-                // Nothing sets _size for the no-entry view, so the container's
-                // real length is taken off the raw file -- MFSOwner::File(url,
-                // true) forces defaultFS, the established "give me the bytes"
-                // primitive, so the name is not extension-sniffed back into
-                // another D64MFile. Remembered on the channel because the block
-                // window below overwrites the stream's size, and F-P has to be
-                // able to put it back.
+                // The container's length bounds the stream view F-P switches
+                // to, and nothing sets _size for the no-entry view. Taken off
+                // the raw file: MFSOwner::File(url, true) forces defaultFS,
+                // the established "give me the bytes" primitive, so the name
+                // is not extension-sniffed back into another D64MFile.
                 uint32_t full_size = 0;
                 {
                     std::unique_ptr<MFile> raw(MFSOwner::File(m_cwd->url, true));
@@ -1131,14 +1291,11 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                     if( raw_stream != nullptr )
                         full_size = raw_stream->size();
                 }
-                m_channels[channel]->setFullSize(full_size);
+                if( full_size > 0 )
+                    stream->setSize(full_size);
 
-                // Direct access reads ONE block at a time, so the channel
-                // starts as a window on block 0 rather than on the whole
-                // image. B-R/U1 move it, B-P addresses within it, F-P leaves
-                // block mode entirely.
-                stream->setSize(stream->block_size);
-                m_channels[channel]->setBlockWindow(0, 0, stream->block_size);
+                m_channels[channel] = new iecChannelHandlerBlock(this, stream, full_size);
+                m_channels[channel]->setName(m_cwd->url + " (direct)");
 
                 m_numOpenChannels++;
                 setStatusCode(ST_OK);
@@ -1381,6 +1538,22 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                             Debug_printv("Stream created for file [%s] pathInStream[%s]", f->url.c_str(), f->pathInStream.c_str());
                             // new_stream will be deleted in iecChannelHandlerFile destructor
                             m_channels[channel] = new iecChannelHandlerFile(this, new_stream, is_dir ? 0x0801 : -1); // 0x0801 = overrides load address to start of basic for C64
+                            // A file created in a disk image takes the type the OPEN
+                            // named; with none, PRG on the LOAD/SAVE channels and
+                            // SEQ on a data channel, as the 1541 ROM does.
+                            if( mode & std::ios_base::out )
+                            {
+                                uint8_t cbm_type = channel < 2 ? 2 : 1;
+                                switch( req.type )
+                                {
+                                    case DosFileType::Prg: cbm_type = 2; break;
+                                    case DosFileType::Seq: cbm_type = 1; break;
+                                    case DosFileType::Usr: cbm_type = 3; break;
+                                    case DosFileType::Del: cbm_type = 0; break;
+                                    default: break;
+                                }
+                                new_stream->setWriteFileType(cbm_type);
+                            }
                             // fullUrl(), not url: for a file inside a container url
                             // names the CONTAINER, and the entry is in pathInStream.
                             m_channels[channel]->setName(f->fullUrl());
@@ -1771,15 +1944,15 @@ uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool 
     }
 }
 
-// Move a channel's pointer, for B-P and F-P.
+// B-P and F-P.
 //
-//   B-P (within_block)  the pointer WITHIN the block B-R/U1 selected, 0-255.
-//                       It addresses the block, so it counts from the block's
-//                       byte 0 even when B-R left the readable window
-//                       starting at byte 1.
-//   F-P                 an absolute offset. On a direct-access channel it
-//                       re-bases the block window onto the block containing
-//                       that offset, so "one block at a time" still holds.
+//   B-P (within_block)  the pointer into a direct-access channel's buffer,
+//                       0-255. It is a BUFFER command, so on any other channel
+//                       it answers 70 NO CHANNEL (vdrive_command_block).
+//   F-P                 an absolute offset into the file or container. On a
+//                       direct-access channel it leaves buffer mode for the
+//                       stream view of the whole container (a Meatloaf
+//                       extension); U1/B-R put it back.
 bool iecDrive::positionChannel(uint32_t chan, uint32_t pos, bool within_block)
 {
     if( chan > 15 )
@@ -1795,6 +1968,23 @@ bool iecDrive::positionChannel(uint32_t chan, uint32_t pos, bool within_block)
         return false;
     }
 
+    iecChannelHandlerBlock *block = channel->blockChannel();
+
+    if( within_block )
+    {
+        if( block == nullptr )
+        {
+            setStatusCode(ST_NO_CHANNEL);
+            return false;
+        }
+
+        // the pointer is a byte; a 1541 keeps only the low byte too
+        block->setPointer((uint8_t) pos);
+        clearReadBuffer(chan);
+        setStatusCode(ST_OK);
+        return true;
+    }
+
     // A directory channel generates its listing and has no stream.
     auto stream = channel->getStream();
     if( stream == nullptr )
@@ -1803,81 +1993,33 @@ bool iecDrive::positionChannel(uint32_t chan, uint32_t pos, bool within_block)
         return false;
     }
 
-    uint32_t target = pos;
-
-    if( within_block )
-    {
-        // No block selected means no origin to count from -- B-P is not a
-        // file-channel command, F-P is.
-        if( !channel->hasBlockWindow() )
-        {
-            setStatusCode(ST_SYNTAX_INVALID);
-            return false;
-        }
-
-        if( pos >= stream->block_size )
-        {
-            setStatusCode(ST_SYNTAX_UNKNOWN);
-            return false;
-        }
-
-        // Only the pointer moves; the window's end is whatever B-R/U1 set.
-        target = channel->blockBase() + pos;
-
-        if( !stream->position(target) )
-        {
-            setStatusCode(ST_SYNTAX_UNKNOWN);
-            return false;
-        }
-
-        channel->repositioned(target);
-        clearReadBuffer(chan);
-        setStatusCode(ST_OK);
-        return true;
-    }
-
-    // F-P seeks anywhere in the file or container, so on a direct-access
-    // channel it LEAVES block mode and restores the container's full extent --
-    // otherwise the block window would stop the read 256 bytes later. B-R/U1
-    // put the channel back into block mode.
-    if( channel->hasBlockWindow() )
-    {
-        if( channel->fullSize() > 0 )
-            stream->setSize(channel->fullSize());
-
-        channel->clearBlockWindow();
-    }
-
-    if( !stream->position(target) )
+    bool ok = block != nullptr ? block->enterStreamMode(pos) : stream->position(pos);
+    if( !ok )
     {
         setStatusCode(ST_SYNTAX_UNKNOWN);
         return false;
     }
 
-    channel->repositioned(target);
+    channel->repositioned(pos);
     clearReadBuffer(chan);
     setStatusCode(ST_OK);
     return true;
 }
 
 
-// Point a channel at a disk block, for B-R/B-W and U1/U2.
+// U1/U2 and B-R/B-W: move a block between the disk and a direct-access
+// channel's buffer. Like vdrive_command_u1a2b()/vdrive_command_block(), only a
+// "#" channel has a buffer, so any other channel answers 70.
 //
-// There is no separate 256-byte block buffer here the way a real drive has
-// one: a channel IS a stream at an offset. So a block command is a seek --
-// the data then moves through ordinary reads and writes on that channel,
-// which is also what makes it work from the console.
-//
-// `extra` is the offset within the block to land on: B-R uses 1 because CBM
-// treats byte 0 as the count of valid bytes, U1 uses 0 and gives the whole
-// 256. Sets the status and returns false on every failure.
-bool iecDrive::seekChannelToBlock(uint8_t channel_num, uint8_t track, uint8_t sector,
-                                  uint8_t extra, bool for_write)
+// The seek also matters beyond the data: some fast loaders expect the drive's
+// track/sector registers to be updated by a block command.
+bool iecDrive::blockTransfer(uint8_t channel_num, uint8_t track, uint8_t sector,
+                             bool for_write, bool cbm)
 {
     // m_channels has 16 entries and the parsed channel is a full byte.
     if( channel_num > 15 )
     {
-        setStatusCode(ST_SYNTAX_UNKNOWN);
+        setStatusCode(ST_NO_CHANNEL);
         return false;
     }
 
@@ -1888,14 +2030,14 @@ bool iecDrive::seekChannelToBlock(uint8_t channel_num, uint8_t track, uint8_t se
         return false;
     }
 
-    // A directory channel generates its listing and has no stream.
-    auto stream = channel->getStream();
-    if( stream == nullptr )
+    iecChannelHandlerBlock *block = channel->blockChannel();
+    if( block == nullptr )
     {
-        setStatusCode(ST_SYNTAX_INVALID);
+        setStatusCode(ST_NO_CHANNEL);
         return false;
     }
 
+    auto stream = block->getStream();
     if( for_write && !(stream->mode & std::ios_base::out) )
     {
         // Opened read-only: OPEN <ch>,8,<sa>,"#,S,W" gets a writable one.
@@ -1910,50 +2052,19 @@ bool iecDrive::seekChannelToBlock(uint8_t channel_num, uint8_t track, uint8_t se
         return false;
     }
 
-    uint32_t base   = (uint32_t) offset;
-    uint32_t start  = base + extra;
-    uint32_t length = stream->block_size;
+    uint8_t st = for_write ? block->writeBlock((uint32_t) offset, cbm)
+                           : block->readBlock((uint32_t) offset, cbm);
 
-    // B-R/B-W reserve byte 0 of the block as the count of valid bytes, so the
-    // window is that many bytes starting at byte 1. U1/U2 have no count byte
-    // and give the whole block. Reading the count costs one container read,
-    // and the seek below puts the stream back where the caller expects it.
-    if( extra > 0 )
-    {
-        if( !stream->position(base) )
-        {
-            setStatusCode(ST_ILLEGAL_TS_COMMAND, track, sector);
-            return false;
-        }
-
-        uint8_t count = 0;
-        if( stream->read(&count, 1) != 1 )
-        {
-            setStatusCode(ST_READ_NO_DATA, track, sector);
-            return false;
-        }
-        length = count;
-    }
-
-    // The window is expressed to the stream as its size: that is what stops a
-    // read at the end of the block, since the reader asks for BUFFER_SIZE.
-    stream->setSize(start + length);
-
-    // position() seeks AND records where it is, which seekSector() cannot do.
-    if( !stream->position(start) )
-    {
-        setStatusCode(ST_ILLEGAL_TS_COMMAND, track, sector);
-        return false;
-    }
-
-    // The channel holds bytes read AHEAD of the stream; without this the next
-    // read serves them instead of the block just seeked to.
-    channel->setBlockWindow(base, start, length);
-
-    // IECFileDevice also holds up to two bytes read ahead for the bus; they
-    // belong to the old position and would be sent as the block's first two
+    // IECFileDevice holds up to two bytes read ahead for the bus; they come
+    // from the old buffer contents and would be sent as the block's first two
     // bytes -- its track/sector link. The VDrive path clears them too.
     clearReadBuffer(channel_num);
+
+    if( st != ST_OK )
+    {
+        setStatusCode(st, track, sector);
+        return false;
+    }
 
     setStatusCode(ST_OK);
     return true;
@@ -2157,17 +2268,14 @@ std::vector<iecDrive::ChannelInfo> iecDrive::consoleChannels()
             info.size       = stream->size();
         }
 
-        // A direct-access channel is a window on one block: report the block's
-        // readable length and the pointer WITHIN it, which is what B-P speaks.
-        // Reporting the stream's size there would show the window's end offset
-        // in the image, which is not a size at all.
-        if( handler->hasBlockWindow() )
+        // A direct-access channel in buffer mode: report the buffer's length
+        // and the pointer within it, which is what B-P speaks.
+        iecChannelHandlerBlock *block = handler->blockChannel();
+        if( block != nullptr && block->inBufferMode() )
         {
             info.has_stream = true;
-            info.size       = handler->blockLength();
-            info.position   = handler->position() >= handler->blockBase()
-                                ? handler->position() - handler->blockBase()
-                                : 0;
+            info.size       = block->length();
+            info.position   = block->pointer();
         }
 
         open_channels.push_back(info);
@@ -2326,6 +2434,14 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
         case ST_RECORD_OVERFLOW     : msg = "OVERFLOW IN RECORD"; break;
         case ST_FILE_TOO_LARGE      : msg = "FILE TOO LARGE"; break;
         case ST_PERMISSION_DENIED   : msg = "PERMISSION DENIED"; break;
+        // Reachable from the block, copy and validate commands.
+        case ST_NO_BLOCK            : msg = "NO BLOCK"; break;
+        case ST_SYNTAX_LONG_LINE    : msg = "LONG LINE"; break;
+        case ST_SYNTAX_NO_NAME      : msg = "NO FILE GIVEN"; break;
+        case ST_FILE_NOT_FOUND_39   : msg = "FILE NOT FOUND"; break;
+        case ST_WRITE_FILE_OPEN     : msg = "WRITE FILE OPEN"; break;
+        case ST_ILLEGAL_TS_LINK     : msg = "ILLEGAL TRACK OR SECTOR"; break;
+        case ST_UNKNOWN_DRIVECODE   : msg = "NOT SUPPORTED"; break;
         default                     : msg = "UNKNOWN ERROR"; break;
     }
 
@@ -2539,7 +2655,7 @@ void iecDrive::dosSetCwd(const std::string &path) { set_cwd(path); }
 iecChannelHandler *iecDrive::dosChannel(uint32_t n) { return n < 16 ? m_channels[n] : nullptr; }
 void iecDrive::dosClearReadBuffer(uint8_t channel) { clearReadBuffer(channel); }
 bool iecDrive::dosPositionChannel(uint32_t ch, uint32_t pos, bool within_block) { return positionChannel(ch, pos, within_block); }
-bool iecDrive::dosSeekChannelToBlock(uint8_t ch, uint8_t t, uint8_t s, uint8_t extra, bool for_write) { return seekChannelToBlock(ch, t, s, extra, for_write); }
+bool iecDrive::dosBlockTransfer(uint8_t ch, uint8_t t, uint8_t s, bool for_write, bool cbm) { return blockTransfer(ch, t, s, for_write, cbm); }
 void iecDrive::dosChangePartition(int pnum) { changePartition(pnum); }
 #ifndef DISABLE_TAPE   // MEATLOAF-GATE
 void iecDrive::dosTapeCommand(const std::string &command) { tapeCommand(command); }
