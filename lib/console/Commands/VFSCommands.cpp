@@ -508,6 +508,14 @@ static bool copy_via_mfile(const char *verb,
         return false;
     }
 
+    // A slow source gives no sign of life otherwise: FSP moves about 5 KB/s,
+    // so one CMD FD image is minutes of silence and "cp test.* /sd" looked
+    // hung. Report progress past 64 KB, and let ESC stop the copy.
+    const size_t progress_step = 64 * 1024;
+    uint32_t expected = in->size();
+    size_t next_report = progress_step;
+    bool cancelled = false;
+
     size_t total = 0;
     bool ok = true;
     uint32_t n;
@@ -520,10 +528,35 @@ static bool copy_via_mfile(const char *verb,
             break;
         }
         total += n;
+        if (total >= next_report)
+        {
+            if (expected > 0)
+                Serial.printf("\r%s: %zu / %lu KB", verb, total / 1024, (unsigned long) (expected / 1024));
+            else
+                Serial.printf("\r%s: %zu KB", verb, total / 1024);
+            next_report += progress_step;
+        }
+        if (ESP32Console::cancel_requested())
+        {
+            cancelled = true;
+            ok = false;
+            break;
+        }
     }
+    if (total >= progress_step)
+        Serial.printf("\r\n");
 
     free(buf);
     out->close();
+
+    if (cancelled)
+    {
+        // A partial copy is worse than none: take it back.
+        dstFile->remove();
+        Serial.printf("%s: cancelled after %zu bytes, '%s' removed\r\n", verb, total, dst.c_str());
+        if (out_total) *out_total = total;
+        return false;
+    }
 
     // A network write is only confirmed at close - FTP, for one, gets the
     // server's verdict on a STOR only then - so a failure there is a failure.
@@ -547,6 +580,7 @@ int mv(int argc, char **argv)
 
     std::string src = resolve_path(argv[1]);
     std::string dst = resolve_path(argv[2]);
+    ESP32Console::cancel_begin();
 
     // Same directory: this is a pure rename, which every filesystem can do
     // in place. MFile::rename() takes a NAME relative to the file's own
@@ -599,6 +633,7 @@ int cp(int argc, char **argv)
     // because that path exists only to the media layer. cat/hex/ls/wget all
     // resolve through MFSOwner already; cp and mv were the holdouts.
     std::string dst = resolve_path(argv[2]);
+    ESP32Console::cancel_begin();
 
     // A wildcard in the LAST component copies every match INTO the target
     // directory ("cp test.* /sd"), as in ls and rm. It used to reach
@@ -654,6 +689,8 @@ int cp(int argc, char **argv)
                 Serial.printf("%s -> %s (%zu bytes)\r\n", src.c_str(), to.c_str(), total);
             else
                 failed = true;
+            if (ESP32Console::cancel_requested())
+                break;   // ESC stops the rest of the matches too
         }
         return failed ? EXIT_FAILURE : EXIT_SUCCESS;
     }
