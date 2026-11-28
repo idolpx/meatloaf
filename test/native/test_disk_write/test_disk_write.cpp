@@ -2239,6 +2239,335 @@ void test_tier3_randomized_stress(void)
         run_random_session(f, s);
 }
 
+
+// ---------------------------------------------------------------------------
+// V (validate): D64MStream::validate() rebuilds the BAM from the directory
+// ---------------------------------------------------------------------------
+
+static bool write_raw_file(const std::string& path, const std::string& data)
+{
+    FILE* f = fopen(path.c_str(), "wb");
+    if (!f) return false;
+    bool ok = fwrite(data.data(), 1, data.size(), f) == data.size();
+    fclose(f);
+    return ok;
+}
+
+static uint8_t open_and_validate(const FormatFixture& f, const std::string& path)
+{
+    auto src = std::make_shared<FileContainerStream>(path);
+    auto image = f.make(src);
+    image->mode = std::ios_base::in | std::ios_base::out;
+    return image->validate();
+}
+
+// Offset of a directory entry's type byte, found by its name in the raw image
+// (the name sits 3 bytes after the type, $A0-padded). -1 if not there.
+static long dir_entry_type_offset(const std::string& raw, const std::string& petscii_name)
+{
+    std::string needle = petscii_name + std::string(16 - petscii_name.size(), '\xA0');
+    size_t at = raw.find(needle);
+    return at == std::string::npos || at < 3 ? -1 : (long) at - 3;
+}
+
+// A formatted image holding a 1500-byte "alpha" and a 300-byte "beta".
+static bool make_two_file_image(const FormatFixture& f, const std::string& path)
+{
+    remove(path.c_str());
+    {
+        auto src = std::make_shared<FileContainerStream>(path, f.size);
+        auto image = f.make(src);
+        if (!image->formatImage("testdisk", "01")) return false;
+    }
+    std::vector<uint8_t> a, b;
+    for (int i = 0; i < 1500; i++) a.push_back((uint8_t) (i * 7));
+    for (int i = 0; i < 300; i++) b.push_back((uint8_t) (i * 3));
+    return open_and_save(f, path, "alpha", a) && open_and_save(f, path, "beta", b);
+}
+
+// On a consistent image validate changes nothing at all - every byte the same.
+// The rebuild clears the BAM and reallocates what the directory reaches, so a
+// single block it forgets, or one it reserves that format did not, shows here.
+void test_tier2_validate_leaves_a_clean_image_unchanged(void)
+{
+    const FormatFixture& f = current_format();
+    std::string path = std::string("build_t2v1_") + f.name + "." + f.ext;
+    char msg[192];
+    snprintf(msg, sizeof(msg), "%s: could not build the image", f.name);
+    TEST_ASSERT_TRUE_MESSAGE(make_two_file_image(f, path), msg);
+
+    std::string before, after;
+    TEST_ASSERT_TRUE(c1541_read_raw_file(path, before));
+    uint8_t st = open_and_validate(f, path);
+    TEST_ASSERT_TRUE(c1541_read_raw_file(path, after));
+    remove(path.c_str());
+
+    snprintf(msg, sizeof(msg), "%s: validate answered %u", f.name, st);
+    TEST_ASSERT_EQUAL_MESSAGE(0, st, msg);
+    snprintf(msg, sizeof(msg), "%s: validate changed a consistent image", f.name);
+    TEST_ASSERT_TRUE_MESSAGE(before == after, msg);
+}
+
+// A BAM that leaks one of alpha's blocks and claims a block nothing uses is
+// put back exactly as it was - and c1541's own validate of the same broken
+// image agrees byte for byte.
+void test_tier2_validate_rebuilds_a_damaged_bam(void)
+{
+    const FormatFixture& f = current_format();
+    std::string path = std::string("build_t2v2_") + f.name + "." + f.ext;
+    char msg[192];
+    snprintf(msg, sizeof(msg), "%s: could not build the image", f.name);
+    TEST_ASSERT_TRUE_MESSAGE(make_two_file_image(f, path), msg);
+
+    std::string clean;
+    TEST_ASSERT_TRUE(c1541_read_raw_file(path, clean));
+
+    {
+        auto src = std::make_shared<FileContainerStream>(path);
+        auto image = f.make(src);
+        image->mode = std::ios_base::in;
+        TEST_ASSERT_TRUE(image->seekPath("alpha"));
+        uint8_t t = image->entry.start_track, s = image->entry.start_sector;
+        image->mode = std::ios_base::in | std::ios_base::out;
+        MStream& bam = *image;                                       // the public interface
+        TEST_ASSERT_TRUE(bam.setBlockAllocation(t, s, false));       // leak
+        uint8_t ft, fs;
+        TEST_ASSERT_TRUE(bam.suggestFreeBlock(0, 0, &ft, &fs));
+        if (ft == t && fs == s)                                      // not the one just leaked
+            TEST_ASSERT_TRUE(bam.suggestFreeBlock(t, (uint8_t) (s + 1), &ft, &fs));
+        TEST_ASSERT_TRUE(bam.setBlockAllocation(ft, fs, true));      // stray claim
+    }
+
+    std::string damaged;
+    TEST_ASSERT_TRUE(c1541_read_raw_file(path, damaged));
+    snprintf(msg, sizeof(msg), "%s: the damage did not reach the image", f.name);
+    TEST_ASSERT_TRUE_MESSAGE(damaged != clean, msg);
+
+    uint8_t st = open_and_validate(f, path);
+    std::string ours;
+    TEST_ASSERT_TRUE(c1541_read_raw_file(path, ours));
+
+    if (f.has_c1541_oracle && c1541_available())
+    {
+        // c1541 picks the image type from the EXTENSION: a copy named
+        // "x.d81.c1541" attaches as a DHD, fails to read the BAM and changes
+        // nothing - which reads as a disagreement about the BAM.
+        std::string theirs_path = std::string("build_t2v2c_") + f.name + "." + f.ext;
+        TEST_ASSERT_TRUE(write_raw_file(theirs_path, damaged));
+        std::string c1541_out = c1541_run("-attach " + c1541_quote(theirs_path) + " -validate");
+        snprintf(msg, sizeof(msg), "%s: c1541 could not validate the damaged image", f.name);
+        TEST_ASSERT_TRUE_MESSAGE(c1541_out.find("Error") == std::string::npos &&
+                                 c1541_out.find("ERR =") == std::string::npos, msg);
+        std::string theirs;
+        TEST_ASSERT_TRUE(c1541_read_raw_file(theirs_path, theirs));
+        remove(theirs_path.c_str());
+        if (ours != theirs)
+        {
+            size_t i = 0;
+            while (i < ours.size() && i < theirs.size() && ours[i] == theirs[i]) i++;
+            unsigned o = i < ours.size() ? (uint8_t) ours[i] : 0, t = i < theirs.size() ? (uint8_t) theirs[i] : 0;
+            unsigned c = i < clean.size() ? (uint8_t) clean[i] : 0;
+            snprintf(msg, sizeof(msg), "%s: our validate and c1541's disagree at offset %zu (block %zu +%zu): ours %02X c1541 %02X before %02X",
+                     f.name, i, i / 256, i % 256, o, t, c);
+            remove(path.c_str());
+            TEST_FAIL_MESSAGE(msg);
+        }
+    }
+    remove(path.c_str());
+
+    snprintf(msg, sizeof(msg), "%s: validate answered %u", f.name, st);
+    TEST_ASSERT_EQUAL_MESSAGE(0, st, msg);
+    snprintf(msg, sizeof(msg), "%s: the BAM was not rebuilt to what it was", f.name);
+    TEST_ASSERT_TRUE_MESSAGE(ours == clean, msg);
+}
+
+// An unclosed file (type without bit 7) is scratched and its blocks freed.
+void test_tier2_validate_scratches_an_unclosed_file(void)
+{
+    const FormatFixture& f = current_format();
+    std::string path = std::string("build_t2v3_") + f.name + "." + f.ext;
+    char msg[192];
+    snprintf(msg, sizeof(msg), "%s: could not build the image", f.name);
+    TEST_ASSERT_TRUE_MESSAGE(make_two_file_image(f, path), msg);
+
+    uint16_t free_with_both = blocks_free_of(f, path);
+
+    std::string raw;
+    TEST_ASSERT_TRUE(c1541_read_raw_file(path, raw));
+    long at = dir_entry_type_offset(raw, "ALPHA");
+    TEST_ASSERT_TRUE(at >= 0);
+    uint16_t alpha_blocks = (uint8_t) raw[at + 28] | ((uint8_t) raw[at + 29] << 8);
+    raw[at] = (char) ((uint8_t) raw[at] & 0x7F);      // "*PRG": never closed
+    TEST_ASSERT_TRUE(write_raw_file(path, raw));
+
+    uint8_t st = open_and_validate(f, path);
+    bool alpha = file_present(f, path, "alpha");
+    bool beta = file_present(f, path, "beta");
+    uint16_t free_after = blocks_free_of(f, path);
+    remove(path.c_str());
+
+    snprintf(msg, sizeof(msg), "%s: validate answered %u", f.name, st);
+    TEST_ASSERT_EQUAL_MESSAGE(0, st, msg);
+    snprintf(msg, sizeof(msg), "%s: the unclosed file survived", f.name);
+    TEST_ASSERT_FALSE_MESSAGE(alpha, msg);
+    snprintf(msg, sizeof(msg), "%s: the closed file was lost", f.name);
+    TEST_ASSERT_TRUE_MESSAGE(beta, msg);
+    snprintf(msg, sizeof(msg), "%s: free %u, expected %u", f.name, free_after, free_with_both + alpha_blocks);
+    TEST_ASSERT_EQUAL_MESSAGE(free_with_both + alpha_blocks, free_after, msg);
+}
+
+// Two files sharing a block cannot be validated: 65 NO BLOCK, and the image is
+// exactly as it was - the BAM a half-finished rebuild left behind is put back.
+void test_tier2_validate_refuses_a_cross_link(void)
+{
+    const FormatFixture& f = current_format();
+    std::string path = std::string("build_t2v4_") + f.name + "." + f.ext;
+    char msg[192];
+    snprintf(msg, sizeof(msg), "%s: could not build the image", f.name);
+    TEST_ASSERT_TRUE_MESSAGE(make_two_file_image(f, path), msg);
+
+    std::string raw;
+    TEST_ASSERT_TRUE(c1541_read_raw_file(path, raw));
+    long a = dir_entry_type_offset(raw, "ALPHA"), b = dir_entry_type_offset(raw, "BETA");
+    TEST_ASSERT_TRUE(a >= 0 && b >= 0);
+    raw[b + 1] = raw[a + 1];                          // beta starts on alpha's first block
+    raw[b + 2] = raw[a + 2];
+    TEST_ASSERT_TRUE(write_raw_file(path, raw));
+
+    uint8_t st = open_and_validate(f, path);
+    std::string after;
+    TEST_ASSERT_TRUE(c1541_read_raw_file(path, after));
+    remove(path.c_str());
+
+    snprintf(msg, sizeof(msg), "%s: validate answered %u, expected 65", f.name, st);
+    TEST_ASSERT_EQUAL_MESSAGE(65, st, msg);
+    snprintf(msg, sizeof(msg), "%s: a failed validate changed the image", f.name);
+    TEST_ASSERT_TRUE_MESSAGE(after == raw, msg);
+}
+
+
+// ---------------------------------------------------------------------------
+// 1581 CBM sub-partitions: a file saved inside one uses the partition's own BAM
+// ---------------------------------------------------------------------------
+
+// A D81 holding a 400-block CBM partition on tracks 50-59, laid out as VICE's
+// "/0:name,<t><s><lo><hi>,C" plus "N" leaves it: the root entry and the root
+// BAM claim the whole range; the partition has a header at 50/0, its own two
+// BAM sectors (only tracks 50-59 present, 50/0-50/3 in use) and a directory at
+// 50/3. Verified against a VICE-made image on hardware, 2026-11-27.
+static void make_d81_with_partition(const std::string& path)
+{
+    remove(path.c_str());
+    {
+        auto src = std::make_shared<FileContainerStream>(path, 819200);
+        auto image = make_d81(src);
+        TEST_ASSERT_TRUE(image->formatImage("parttest", "pt"));
+    }
+    std::string d;
+    TEST_ASSERT_TRUE(c1541_read_raw_file(path, d));
+    auto off = [](int t, int s) { return ((t - 1) * 40 + s) * 256; };
+    auto bamrec = [&](int base_track, int t) {
+        return off(base_track, t <= 40 ? 1 : 2) + 0x10 + ((t - 1) % 40) * 6;
+    };
+
+    // root: claim tracks 50-59 and add the CBM entry in the first directory slot
+    for (int t = 50; t <= 59; t++)
+    {
+        int r = bamrec(40, t);
+        d[r] = 0;
+        for (int i = 1; i < 6; i++) d[r + i] = 0;
+    }
+    int e = off(40, 3);
+    d[e + 2] = (char) 0x85;
+    d[e + 3] = 50; d[e + 4] = 0;
+    std::string name = "PART";
+    for (int i = 0; i < 16; i++) d[e + 5 + i] = i < (int) name.size() ? name[i] : (char) 0xA0;
+    d[e + 30] = (char) (400 & 0xFF); d[e + 31] = (char) (400 >> 8);
+
+    // partition header: a copy of the root's, linking to its own directory
+    int h = off(50, 0);
+    for (int i = 0; i < 256; i++) d[h + i] = d[off(40, 0) + i];
+    d[h] = 50; d[h + 1] = 3;
+    std::string sub = "SUB";
+    for (int i = 0; i < 16; i++) d[h + 4 + i] = i < (int) sub.size() ? sub[i] : (char) 0xA0;
+
+    // partition BAM: the root's BAM sectors, re-linked, with only tracks
+    // 50-59 present and 50/0-50/3 allocated
+    for (int bs = 1; bs <= 2; bs++)
+        for (int i = 0; i < 256; i++) d[off(50, bs) + i] = d[off(40, bs) + i];
+    d[off(50, 1)] = 50; d[off(50, 1) + 1] = 2;
+    d[off(50, 2)] = 0;  d[off(50, 2) + 1] = (char) 0xFF;
+    for (int t = 1; t <= 80; t++)
+    {
+        int r = bamrec(50, t);
+        bool in = t >= 50 && t <= 59;
+        d[r] = in ? 40 : 0;
+        for (int i = 1; i < 6; i++) d[r + i] = in ? (char) 0xFF : 0;
+    }
+    d[bamrec(50, 50)] = 36;
+    d[bamrec(50, 50) + 1] = (char) 0xF0;          // 50/0-50/3
+
+    // partition directory: empty, end of chain
+    int pd = off(50, 3);
+    for (int i = 0; i < 256; i++) d[pd + i] = 0;
+    d[pd + 1] = (char) 0xFF;
+
+    TEST_ASSERT_TRUE(write_raw_file(path, d));
+}
+
+void test_d81_partition_save_uses_its_own_bam(void)
+{
+    std::string path = "build_part.d81";
+    make_d81_with_partition(path);
+    std::string before;
+    TEST_ASSERT_TRUE(c1541_read_raw_file(path, before));
+
+    std::vector<uint8_t> payload(600, 0x5A);   // three blocks
+    {
+        auto src = std::make_shared<FileContainerStream>(path);
+        auto image = make_d81(src);
+        TEST_ASSERT_EQUAL_MESSAGE(0, save_file_status(*image, "part/insub", payload),
+                                  "save into the partition failed");
+    }
+
+    std::string after;
+    TEST_ASSERT_TRUE(c1541_read_raw_file(path, after));
+    auto off = [](int t, int s) { return ((t - 1) * 40 + s) * 256; };
+
+    // the entry is in the partition's directory and its blocks inside the
+    // partition's tracks
+    int pd = off(50, 3);
+    TEST_ASSERT_EQUAL_HEX8_MESSAGE(0x82, (uint8_t) after[pd + 2], "no entry in the partition directory");
+    uint8_t t = after[pd + 3], s = after[pd + 4];
+    int n = 0;
+    while (t != 0 && n < 10)
+    {
+        char m[96];
+        snprintf(m, sizeof(m), "block %d at %u/%u is outside the partition", n, t, s);
+        TEST_ASSERT_TRUE_MESSAGE(t >= 51 && t <= 59, m);
+        int o = off(t, s);
+        t = after[o]; s = after[o + 1];
+        n++;
+    }
+    TEST_ASSERT_EQUAL(3, n);
+
+    // the ROOT's directory and BAM sectors are exactly as they were
+    for (int sec = 0; sec <= 3; sec++)
+        TEST_ASSERT_TRUE_MESSAGE(before.compare(off(40, sec), 256, after, off(40, sec), 256) == 0,
+                                 "a root header/BAM/directory sector changed");
+
+    // and the partition reports its own name and free count
+    {
+        auto src = std::make_shared<FileContainerStream>(path);
+        auto image = make_d81(src);
+        image->mode = std::ios_base::in;
+        TEST_ASSERT_TRUE(image->seekDirectory("part"));
+        TEST_ASSERT_EQUAL_STRING_LEN("SUB", image->header.name, 3);
+        TEST_ASSERT_EQUAL(400 - 40 - 3, image->blocksFree());
+    }
+    remove(path.c_str());
+}
+
 void process()
 {
     UNITY_BEGIN();
@@ -2264,6 +2593,7 @@ void process()
     RUN_TEST(test_d90_remove_returns_every_block);
     RUN_TEST(test_d90_format_new_matches_c1541);
     RUN_TEST(test_d90_reformat_keeps_geometry_and_clears);
+    RUN_TEST(test_d81_partition_save_uses_its_own_bam);
     // Once per format, so no format can be hidden behind another's failure.
     for (g_format_index = 0; g_format_index < all_formats().size(); g_format_index++)
     {
@@ -2281,6 +2611,10 @@ void process()
         RUN_TEST(test_tier2_remove_missing_file_is_a_noop);
         RUN_TEST(test_tier2_unremove_recovers_a_scratched_file);
         RUN_TEST(test_tier2_unremove_refuses_when_blocks_reused);
+        RUN_TEST(test_tier2_validate_leaves_a_clean_image_unchanged);
+        RUN_TEST(test_tier2_validate_rebuilds_a_damaged_bam);
+        RUN_TEST(test_tier2_validate_scratches_an_unclosed_file);
+        RUN_TEST(test_tier2_validate_refuses_a_cross_link);
         RUN_TEST(test_tier3_randomized_stress);
     }
 

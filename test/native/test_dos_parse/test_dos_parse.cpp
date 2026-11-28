@@ -147,6 +147,51 @@ void test_p_bad(void)
     TEST_ASSERT_FALSE(PC("P", 1, c));
 }
 
+
+static int BP(const char *s, int out[4]) { out[0]=out[1]=out[2]=out[3]=-7; return parseBlockParams(std::string(s), out); }
+void test_bp_spaces(void)
+{
+    int v[4]; TEST_ASSERT_EQUAL(4, BP("U1 2 0 18 1", v));
+    TEST_ASSERT_EQUAL(2, v[0]); TEST_ASSERT_EQUAL(0, v[1]); TEST_ASSERT_EQUAL(18, v[2]); TEST_ASSERT_EQUAL(1, v[3]);
+}
+void test_bp_colon_commas(void)
+{
+    int v[4]; TEST_ASSERT_EQUAL(4, BP("U1:2,0,18,1", v));
+    TEST_ASSERT_EQUAL(18, v[2]); TEST_ASSERT_EQUAL(1, v[3]);
+    TEST_ASSERT_EQUAL(4, BP("B-R:2, 0, 17, 09", v));
+    TEST_ASSERT_EQUAL(17, v[2]); TEST_ASSERT_EQUAL(9, v[3]);
+}
+void test_bp_basic_str(void)
+{
+    // PRINT#15,"U1";2;0;T;S -> numbers carry a leading space and a trailing one
+    int v[4]; TEST_ASSERT_EQUAL(4, BP("U1 2  0  18  1 ", v));
+    TEST_ASSERT_EQUAL(1, v[3]);
+}
+void test_bp_long_word(void)
+{
+    int v[4]; TEST_ASSERT_EQUAL(4, BP("BLOCK-READ 2 0 18 1", v));
+    TEST_ASSERT_EQUAL(18, v[2]);
+}
+void test_bp_fewer(void)
+{
+    int v[4]; TEST_ASSERT_EQUAL(2, BP("B-P 2 5", v));
+    TEST_ASSERT_EQUAL(2, v[0]); TEST_ASSERT_EQUAL(5, v[1]);
+    TEST_ASSERT_EQUAL(0, BP("U1", v));
+}
+void test_bp_bad(void)
+{
+    int v[4];
+    TEST_ASSERT_EQUAL(-1, BP("U1:2 0 50 E0", v));
+    TEST_ASSERT_EQUAL(-1, BP("U1:2 0 18 1X", v));
+    TEST_ASSERT_EQUAL(4, BP("U1:2 0 18 1 7", v));   // VICE ignores a separated fifth
+    TEST_ASSERT_EQUAL(-1, BP("B-P 2 X", v));
+}
+void test_bp_hash_and_paren(void)
+{
+    int v[4]; TEST_ASSERT_EQUAL(4, BP("B-A:#0)18,1,", v) + 1); // 3 params + 1
+    TEST_ASSERT_EQUAL(0, v[0]); TEST_ASSERT_EQUAL(18, v[1]); TEST_ASSERT_EQUAL(1, v[2]);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -158,5 +203,7 @@ int main(int, char **)
     RUN_TEST(test_rel_length_is_not_mode); RUN_TEST(test_rel_on_channel1_is_not_a_write_open); RUN_TEST(test_types); RUN_TEST(test_empty);
     RUN_TEST(test_tokenizer_parity);
     RUN_TEST(test_p_full); RUN_TEST(test_p_defaults); RUN_TEST(test_p_cr); RUN_TEST(test_p_bad);
+    RUN_TEST(test_bp_spaces); RUN_TEST(test_bp_colon_commas); RUN_TEST(test_bp_basic_str); RUN_TEST(test_bp_long_word);
+    RUN_TEST(test_bp_fewer); RUN_TEST(test_bp_bad); RUN_TEST(test_bp_hash_and_paren);
     return UNITY_END();
 }

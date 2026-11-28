@@ -41,9 +41,12 @@
 
 #include "../IECBusHandlerInternal.h"
 
+// The block loops below run between the timed bytes, so they are RAMFUNC too:
+// a flash cache miss here delays the wait for the next byte's start edge.
+
 #if defined(IEC_FP_GEOS) && defined(IEC_IMPL_SOFTLOAD)
 
-bool IECBusHandler::geosWaitCLK(bool state)
+bool RAMFUNC(IECBusHandler::geosWaitCLK)(bool state)
 {
   while( readPinCLK()!=state )
     {
@@ -59,7 +62,7 @@ bool IECBusHandler::geosWaitCLK(bool state)
 
 
 // Send one byte after waiting for CLK high, leaving DATA asserted ("busy").
-bool IECBusHandler::geosTransmitByteWait(uint8_t rxtx, uint8_t byte)
+bool RAMFUNC(IECBusHandler::geosTransmitByteWait)(uint8_t rxtx, uint8_t byte)
 {
   if( !geosWaitCLK(HIGH) ) return false;
   writePinDATA(HIGH);
@@ -75,7 +78,7 @@ bool IECBusHandler::geosTransmitByteWait(uint8_t rxtx, uint8_t byte)
 
 
 // Blocks travel backwards: the LAST byte of the buffer goes out first.
-bool IECBusHandler::geosTransmitBuffer(uint8_t rxtx, const uint8_t *data, uint16_t len)
+bool RAMFUNC(IECBusHandler::geosTransmitBuffer)(uint8_t rxtx, const uint8_t *data, uint16_t len)
 {
   if( !geosWaitCLK(HIGH) ) return false;
   writePinDATA(HIGH);
@@ -92,7 +95,7 @@ bool IECBusHandler::geosTransmitBuffer(uint8_t rxtx, const uint8_t *data, uint16
 }
 
 
-bool IECBusHandler::geosReceiveBuffer(uint8_t rxtx, uint8_t *data, uint16_t len)
+bool RAMFUNC(IECBusHandler::geosReceiveBuffer)(uint8_t rxtx, uint8_t *data, uint16_t len)
 {
   if( !geosWaitCLK(HIGH) ) return false;
   writePinDATA(HIGH);
@@ -107,7 +110,7 @@ bool IECBusHandler::geosReceiveBuffer(uint8_t rxtx, uint8_t *data, uint16_t len)
 
 
 // A length byte followed by that many data bytes. A length of 0 means 256.
-bool IECBusHandler::geosReceiveLenBlock(uint8_t rxtx, uint8_t *data)
+bool RAMFUNC(IECBusHandler::geosReceiveLenBlock)(uint8_t rxtx, uint8_t *data)
 {
   if( !geosWaitCLK(HIGH) ) { data[0] = 0; data[1] = 0; return false; }
 

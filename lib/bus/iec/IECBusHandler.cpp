@@ -584,7 +584,10 @@ bool IECBusHandler::canServeATN()
 }
 
 
-bool IECBusHandler::isResetPinIdle()
+// RAMFUNC: the fast loaders' edge-wait loops call this on every iteration with
+// interrupts off. In flash, a cache miss there stalls ~4 us on a PSRAM board and
+// the loader samples the wrong bit pair (GEOS from a CMD HD image, 2026-11-27).
+bool RAMFUNC(IECBusHandler::isResetPinIdle)()
 {
   return readPinRESET();
 }

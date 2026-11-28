@@ -43,6 +43,7 @@
 // https://github.com/c64pectre/c64-cmd-hd
 // https://www.pipesup.ca/cmdhd-in-vice/
 // https://mikenaberezny.com/hardware/c64-128/cmd-hd-series/
+// https://dn710605.ca.archive.org/0/items/cmd-hd-manual-remaster-v-0.1/CMD%20HD%20User%20Manual%20Remaster%20V1.pdf
 //
 
 
@@ -93,13 +94,91 @@ public:
         std::string disk_label;             // system partition (entry 0) name
         std::vector<DHDPartition> parts;
 
+        // Where the 32-byte partition entries live in the image, so the
+        // G-P/R-P/D-P commands can read and write them raw.
+        uint32_t table_base = 0;
+        uint32_t sys_base = 0;              // byte offset of the system partition
+        uint32_t image_size = 0;            // bytes
+        uint16_t maxpart = 254;             // 254 on an HD, 31 on an FD
+        uint8_t  fd_kind = 0;               // 0 HD, else 1/2/4 for D1M/D2M/D4M
+
         const DHDPartition* byNumber(uint8_t number) const;
         const DHDPartition* byName(std::string utf8name) const;
-        const DHDPartition* current() const { return byNumber(selected); }
+        // nullptr when nothing is selected - a new image has no partitions, and
+        // byNumber(0) is the SYSTEM partition, never something to mount.
+        const DHDPartition* current() const { return selected ? byNumber(selected) : nullptr; }
     };
 
     static Image* obtain(const std::string& containerUrl);
     static bool select(const std::string& containerUrl, uint8_t number);
+
+    // The raw 32-byte table entry `number` (0 = system partition). False when
+    // the image has no table or the entry is past the end of the image.
+    static bool readEntry(const std::string& containerUrl, uint8_t number, uint8_t out[32]);
+
+    // R-P: write a new name (PETSCII, padded with $A0) into entry `number`.
+    static bool renamePartition(const std::string& containerUrl, uint8_t number, const std::string& petscii_name);
+
+    // D-P: clear the type of every listed partition, then pack the remaining
+    // ones together, moving their data (vdrive_pack_parts). VICE allows this
+    // on an FD only, because there the system partition sits at the END and
+    // packing from LBA 0 is safe; on an HD the pack starts after the system
+    // partition and never moves anything into it. Returns a CBM status; the
+    // table is re-read after. An empty list only packs (partition:pack); a
+    // DHD is then cut at the end of its last partition either way.
+    static uint8_t deletePartitions(const std::string& containerUrl, const std::vector<uint8_t>& numbers);
+
+    // Create a partition (a Meatloaf extension - on CMD hardware only HD-TOOLS
+    // and FD-TOOLS do this). type is 1 native, 2 1541, 3 1571, 4 1581; lbas is
+    // its size in 512-byte LBAs. insert_before = 0 places it in the first free
+    // gap that fits - on a DHD, at the end of the image, growing it, when no
+    // gap does; otherwise it goes where that partition starts and every
+    // partition from there on moves up by its size (a DHD grows for that too). The lowest free table
+    // slot is used and returned in *out_number. The partition is NOT
+    // formatted here. Returns a CBM status.
+    // slot = 0 takes the lowest free table slot; otherwise that slot is used
+    // (63 if it is in use, 77 if it is beyond this image's table).
+    static uint8_t createPartition(const std::string& containerUrl, uint8_t type, const std::string& petscii_name,
+                                   uint32_t lbas, uint8_t insert_before, uint8_t slot, uint8_t* out_number);
+
+    // The partition the drive selects at power-on (cfg $E2 of the system
+    // partition). Returns a CBM status.
+    static uint8_t setDefaultPartition(const std::string& containerUrl, uint8_t number);
+
+    // Copy partition `number` out to a standalone image in the container's
+    // directory: .d64 / .d71 / .d81 / .dnp by its type. `filename` (UTF-8)
+    // defaults to the partition's name; the extension is added if missing.
+    // Partition 0 on an HD is the system partition (the drive's DOS): it goes
+    // to /sd/.sys/cmdhd.sys by default, which createImage() uses for new
+    // DHDs. 63 if the file exists. Returns a CBM status.
+    static uint8_t dumpPartition(const std::string& containerUrl, uint8_t number, std::string filename);
+
+    // A new, empty CMD container (N0:/MD: with a .dhd .d1m .d2m .d4m name):
+    // the type comes from the extension. An FD is its fixed size; a DHD is
+    // only its system partition (272 LBAs) and grows as partitions are added.
+    // FD layout as VICE's format (vdrive_command_format_internal): system
+    // partition at the end, a 4-sector table, the config sector with the FD
+    // magic. A DHD gets its system partition (144 LBAs: the config track and
+    // a 32-sector table) at LBA 128, inside the range vdrive_find_sys() scans,
+    // with the HD magic. No user partitions; 63 if the file exists.
+    // A DHD takes its system partition from /sd/.sys/cmdhd.sys when there is
+    // one (partition:dump,0 of a real image): a real CMD HD loads its DOS from
+    // there. Without it the system partition has only the magic, table and
+    // config - enough for Meatloaf and VICE's virtual drive, not hardware.
+    static uint8_t createImage(const std::string& url);
+
+    // True for a name a new CMD container is made from: .dhd .d1m .d2m .d4m
+    static bool isContainerName(const std::string& name);
+
+    // Copy a D64/D71/D81/DNP into partition `number`. The file's type must be
+    // the partition's (64) and it must fit (52); a D64/D71/D81 carrying error
+    // info has it dropped. The rest of the window is zeroed.
+    static uint8_t writePartitionImage(const std::string& containerUrl, uint8_t number, const std::string& mediaUrl);
+
+    // What a media file would need: its partition type (1 native, 2 1541,
+    // 3 1571, 4 1581) and size in LBAs. False when it is not one of those or
+    // cannot be read. *err gets the CBM status.
+    static bool mediaGeometry(const std::string& mediaUrl, uint8_t* type, uint32_t* lbas, uint8_t* err);
 
     // True while the registry reads the raw image (so DHDMFileSystem
     // declines the path and the underlying filesystem serves the bytes)
@@ -115,6 +194,10 @@ public:
 
 private:
     static bool parse(const std::string& containerUrl, Image& img);
+    static std::shared_ptr<MStream> openRaw(const std::string& containerUrl, std::ios_base::openmode mode);
+    static bool loadTable(Image* img, std::shared_ptr<MStream>& s, std::vector<uint8_t>& raw);
+    static bool saveTable(Image* img, std::shared_ptr<MStream>& s, const std::vector<uint8_t>& raw);
+    static void forget(const std::string& containerUrl);
 
     static std::map<std::string, Image> s_images;
     static bool s_probing;
@@ -251,6 +334,35 @@ public:
         return BASE::getSourceStream(mode);
     }
 
+    // N0: (and partition:create) inside a CMD partition. D64MFile::format()
+    // opens the image with trunc, which is right for a .d64 on its own and
+    // wrong here: the image is the whole CMD container, and an empty
+    // pathInStream passes the mode straight to it. So open in|out and lay the
+    // disk down inside the partition's fixed window. A native partition gets
+    // its track count from the window (128 LBAs per 256-sector track).
+    bool format(std::string header_info) override
+    {
+        normalizePath();
+        const DHDPartition* p = effectivePartition();
+        if (p == nullptr)
+            return false;
+        auto stream = std::static_pointer_cast<D64MStream>(
+            BASE::getSourceStream(std::ios_base::in | std::ios_base::out));
+        if (stream == nullptr || !stream->isOpen())
+            return false;
+
+        D64FormatSpec spec = parseD64FormatSpec(header_info);
+        size_t tracks = spec.track_count;
+        if (p->type == 1)
+            tracks = p->size / 65536;           // p->size is bytes; a track is 64 KB
+        else
+            tracks = 0;                         // fixed geometry
+        bool ok = stream->formatImage(spec.name, spec.id, tracks, false);
+        stream->close();
+        DHDImageRegistry::disposeCachedStream(DHDImageRegistry::containerOf(this->url));
+        return ok;
+    }
+
     bool rewindDirectory() override
     {
         normalizePath();
@@ -380,7 +492,8 @@ public:
         auto img = DHDImageRegistry::obtain(DHDImageRegistry::containerOf(this->url));
         if (img == nullptr)
             return nullptr;
-        return (m_part == 0) ? img->current() : img->byNumber(m_part);
+        const DHDPartition* p = (m_part == 0) ? img->current() : img->byNumber(m_part);
+        return (p != nullptr && p->number != 0) ? p : nullptr;
     }
 
     // Name the partition for the broker, so its rebuild resolves the partition

@@ -38,6 +38,7 @@
 // https://vice-emu.sourceforge.io/vice_17.html#SEC403
 // https://web.archive.org/web/20180925144409/https://cbm8bit.com/articles/user-contributions/howto_d1m_d2m_d4m
 // https://ist.uwaterloo.ca/~schepers/formats/D2M-DNP.TXT
+// https://dn721602.ca.archive.org/0/items/fd-series-second-edition-first-printing-october-1992-manual-creative-micro-designs-inc/FD-Series_Second-Edition-First-Printing-October-1992-Manual_Creative-Micro-Designs-Inc.pdf
 //
 
 

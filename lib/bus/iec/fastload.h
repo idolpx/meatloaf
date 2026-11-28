@@ -131,6 +131,10 @@
 #define IEC_FLRX_BITFIRE_IDATA      17
 #define IEC_FLRX_BITFIRE_CLOCK      18
 #define IEC_FLRX_BITFIRE_ICLK       19
+// CMD HD/FD resident GEOS turbo (gateWay HardDrive/HD1581 drivers): the 1581-2.1
+// bit layout, with sample and write points re-derived from the driver's own C64
+// routines -- see protocol/geos.cpp. Not from sd2iec; no CRC entry uses it.
+#define IEC_FLRX_GEOS_CMDHD         20
 
 // CRC-16 with the reflected polynomial 0xA001, initial value 0xFFFF -- the
 // routine AVR libc calls _crc16_update and sd2iec calls crc16_update. Its
@@ -173,6 +177,14 @@ class IECFastLoadDetect
 
   // Called when the drive is reset or initialised.
   void reset();
+
+  // Make `variant` the loader the next M-E falls back to, as though its upload
+  // had just been recognised, and `rxtx` the transfer timing. For loaders that
+  // are resident in the drive's DOS instead of uploaded: CMD HD/FD drives carry
+  // a 1581-compatible GEOS turbo, so CMD's GEOS drivers send `GEOS` and then
+  // M-E $040F with nothing for the CRC to see. Any later M-W clears it, as it
+  // clears every previous-round detection.
+  void setResident(uint8_t variant, uint8_t rxtx);
 
   // Some loaders need a window of the code they upload kept, not just
   // hashed: GEOS stage 1 sends its sector chains XOR-ed with a 256-byte key

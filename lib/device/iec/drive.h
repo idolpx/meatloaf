@@ -59,7 +59,7 @@ public:
   iecChannelHandler(iecDrive *drive);
   virtual ~iecChannelHandler();
 
-  uint8_t read(uint8_t *data, uint8_t n);
+  virtual uint8_t read(uint8_t *data, uint8_t n);
   virtual uint8_t write(uint8_t *data, uint8_t n);
 
   virtual uint8_t writeBufferData() = 0;
@@ -69,6 +69,9 @@ public:
   // REL channels only (iecChannelHandlerRel); nullptr everywhere else. The
   // drive asks this rather than casting, since the build has no RTTI.
   virtual RELMStream *relStream() { return nullptr; }
+
+  // Direct-access ("#") channels only; nullptr everywhere else. Same reason.
+  virtual class iecChannelHandlerBlock *blockChannel() { return nullptr; }
 
   // True once the bytes handed out so far end a unit the bus must close with
   // EOI. A file channel signals its end by a 0 read instead, so never.
@@ -117,38 +120,6 @@ public:
     m_position = position;
   }
 
-  // A direct-access ("#") channel is a window on ONE block at a time, not on
-  // the whole image: B-R/U1 select the block and a read runs to the end of it.
-  //
-  //   base    where the block starts. B-P counts from HERE, not from the
-  //           readable start, because it addresses the block.
-  //   start   where reading begins -- the block start for U1/U2, one byte
-  //           later for B-R/B-W, which reserve byte 0 as the count.
-  //   len     how many bytes are readable: 256 for U1, and for B-R whatever
-  //           that count byte says.
-  void setBlockWindow(uint32_t base, uint32_t start, uint32_t len)
-  {
-    m_block_base = base;
-    m_block_len  = len;
-    m_has_block  = true;
-    repositioned(start);
-  }
-
-  // F-P leaves block mode: the whole container becomes readable from the
-  // target, so a direct-access channel can be read end to end. B-R/U1 put it
-  // back by selecting a block again.
-  void clearBlockWindow() { m_has_block = false; }
-
-  // Extent of the underlying stream, remembered at open because the block
-  // window overwrites the stream's size and leaving block mode has to put it
-  // back. 0 when unknown.
-  void     setFullSize(uint32_t size) { m_full_size = size; }
-  uint32_t fullSize() const { return m_full_size; }
-
-  bool     hasBlockWindow() const { return m_has_block; }
-  uint32_t blockBase()      const { return m_block_base; }
-  uint32_t blockLength()    const { return m_block_len; }
-
   bool m_eos = false;
 
 protected:
@@ -156,10 +127,6 @@ protected:
   uint8_t  *m_data;
   size_t    m_len, m_ptr;
   size_t    m_position = 0;
-  uint32_t  m_block_base = 0;
-  uint32_t  m_block_len = 0;
-  uint32_t  m_full_size = 0;
-  bool      m_has_block = false;
   std::string m_name;
 };
 
@@ -175,11 +142,62 @@ public:
   virtual uint8_t write(uint8_t *data, uint8_t n) override;
   virtual std::shared_ptr<MStream> getStream() override { return m_stream; };
 
-private:
+protected:
   std::shared_ptr<MStream> m_stream;
   int       m_fixLoadAddress;
   uint32_t  m_byteCount;
   uint64_t  m_timeStart, m_transportTimeUS;
+};
+
+
+// A direct-access channel, OPEN <ch>,8,<sa>,"#": a 256-byte buffer, as a CBM
+// drive and VICE (BUFFER_MEMORY_BUFFER in vdrive-iec.c) have one. Reads and
+// writes move bytes between the bus and the BUFFER; only U1/B-R fill it from
+// the disk and only U2/B-W write it back. It used to be a seek into the image
+// instead, so PRINT#2 before a U2 landed on whatever block the channel last
+// pointed at - block 0 after the OPEN.
+//
+//   open   pointer 1, length 256
+//   read   buffer[pointer++]; the byte at length-1 carries EOI and the pointer
+//          wraps to 1
+//   write  buffer[pointer++], wrapping to 0
+//
+// F-P (a Meatloaf extension) switches the channel to STREAM mode: the whole
+// container, readable and writable from an absolute offset, through the
+// ordinary file path. U1/B-R put it back into buffer mode.
+class iecChannelHandlerBlock : public iecChannelHandlerFile
+{
+public:
+  iecChannelHandlerBlock(iecDrive *drive, std::shared_ptr<MStream> stream, uint32_t full_size);
+
+  virtual uint8_t read(uint8_t *data, uint8_t n) override;
+  virtual uint8_t write(uint8_t *data, uint8_t n) override;
+  virtual bool atEOI() const override { return m_buffer_mode && m_eoi; }
+  virtual iecChannelHandlerBlock *blockChannel() override { return this; }
+
+  // Block transfers. `offset` is the block's byte offset in the container.
+  // `cbm` selects B-R/B-W semantics (byte 0 is the count), else U1/U2.
+  uint8_t readBlock(uint32_t offset, bool cbm);
+  uint8_t writeBlock(uint32_t offset, bool cbm);
+
+  void     setPointer(uint8_t p) { m_bufptr = p; m_eoi = false; m_at_end = false; }
+  uint16_t pointer() const { return m_bufptr; }
+  uint16_t length() const { return m_buflen; }
+  uint8_t *buffer() { return m_buf; }
+
+  bool     inBufferMode() const { return m_buffer_mode; }
+  // F-P: leave buffer mode and seek the whole container
+  bool     enterStreamMode(uint32_t pos);
+  uint32_t fullSize() const { return m_full_size; }
+
+private:
+  uint8_t  m_buf[256];
+  uint16_t m_bufptr = 1;
+  uint16_t m_buflen = 256;
+  bool     m_eoi = false;
+  bool     m_at_end = false;          // the last read ended the buffer: answer one 0
+  bool     m_buffer_mode = true;
+  uint32_t m_full_size = 0;
 };
 
 
@@ -376,6 +394,8 @@ protected:
   // The switch point for a software fast loader identified from the code the
   // host uploaded -- see IECFileDevice::startFastLoader.
   virtual bool startFastLoader(uint8_t variant, uint8_t param, uint8_t rxtx, const uint8_t *cmd, uint8_t cmdLen, uint16_t crc);
+  virtual void fastLoaderNotMatched(uint16_t address, uint16_t crc);
+  virtual void fastLoaderDisabled(uint8_t variant, uint16_t address);
 #endif
 
   // REL files: the channel, an existing file's stream, and a name that
@@ -386,8 +406,8 @@ protected:
 
   // Point a channel at a disk block for B-R/B-W and U1/U2 -- see the comment
   // on the definition for why a block command is a seek here.
-  bool seekChannelToBlock(uint8_t channel_num, uint8_t track, uint8_t sector,
-                          uint8_t extra, bool for_write);
+  bool blockTransfer(uint8_t channel_num, uint8_t track, uint8_t sector,
+                     bool for_write, bool cbm);
 
   // B-P (within_block: relative to the selected block) and F-P (absolute).
   bool positionChannel(uint32_t chan, uint32_t pos, bool within_block);
@@ -419,11 +439,12 @@ protected:
   iecChannelHandler *dosChannel(uint32_t n) override;
   void     dosClearReadBuffer(uint8_t channel) override;
   bool     dosPositionChannel(uint32_t ch, uint32_t pos, bool within_block) override;
-  bool     dosSeekChannelToBlock(uint8_t ch, uint8_t t, uint8_t s, uint8_t extra, bool for_write) override;
+  bool     dosBlockTransfer(uint8_t ch, uint8_t t, uint8_t s, bool for_write, bool cbm) override;
   void     dosChangePartition(int pnum) override;
   void     dosTapeCommand(const std::string &command) override;
   driveMemory &dosMemory() override;
   void     dosEnableFastLoader(uint8_t family, bool enable) override;
+  bool     dosArmResidentFastLoader(uint8_t variant, uint8_t rxtx) override;
   void     dosReset() override;
   uint8_t  dosDeviceNumber() override;
   bool     dosUseVDrive() override;

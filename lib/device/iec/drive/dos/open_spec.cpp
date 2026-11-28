@@ -1,3 +1,4 @@
+#include <cctype>
 #include "open_spec.h"
 
 OpenRequest parseOpenSpec(uint8_t channel, const std::string& rawIn)
@@ -116,4 +117,51 @@ bool parsePositionCommand(const uint8_t* data, uint8_t len, PositionCommand& out
     if (len > 3) out.record |= (uint16_t)data[3] << 8;
     if (len > 4) out.position = data[4];
     return true;
+}
+
+static bool isBlockParamSeparator(char c)
+{
+    // vdrive_command_get_block_parameters: "1541 firmware skips 0x20, 0x2c,
+    // and 0x1d", and VICE adds ')' and '#'.
+    return c == ' ' || c == ',' || c == ')' || c == '#' || c == 0x1d;
+}
+
+int parseBlockParams(const std::string& command, int out[4])
+{
+    // Parameters follow the colon; without one, they follow the command word
+    // ("U1 2 0 18 1", "BLOCK-READ 2 0 18 1").
+    size_t i = command.find(':');
+    if (i != std::string::npos)
+        i++;
+    else
+    {
+        i = 0;
+        while (i < command.size() && command[i] != ' ' && command[i] != ',')
+            i++;
+    }
+
+    int n = 0;
+    for (; n < 4; n++)
+    {
+        while (i < command.size() && isBlockParamSeparator(command[i]))
+            i++;
+        if (i >= command.size())
+            break;
+        if (command[i] < '0' || command[i] > '9')
+            return -1;
+
+        int v = 0;
+        while (i < command.size() && command[i] >= '0' && command[i] <= '9')
+        {
+            if (v < 100000) v = v * 10 + (command[i] - '0');   // saturate, never overflow
+            i++;
+        }
+        out[n] = v;
+    }
+
+    // VICE: a letter or digit straight after the fourth number is a syntax
+    // error; anything separated from it is ignored.
+    if (n == 4 && i < command.size() && isalnum((unsigned char)command[i]))
+        return -1;
+    return n;
 }

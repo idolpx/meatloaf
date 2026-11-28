@@ -61,7 +61,7 @@ int cat(int argc, char **argv)
 
     for (int n = 1; n < argc; n++)
     {
-        std::unique_ptr<MFile> path(getCurrentPath()->cd(argv[n]));
+        std::unique_ptr<MFile> path(resolveConsolePath(argv[n]));
         Meat::iostream istream(path.get());
 
         if(istream.is_open()) {
@@ -112,7 +112,7 @@ int hex(int argc, char **argv)
 
     for (int n = 1; n < argc; n++)
     {
-        std::unique_ptr<MFile> path(getCurrentPath()->cd(argv[n]));
+        std::unique_ptr<MFile> path(resolveConsolePath(argv[n]));
         //Debug_printv("Opening file for hex: %s", path->url.c_str());
         Meat::iostream istream(path.get());
 
@@ -233,7 +233,7 @@ int cd(int argc, char **argv)
         path = argv[1];
     }
 
-    std::unique_ptr<MFile> destPath(getCurrentPath()->cd(argv[1]));
+    std::unique_ptr<MFile> destPath(resolveConsolePath(argv[1]));
 
     Debug_printv("url[%s] path[%s] pathInStream[%s]", destPath->url.c_str(), path, destPath->pathInStream.c_str());
     if(destPath->isDirectory()) {
@@ -278,7 +278,7 @@ int ls(int argc, char **argv)
     if (filtered && slash != std::string::npos)
     {
         // Keep the trailing '/' so a rooted "/fb*" still resolves to "/"
-        listPath = getCurrentPath()->cd(arg.substr(0, slash + 1));
+        listPath = resolveConsolePath(arg.substr(0, slash + 1));
     }
     else if (filtered || path_arg == nullptr)
     {
@@ -286,7 +286,7 @@ int ls(int argc, char **argv)
     }
     else
     {
-        listPath = getCurrentPath()->cd(path_arg);
+        listPath = resolveConsolePath(path_arg);
     }
 
     //Debug_printv("ls path[%s]", listPath->url.c_str());
@@ -508,6 +508,14 @@ static bool copy_via_mfile(const char *verb,
         return false;
     }
 
+    // A slow source gives no sign of life otherwise: FSP moves about 5 KB/s,
+    // so one CMD FD image is minutes of silence and "cp test.* /sd" looked
+    // hung. Report progress past 64 KB, and let ESC stop the copy.
+    const size_t progress_step = 64 * 1024;
+    uint32_t expected = in->size();
+    size_t next_report = progress_step;
+    bool cancelled = false;
+
     size_t total = 0;
     bool ok = true;
     uint32_t n;
@@ -520,10 +528,35 @@ static bool copy_via_mfile(const char *verb,
             break;
         }
         total += n;
+        if (total >= next_report)
+        {
+            if (expected > 0)
+                Serial.printf("\r%s: %zu / %lu KB", verb, total / 1024, (unsigned long) (expected / 1024));
+            else
+                Serial.printf("\r%s: %zu KB", verb, total / 1024);
+            next_report += progress_step;
+        }
+        if (ESP32Console::cancel_requested())
+        {
+            cancelled = true;
+            ok = false;
+            break;
+        }
     }
+    if (total >= progress_step)
+        Serial.printf("\r\n");
 
     free(buf);
     out->close();
+
+    if (cancelled)
+    {
+        // A partial copy is worse than none: take it back.
+        dstFile->remove();
+        Serial.printf("%s: cancelled after %zu bytes, '%s' removed\r\n", verb, total, dst.c_str());
+        if (out_total) *out_total = total;
+        return false;
+    }
 
     // A network write is only confirmed at close - FTP, for one, gets the
     // server's verdict on a STOR only then - so a failure there is a failure.
@@ -547,6 +580,7 @@ int mv(int argc, char **argv)
 
     std::string src = resolve_path(argv[1]);
     std::string dst = resolve_path(argv[2]);
+    ESP32Console::cancel_begin();
 
     // Same directory: this is a pure rename, which every filesystem can do
     // in place. MFile::rename() takes a NAME relative to the file's own
@@ -598,9 +632,70 @@ int cp(int argc, char **argv)
     // impossible - "cp bible/read.me x" inside a .dhd failed with ENOENT
     // because that path exists only to the media layer. cat/hex/ls/wget all
     // resolve through MFSOwner already; cp and mv were the holdouts.
-    std::string src = resolve_path(argv[1]);
     std::string dst = resolve_path(argv[2]);
+    ESP32Console::cancel_begin();
 
+    // A wildcard in the LAST component copies every match INTO the target
+    // directory ("cp test.* /sd"), as in ls and rm. It used to reach
+    // MFSOwner::File() as a literal name and answer "No such file".
+    std::string arg = argv[1];
+    size_t slash = arg.find_last_of('/');
+    std::string pattern = (slash == std::string::npos) ? arg : arg.substr(slash + 1);
+    if (pattern.find_first_of("*?") != std::string::npos)
+    {
+        std::unique_ptr<MFile> target(MFSOwner::File(dst, true));
+        if (!target || !target->exists() || !target->isDirectory())
+        {
+            Serial.printf("cp: target '%s' is not a directory\r\n", dst.c_str());
+            return EXIT_FAILURE;
+        }
+
+        std::unique_ptr<MFile> dir(slash == std::string::npos
+                                   ? MFSOwner::File(getCurrentPath()->fullUrl())
+                                   : resolveConsolePath(arg.substr(0, slash + 1)));
+        if (!dir || !dir->isDirectory())
+        {
+            Serial.printf("cp: cannot access '%s': No such directory\r\n", arg.c_str());
+            return EXIT_FAILURE;
+        }
+
+        // Read the whole listing before copying anything: a network
+        // filesystem keeps ONE listing per session, and opening a source
+        // mid-walk replaces it.
+        psram_string_vector matches;
+        dir->rewindDirectory();
+        MFile *rawEntry;
+        while ((rawEntry = dir->getNextFileInDir()) != nullptr)
+        {
+            std::unique_ptr<MFile> entry(rawEntry);
+            if (entry->name == "." || entry->name == "..")
+                continue;
+            if (mstr::compare(entry->name, pattern, false))
+                matches.emplace_back((dir->fullUrl() + "/" + entry->name).c_str());
+        }
+        if (matches.empty())
+        {
+            Serial.printf("cp: no match for '%s'\r\n", arg.c_str());
+            return EXIT_FAILURE;
+        }
+
+        bool failed = false;
+        for (auto &m : matches)
+        {
+            std::string src(m.c_str());
+            std::string to = dst;
+            size_t total = 0;
+            if (copy_via_mfile("cp", src, to, &total))
+                Serial.printf("%s -> %s (%zu bytes)\r\n", src.c_str(), to.c_str(), total);
+            else
+                failed = true;
+            if (ESP32Console::cancel_requested())
+                break;   // ESC stops the rest of the matches too
+        }
+        return failed ? EXIT_FAILURE : EXIT_SUCCESS;
+    }
+
+    std::string src = resolve_path(argv[1]);
     size_t total = 0;
     if (!copy_via_mfile("cp", src, dst, &total))
         return EXIT_FAILURE;
@@ -732,7 +827,7 @@ int rm(int argc, char **argv)
             if (slash != std::string::npos)
             {
                 // keep the trailing '/' so a rooted "/pl*" still resolves to "/"
-                dirHolder.reset(getCurrentPath()->cd(pattern.substr(0, slash + 1)));
+                dirHolder.reset(resolveConsolePath(pattern.substr(0, slash + 1)));
                 if (!dirHolder || !dirHolder->isDirectory())
                 {
                     if (!force)
@@ -767,7 +862,7 @@ int rm(int argc, char **argv)
         }
         else
         {
-            std::unique_ptr<MFile> target(getCurrentPath()->cd(argv[argi]));
+            std::unique_ptr<MFile> target(resolveConsolePath(argv[argi]));
 
             // fullUrl(), NOT url. For anything inside a container, url is the
             // CONTAINER's path and the part within it is held separately in
@@ -791,7 +886,7 @@ int rmdir(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    std::unique_ptr<MFile> rd(getCurrentPath()->cd(argv[1]));
+    std::unique_ptr<MFile> rd(resolveConsolePath(argv[1]));
 
     if(!rd->rmDir()) {
         Serial.printf("Error deleting %s: %s\r\n", rd->url.c_str(), strerror(errno));
@@ -808,7 +903,7 @@ int mkdir(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    std::unique_ptr<MFile> md(getCurrentPath()->cd(argv[1]));
+    std::unique_ptr<MFile> md(resolveConsolePath(argv[1]));
 
     if(!md->mkDir()) {
         Serial.printf("Error creating %s: %s\r\n", md->url.c_str(), strerror(errno));

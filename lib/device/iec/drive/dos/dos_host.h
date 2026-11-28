@@ -24,11 +24,17 @@ public:
   virtual iecChannelHandler* dosChannel(uint32_t n) = 0;                 // nullptr if n>15 or closed
   virtual void     dosClearReadBuffer(uint8_t channel) = 0;
   virtual bool     dosPositionChannel(uint32_t ch, uint32_t pos, bool within_block) = 0;
-  virtual bool     dosSeekChannelToBlock(uint8_t ch, uint8_t t, uint8_t s, uint8_t extra, bool for_write) = 0;
+  // U1/U2 (cbm=false) and B-R/B-W (cbm=true) on a direct-access channel:
+  // between the disk block and the channel's 256-byte buffer.
+  virtual bool     dosBlockTransfer(uint8_t ch, uint8_t t, uint8_t s, bool for_write, bool cbm) = 0;
   virtual void     dosChangePartition(int pnum) = 0;
   virtual void     dosTapeCommand(const std::string& command) = 0;
   virtual driveMemory& dosMemory() = 0;
   virtual void     dosEnableFastLoader(uint8_t family, bool enable) = 0;
+  // A loader resident in the drive's DOS rather than uploaded (IEC_FLV_* /
+  // IEC_FLRX_*): the next M-E that detects nothing starts it. False when no
+  // session could run (not compiled in, or the family is disabled).
+  virtual bool     dosArmResidentFastLoader(uint8_t variant, uint8_t rxtx) = 0;
   virtual void     dosReset() = 0;
   virtual uint8_t  dosDeviceNumber() = 0;
 

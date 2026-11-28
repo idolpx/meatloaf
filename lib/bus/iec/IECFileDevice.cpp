@@ -801,6 +801,7 @@ bool IECFileDevice::isFastLoaderRequest(const char *cmd)
   uint8_t  flRxtx    = IEC_FLRX_NONE;
   uint16_t flAddress = 0;
   uint16_t flCrc     = 0;
+  uint8_t  flDisabled = IEC_FLV_NONE;
 
   if( m_writeBufferLen>=6 && strncmp_P(cmd, PSTR("M-W"), 3)==0 )
     {
@@ -821,7 +822,7 @@ bool IECFileDevice::isFastLoaderRequest(const char *cmd)
 
       // a loader the user has turned off is reported but not started
       if( flVariant!=IEC_FLV_NONE && !isFastLoaderEnabled(iecFastLoadFamily(flVariant)) )
-        { flVariant = IEC_FLV_NONE; flMatched = false; }
+        { flDisabled = flVariant; flVariant = IEC_FLV_NONE; flMatched = false; }
     }
 #endif
 
@@ -1099,10 +1100,28 @@ bool IECFileDevice::isFastLoaderRequest(const char *cmd)
       m_uploadCtr = 0;
       return true;
     }
+
+  if( flIsExec && flDisabled!=IEC_FLV_NONE )
+    fastLoaderDisabled(flDisabled, flAddress);
+  else if( flIsExec && !flMatched && flVariant==IEC_FLV_NONE )
+    fastLoaderNotMatched(flAddress, flCrc);
 #endif
 
   m_uploadCtr = 0;
   return false;
+}
+
+
+bool IECFileDevice::armResidentFastLoader(uint8_t variant, uint8_t rxtx)
+{
+#if defined(IEC_SUPPORT_SOFTLOAD) && defined(IEC_IMPL_SOFTLOAD)
+  if( !isFastLoaderEnabled(iecFastLoadFamily(variant)) ) return false;
+  m_fastload.setResident(variant, rxtx);
+  return true;
+#else
+  (void) variant; (void) rxtx;
+  return false;
+#endif
 }
 
 
@@ -1266,6 +1285,11 @@ void IECFileDevice::reset()
   m_uploadCtr = 0;
   m_eoi = true;
   m_statusEoi = true;
+#ifdef IEC_SUPPORT_SOFTLOAD
+  // a half-finished upload and a resident-loader arm are both gone after a
+  // RESET: the computer starts over, and GEOS re-sends "GEOS" when it boots
+  m_fastload.reset();
+#endif
 
   IECDevice::reset();
 }

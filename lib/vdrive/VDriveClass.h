@@ -107,6 +107,9 @@ class VDrive
   uint8_t sectorsPerTrack(uint32_t track);
   uint8_t imageFormat();
 
+  // true for a CMD HD (.dhd) or FD (.d1m/.d2m/.d4m) container
+  bool isCmdImage();
+
   // create and optionally format a new disk image. Parameters
   // - filename: name of the created image file on the host file system, required
   // - itype: image type ("d64", "g64", ...), if NULL use extension from filename parameter
