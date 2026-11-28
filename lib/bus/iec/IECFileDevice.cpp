@@ -1099,10 +1099,23 @@ bool IECFileDevice::isFastLoaderRequest(const char *cmd)
       m_uploadCtr = 0;
       return true;
     }
+
+  if( flIsExec && !flMatched && flVariant==IEC_FLV_NONE )
+    fastLoaderNotMatched(flAddress, flCrc);
 #endif
 
   m_uploadCtr = 0;
   return false;
+}
+
+
+void IECFileDevice::armResidentFastLoader(uint8_t variant, uint8_t rxtx)
+{
+#ifdef IEC_SUPPORT_SOFTLOAD
+  m_fastload.setResident(variant, rxtx);
+#else
+  (void) variant; (void) rxtx;
+#endif
 }
 
 

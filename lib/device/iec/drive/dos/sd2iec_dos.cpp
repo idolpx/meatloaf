@@ -61,6 +61,14 @@ bool CbmDos::cmdSd2iec(std::string& command, size_t colon_position)
             break;
 
         case 'G':
+            // GEOS (CMD HD/FD): CMD's GEOS drivers send "GEOS\0" before their
+            // first M-E $040F. The CR-strip leaves the NUL in place.
+            if ( command.compare(0, 4, "GEOS") == 0 &&
+                 ( command.size() == 4 || (command.size() == 5 && command[4] == '\0') ) )
+            {
+                cmdGeos();
+                return true;
+            }
             // G-P[<partition>]: CMD partition info
             if ( command.size() >= 3 && command[1] == '-' && command[2] == 'P' )
             {
@@ -395,6 +403,7 @@ void CbmDos::cmdSetTime(const std::string& command, size_t colon)
 
 // G-P, R-P, D-P on media with no partition table: 31. CmdHdDos overrides.
 void CbmDos::cmdGetPartitionInfo() { m_host.dosSetStatus(ST_SYNTAX_INVALID); }
+void CbmDos::cmdGeos()             { m_host.dosSetStatus(ST_SYNTAX_INVALID); }
 void CbmDos::cmdRenamePartition(const std::string& arg) { (void) arg; m_host.dosSetStatus(ST_SYNTAX_INVALID); }
 void CbmDos::cmdDeletePartition() { m_host.dosSetStatus(ST_SYNTAX_INVALID); }
 

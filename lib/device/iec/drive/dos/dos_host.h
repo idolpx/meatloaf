@@ -31,6 +31,9 @@ public:
   virtual void     dosTapeCommand(const std::string& command) = 0;
   virtual driveMemory& dosMemory() = 0;
   virtual void     dosEnableFastLoader(uint8_t family, bool enable) = 0;
+  // A loader resident in the drive's DOS rather than uploaded (IEC_FLV_* /
+  // IEC_FLRX_*): the next M-E that detects nothing starts it.
+  virtual void     dosArmResidentFastLoader(uint8_t variant, uint8_t rxtx) = 0;
   virtual void     dosReset() = 0;
   virtual uint8_t  dosDeviceNumber() = 0;
 

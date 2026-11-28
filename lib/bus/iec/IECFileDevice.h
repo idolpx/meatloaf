@@ -127,14 +127,11 @@ class IECFileDevice : public IECDevice
 #endif
 
 #ifdef IEC_SUPPORT_SOFTLOAD
-  // Called for every M-E that reaches the software fast loader dispatch --
-  // this is the single point where a detected loader is switched in.
-  //
-  // "variant" is IEC_FLV_* or IEC_FLV_NONE when the uploaded code matched no
-  // known loader, or matched one the user has disabled. It is called in that
-  // case too, on purpose: an unrecognised M-E is exactly what has to be
-  // reported to add support for a new loader, and "crc" (taken before the
-  // detector rolls its state) is the only evidence of which loader it was.
+  // Called for every M-E that resolved to a loader -- by CRC, or by a
+  // catch-all table row matched on the address alone (then "variant" is
+  // IEC_FLV_NONE). This is the single point where a detected loader is
+  // switched in. An M-E that matched nothing goes to fastLoaderNotMatched()
+  // instead.
   //
   // Return true to consume the M-E: the loader has taken over and the drive
   // must not also run its normal M-E handling. Return false to let the M-E
@@ -145,7 +142,18 @@ class IECFileDevice : public IECDevice
   // after the address -- Turbodisk appends the name of the file to load -- so
   // the address alone is not enough.
   virtual bool startFastLoader(uint8_t variant, uint8_t param, uint8_t rxtx, const uint8_t *cmd, uint8_t cmdLen, uint16_t crc);
+
+  // An M-E that matched no loader, or one the user has disabled. An
+  // unrecognised M-E is exactly what has to be reported to add support for a
+  // new loader, and "crc" (taken before the detector rolls its state) is the
+  // only evidence of which loader it was. The M-E then runs normally.
+  virtual void fastLoaderNotMatched(uint16_t address, uint16_t crc) { (void) address; (void) crc; }
 #endif
+
+  // Tell the loader detector that "variant" is resident in the drive's DOS,
+  // so the next M-E that detects nothing starts it -- see
+  // IECFastLoadDetect::setResident(). No-op without software loader support.
+  void armResidentFastLoader(uint8_t variant, uint8_t rxtx);
 
  private:
 

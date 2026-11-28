@@ -2664,6 +2664,11 @@ void iecDrive::dosTapeCommand(const std::string &command) { (void) command; }
 #endif
 driveMemory &iecDrive::dosMemory() { return m_memory; }
 void iecDrive::dosEnableFastLoader(uint8_t family, bool enable) { enableFastLoader(family, enable); }
+void iecDrive::dosArmResidentFastLoader(uint8_t variant, uint8_t rxtx)
+{
+    armResidentFastLoader(variant, rxtx);
+    Debug_printv("resident fast loader armed: %s", iecFastLoadName(variant));
+}
 void iecDrive::dosReset() { reset(); }
 uint8_t iecDrive::dosDeviceNumber() { return m_devnr; }
 bool iecDrive::dosUseVDrive() { return Meatloaf.use_vdrive; }
@@ -3150,19 +3155,21 @@ bool iecDrive::startFastLoader(uint8_t variant, uint8_t param, uint8_t rxtx, con
 {
     uint16_t address = cmdLen>=5 ? (cmd[3] | (cmd[4]<<8)) : 0;
 
-    // Every M-E that reaches the software fast loader dispatch lands here,
-    // including the ones that matched nothing -- that is the case worth
-    // reporting, since its CRC is what identifies a loader we do not know yet.
-    if( variant == IEC_FLV_NONE )
-        Debug_printv("M-E address[%04X] crc[%04X] - no known fast loader", address, crc);
-    else
-        Debug_printv("M-E address[%04X] crc[%04X] - %s", address, crc, iecFastLoadName(variant));
+    // variant is IEC_FLV_NONE here only for a catch-all row matched on the
+    // address alone; an M-E that matched nothing goes to fastLoaderNotMatched().
+    Debug_printv("M-E address[%04X] crc[%04X] - %s", address, crc, iecFastLoadName(variant));
 
     bool started = SystemFileDevice::startFastLoader(variant, param, rxtx, cmd, cmdLen, crc);
     if( variant != IEC_FLV_NONE && !started )
         Debug_printv("%s is detected but not implemented - falling back", iecFastLoadName(variant));
 
     return started;
+}
+
+// The case worth reporting: its CRC is what identifies a loader we do not know yet.
+void iecDrive::fastLoaderNotMatched(uint16_t address, uint16_t crc)
+{
+    Debug_printv("M-E address[%04X] crc[%04X] - no known fast loader", address, crc);
 }
 #endif
 
