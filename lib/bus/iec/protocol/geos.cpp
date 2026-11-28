@@ -156,11 +156,16 @@ bool RAMFUNC(IECBusHandler::receiveGeosByte)(uint8_t rxtx, uint8_t &data)
     case IEC_FLRX_GEOS_2MHZ:
     case IEC_FLRX_GEOS_1581_21:
     case IEC_FLRX_GEOS_CMDHD:
+    case IEC_FLRX_WHEELS_2MHZ:
+    case IEC_FLRX_WHEELS_CMDHD:
       {
         // 1581-2.1 reads with the 2 MHz timing (only its SEND differs); CMD HD
-        // uses the same bit layout at its own sample points
+        // uses the same bit layout at its own sample points. Plain Wheels at
+        // 2 MHz (1571/1581/FD/HD stage 2) is sd2iec's RXTX_WHEELS_2MHZ =
+        // { geos_get_byte_2mhz, geos_send_byte_1581_21 } -- the GEOS layout,
+        // NOT the Wheels 4.4 one below
         const GeosSample *s = (rxtx==IEC_FLRX_GEOS_1MHZ) ? s_geos1MHz :
-                              (rxtx==IEC_FLRX_GEOS_CMDHD) ? s_geosCmdHd : s_geos2MHz;
+                              (rxtx==IEC_FLRX_GEOS_CMDHD || rxtx==IEC_FLRX_WHEELS_CMDHD) ? s_geosCmdHd : s_geos2MHz;
 
         // the first two points place their bits directly
         for(uint8_t i=0; i<2; i++)
@@ -217,7 +222,6 @@ bool RAMFUNC(IECBusHandler::receiveGeosByte)(uint8_t rxtx, uint8_t &data)
         break;
       }
 
-    case IEC_FLRX_WHEELS_2MHZ:
     case IEC_FLRX_WHEELS44_1581:
       {
         // Wheels 4.4 at 2 MHz places every bit directly, CLK carrying the
@@ -325,7 +329,30 @@ bool RAMFUNC(IECBusHandler::transmitGeosByte)(uint8_t rxtx, uint8_t value)
         break;
       }
 
+    case IEC_FLRX_WHEELS_CMDHD:
+      {
+        // The 1581-2.1 layout again, timed for Wheels 64's C64 receive (SYSTEM1
+        // $5826): it pulls CLK low, releases it 8 cycles later and reads the
+        // pairs 12/20/30/40 cycles after the pull -- 12.2/20.3/30.5/40.6 us on
+        // PAL, 11.7/19.6/29.3/39.1 on NTSC, ~2 us later than gateWay's. Each pair
+        // goes out ~1 us after the PAL read of the one before, leaving 6-8 us
+        // before the NTSC read; sd2iec's 7/14/24/33 left 4.7-6 and Wheels
+        // crashed part way through loading its kernel.
+        uint8_t v = (uint8_t) ~value;
+        static const DRAM_ATTR uint8_t th[4] = { 2, 26, 43, 63 };   // half-us
+        for(uint8_t pair=0; pair<4; pair++)
+          {
+            geos_wait_halfus(th[pair]);
+            writePinCLK (!(v & 1));
+            writePinDATA(!(v & 2));
+            v >>= 2;
+          }
+        geos_wait_halfus(87);   // hold past the last PAL read (40.6 us)
+        break;
+      }
+
     case IEC_FLRX_GEOS_1581_21:
+    case IEC_FLRX_WHEELS_2MHZ:   // see receiveGeosByte()
       {
         uint8_t v = (uint8_t) ~value;
         static const DRAM_ATTR uint32_t t[4] = { 7, 14, 24, 33 };   // DRAM: read after the start edge
@@ -364,7 +391,6 @@ bool RAMFUNC(IECBusHandler::transmitGeosByte)(uint8_t rxtx, uint8_t value)
         break;
       }
 
-    case IEC_FLRX_WHEELS_2MHZ:
     case IEC_FLRX_WHEELS44_1581:
       {
         uint8_t v = (uint8_t) ~value;

@@ -135,6 +135,11 @@
 // bit layout, with sample and write points re-derived from the driver's own C64
 // routines -- see protocol/geos.cpp. Not from sd2iec; no CRC entry uses it.
 #define IEC_FLRX_GEOS_CMDHD         20
+// Wheels 64 on a CMD HD (native and emulation drivers): commands arrive with
+// the GEOS_CMDHD receive points (Wheels' C64 send writes at the same cycles as
+// gateWay's), blocks go out at points derived from Wheels' C64 receive. Not
+// from sd2iec, which uses WHEELS_2MHZ for these.
+#define IEC_FLRX_WHEELS_CMDHD       21
 
 // CRC-16 with the reflected polynomial 0xA001, initial value 0xFFFF -- the
 // routine AVR libc calls _crc16_update and sd2iec calls crc16_update. Its

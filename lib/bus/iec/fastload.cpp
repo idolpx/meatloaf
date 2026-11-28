@@ -110,8 +110,8 @@ static const IECFastLoadCrcEntry s_crcTable[] =
   { 0x9804, IEC_FLV_WHEELS_S2,         IEC_FLRX_WHEELS_2MHZ,      }, // Wheels 64 1581
   { 0x48f5, IEC_FLV_WHEELS_S2,         IEC_FLRX_WHEELS_2MHZ,      }, // Wheels 64 FD native partition
   { 0x1356, IEC_FLV_WHEELS_S2,         IEC_FLRX_WHEELS_2MHZ,      }, // Wheels 64 FD emulation partition
-  { 0xe885, IEC_FLV_WHEELS_S2,         IEC_FLRX_WHEELS_2MHZ,      }, // Wheels 64 HD native partition
-  { 0x4eca, IEC_FLV_WHEELS_S2,         IEC_FLRX_WHEELS_2MHZ,      }, // Wheels 64 HD emulation partition
+  { 0xe885, IEC_FLV_WHEELS_S2,         IEC_FLRX_WHEELS_CMDHD,     }, // Wheels 64 HD native partition
+  { 0x4eca, IEC_FLV_WHEELS_S2,         IEC_FLRX_WHEELS_CMDHD,     }, // Wheels 64 HD emulation partition
   { 0xdbf6, IEC_FLV_WHEELS_S2,         IEC_FLRX_WHEELS_2MHZ,      }, // Wheels 128 1571
   { 0xe4ab, IEC_FLV_WHEELS_S2,         IEC_FLRX_WHEELS_2MHZ,      }, // Wheels 128 1581
   { 0x6de5, IEC_FLV_WHEELS_S2,         IEC_FLRX_WHEELS_2MHZ,      }, // Wheels 128 FD native

@@ -40,6 +40,7 @@
 // -----------------------------------------------------------------------------
 
 #include "../IECBusHandlerInternal.h"
+#include "../../../../include/debug.h"
 
 // The block loops below run between the timed bytes, so they are RAMFUNC too:
 // a flash cache miss here delays the wait for the next byte's start edge.
@@ -52,7 +53,12 @@ bool RAMFUNC(IECBusHandler::geosWaitCLK)(bool state)
     {
       if( !isResetPinIdle() ) return false;
 #ifdef ESP_PLATFORM
-      if( !timer_less_than(IWDT_FEED_TIME) )
+      // Feed only if interrupts are off. The sessions call this BETWEEN
+      // transfers, with interrupts on, and an unconditional
+      // interrupts();noInterrupts() would leave them off -- a session ending
+      // in this wait (a reset, or an idle computer) then returned with them
+      // masked and the interrupt watchdog rebooted the board.
+      if( !haveInterrupts && !timer_less_than(IWDT_FEED_TIME) )
         { interrupts(); noInterrupts(); timer_reset(); }
 #endif
     }
@@ -487,6 +493,14 @@ bool IECBusHandler::runWheelsStage2Loader(uint8_t rxtx, uint8_t variant)
   bool lastOk = true;
   bool running = true;
 
+  // Trace of the last commands, logged after the bus is released: the session
+  // has no other way to say why it ended, and a failed Wheels boot just
+  // resets the computer. why: 0 quit, 1 receive/transmit failed, 2 unknown
+  // command, 3 lost CLK.
+  uint8_t trace[8][4];
+  uint16_t ncmds = 0;
+  uint8_t why = 3;
+
   while( running )
     {
       if( !geosWaitCLK(HIGH) ) break;
@@ -495,7 +509,9 @@ bool IECBusHandler::runWheelsStage2Loader(uint8_t rxtx, uint8_t variant)
       noInterrupts();
       bool ok = wheelsReceiveBuffer(rxtx, variant, cmd, 4);
       interrupts();
-      if( !ok ) break;
+      if( !ok ) { why = 1; break; }
+      memcpy(trace[ncmds & 7], cmd, 4);
+      ncmds++;
 
       // cmd[0]/cmd[1] are an address in the uploaded code; only its low byte
       // distinguishes the operations
@@ -505,6 +521,9 @@ bool IECBusHandler::runWheelsStage2Loader(uint8_t rxtx, uint8_t variant)
           geosWaitCLK(HIGH);
           writePinDATA(HIGH);
           setATNInterruptEnabled(atnInterruptWasEnabled);
+          // interrupts must be on to print (newlib's lock abort()s otherwise)
+          interrupts();
+          Debug_printv("wheels s2: quit after %u commands", ncmds);
           return true;
 
         case 0x06:   // WRITE
@@ -584,16 +603,23 @@ bool IECBusHandler::runWheelsStage2Loader(uint8_t rxtx, uint8_t variant)
 
         default:
           running = false;
+          why = 2;
           break;
         }
 
-      if( !ok ) break;
+      if( !ok ) { why = 1; break; }
       if( running && !geosWaitCLK(LOW) ) break;
     }
 
   writePinCLK(HIGH);
   writePinDATA(HIGH);
   setATNInterruptEnabled(atnInterruptWasEnabled);
+
+  interrupts();   // see the QUIT case
+  Debug_printv("wheels s2: ended (%s) after %u commands",
+               why==1 ? "transfer failed" : why==2 ? "unknown command" : "lost CLK or reset", ncmds);
+  for(uint16_t k = (ncmds > 8 ? ncmds - 8 : 0); k < ncmds; k++)
+    Debug_printv("  cmd %u: %02X%02X %u/%u", k, trace[k & 7][1], trace[k & 7][0], trace[k & 7][2], trace[k & 7][3]);
 
   if( !readPinATN() ) atnRequest();
 

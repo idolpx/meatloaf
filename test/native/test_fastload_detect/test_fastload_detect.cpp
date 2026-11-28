@@ -75,6 +75,40 @@ void test_arm_overrides_pending_detection() {
     TEST_ASSERT_TRUE(m);
 }
 
+// Two bytes that bring the upload CRC to `crc`.
+static bool bytesForCrc(uint16_t crc, uint8_t up[2]) {
+    for (unsigned v = 0; v < 0x10000; v++) {
+        up[0] = v & 0xff; up[1] = v >> 8;
+        if (iecCrc16Update(iecCrc16Update(0xFFFF, up[0]), up[1]) == crc) return true;
+    }
+    return false;
+}
+
+// Wheels 64's CMD HD drivers (native $E885, emulation $4ECA) get timing
+// derived from Wheels' own C64 transfer routines, not sd2iec's WHEELS_2MHZ;
+// the C64 then re-enters with a bare M-E $0300, which must keep both.
+static void checkWheelsHd(uint16_t crc) {
+    uint8_t up[2];
+    TEST_ASSERT_TRUE(bytesForCrc(crc, up));
+    TEST_ASSERT_EQUAL_UINT8(IEC_FLV_WHEELS_S2, d.memWrite(0x0300, up, 2));
+    for (int i = 0; i < 2; i++) {
+        TEST_ASSERT_EQUAL_UINT8(IEC_FLRX_WHEELS_CMDHD, d.rxtx());
+        uint8_t p = 0; bool m = false;
+        TEST_ASSERT_EQUAL_UINT8(IEC_FLV_WHEELS_S2, d.memExec(0x0300, &p, &m));
+        TEST_ASSERT_TRUE(m);
+    }
+}
+void test_wheels64_hd_native_uses_cmdhd_timing()    { checkWheelsHd(0xe885); }
+void test_wheels64_hd_emulation_uses_cmdhd_timing() { checkWheelsHd(0x4eca); }
+
+// The other 2 MHz Wheels drivers keep sd2iec's timing (their C64 code is unread).
+void test_wheels64_1581_keeps_2mhz_timing() {
+    uint8_t up[2];
+    TEST_ASSERT_TRUE(bytesForCrc(0x9804, up));
+    TEST_ASSERT_EQUAL_UINT8(IEC_FLV_WHEELS_S2, d.memWrite(0x0300, up, 2));
+    TEST_ASSERT_EQUAL_UINT8(IEC_FLRX_WHEELS_2MHZ, d.rxtx());
+}
+
 int main(int, char **) {
     UNITY_BEGIN();
     RUN_TEST(test_unarmed_exec_matches_nothing);
@@ -83,5 +117,8 @@ int main(int, char **) {
     RUN_TEST(test_mw_after_arm_clears_it);
     RUN_TEST(test_reset_clears_arm);
     RUN_TEST(test_arm_overrides_pending_detection);
+    RUN_TEST(test_wheels64_hd_native_uses_cmdhd_timing);
+    RUN_TEST(test_wheels64_hd_emulation_uses_cmdhd_timing);
+    RUN_TEST(test_wheels64_1581_keeps_2mhz_timing);
     return UNITY_END();
 }
