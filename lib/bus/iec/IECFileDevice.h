@@ -143,17 +143,23 @@ class IECFileDevice : public IECDevice
   // the address alone is not enough.
   virtual bool startFastLoader(uint8_t variant, uint8_t param, uint8_t rxtx, const uint8_t *cmd, uint8_t cmdLen, uint16_t crc);
 
-  // An M-E that matched no loader, or one the user has disabled. An
-  // unrecognised M-E is exactly what has to be reported to add support for a
-  // new loader, and "crc" (taken before the detector rolls its state) is the
-  // only evidence of which loader it was. The M-E then runs normally.
+  // An M-E that matched no loader. An unrecognised M-E is exactly what has
+  // to be reported to add support for a new loader, and "crc" (taken before
+  // the detector rolls its state) is the only evidence of which loader it
+  // was. The M-E then runs normally.
   virtual void fastLoaderNotMatched(uint16_t address, uint16_t crc) { (void) address; (void) crc; }
+
+  // An M-E that resolved to a loader whose family the user has turned off.
+  // Not started; the M-E then runs normally.
+  virtual void fastLoaderDisabled(uint8_t variant, uint16_t address) { (void) variant; (void) address; }
 #endif
 
   // Tell the loader detector that "variant" is resident in the drive's DOS,
   // so the next M-E that detects nothing starts it -- see
-  // IECFastLoadDetect::setResident(). No-op without software loader support.
-  void armResidentFastLoader(uint8_t variant, uint8_t rxtx);
+  // IECFastLoadDetect::setResident(). Returns false, and arms nothing, when
+  // no session could run: this build has no loader implementations
+  // (EXTRA_FASTLOADERS) or the variant's family is disabled.
+  bool armResidentFastLoader(uint8_t variant, uint8_t rxtx);
 
  private:
 

@@ -20,8 +20,11 @@
 // its own, IEC_FLRX_GEOS_CMDHD -- see protocol/geos.cpp.
 void CmdHdDos::cmdGeos()
 {
-    m_host.dosArmResidentFastLoader(IEC_FLV_GEOS_S23_1581, IEC_FLRX_GEOS_CMDHD);
-    m_host.dosSetStatus(ST_OK);
+    // 31 when no session could run, as on a drive without the turbo
+    if ( m_host.dosArmResidentFastLoader(IEC_FLV_GEOS_S23_1581, IEC_FLRX_GEOS_CMDHD) )
+        m_host.dosSetStatus(ST_OK);
+    else
+        m_host.dosSetStatus(ST_SYNTAX_INVALID);
 }
 
 bool CmdHdDos::cmdChangePartition(const std::string& command)

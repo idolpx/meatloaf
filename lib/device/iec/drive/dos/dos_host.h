@@ -32,8 +32,9 @@ public:
   virtual driveMemory& dosMemory() = 0;
   virtual void     dosEnableFastLoader(uint8_t family, bool enable) = 0;
   // A loader resident in the drive's DOS rather than uploaded (IEC_FLV_* /
-  // IEC_FLRX_*): the next M-E that detects nothing starts it.
-  virtual void     dosArmResidentFastLoader(uint8_t variant, uint8_t rxtx) = 0;
+  // IEC_FLRX_*): the next M-E that detects nothing starts it. False when no
+  // session could run (not compiled in, or the family is disabled).
+  virtual bool     dosArmResidentFastLoader(uint8_t variant, uint8_t rxtx) = 0;
   virtual void     dosReset() = 0;
   virtual uint8_t  dosDeviceNumber() = 0;
 

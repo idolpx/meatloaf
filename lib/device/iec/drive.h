@@ -395,6 +395,7 @@ protected:
   // host uploaded -- see IECFileDevice::startFastLoader.
   virtual bool startFastLoader(uint8_t variant, uint8_t param, uint8_t rxtx, const uint8_t *cmd, uint8_t cmdLen, uint16_t crc);
   virtual void fastLoaderNotMatched(uint16_t address, uint16_t crc);
+  virtual void fastLoaderDisabled(uint8_t variant, uint16_t address);
 #endif
 
   // REL files: the channel, an existing file's stream, and a name that
@@ -443,7 +444,7 @@ protected:
   void     dosTapeCommand(const std::string &command) override;
   driveMemory &dosMemory() override;
   void     dosEnableFastLoader(uint8_t family, bool enable) override;
-  void     dosArmResidentFastLoader(uint8_t variant, uint8_t rxtx) override;
+  bool     dosArmResidentFastLoader(uint8_t variant, uint8_t rxtx) override;
   void     dosReset() override;
   uint8_t  dosDeviceNumber() override;
   bool     dosUseVDrive() override;

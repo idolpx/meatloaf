@@ -2121,6 +2121,15 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
             if( command=="CD_" || command=="CD:_" || command=="CD.." || command=="CD:.." )
                 return;
         }
+        else if( m_vdrive->isCmdImage() && command.compare(0, 4, "GEOS")==0 &&
+                 (command.size()==4 || (command.size()==5 && command[4]=='\0')) )
+        {
+            // CMD's resident GEOS turbo (see CmdHdDos::cmdGeos): VICE's DOS
+            // does not know the command, and the session reads its blocks
+            // through m_vdrive anyway
+            setStatusCode(dosArmResidentFastLoader(IEC_FLV_GEOS_S23_1581, IEC_FLRX_GEOS_CMDHD) ? ST_OK : ST_SYNTAX_INVALID);
+            return;
+        }
         else
         {
             // execute command within virtual drive
@@ -2664,10 +2673,11 @@ void iecDrive::dosTapeCommand(const std::string &command) { (void) command; }
 #endif
 driveMemory &iecDrive::dosMemory() { return m_memory; }
 void iecDrive::dosEnableFastLoader(uint8_t family, bool enable) { enableFastLoader(family, enable); }
-void iecDrive::dosArmResidentFastLoader(uint8_t variant, uint8_t rxtx)
+bool iecDrive::dosArmResidentFastLoader(uint8_t variant, uint8_t rxtx)
 {
-    armResidentFastLoader(variant, rxtx);
-    Debug_printv("resident fast loader armed: %s", iecFastLoadName(variant));
+    bool armed = armResidentFastLoader(variant, rxtx);
+    Debug_printv("resident fast loader %s: %s", armed ? "armed" : "unavailable (not built or disabled)", iecFastLoadName(variant));
+    return armed;
 }
 void iecDrive::dosReset() { reset(); }
 uint8_t iecDrive::dosDeviceNumber() { return m_devnr; }
@@ -3170,6 +3180,11 @@ bool iecDrive::startFastLoader(uint8_t variant, uint8_t param, uint8_t rxtx, con
 void iecDrive::fastLoaderNotMatched(uint16_t address, uint16_t crc)
 {
     Debug_printv("M-E address[%04X] crc[%04X] - no known fast loader", address, crc);
+}
+
+void iecDrive::fastLoaderDisabled(uint8_t variant, uint16_t address)
+{
+    Debug_printv("M-E address[%04X] - %s is disabled", address, iecFastLoadName(variant));
 }
 #endif
 

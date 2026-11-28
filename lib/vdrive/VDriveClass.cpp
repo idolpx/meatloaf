@@ -111,6 +111,14 @@ uint8_t VDrive::imageFormat()
 }
 
 
+bool VDrive::isCmdImage()
+{
+  if( m_drive==NULL ) return false;
+  vdrive_t *d = (vdrive_t *) m_drive;
+  return VDRIVE_IS_HD(d) || VDRIVE_IS_FD(d);
+}
+
+
 bool VDrive::createDiskImage(const char *filename, const char *itype, const char *name, bool convertNameToPETSCII)
 {
   char *command, *itypec = NULL;
