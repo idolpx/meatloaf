@@ -433,6 +433,203 @@ class U64Remote:
                        {"address": KB_CNT_ADDR, "data": "02"})
             time.sleep(0.3)
 
+    # ── Machine configuration (U64 / Ultimate II+) ───────────────────
+
+    def _api_json(self, method: str, endpoint: str, params: dict = None,
+                  body=None) -> dict:
+        """Call a JSON endpoint; raise on HTTP errors or a non-empty "errors"."""
+        url = f"{self.api}/{endpoint}"
+        r = requests.request(method, url, params=params or {}, json=body,
+                             headers=self._headers, timeout=15)
+        if r.status_code >= 400:
+            raise RuntimeError(f"{method} {endpoint}: HTTP {r.status_code} {r.text.strip()}")
+        try:
+            data = r.json()
+        except ValueError:
+            return {}
+        if data.get("errors"):
+            raise RuntimeError(f"{method} {endpoint}: {data['errors']}")
+        return data
+
+    @staticmethod
+    def _path(*parts: str) -> str:
+        # names carry spaces and slashes ("C64 and Cartridge Settings")
+        from urllib.parse import quote
+        return "/".join(quote(x, safe="*") for x in parts if x)
+
+    def config_categories(self) -> list:
+        """Every configuration category the device has."""
+        return self._api_json("GET", "configs").get("categories", [])
+
+    def config_get(self, category: str, item: str = "") -> dict:
+        """Settings in `category` (or one `item`). Both accept * wildcards,
+        e.g. ("c64*", "reu*"). With an item you get current/values/default."""
+        data = self._api_json("GET", "configs/" + self._path(category, item))
+        data.pop("errors", None)
+        return data
+
+    def config_set(self, category: str, item: str, value: str) -> None:
+        """Set one item. The value must be spelled exactly as config_get()
+        lists it ("Enabled", "2 MB"). Changes are live but NOT saved to flash;
+        some (REU, cartridge) only take effect after reboot()."""
+        self._api_json("PUT", "configs/" + self._path(category, item),
+                       {"value": value})
+
+    def config_set_many(self, settings: dict) -> None:
+        """Set several items at once: {category: {item: value, ...}, ...}."""
+        self._api_json("POST", "configs", body=settings)
+
+    def config_save(self) -> None:
+        """Persist the current configuration to the device's flash."""
+        self._api_json("PUT", "configs:save_to_flash")
+
+    def config_load(self) -> None:
+        """Discard unsaved changes: reload the configuration from flash."""
+        self._api_json("PUT", "configs:load_from_flash")
+
+    def config_defaults(self) -> None:
+        """Reset every setting to factory defaults (not saved until config_save)."""
+        self._api_json("PUT", "configs:reset_to_default")
+
+    def set_reu(self, mode: str = "Enabled", size: str = "") -> None:
+        """REU on/off/GeoRAM, optional size, then reboot so the C64 sees it.
+        mode: "Enabled", "Disabled" or "GeoRAM Mode"; size e.g. "512 KB",
+        "2 MB" (128 KB-16 MB). Measured 2026-11-28: with only a reset, Wheels
+        still reported 'requires ram expansion'; after reboot() it booted."""
+        settings = {"RAM Expansion Unit": mode}
+        if size:
+            settings["REU Size"] = size
+        self.config_set_many({"C64 and Cartridge Settings": settings})
+        self.reboot()
+
+    def reboot(self) -> None:
+        """Full machine reboot (re-applies cartridge/REU settings), unlike
+        reset(), which only resets the C64. Waits for BASIC to come up."""
+        self._put("machine:reboot", {})
+        time.sleep(6)
+
+    # ── Screen capture ───────────────────────────────────────────────
+
+    PALETTE = [(0, 0, 0), (255, 255, 255), (136, 57, 50), (103, 182, 189),
+               (139, 63, 150), (85, 160, 73), (64, 49, 141), (191, 206, 114),
+               (139, 84, 41), (87, 66, 0), (184, 105, 98), (80, 80, 80),
+               (120, 120, 120), (148, 224, 137), (120, 105, 196),
+               (159, 159, 159)]
+
+    @staticmethod
+    def _chargen() -> bytes:
+        """The 4 KB character ROM: readmem cannot reach it, so it comes from a
+        file - $C64_CHARGEN, else a VICE install."""
+        cands = [os.environ.get("C64_CHARGEN", "")]
+        for root in ("/usr/local/share/vice", "/opt/homebrew/share/vice",
+                     "/usr/share/vice", "/usr/lib/vice",
+                     "/Applications/vice-x86-64-gtk3/share/vice"):
+            cands += [f"{root}/C64/chargen-901225-01.bin", f"{root}/C64/chargen"]
+        for c in cands:
+            if c and os.path.isfile(c) and os.path.getsize(c) >= 4096:
+                return open(c, "rb").read()[:4096]
+        return b""
+
+    def in_geos(self) -> bool:
+        """True while GEOS/Wheels runs: its kernal signature "GEOS BOOT" is at
+        $C006 AND the KERNAL ROM is banked out (reset vector $FFFC is not
+        $FCE2). The signature alone survives a C64 reset back to BASIC."""
+        return (self._get_mem("C006", 9) == b"GEOS BOOT"
+                and self._get_mem("FFFC", 2) != b"\xe2\xfc")
+
+    def screenshot(self, path: str, *, mode: str = "auto", bank: int = -1,
+                   scale: int = 2) -> dict:
+        """Render the C64 screen to a PNG (needs Pillow).
+
+        mode "auto": follow the VIC registers (text, hi-res or multicolour
+        bitmap, ECM/MCM text), switching to "geos" when in_geos() says GEOS or
+        Wheels is running. mode "geos": GEOS/Wheels' fixed screen - bitmap
+        $A000, colours $8C00. GEOS banks I/O out, so over readmem the VIC
+        registers read as RAM garbage and cannot be used.
+        bank: VIC bank base override (e.g. 0x4000); -1 reads it from $DD00.
+        Returns what was decoded (registers, mode, file)."""
+        try:
+            from PIL import Image
+        except ImportError:
+            raise RuntimeError("screenshot needs Pillow: pip install pillow")
+        pal = self.PALETTE
+        info = {"file": path}
+
+        if mode == "auto" and self.in_geos():
+            mode = "geos"
+            info["detected"] = "GEOS/Wheels running"
+
+        if mode == "geos":
+            bm = self._get_mem("A000", 8000)
+            sm = self._get_mem("8C00", 1000)
+            img = Image.new("RGB", (320, 200)); px = img.load()
+            for i in range(1000):
+                cx, cy, c = i % 40, i // 40, sm[i]
+                for row in range(8):
+                    b = bm[i * 8 + row]
+                    for bit in range(8):
+                        px[cx * 8 + bit, cy * 8 + row] = pal[(c >> 4) if (b >> (7 - bit)) & 1 else (c & 15)]
+            info["mode"] = "geos"
+        else:
+            vic = self._get_mem("D011", 8)
+            d011, d016, d018 = vic[0], vic[5], vic[7]
+            border, bg0, bg1, bg2, bg3 = self._get_mem("D020", 5)
+            if bank < 0:
+                bank = (3 - (self._get_mem("DD00", 1)[0] & 3)) * 0x4000
+            scr = bank + ((d018 >> 4) & 15) * 0x400
+            info.update(d011=f"{d011:02x}", d016=f"{d016:02x}", d018=f"{d018:02x}",
+                        bank=f"{bank:04x}", screen=f"{scr:04x}")
+            img = Image.new("RGB", (320 + 64, 200 + 70), pal[border & 15])
+            px = img.load(); ox, oy = 32, 35
+            sm = self._get_mem(f"{scr:04X}", 1000)
+            cram = self._get_mem("D800", 1000)
+            multi = bool(d016 & 0x10)
+            if d011 & 0x20:  # bitmap
+                bm = self._get_mem(f"{bank + (d018 & 8) * 0x400:04X}", 8000)
+                info["mode"] = "multicolour bitmap" if multi else "hi-res bitmap"
+                for i in range(1000):
+                    cx, cy, c = i % 40, i // 40, sm[i]
+                    for row in range(8):
+                        b = bm[i * 8 + row]
+                        for bit in range(8):
+                            if multi:
+                                v = (b >> (6 - (bit & 6))) & 3
+                                col = [bg0, c >> 4, c & 15, cram[i]][v]
+                            else:
+                                col = (c >> 4) if (b >> (7 - bit)) & 1 else c
+                            px[ox + cx * 8 + bit, oy + cy * 8 + row] = pal[col & 15]
+            else:  # text
+                cofs = (d018 & 14) * 0x400
+                if cofs in (0x1000, 0x1800) and bank in (0x0000, 0x8000):
+                    rom = self._chargen()  # the ROM image the VIC sees there
+                    chars = rom[cofs - 0x1000:cofs - 0x1000 + 2048] if rom else b""
+                    info["charset"] = "ROM" if rom else "ROM (no chargen file: blocks)"
+                else:
+                    chars = self._get_mem(f"{bank + cofs:04X}", 2048)
+                    info["charset"] = f"RAM {bank + cofs:04x}"
+                ecm = bool(d011 & 0x40)
+                info["mode"] = "ECM text" if ecm else ("multicolour text" if multi else "text")
+                for i in range(1000):
+                    cx, cy = i % 40, i // 40
+                    code, fg = sm[i], cram[i] & 15
+                    bgc = [bg0, bg1, bg2, bg3][code >> 6] if ecm else bg0
+                    if ecm:
+                        code &= 63
+                    mc = multi and (fg & 8)
+                    for row in range(8):
+                        b = chars[code * 8 + row] if chars else 0xFF
+                        for bit in range(8):
+                            if mc:
+                                v = (b >> (6 - (bit & 6))) & 3
+                                col = [bgc, bg1, bg2, fg & 7][v]
+                            else:
+                                col = fg if (b >> (7 - bit)) & 1 else bgc
+                            px[ox + cx * 8 + bit, oy + cy * 8 + row] = pal[col & 15]
+        if scale > 1:
+            img = img.resize((img.width * scale, img.height * scale), Image.NEAREST)
+        img.save(path)
+        return info
+
     def read_screen(self) -> str:
         """Read screen memory ($0400) and decode screen codes to ASCII.
 
@@ -1183,6 +1380,26 @@ def main():
     p.add_argument("--url", default="")
     p = sub.add_parser("reset", help="Hardware reset C64")
     p.add_argument("--url", default="")
+    p = sub.add_parser("reboot", help="Full U64 reboot (applies REU/cartridge settings)")
+    p.add_argument("--url", default="")
+    p = sub.add_parser("screenshot", help="Save the C64 screen as a PNG")
+    p.add_argument("file", nargs="?", default="/tmp/c64screen.png")
+    p.add_argument("--mode", choices=["auto", "geos"], default="auto",
+                   help="geos = GEOS/Wheels screen ($A000/$8C00)")
+    p.add_argument("--bank", default="", help="VIC bank override, e.g. 4000")
+    p.add_argument("--scale", type=int, default=2)
+    p.add_argument("--url", default="")
+    p = sub.add_parser("u64-config", help="Read/change U64 configuration")
+    p.add_argument("action", choices=["list", "get", "set", "save", "load", "defaults"],
+                   help="list categories | get CAT [ITEM] | set CAT ITEM VALUE | "
+                        "save/load flash | defaults")
+    p.add_argument("args", nargs="*", help="category, item (both take * wildcards), value")
+    p.add_argument("--url", default="")
+    p = sub.add_parser("reu", help="Show or set the REU (then reboots)")
+    p.add_argument("mode", nargs="?", default="",
+                   help="on | off | georam (omit to show)")
+    p.add_argument("--size", default="", help='e.g. "512 KB", "2 MB", "16 MB"')
+    p.add_argument("--url", default="")
     p = sub.add_parser("stop", help="Press STOP key")
     p.add_argument("--url", default="")
 
@@ -1320,6 +1537,48 @@ def main():
     elif args.command == "reset":
         cycle.u64.reset()
         print("Reset complete.")
+
+    elif args.command == "reboot":
+        cycle.u64.reboot()
+        print("Reboot complete.")
+
+    elif args.command == "screenshot":
+        bank = int(args.bank, 16) if args.bank else -1
+        print(json.dumps(cycle.u64.screenshot(args.file, mode=args.mode, bank=bank,
+                                              scale=args.scale), indent=2))
+
+    elif args.command == "u64-config":
+        u, a = cycle.u64, args.args
+        if args.action == "list":
+            print("\n".join(u.config_categories()))
+        elif args.action == "get":
+            if not a:
+                sys.exit("usage: u64-config get CATEGORY [ITEM]")
+            print(json.dumps(u.config_get(a[0], a[1] if len(a) > 1 else ""), indent=2))
+        elif args.action == "set":
+            if len(a) != 3:
+                sys.exit('usage: u64-config set CATEGORY ITEM VALUE  (quote names with spaces)')
+            try:
+                u.config_set(*a)
+            except RuntimeError as e:
+                allowed = u.config_get(a[0], a[1])
+                sys.exit(f"{e}\nallowed: {json.dumps(allowed)}")
+            print(json.dumps(u.config_get(a[0], a[1]), indent=2))
+        elif args.action == "save":
+            u.config_save(); print("Saved to flash.")
+        elif args.action == "load":
+            u.config_load(); print("Reloaded from flash.")
+        elif args.action == "defaults":
+            u.config_defaults(); print("Reset to defaults (not saved).")
+
+    elif args.command == "reu":
+        u = cycle.u64
+        if args.mode:
+            m = {"on": "Enabled", "off": "Disabled", "georam": "GeoRAM Mode"}.get(args.mode.lower())
+            if not m:
+                sys.exit("mode must be on, off or georam")
+            u.set_reu(m, args.size)
+        print(json.dumps(u.config_get("C64 and Cartridge Settings", "R*"), indent=2))
 
     elif args.command == "stop":
         cycle.u64.press_stop()

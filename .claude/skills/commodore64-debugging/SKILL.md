@@ -13,8 +13,10 @@ description: |
   table / map file / VICE label file debugging, or any "unattended
   debug cycle" for the C64 → Meatloaf → API pipeline. Also trigger
   when the user talks about the Ultimate 64 REST API, serial capture
-  from an ESP32, automated C64 program testing, or uploading compiled
-  .prg files. This is the primary skill for anyone doing C64 HTTP
+  from an ESP32, automated C64 program testing, uploading compiled
+  .prg files, taking a C64 screenshot (text, bitmap, GEOS/Wheels), or
+  changing Ultimate 64 settings (REU/GeoRAM, cartridges, drives,
+  reboot). This is the primary skill for anyone doing C64 HTTP
   debugging with Meatloaf — do not defer to other skills for these
   scenarios.
 ---
@@ -64,6 +66,12 @@ The Ultimate 64 exposes a REST API on port 80. Key endpoints:
 | `/v1/info` | GET | System info |
 | `/v1/machine:menu_button` | PUT | Toggle menu |
 | `/v1/machine:debugreg` | GET/PUT | Read/write debug register ($D7FF) |
+| `/v1/machine:reboot` | PUT | Full reboot — re-applies REU/cartridge settings (`reset` does not) |
+| `/v1/configs` | GET | List configuration categories |
+| `/v1/configs/<cat>[/<item>]` | GET | Settings; with an item: `current`, `values`, `default`. `*` wildcards work (`c64*/reu*`) |
+| `/v1/configs/<cat>/<item>?value=` | PUT | Change one setting (value spelled exactly as listed) |
+| `/v1/configs` | POST | Change several: `{"<cat>": {"<item>": "<value>"}}` |
+| `/v1/configs:save_to_flash` / `:load_from_flash` / `:reset_to_default` | PUT | Persist / discard / factory-reset the configuration |
 
 Memory locations used:
 - **$0277** — Keyboard buffer (10-byte FIFO). Key codes go here.
@@ -400,6 +408,89 @@ not one. **Wait a fixed time, then read the screen once.**
   theoretically unstick even KERNAL-blocked I/O, but the U64 API has no
   mechanism to trigger it (no CIA or NMI endpoints).
 
+### `type` already presses RETURN
+
+`type "LOAD\"STARTER\",8"` types the line and presses RETURN. Do not add
+`\r` — it is typed literally (the C64 shows ` r` and runs `LOAD"STARTER",8 R`).
+
+### GEOS / Wheels cannot be driven
+
+GEOS and Wheels read the keyboard matrix and mouse themselves; the keyboard
+buffer at $0277 does nothing there. Dialogs ("Use this input driver?") need a
+person. Screenshots still work — see below.
+
+---
+
+## Screen Capture (PNG)
+
+`screen` returns text only. `screenshot` renders what the VIC shows to a PNG
+(needs `pip install pillow`):
+
+```bash
+python3 scripts/meatloaf_debug.py screenshot /tmp/c64.png           # auto
+python3 scripts/meatloaf_debug.py screenshot /tmp/c64.png --mode geos
+python3 scripts/meatloaf_debug.py screenshot /tmp/c64.png --bank 4000 --scale 3
+```
+
+It prints JSON naming what it decoded (VIC registers, bank, screen address,
+mode, charset). Then look at the PNG with the Read tool, or send it to the user.
+
+- **auto** follows the VIC registers: text (ROM or RAM charset, ECM,
+  multicolour) and hi-res or multicolour bitmap, with the border.
+- **GEOS/Wheels is detected automatically** and rendered from its fixed
+  screen (bitmap $A000, colours $8C00). GEOS banks I/O out, so over readmem
+  `$D011`/`$D018`/`$DD00` read as RAM and are garbage. Detection needs both
+  `"GEOS BOOT"` at $C006 and the KERNAL banked out (`$FFFC` ≠ `$FCE2`),
+  because the signature survives a C64 reset back to BASIC. `--mode geos`
+  forces it.
+- **The ROM character set cannot be read over readmem.** Text mode with the
+  ROM charset needs a chargen file: `$C64_CHARGEN`, else a VICE install
+  (`/usr/local/share/vice/C64/chargen-901225-01.bin`, Homebrew and Linux paths
+  are tried too). Without one, characters render as solid blocks and the JSON
+  says so. A RAM charset (custom fonts) is read from the C64.
+- A capture is 2-3 memory reads (~10 KB). Like any readmem it stalls the CPU
+  briefly — do not take one while an IEC transfer is running (see above).
+
+In Python: `U64Remote().screenshot(path, mode="auto")`, `U64Remote().in_geos()`.
+
+---
+
+## U64 Configuration (REU, cartridges, drives, …)
+
+```bash
+python3 scripts/meatloaf_debug.py u64-config list                       # categories
+python3 scripts/meatloaf_debug.py u64-config get "C64 and Cartridge Settings"
+python3 scripts/meatloaf_debug.py u64-config get "c64*" "reu*"          # wildcards
+python3 scripts/meatloaf_debug.py u64-config set "Drive A Settings" "Drive" "Disabled"
+python3 scripts/meatloaf_debug.py u64-config save                       # persist to flash
+python3 scripts/meatloaf_debug.py u64-config load                       # discard unsaved
+python3 scripts/meatloaf_debug.py u64-config defaults                   # factory (unsaved)
+
+python3 scripts/meatloaf_debug.py reu                                   # show REU settings
+python3 scripts/meatloaf_debug.py reu on --size "2 MB"                  # set + reboot
+python3 scripts/meatloaf_debug.py reu georam --size "512 KB"
+python3 scripts/meatloaf_debug.py reu off
+python3 scripts/meatloaf_debug.py reboot                                # full machine reboot
+```
+
+- **Values must be spelled exactly as `get` lists them** (`"2 MB"`, not
+  `2MB`). A bad value fails with the device's error and the allowed values.
+- **`set` is live but not saved**; `save` writes flash. Leave the user's
+  saved configuration alone unless they asked for a permanent change.
+- **REU and cartridge changes need `reboot`, not `reset`.** Measured
+  2026-11-28: with the REU enabled and only a C64 reset, Wheels still said
+  "Wheels requires ram expansion"; after `machine:reboot` it booted. `reu`
+  reboots for you. A reboot clears the C64, so re-mount/re-load afterwards.
+- Wheels and other GEOS setups need an REU; check `reu` before chasing a
+  "requires ram expansion" failure in the drive.
+- Drives A/B in the U64 can answer on the same IEC device number as
+  Meatloaf: check `get "Drive A Settings"` when a device number misbehaves.
+
+In Python (`U64Remote`): `config_categories()`, `config_get(cat, item)`,
+`config_set(cat, item, value)`, `config_set_many({cat: {item: value}})`,
+`config_save()`, `config_load()`, `config_defaults()`, `set_reu(mode, size)`,
+`reboot()`.
+
 ---
 
 ## C-PRG / cc65 Programs
@@ -635,6 +726,16 @@ python3 scripts/meatloaf_debug.py stop
 
 # Hardware reset
 python3 scripts/meatloaf_debug.py reset
+
+# Full U64 reboot (re-applies REU/cartridge settings)
+python3 scripts/meatloaf_debug.py reboot
+
+# Screenshot to PNG (auto-detects GEOS/Wheels)
+python3 scripts/meatloaf_debug.py screenshot /tmp/c64.png
+
+# U64 configuration and REU
+python3 scripts/meatloaf_debug.py u64-config get "c64*" "reu*"
+python3 scripts/meatloaf_debug.py reu on --size "2 MB"
 
 # Inject a compiled .prg (cc65, KickAss) — full cycle:
 python3 scripts/meatloaf_debug.py reset
