@@ -52,6 +52,8 @@ description = The internet is a massive floppy drive for your C64 with Meatloaf!
 ;environment = esp32-s3-rgb                 ;                                             (ESP32-S3, 16M Flash, 8M PSRAM)
 ;environment = esp32-s3-dev-kit-n8r8        ; Waveshare ESP32-S3                          (ESP32-S3, 8M Flash, 8M PSRAM)
 ;environment = esp32-s3-makemagazin         ; Make Magazin Germany ESP32-S3-DevKitC-1     (ESP32-S3, 8M Flash, 8M PSRAM)
+;environment = esp32-s3-carrier-clauss-v1_1-n8r8  ; MeatLoaf Carrier Board ClausS V1.1     (ESP32-S3, 8M Flash, 8M PSRAM)
+;environment = esp32-s3-carrier-clauss-v1_1-n16r8 ; MeatLoaf Carrier Board ClausS V1.1     (ESP32-S3, 16M Flash, 8M PSRAM)
 
 ; EXPERIMENTAL
 ; ESP32-C3
@@ -496,6 +498,60 @@ build_flags =
     -D ENABLE_DISPLAY
     -D ENABLE_CONSOLE
     -D ENABLE_CONSOLE_TCP
+
+[esp32_s3_carrier_clauss_v1_1]
+monitor_speed = 921600
+build_unflags =
+    -D DEBUG_SPEED=${env.monitor_speed}
+    -D ENABLE_MODEM
+    -D PARALLEL_BUS
+platform_packages =
+    tasmota/tool-mklittlefs@4.0.0
+extra_scripts =
+    ${esp32_base.extra_scripts}
+    pre:build_version.py
+build_flags =
+    ${env.build_flags}
+    -D PINMAP_ESP32_S3_CARRIER_CLAUSS_V1_1
+    -D SD_CARD
+    -D ENABLE_DISPLAY
+    -D ENABLE_CONSOLE
+    -D ENABLE_CONSOLE_TCP
+    -D ENABLE_ETHERNET
+    -D EXTRA_DISK_FORMATS
+    -D IEC_ROOT_BUTTON
+    -D IEC_SPLIT_LINES
+    -D IEC_INVERTED_LINES
+    -D IEC_SPLIT_SRQ
+    -D DEBUG_SPEED=921600
+
+[env:esp32-s3-carrier-clauss-v1_1-n8r8]
+extends = esp32_base
+board = esp32-s3-wroom-1-n8r8
+board_build.esp-idf.sdkconfig_path = sdkconfig.esp32-s3-carrier-clauss-v1_1-n8r8
+custom_firmware_description = MeatLoaf Carrier Board ClausS V1.1 (N8R8) - no local WebUI
+custom_hardware_id = clauss-v1_1-n8r8
+monitor_speed = ${esp32_s3_carrier_clauss_v1_1.monitor_speed}
+build_unflags = ${esp32_s3_carrier_clauss_v1_1.build_unflags}
+platform_packages = ${esp32_s3_carrier_clauss_v1_1.platform_packages}
+extra_scripts = ${esp32_s3_carrier_clauss_v1_1.extra_scripts}
+build_flags =
+    ${esp32_s3_carrier_clauss_v1_1.build_flags}
+    -D FLASH_SIZE=8
+
+[env:esp32-s3-carrier-clauss-v1_1-n16r8]
+extends = esp32_base
+board = esp32-s3-wroom-1-n16r8
+board_build.esp-idf.sdkconfig_path = sdkconfig.esp32-s3-carrier-clauss-v1_1-n16r8
+custom_firmware_description = MeatLoaf Carrier Board ClausS V1.1 (N16R8)
+custom_hardware_id = clauss-v1_1-n16r8
+monitor_speed = ${esp32_s3_carrier_clauss_v1_1.monitor_speed}
+build_unflags = ${esp32_s3_carrier_clauss_v1_1.build_unflags}
+platform_packages = ${esp32_s3_carrier_clauss_v1_1.platform_packages}
+extra_scripts = ${esp32_s3_carrier_clauss_v1_1.extra_scripts}
+build_flags =
+    ${esp32_s3_carrier_clauss_v1_1.build_flags}
+    -D FLASH_SIZE=16
 
 [env:lolin-s3-pro]
 extends = esp32_base

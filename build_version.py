@@ -16,6 +16,12 @@ Import("env")
 environment_name = env["PIOENV"]
 print(f"Setting build version for environment: {environment_name}")
 
+# ESP-IDF stores the project version in a 32-byte field. Environments with a
+# long descriptive name can provide a shorter stable identifier for hardware
+# detection without changing their PlatformIO or release artifact names.
+custom_hardware_id = env.GetProjectOption("custom_hardware_id", "").strip()
+hardware_id = custom_hardware_id or environment_name
+
 # Need to run this command in the PIO virtual environment
 #env.Execute("$PYTHONEXE -m pip list --format=json --disable-pip-version-check");
 #exit(0);
@@ -95,7 +101,11 @@ if 1:
     fout.close()
 
 # Always write version.txt
-version_txt = fw_date + "." + environment_name
+version_txt = fw_date + "." + hardware_id
+if custom_hardware_id and len(version_txt.encode("utf-8")) > 31:
+    raise ValueError(
+        "Firmware version exceeds ESP-IDF's 31-byte limit; set custom_hardware_id"
+    )
 print(version_txt)
 fout = open(version_file, "w")
 fout.write(version_txt)
