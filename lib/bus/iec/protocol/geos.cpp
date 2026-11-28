@@ -59,17 +59,44 @@
 
 #if defined(IEC_FP_GEOS) && defined(IEC_IMPL_SOFTLOAD)
 
+#ifndef DRAM_ATTR
+#define DRAM_ATTR   // only ESP-IDF needs the tables kept out of flash
+#endif
+
+
 // One sample point: when to look, and which data bit each line carries.
 struct GeosSample { uint16_t halfUs; uint8_t clkBit; uint8_t dataBit; };
 
 // Receive layouts. halfUs is twice the microsecond offset so the 2 MHz
 // variants' half-microsecond points survive as integers.
-static const GeosSample s_geos1MHz[4] = {
+// DRAM_ATTR: these are read inside the timed bit loops. A const table lives in
+// flash otherwise, and a flash cache miss stalls ~4 us on a PSRAM board -- enough
+// to land a sample on the next bit pair (measured on fujiloaf-rev0, 2026-11-27).
+static const DRAM_ATTR GeosSample s_geos1MHz[4] = {
   {  30, 3, 4 }, {  58, 5, 6 }, {  86, 2, 1 }, { 118, 0, 0 }
 };
-static const GeosSample s_geos2MHz[4] = {
+// CMD HD/FD GEOS turbo. Derived, not transcribed: the HardDrive driver's C64
+// send routine (GEOBOOT, $98AD) stores bit pairs at 9.1/22.3/33.5/43.6 us after
+// its start edge on PAL (x0.963 on NTSC). Each point sits ~1.5 us after the
+// PAL store, so it has 7-10 us before the NTSC store that replaces it -- the
+// ESP32's level-4/5 interrupts, which noInterrupts() does not mask, stall the
+// bus task by up to ~4 us, and the sd2iec points left only 3-4.5 us.
+static const DRAM_ATTR GeosSample s_geosCmdHd[4] = {
+  {  22, 3, 4 }, {  48, 5, 6 }, {  70, 2, 1 }, {  91, 0, 0 }
+};
+static const DRAM_ATTR GeosSample s_geos2MHz[4] = {
   {  30, 3, 4 }, {  58, 5, 6 }, {  77, 2, 1 }, {  99, 0, 0 }
 };
+
+// Wait until `h` half-microseconds after timer_start(). Integer-only on purpose:
+// timer_wait_until(h / 2.0) does software double arithmetic between two samples.
+#ifdef ESP_PLATFORM
+#define geos_wait_halfus(h) \
+  do { esp_cpu_cycle_count_t to_ = uint32_t(h) * timer_cycles_per_us_div2; \
+       while( (esp_cpu_get_cycle_count()-timer_start_cycles) < to_ ); } while(0)
+#else
+#define geos_wait_halfus(h) timer_wait_until((h) / 2.0)
+#endif
 
 // Plain Wheels and Wheels 4.4 (1 MHz) read the same bit pattern as ULoad3 --
 // pairs of (7,5), (6,4), (3,1), (2,0) with a shift and a nibble swap between
@@ -128,29 +155,32 @@ bool RAMFUNC(IECBusHandler::receiveGeosByte)(uint8_t rxtx, uint8_t &data)
     case IEC_FLRX_GEOS_1MHZ:
     case IEC_FLRX_GEOS_2MHZ:
     case IEC_FLRX_GEOS_1581_21:
+    case IEC_FLRX_GEOS_CMDHD:
       {
-        // 1581-2.1 reads with the 2 MHz timing; only its SEND differs
-        const GeosSample *s = (rxtx==IEC_FLRX_GEOS_1MHZ) ? s_geos1MHz : s_geos2MHz;
+        // 1581-2.1 reads with the 2 MHz timing (only its SEND differs); CMD HD
+        // uses the same bit layout at its own sample points
+        const GeosSample *s = (rxtx==IEC_FLRX_GEOS_1MHZ) ? s_geos1MHz :
+                              (rxtx==IEC_FLRX_GEOS_CMDHD) ? s_geosCmdHd : s_geos2MHz;
 
         // the first two points place their bits directly
         for(uint8_t i=0; i<2; i++)
           {
-            timer_wait_until(s[i].halfUs / 2.0);
+            geos_wait_halfus(s[i].halfUs);
             if( readPinCLK()  ) v |= (uint8_t)(1u << s[i].clkBit);
             if( readPinDATA() ) v |= (uint8_t)(1u << s[i].dataBit);
           }
 
         // the last two use the shift-in-between sequence
-        timer_wait_until(s[2].halfUs / 2.0);
+        geos_wait_halfus(s[2].halfUs);
         if( readPinDATA() ) v |= 0x01;
         if( readPinCLK()  ) v |= 0x04;
         v <<= 1;
 
-        timer_wait_until(s[3].halfUs / 2.0);
+        geos_wait_halfus(s[3].halfUs);
         if( readPinDATA() ) v |= 0x01;
         if( readPinCLK()  ) v |= 0x04;
 
-        timer_wait_until(s[3].halfUs / 2.0 + 11);
+        geos_wait_halfus(s[3].halfUs + 22);
         break;
       }
 
@@ -275,10 +305,30 @@ bool RAMFUNC(IECBusHandler::transmitGeosByte)(uint8_t rxtx, uint8_t value)
         break;
       }
 
+    case IEC_FLRX_GEOS_CMDHD:
+      {
+        // The 1581-2.1 layout. The HardDrive driver's C64 receive ($985E) reads
+        // the four pairs at 10.2/18.3/28.4/38.6 us after its start edge on PAL
+        // (x0.963 NTSC). Each pair is written ~1 us after the PAL read of the
+        // pair before, giving 6-9 us of lead over the NTSC read -- against
+        // 2.5-5.5 us with the sd2iec points, which a ~4 us stall overran.
+        uint8_t v = (uint8_t) ~value;
+        static const DRAM_ATTR uint8_t th[4] = { 2, 23, 39, 59 };   // half-us
+        for(uint8_t pair=0; pair<4; pair++)
+          {
+            geos_wait_halfus(th[pair]);
+            writePinCLK (!(v & 1));
+            writePinDATA(!(v & 2));
+            v >>= 2;
+          }
+        geos_wait_halfus(84);   // hold past the last PAL read (38.6 us)
+        break;
+      }
+
     case IEC_FLRX_GEOS_1581_21:
       {
         uint8_t v = (uint8_t) ~value;
-        const uint32_t t[4] = { 7, 14, 24, 33 };
+        static const DRAM_ATTR uint32_t t[4] = { 7, 14, 24, 33 };   // DRAM: read after the start edge
         for(uint8_t pair=0; pair<4; pair++)
           {
             timer_wait_until(t[pair]);
@@ -318,7 +368,7 @@ bool RAMFUNC(IECBusHandler::transmitGeosByte)(uint8_t rxtx, uint8_t value)
     case IEC_FLRX_WHEELS44_1581:
       {
         uint8_t v = (uint8_t) ~value;
-        const uint32_t t[4] = { 7, 15, 26, 37 };
+        static const DRAM_ATTR uint32_t t[4] = { 7, 15, 26, 37 };   // DRAM: read after the start edge
         for(uint8_t pair=0; pair<4; pair++)
           {
             timer_wait_until(t[pair]);

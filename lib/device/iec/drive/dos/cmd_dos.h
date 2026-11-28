@@ -14,6 +14,7 @@ public:
 protected:
   bool cmdChangePartition(const std::string& command) override;
   void cmdGetPartitionInfo() override;
+  void cmdGeos() override;
   void cmdRenamePartition(const std::string& arg) override;
   void cmdDeletePartition() override;
   void cmdPartitionAdmin(const std::string& args) override;

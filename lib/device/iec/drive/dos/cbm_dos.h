@@ -68,6 +68,7 @@ protected:
   virtual bool cmdChangePartition(const std::string& command);                // CP / C<shift-P>: 31 here, media DOSes override
   bool partitionFromCommand(const std::string& command);                      // parses the partition number, asks the host to select it
   virtual void cmdGetPartitionInfo();                                         // G-P: 31 here, CmdHdDos overrides
+  virtual void cmdGeos();                                                     // GEOS: 31 here, CmdHdDos starts its resident turbo
   virtual void cmdRenamePartition(const std::string& arg);                    // R-P: 31 here, CmdHdDos overrides
   virtual void cmdDeletePartition();                                          // D-P: 31 here, CmdHdDos overrides
   void cmdMakeDirectory(const std::string& arg);                              // MD

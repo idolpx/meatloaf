@@ -11,6 +11,22 @@
 #include "../../../../../include/debug.h"
 #include "../../../../../include/cbm_defines.h"
 
+// GEOS: a real CMD HD/FD carries a 1581-compatible GEOS turbo in its DOS, so
+// CMD's GEOS drivers (gateWay's HardDrive and HD1581, found by disassembling
+// GEOBOOT) upload nothing: they send "GEOS" once, then M-E $040F on every turbo
+// entry and speak the 1581 GEOS command set. Arming the detector makes that
+// M-E start the existing 1581 GEOS session. The bytes use the 1581-2.1 layout
+// (the 2 MHz one failed on hardware at the first status byte), with timing of
+// its own, IEC_FLRX_GEOS_CMDHD -- see protocol/geos.cpp.
+void CmdHdDos::cmdGeos()
+{
+    // 31 when no session could run, as on a drive without the turbo
+    if ( m_host.dosArmResidentFastLoader(IEC_FLV_GEOS_S23_1581, IEC_FLRX_GEOS_CMDHD) )
+        m_host.dosSetStatus(ST_OK);
+    else
+        m_host.dosSetStatus(ST_SYNTAX_INVALID);
+}
+
 bool CmdHdDos::cmdChangePartition(const std::string& command)
 {
     return partitionFromCommand(command);

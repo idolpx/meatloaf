@@ -607,6 +607,17 @@ void IECFastLoadDetect::reset()
 }
 
 
+void IECFastLoadDetect::setResident(uint8_t variant, uint8_t rxtx)
+{
+  // drop any half-finished upload: a detection pending from it would
+  // otherwise outrank the resident loader at the next M-E
+  m_crc = 0xFFFF;
+  m_detected = IEC_FLV_NONE;
+  m_previous = variant;
+  m_rxtx = rxtx;
+}
+
+
 uint8_t IECFastLoadDetect::memWrite(uint16_t address, const uint8_t *data, size_t len)
 {
   // These destinations carry no loader code and must not reach the CRC, or
@@ -746,6 +757,7 @@ uint8_t iecFastLoadFamily(uint8_t) { return 0xFF; }
 const char *iecFastLoadName(uint8_t) { return "none"; }
 
 void IECFastLoadDetect::reset() {}
+void IECFastLoadDetect::setResident(uint8_t, uint8_t) {}
 uint8_t IECFastLoadDetect::memWrite(uint16_t, const uint8_t *, size_t) { return IEC_FLV_NONE; }
 uint8_t IECFastLoadDetect::memExec(uint16_t, uint8_t *) { return IEC_FLV_NONE; }
 
